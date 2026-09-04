@@ -12,6 +12,7 @@ import { formatCurrency, formatNumber } from "@/lib/utils";
 import { LabelPrintButton } from "./label-print-button";
 import { getStoreSettings } from "@/lib/data/settings";
 import { NumberInput } from "@/components/ui/number-input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -161,7 +162,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           {query.from && <input type="hidden" name="from" value={query.from} />}
           <Field label={t("products.labels.template")}><Select name="templateId" defaultValue={template.id} options={templates.map((item) => ({ value: item.id, label: item.name }))} rootClassName="w-full" searchable /></Field>
           <Field label={t("products.labels.price")}>
-            <NumberInput name="price" min={0} step={1000} defaultValue={hasPriceOverride ? Number(query.price) : isBatch ? undefined : Number(product.retailPrice)} placeholder={isBatch ? "Giá riêng theo sản phẩm" : undefined} suffix="đ" thousandSeparator formatOnChange className="h-11 bg-canvas lg:h-10" />
+            <MoneyInput name="price" min={0} step={1000} defaultValue={hasPriceOverride ? Number(query.price) : isBatch ? undefined : Number(product.retailPrice)} placeholder={isBatch ? "Giá riêng theo sản phẩm" : undefined} suffix="đ" className="h-11 bg-canvas lg:h-10" />
           </Field>
           {showLabelLineControls && (
             <div className="overflow-hidden rounded-lg border border-border-soft sm:col-span-2">

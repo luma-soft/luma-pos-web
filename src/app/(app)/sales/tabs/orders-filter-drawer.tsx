@@ -1,12 +1,12 @@
 "use client";
 
+import { MoneyInput, type MoneyInputProps } from "@/components/ui/money-input";
 import { Toggle } from "@/components/ui/toggle";
 import {
   useCallback,
   useEffect,
   useRef,
   useState,
-  type InputHTMLAttributes,
   type ReactNode,
 } from "react";
 import { Barcode, Search, X } from "lucide-react";
@@ -531,8 +531,8 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                       value={draft.minTotal}
                       placeholder="0"
                       suffix="đ"
-                      onChange={(event) =>
-                        updateDraft({ minTotal: event.target.value })
+                      onChange={(value) =>
+                        updateDraft({ minTotal: value == null ? "" : String(value) })
                       }
                     />
                     <LabeledInput
@@ -541,8 +541,8 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                       value={draft.maxTotal}
                       placeholder="Không giới hạn"
                       suffix="đ"
-                      onChange={(event) =>
-                        updateDraft({ maxTotal: event.target.value })
+                      onChange={(value) =>
+                        updateDraft({ maxTotal: value == null ? "" : String(value) })
                       }
                     />
                   </div>
@@ -604,7 +604,7 @@ function LabeledInput({
   icon,
   suffix,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & {
+}: MoneyInputProps & {
   label: string;
   icon?: ReactNode;
   suffix?: string;
@@ -614,9 +614,9 @@ function LabeledInput({
       <span className="block text-xs text-slate-500">{label}</span>
       <span className="flex items-center gap-2">
         {icon && <span className="text-slate-500">{icon}</span>}
-        <input
+        <MoneyInput
           {...props}
-          className="min-w-0 flex-1 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
+          className="min-w-0 flex-1 border-0 rounded-none px-0 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
         />
         {suffix && <span className="text-sm font-semibold">{suffix}</span>}
       </span>

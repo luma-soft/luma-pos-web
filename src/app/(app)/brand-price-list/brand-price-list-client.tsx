@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Copy, Edit3, ExternalLink, ImageOff, Search, X } from "lucide-react";
 import Image from "next/image";
-import { NumberInput } from "@/components/ui/number-input";
+import { MoneyInput } from "@/components/ui/money-input";
 import type { BrandPriceListProduct } from "@/lib/data/brand-price-lists";
 import { formatCurrency } from "@/lib/utils";
 
@@ -376,11 +376,10 @@ export function BrandPriceListClient({
             </div>
             <p className="mt-2 text-sm text-slate-500">{editing.name}</p>
             <div className="mt-4">
-              <NumberInput
+              <MoneyInput
                 autoFocus
                 value={price}
                 onChange={setPrice}
-                thousandSeparator
                 min={0}
                 decimals={0}
                 suffix="đ"

@@ -27,7 +27,7 @@ import {
   FormField,
   Section,
   Input,
-  NumberInput,
+  NumberInput, MoneyInput,
   QuantityInput,
   Select,
   Button,
@@ -1357,7 +1357,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
           labelTx="products.pricing.costPrice"
           hintTx={isCombo ? "products.combo.costAutoHint" : undefined}
         >
-          <NumberInput
+          <MoneyInput
             value={watch("costPrice")}
             onChange={(v) => setValue("costPrice", v ?? 0)}
             suffix={`đ/${baseUnit}`}
@@ -1369,7 +1369,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
           />
         </Field>
         <Field labelTx="products.pricing.retailPrice">
-          <NumberInput
+          <MoneyInput
             value={watch("retailPrice")}
             onChange={(v) => setValue("retailPrice", v ?? 0)}
             suffix={`đ/${baseUnit}`}
@@ -1451,7 +1451,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
                         <td className="col-span-2 block p-0 break-words font-medium lg:table-cell lg:px-4 lg:py-3">{book.name}</td>
                         <td className="block p-0 lg:table-cell lg:px-4 lg:py-3">
                           <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">{t("products.pricing.retailPrice")}</div>
-                          <NumberInput
+                          <MoneyInput
                             value={value}
                             onChange={(next) => {
                               setDraftOverrides((current) => ({

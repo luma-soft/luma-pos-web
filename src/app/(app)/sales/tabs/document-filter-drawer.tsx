@@ -1,5 +1,6 @@
 "use client";
 
+import { MoneyInput, type MoneyInputProps } from "@/components/ui/money-input";
 import { Toggle } from "@/components/ui/toggle";
 import {
   useCallback,
@@ -815,8 +816,8 @@ export function DocumentFilterDrawer({
                       value={draft.minTotal}
                       placeholder="0"
                       suffix="đ"
-                      onChange={(event) =>
-                        updateDraft({ minTotal: event.target.value })
+                      onChange={(value) =>
+                        updateDraft({ minTotal: value == null ? "" : String(value) })
                       }
                     />
                     <LabeledInput
@@ -825,8 +826,8 @@ export function DocumentFilterDrawer({
                       value={draft.maxTotal}
                       placeholder="Không giới hạn"
                       suffix="đ"
-                      onChange={(event) =>
-                        updateDraft({ maxTotal: event.target.value })
+                      onChange={(value) =>
+                        updateDraft({ maxTotal: value == null ? "" : String(value) })
                       }
                     />
                   </div>
@@ -944,7 +945,7 @@ function LabeledInput({
   label,
   suffix,
   ...props
-}: React.ComponentProps<"input"> & {
+}: MoneyInputProps & {
   label: string;
   suffix?: string;
 }) {
@@ -952,9 +953,9 @@ function LabeledInput({
     <label className="block rounded-xl border border-border px-3 pb-2 pt-1 focus-within:border-primary-500 focus-within:ring-2 focus-visible:ring-primary-100">
       <span className="block text-xs text-slate-500">{label}</span>
       <span className="flex items-center gap-2">
-        <input
+        <MoneyInput
           {...props}
-          className="min-w-0 flex-1 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
+          className="min-w-0 flex-1 border-0 rounded-none px-0 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
         />
         {suffix && <span className="text-sm font-semibold">{suffix}</span>}
       </span>

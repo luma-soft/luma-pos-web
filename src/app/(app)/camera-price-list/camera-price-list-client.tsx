@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClipboardList, Copy, Edit3, ImageOff, ListChecks, Search, X } from "lucide-react";
 import Image from "next/image";
-import { NumberInput } from "@/components/ui/number-input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { LumaActionMenu } from "@/components/ui/action-menu";
 import {
   cameraQuoteCopyLayout,
@@ -1032,10 +1032,9 @@ export function CameraPriceListClient({
               {editing.model.model} · {editing.label}
             </p>
             <div className="mt-4">
-              <NumberInput
+              <MoneyInput
                 value={price}
                 onChange={setPrice}
-                thousandSeparator
                 min={0}
                 decimals={0}
                 suffix="đ"

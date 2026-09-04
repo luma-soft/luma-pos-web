@@ -1,5 +1,6 @@
 "use client";
 
+import { MoneyInput } from "@/components/ui/money-input";
 import { DateInput } from "@/components/ui/date-input";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
@@ -846,8 +847,8 @@ function MoneyRangeFilter({
     <div>
       <h3 className="mb-3 text-sm font-bold">{title}</h3>
       <div className="grid grid-cols-2 gap-2">
-        <input name={fromName} inputMode="numeric" defaultValue={fromValue ?? ""} placeholder={t("customers.filters.fromValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
-        <input name={toName} inputMode="numeric" defaultValue={toValue ?? ""} placeholder={t("customers.filters.toValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
+        <MoneyInput name={fromName} min={-Number.MAX_SAFE_INTEGER} defaultValue={fromValue ?? ""} placeholder={t("customers.filters.fromValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
+        <MoneyInput name={toName} min={-Number.MAX_SAFE_INTEGER} defaultValue={toValue ?? ""} placeholder={t("customers.filters.toValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
       </div>
     </div>
   );

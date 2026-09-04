@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/lib/utils";
@@ -336,11 +337,11 @@ function RoomCard({
         <CalculatorSection icon={<ReceiptText />} title={t("pricing")} description={t("pricingHint")}>
           <div className="grid gap-4 lg:grid-cols-3">
             <PriceGroup title={t("floor")}>
-              <NumberField id={`${room.id}-floor-price`} label={t("pricePerSquareMeter")} value={room.floorPrice} suffix="₫" step={1000} onChange={(floorPrice) => onPatch({ floorPrice })} />
+              <NumberField id={`${room.id}-floor-price`} label={t("pricePerSquareMeter")} value={room.floorPrice} suffix="₫" money step={1000} onChange={(floorPrice) => onPatch({ floorPrice })} />
               <NumberField id={`${room.id}-floor-waste`} label={t("waste")} value={room.floorWaste} suffix="%" onChange={(floorWaste) => onPatch({ floorWaste })} />
             </PriceGroup>
             <PriceGroup title={t("wall")} muted={!wallVisible}>
-              <NumberField id={`${room.id}-wall-price`} label={t("pricePerSquareMeter")} value={room.wallPrice} suffix="₫" step={1000} disabled={!wallVisible} onChange={(wallPrice) => onPatch({ wallPrice })} />
+              <NumberField id={`${room.id}-wall-price`} label={t("pricePerSquareMeter")} value={room.wallPrice} suffix="₫" money step={1000} disabled={!wallVisible} onChange={(wallPrice) => onPatch({ wallPrice })} />
               <NumberField id={`${room.id}-wall-waste`} label={t("waste")} value={room.wallWaste} suffix="%" disabled={!wallVisible} onChange={(wallWaste) => onPatch({ wallWaste })} />
             </PriceGroup>
             <PriceGroup title={t("skirting")} muted={!room.skirtEnabled}>
@@ -359,7 +360,7 @@ function RoomCard({
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <NumberField id={`${room.id}-skirt-price`} label={t("price")} value={room.skirtPrice} suffix="₫" step={1000} disabled={!room.skirtEnabled} onChange={(skirtPrice) => onPatch({ skirtPrice })} />
+                <NumberField id={`${room.id}-skirt-price`} label={t("price")} value={room.skirtPrice} suffix="₫" money step={1000} disabled={!room.skirtEnabled} onChange={(skirtPrice) => onPatch({ skirtPrice })} />
                 <NumberField id={`${room.id}-skirt-waste`} label={t("waste")} value={room.skirtWaste} suffix="%" disabled={!room.skirtEnabled} onChange={(skirtWaste) => onPatch({ skirtWaste })} />
               </div>
             </PriceGroup>
@@ -516,16 +517,18 @@ function PriceGroup({ title, muted, children }: { title: string; muted?: boolean
   );
 }
 
-function NumberField({ id, label, hint, value, suffix, step = "any", disabled, onChange }: {
+function NumberField({ id, label, hint, value, suffix, money = false, step = "any", disabled, onChange }: {
   id: string;
   label: string;
   hint?: string;
   value: number;
   suffix?: string;
+  money?: boolean;
   step?: number | "any";
   disabled?: boolean;
   onChange: (value: number) => void;
 }) {
+  const FieldInput = money ? MoneyInput : NumberInput;
   return (
     <label htmlFor={id} className="block min-w-0 space-y-1.5">
       <span className="flex min-w-0 items-baseline justify-between gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -533,7 +536,7 @@ function NumberField({ id, label, hint, value, suffix, step = "any", disabled, o
         {hint && <span className="font-normal text-slate-400">{hint}</span>}
       </span>
       <span className="relative block">
-        <NumberInput
+        <FieldInput
           id={id}
           min={0}
           step={step}

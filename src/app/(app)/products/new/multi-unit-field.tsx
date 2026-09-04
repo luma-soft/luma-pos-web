@@ -3,7 +3,7 @@
 import { useFieldArray, useFormContext } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import { Plus, Trash2 } from "lucide-react";
-import { Button, Input, NumberInput, Field } from "@/components/ui";
+import { Button, Input, NumberInput, MoneyInput, Field } from "@/components/ui";
 import { formatNumber } from "@/lib/utils";
 import type { CreateProductInput } from "./schema";
 
@@ -69,7 +69,7 @@ export function MultiUnitField() {
               </Field>
 
               <Field labelTx="products.units.priceOverride" className="min-w-0">
-                <NumberInput
+                <MoneyInput
                   value={watch(`units.${idx}.priceOverride`) ?? null}
                   onChange={(v) => setValue(`units.${idx}.priceOverride`, v)}
                   suffix={`đ/${watch(`units.${idx}.unitName`) || "đơn vị"}`}

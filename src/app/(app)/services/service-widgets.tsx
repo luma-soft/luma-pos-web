@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/label";
 import { Input, Textarea } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 import { Toggle } from "@/components/ui/toggle";
@@ -619,8 +620,8 @@ export function WarrantyClaimQuickCreate({
           <Field label={t("services.fields.description")} className="sm:col-span-2"><Textarea value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
           {initial && (
             <>
-              <Field label={t("services.fields.laborCharge")}><NumberInput value={laborCharge} onChange={setLaborCharge} min={0} suffix="đ" /></Field>
-              <Field label={t("services.fields.materialCharge")}><NumberInput value={materialCharge} onChange={setMaterialCharge} min={0} suffix="đ" /></Field>
+              <Field label={t("services.fields.laborCharge")}><MoneyInput value={laborCharge} onChange={setLaborCharge} min={0} suffix="đ" /></Field>
+              <Field label={t("services.fields.materialCharge")}><MoneyInput value={materialCharge} onChange={setMaterialCharge} min={0} suffix="đ" /></Field>
             </>
           )}
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
@@ -1313,7 +1314,7 @@ export function ServiceCostEditor({
           <Field label={t("services.fields.job")}><Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.jobs.noQuote") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} /></Field>
           <Field label={t("services.costs.description")} required className="sm:col-span-2"><Input value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
           <Field label={t("services.costs.quantity")}><NumberInput value={quantity} onChange={setQuantity} min={0} decimals={4} /></Field>
-          <Field label={t("services.costs.unitCost")}><NumberInput value={unitCost} onChange={setUnitCost} min={0} suffix="đ" /></Field>
+          <Field label={t("services.costs.unitCost")}><MoneyInput value={unitCost} onChange={setUnitCost} min={0} suffix="đ" /></Field>
           <Field label={t("services.costs.staff")}><Select value={staffId} onChange={(event) => setStaffId(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...staff.map((person) => ({ value: person.id, label: person.name }))]} /></Field>
           <Field label={t("services.costs.incurredOn")}><Input type="date" value={incurredOn} onChange={(event) => setIncurredOn(event.target.value)} /></Field>
           <Field label={t("customers.fields.note")} className="sm:col-span-2"><Textarea value={note} onChange={(event) => setNote(event.target.value)} /></Field>

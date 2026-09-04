@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input, NumberInput, QuantityInput, Select } from "@/components/ui";
+import { Input, MoneyInput, QuantityInput, Select } from "@/components/ui";
 import { formatNumber } from "@/lib/utils";
 import { buildVariantCombinations } from "@/lib/products/variant-model";
 import type { CreateProductInput } from "./schema";
@@ -104,8 +104,8 @@ export function VariantChildrenField({ visible, enabled }: { visible: boolean; e
                 <td className={tdClass}><label className="mb-1 block text-xs text-slate-500 lg:hidden">SKU</label><Input className={inputClass} {...register(`variantChildren.${index}.sku`)} aria-label={`${row.variantName} — SKU`} placeholder="Tự sinh" /></td>
                 <td className={tdClass}><label className="mb-1 block text-xs text-slate-500 lg:hidden">Mã vạch</label><Input className={inputClass} {...register(`variantChildren.${index}.barcode`)} aria-label={`${row.variantName} — Mã vạch`} /></td>
                 <td className={tdClass}><label className="mb-1 block text-xs text-slate-500 lg:hidden">Đơn vị</label><Input className={`${inputClass} lg:w-20`} {...register(`variantChildren.${index}.baseUnit`)} readOnly={persisted} aria-label={`${row.variantName} — Đơn vị`} /></td>
-                <td className={tdClass}><label className="mb-1 block text-xs text-slate-500 lg:hidden">Giá nhập</label><NumberInput min={0} value={child.costPrice} aria-label={`${row.variantName} — Giá nhập`} onChange={(value) => setValue(`variantChildren.${index}.costPrice`, value ?? 0, { shouldDirty: true })} className="w-full lg:min-w-32" /></td>
-                <td className={tdClass}><label className="mb-1 block text-xs text-slate-500 lg:hidden">Giá bán</label><NumberInput min={0} value={child.retailPrice} aria-label={`${row.variantName} — Giá bán`} onChange={(value) => setValue(`variantChildren.${index}.retailPrice`, value ?? 0, { shouldDirty: true })} className="w-full lg:min-w-32" /></td>
+                <td className={tdClass}><label className="mb-1 block text-xs text-slate-500 lg:hidden">Giá nhập</label><MoneyInput suffix="đ" min={0} value={child.costPrice} aria-label={`${row.variantName} — Giá nhập`} onChange={(value) => setValue(`variantChildren.${index}.costPrice`, value ?? 0, { shouldDirty: true })} className="w-full lg:min-w-32" /></td>
+                <td className={tdClass}><label className="mb-1 block text-xs text-slate-500 lg:hidden">Giá bán</label><MoneyInput suffix="đ" min={0} value={child.retailPrice} aria-label={`${row.variantName} — Giá bán`} onChange={(value) => setValue(`variantChildren.${index}.retailPrice`, value ?? 0, { shouldDirty: true })} className="w-full lg:min-w-32" /></td>
                 <td className={tdClass}>{persisted ? <div className="whitespace-nowrap py-2"><span className="font-semibold">{formatNumber(Number(child.currentStock ?? 0))}</span> {child.baseUnit}<span className="block text-xs text-slate-500">Tồn hiện tại</span></div> : <><label className="mb-1 block text-xs text-slate-500 lg:hidden">Tồn đầu</label><QuantityInput min={0} value={Number(child.initialStock ?? 0)} inputLabel={`${row.variantName} — Tồn đầu`} onChange={(value) => setValue(`variantChildren.${index}.initialStock`, value, { shouldDirty: true })} className="w-full lg:w-32" touchTargets /></>}</td>
                 <td className={tdClass}><label className="inline-flex min-h-11 items-center gap-2"><Checkbox {...register(`variantChildren.${index}.directSale`)} aria-label={`${row.variantName} — Bán trực tiếp`} /><span className="lg:hidden">Bán</span></label></td>
               </> : <td colSpan={7} className="col-span-2 py-2 text-xs lg:table-cell lg:px-3">{awaitingAssignment ? 'Gán SKU đã có vào một tổ hợp trước.' : 'Tổ hợp này sẽ không được tạo.'}</td>}

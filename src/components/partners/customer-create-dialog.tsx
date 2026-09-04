@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
 import { X } from "lucide-react";
-import { Button, Form, FormField, Heading, Input, NumberInput, Select, Textarea } from "@/components/ui";
+import { Button, Form, FormField, Heading, Input, MoneyInput, Select, Textarea } from "@/components/ui";
 import { createCustomer } from "@/lib/actions/partners";
 import { createCustomerSchema, type CreateCustomerInput, type CreateCustomerOutput } from "@/lib/schemas/order";
 import { cn } from "@/lib/utils";
@@ -141,7 +141,7 @@ export function CustomerCreateForm({
         </FormField>
         <FormField name="debtLimit" labelTx="customers.fields.debtLimit" hintTx="customers.fields.debtLimitHint">
           {(field) => (
-            <NumberInput value={field.value ?? 0} onChange={(v) => field.onChange(v ?? 0)} suffix="đ" min={0} />
+            <MoneyInput value={field.value ?? 0} onChange={(v) => field.onChange(v ?? 0)} suffix="đ" min={0} />
           )}
         </FormField>
       </div>

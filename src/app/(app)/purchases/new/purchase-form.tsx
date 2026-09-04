@@ -586,7 +586,7 @@ export function PurchaseForm({
                         <div className="space-y-1 text-xs font-semibold text-slate-500">
                           <span>{t("orders.cols.discount")}</span>
                           <div className="flex items-center gap-1">
-                            <NumberInput aria-label={t("orders.cols.discount")} min={0} value={l.discInput} placeholder="0" onChange={(discInput) => patch(l.productId, { discInput: discInput ?? 0 })} className={cn(numCls, "h-11 min-w-0")} />
+                            {l.discMode === "vnd" ? <MoneyInput aria-label={t("orders.cols.discount")} min={0} value={l.discInput} placeholder="0" onChange={(discInput) => patch(l.productId, { discInput: discInput ?? 0 })} className={cn(numCls, "h-11 min-w-0")} /> : <NumberInput max={100} decimals={2} thousandSeparator={false} aria-label={t("orders.cols.discount")} min={0} value={l.discInput} placeholder="0" onChange={(discInput) => patch(l.productId, { discInput: discInput ?? 0 })} className={cn(numCls, "h-11 min-w-0")} />}
                             <div className="flex shrink-0 overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
                               {(["vnd", "pct"] as const).map((mode) => (
                                 <Button
@@ -649,7 +649,7 @@ export function PurchaseForm({
                       <td className="px-2 py-2"><MoneyInput value={l.unitCost} onChange={(v) => patch(l.productId, { unitCost: v ?? 0 })} className={numCls} /></td>
                       <td className="px-2 py-2">
                         <div className="flex items-center gap-1">
-                          <NumberInput min={0} value={l.discInput} placeholder="0" onChange={(discInput) => patch(l.productId, { discInput: discInput ?? 0 })} className={numCls} />
+                          {l.discMode === "vnd" ? <MoneyInput min={0} value={l.discInput} placeholder="0" onChange={(discInput) => patch(l.productId, { discInput: discInput ?? 0 })} className={numCls} /> : <NumberInput max={100} decimals={2} thousandSeparator={false} min={0} value={l.discInput} placeholder="0" onChange={(discInput) => patch(l.productId, { discInput: discInput ?? 0 })} className={numCls} />}
                           <div className="flex rounded-md overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0">
                             {(["vnd", "pct"] as const).map((m) => (
                               <Button

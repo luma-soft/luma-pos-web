@@ -8,7 +8,7 @@ import { Plus, Trash2, Pencil, Loader2, X, Check } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { saveModifierGroup, setModifierGroupActive, deleteModifierGroup } from "@/lib/actions/modifiers";
 import type { ModifierGroup } from "@/lib/data/modifiers";
-import { NumberInput } from "@/components/ui/number-input";
+import { MoneyInput } from "@/components/ui/money-input";
 
 type Cat = { id: string; name: string };
 type OptRow = { id: string; label: string; priceDelta: number };
@@ -118,7 +118,7 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
                   {form.options.map((o, i) => (
                     <div key={o.id} className="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_2.75rem]">
                       <input value={o.label} onChange={(e) => setOpt(i, { label: e.target.value })} placeholder={t("modifiers.optionLabel")} className="min-h-11 rounded-[10px] border border-border bg-canvas px-3 py-2 text-sm min-w-11" />
-                      <NumberInput value={o.priceDelta} onChange={(priceDelta) => setOpt(i, { priceDelta: priceDelta ?? 0 })} placeholder="+0" className="min-h-11 min-w-0 rounded-[10px] bg-canvas px-2 font-mono" />
+                      <MoneyInput min={-Number.MAX_SAFE_INTEGER} value={o.priceDelta} onChange={(priceDelta) => setOpt(i, { priceDelta: priceDelta ?? 0 })} placeholder="+0" className="h-11 w-full min-w-0 rounded-[10px] border border-border bg-canvas px-2 text-right font-mono text-sm outline-none focus:border-primary-600" />
                       <button
                         onClick={() => setForm((f) => ({ ...f, options: f.options.filter((_, x) => x !== i) }))}
                         aria-label={`${t("common.delete")} ${o.label || t("modifiers.optionLabel")}`}
