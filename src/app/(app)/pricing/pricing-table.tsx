@@ -547,7 +547,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
         tableId="inventory.pricing"
         rows={rows}
         columns={columns}
-        showColumnMenu={false}
+        embedded
         visibleColumnKeys={visibleColumnKeys}
         onColumnVisibilityChange={setVisibleColumnKeys}
         getRowId={(row) => row.id}

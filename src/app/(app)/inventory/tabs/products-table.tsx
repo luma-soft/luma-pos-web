@@ -472,10 +472,9 @@ export function ProductsTable({
                     : column.key === "product" ? <Link href={Routes.productDetail(child.id)} scroll={false} onClick={stopRowToggle} className="block whitespace-normal font-medium hover:text-primary-600"><span className="block break-words">{child.name}</span>{productVariantLabel(child) !== child.name && <span className="mt-1 block text-xs font-normal text-slate-500">{t("products.variants.version")}: {productVariantLabel(child)}</span>}</Link>
                     : column.render(child)}
                 </td>)}
-                <td />
               </tr>;
             })}
-            <tr className="bg-surface"><td colSpan={visibleColumns.length + 1} className="border-x border-b border-primary-600 border-t border-t-border-soft">{groupControls(product)}</td></tr>
+            <tr className="bg-surface"><td colSpan={visibleColumns.length} className="border-x border-b border-primary-600 border-t border-t-border-soft">{groupControls(product)}</td></tr>
           </Fragment>;
         }}
         renderMobileRow={({ row: product }) => {

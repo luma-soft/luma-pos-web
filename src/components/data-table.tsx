@@ -191,6 +191,7 @@ export function DataTableShell<T>({
   toolbar,
   toolbarFloating = false,
   showColumnMenu = true,
+  embedded = false,
   visibleColumnKeys,
   onColumnVisibilityChange,
   maxHeight = "calc(100dvh - 250px)",
@@ -229,6 +230,8 @@ export function DataTableShell<T>({
   toolbarFloating?: boolean;
   /** Tắt menu mặc định khi màn hình đã có bộ chọn cột riêng trên toolbar. */
   showColumnMenu?: boolean;
+  /** Bảng nằm trong card có toolbar: dùng viền ngoài, chỉ kế thừa bo góc dưới. */
+  embedded?: boolean;
   /** Điều khiển hiển thị cột từ UI bên ngoài bảng (ví dụ chip bảng giá). */
   visibleColumnKeys?: Set<string>;
   /** Đồng bộ thay đổi từ menu chọn cột về UI bên ngoài. */
@@ -312,7 +315,8 @@ export function DataTableShell<T>({
 
   const visibleKeys = visibleColumnKeys ?? storedVisible ?? defaultVisible;
   const visibleColumns = columns.filter((column) => column.required || visibleKeys.has(column.key));
-  const hasUtilityColumn = showColumnMenu || Boolean(renderExpanded);
+  // Only actual row expansion needs a body column. Header controls float above it.
+  const hasUtilityColumn = Boolean(renderExpanded);
   const displayRows = useMemo(() => {
     if (!sort) return rows;
     const column = columns.find((item) => item.key === sort.key);
@@ -353,6 +357,7 @@ export function DataTableShell<T>({
 
   function resetColumns() {
     setStoredVisible(defaultVisible);
+    onColumnVisibilityChange?.(new Set(defaultVisible));
     try {
       window.localStorage.removeItem(storageKey);
     } catch {
@@ -381,7 +386,7 @@ export function DataTableShell<T>({
   );
 
   return (
-    <div className="relative flex min-h-0 w-full min-w-0 flex-col">
+    <div className={cn("relative flex min-h-0 w-full min-w-0 flex-col", embedded && "rounded-b-[inherit]")}>
       {toolbar && <div className={cn("mb-2 flex flex-wrap items-center justify-end gap-2", toolbarFloating && "lg:absolute lg:-top-[65px] lg:right-0 lg:mb-0")}>{toolbar}</div>}
 
       {rows.length === 0 && empty ? (
@@ -400,7 +405,7 @@ export function DataTableShell<T>({
         </div>
       ) : (
         <>
-          <div className={cn("space-y-2 lg:hidden", mobileListClassName)}>
+          <div className={cn(embedded ? "overflow-hidden rounded-b-[inherit] lg:hidden" : "space-y-2 lg:hidden", mobileListClassName)}>
             {displayRows.map((row) => {
               const id = getRowId(row);
               const expandable = Boolean(!onRowClick && renderExpanded && (canExpand ? canExpand(row) : true));
@@ -413,7 +418,8 @@ export function DataTableShell<T>({
                 <div
                   key={id}
                   className={cn(
-                    "overflow-hidden rounded-card border bg-surface",
+                    "overflow-hidden bg-surface",
+                    embedded ? "border-b last:border-b-0" : "rounded-card border",
                     expanded ? "border-primary-200 shadow-e1" : "border-border-soft",
                     mobileRowClassName,
                   )}
@@ -440,10 +446,17 @@ export function DataTableShell<T>({
             })}
           </div>
 
+          <div className={cn("relative hidden min-h-0 lg:block", embedded ? "rounded-b-[inherit]" : "rounded-card")}>
+            {showColumnMenu && (
+              <div className="absolute right-px top-px z-20 flex h-12 items-center rounded-tr-[inherit] bg-canvas px-2 before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-3 before:bg-linear-to-r before:from-transparent before:to-canvas">
+                {columnVisibilityMenu}
+              </div>
+            )}
           <div
             ref={desktopTableRef}
             className={cn(
-              "hidden min-h-0 rounded-card border border-border-soft bg-surface lg:block",
+              "min-h-0 bg-surface",
+              embedded ? "rounded-b-[inherit] border-0" : "rounded-card border border-border-soft",
               maxHeight ? "data-table-scroll-region overflow-auto [scrollbar-gutter:stable]" : "overflow-x-auto",
               fillHeight && "h-full",
             )}
@@ -457,8 +470,8 @@ export function DataTableShell<T>({
                 {hasUtilityColumn && <col style={{ width: "44px" }} />}
               </colgroup>
               <thead>
-                <tr className="bg-canvas text-left text-xs font-semibold text-slate-500 dark:text-slate-300">
-                  {visibleColumns.map((column) => {
+                <tr className="h-12 bg-canvas text-left text-xs font-semibold text-slate-500 dark:text-slate-300">
+                  {visibleColumns.map((column, index) => {
                     const sortable = isSortableColumn(column);
                     const controlsVisible = sortable && activeSortColumn === column.key;
                     const direction = sort?.key === column.key ? sort.direction : null;
@@ -473,6 +486,7 @@ export function DataTableShell<T>({
                           column.align === "right" && "text-right",
                           column.align === "center" && "text-center",
                           column.headerClassName,
+                          showColumnMenu && !hasUtilityColumn && index === visibleColumns.length - 1 && "pr-14",
                         )}
                       >
                         {sortable ? (
@@ -528,7 +542,7 @@ export function DataTableShell<T>({
                       </th>
                     );
                   })}
-                  {hasUtilityColumn && <th className="sticky right-0 top-0 z-20 bg-canvas px-2 py-2 text-right shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)]">{showColumnMenu && columnVisibilityMenu}</th>}
+                  {hasUtilityColumn && <th className="sticky right-0 top-0 z-10 bg-canvas px-2 py-2" />}
                 </tr>
               </thead>
               <tbody>
@@ -596,6 +610,7 @@ export function DataTableShell<T>({
               </tbody>
             </table>
           </div>
+          </div>
         </>
       )}
       {selectedDetailRow && renderDetail && (
@@ -630,16 +645,43 @@ function ColumnVisibilityMenu<T>({
   onToggle: (key: string) => void;
   onReset: () => void;
 }) {
+  const menuId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const firstControl = menuRef.current?.querySelector<HTMLElement>("input:not(:disabled)")
+      ?? menuRef.current?.querySelector<HTMLElement>("button");
+    firstControl?.focus({ preventScroll: true });
+    function closeWithEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      onOpenChange(false);
+      triggerRef.current?.focus({ preventScroll: true });
+    }
+    document.addEventListener("keydown", closeWithEscape);
+    return () => document.removeEventListener("keydown", closeWithEscape);
+  }, [open, onOpenChange]);
+
   return (
     <div className="relative inline-flex justify-end" onClick={stopRowToggle}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => onOpenChange(!open)}
+        onKeyDown={(event) => {
+          if (event.key !== "ArrowDown") return;
+          event.preventDefault();
+          onOpenChange(true);
+        }}
         className={cn(
           "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-white/75 hover:text-slate-800 dark:hover:bg-slate-900/50 dark:hover:text-slate-100",
           open && "bg-white text-primary-700 shadow-sm dark:bg-slate-900 dark:text-primary-300",
         )}
         aria-label="Chọn cột hiển thị"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
         title="Chọn cột hiển thị"
       >
         <Columns3 className="h-4 w-4" />
@@ -647,10 +689,26 @@ function ColumnVisibilityMenu<T>({
       {open && (
         <>
           <button type="button" className="fixed inset-0 z-30 cursor-default" aria-label="Đóng chọn cột" onClick={() => onOpenChange(false)} />
-          <div className="absolute right-0 top-full z-40 mt-2 w-[300px] rounded-card border border-border-soft bg-surface p-3 text-left shadow-e2">
+          <div
+            ref={menuRef}
+            id={menuId}
+            role="dialog"
+            aria-label="Thông tin hiển thị"
+            onKeyDown={(event) => {
+              if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+              event.preventDefault();
+              const controls = Array.from(menuRef.current?.querySelectorAll<HTMLElement>("input:not(:disabled), button:not(:disabled)") ?? []);
+              if (!controls.length) return;
+              const current = controls.indexOf(document.activeElement as HTMLElement);
+              const next = event.key === "Home" ? 0 : event.key === "End" ? controls.length - 1
+                : (current + (event.key === "ArrowDown" ? 1 : -1) + controls.length) % controls.length;
+              controls[next]?.focus();
+            }}
+            className="absolute right-0 top-full z-40 mt-2 w-[300px] max-w-[calc(100vw-2rem)] rounded-card border border-border-soft bg-surface p-3 text-left shadow-e2"
+          >
             <div className="mb-2 flex items-center justify-between gap-3">
               <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Thông tin hiển thị</div>
-              <button type="button" onClick={() => onOpenChange(false)} className="rounded-md p-1 text-slate-400 hover:bg-surface-2 hover:text-slate-700">
+              <button type="button" aria-label="Đóng chọn cột" onClick={() => { onOpenChange(false); triggerRef.current?.focus(); }} className="rounded-md p-1 text-slate-400 hover:bg-surface-2 hover:text-slate-700">
                 <X className="h-4 w-4" />
               </button>
             </div>
