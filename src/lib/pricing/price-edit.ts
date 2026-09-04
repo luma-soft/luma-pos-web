@@ -16,6 +16,25 @@ export type PriceFormulaFilters = z.infer<typeof priceFormulaFiltersSchema>;
 export type PriceUnit = { id?: string; unitName: string; multiplier: number; priceOverride: number | null };
 export type PriceEditProduct = { baseUnit: string; retailPrice: number; units: PriceUnit[] };
 export type UnitPriceMode = "keep" | "sync";
+export const priceEditSnapshotSchema = z.object({
+  baseUnit: z.string().min(1),
+  retailPrice: z.number().finite().nonnegative(),
+  basePrice: z.number().finite().nonnegative().nullable(),
+  units: z.array(z.object({
+    unitName: z.string().min(1), multiplier: z.number().finite().positive(), priceOverride: z.number().finite().nonnegative().nullable(),
+  }).strict()).max(500),
+}).strict();
+export type PriceEditSnapshot = z.infer<typeof priceEditSnapshotSchema>;
+export function priceEditSnapshot(product: PriceEditProduct, basePrice: number | null): PriceEditSnapshot {
+  return { baseUnit: product.baseUnit, retailPrice: product.retailPrice, basePrice,
+    units: product.units.map(({ unitName, multiplier, priceOverride }) => ({ unitName, multiplier, priceOverride: priceOverride ?? null })) };
+}
+export function matchesPriceEditSnapshot(expected: PriceEditSnapshot, actual: PriceEditSnapshot): boolean {
+  const stable = (snapshot: PriceEditSnapshot) => JSON.stringify({ ...snapshot,
+    units: [...snapshot.units].sort((a, b) => a.unitName.localeCompare(b.unitName)).map(({ unitName, multiplier, priceOverride }) => ({ unitName, multiplier, priceOverride })),
+  });
+  return stable(expected) === stable(actual);
+}
 
 // Calculate from decimal input, not a binary intermediate (20.15 × 50% is a
 // half-cent tie that floating arithmetic can put below 10.075).
@@ -71,6 +90,9 @@ export function pricingUnitPrice(product: PriceEditProduct, book: PriceBookSourc
 /** Same pure calculation for the confirmation preview and the transactional write. */
 export function planPriceEdit(product: PriceEditProduct, book: PriceBookSource, currentBasePrice: number | null, price: number | null, unitName = product.baseUnit, mode: UnitPriceMode = "keep") {
   if (isPriceBookReadOnly(book) || (mode !== "keep" && mode !== "sync") || (price !== null && (!Number.isFinite(price) || price < 0))) throw new Error("errors.invalidData");
+  // The edited amount itself is money: normalize before inverse conversion,
+  // matching the mobile editor and the value acknowledged in the preview.
+  price = price == null ? null : priceMoney(price);
   const source = systemPriceBookType(book);
   const unit = unitName === product.baseUnit ? undefined : product.units.find((candidate) => candidate.unitName === unitName);
   if (unitName !== product.baseUnit && !unit) throw new Error("errors.invalidData");

@@ -44,6 +44,14 @@ test("company/custom unit edit uses its own conversion, keeps missing and zero",
   expect(pricingUnitPrice(product, custom, null, "cây")).toBe(700);
 });
 
+test("unit inputs normalize to two decimals before conversion like mobile", () => {
+  // 40.295 is stored as 40.30 first; dividing by four lands exactly at 10.075.
+  expect(planPriceEdit(product, retail, 200, 40.295, "cây", "sync").basePrice).toBe(10.08);
+  expect(planPriceEdit(product, list, 200, 40.295, "cây").basePrice).toBe(10.08);
+  const customProduct = { ...product, retailPrice: 100, units: [{ unitName: "cây", multiplier: 4, priceOverride: 400 }] };
+  expect(planPriceEdit(customProduct, custom, 200, 40.295, "cây").basePrice).toBe(10.08);
+});
+
 test("non-invertible custom alternate is readonly; zero retail is not a fake multiplier", () => {
   const zeroRetail = { ...product, retailPrice: 0 };
   expect(pricingUnitScale(zeroRetail, custom, product.units[1])).toBeNull();

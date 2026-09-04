@@ -4178,6 +4178,7 @@
     },
     "errors": {
       "priceUnavailable": "Sản phẩm chưa có dữ liệu cho bảng giá này. Hãy chọn bảng giá khác.",
+      "priceChanged": "Giá hoặc đơn vị đã thay đổi ở nơi khác. Tải lại và xác nhận lại trước khi lưu.",
       "systemReadOnly": "Bảng giá hệ thống tự động cập nhật, không thể sửa hoặc xóa.",
       "cannotDeleteDefault": "Không thể xóa bảng giá mặc định"
     },

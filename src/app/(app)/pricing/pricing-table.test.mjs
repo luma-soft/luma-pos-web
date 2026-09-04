@@ -16,6 +16,7 @@ mock.module("next/navigation", () => ({
   useRouter: () => ({ refresh() {} }), usePathname: () => "/inventory", useSearchParams: () => new URLSearchParams(),
 }));
 mock.module("next-intl", () => ({ useTranslations: () => (key) => key, useLocale: () => "vi" }));
+mock.module("@/components/confirm-dialog-provider", () => ({ useConfirmDialog: () => ({ confirm: async () => false }) }));
 mock.module("@/components/data-table", () => ({
   DataTableShell: (props) => { tableProps = props; return null; },
   stopRowToggle: () => {},
@@ -66,7 +67,8 @@ describe("pricing table sources and editing", () => {
     priceWrites.length = 0;
     renderToStaticMarkup(createElement(PricingTable, { books, rows: [{ ...row, units: [] }], total: 1 }));
     await tableProps.columns.find((column) => column.key === "book:retail").render(row).props.onCommit(130000);
-    expect(priceWrites).toEqual([{ priceBookId: "retail", productId: row.id, price: 130000 }]);
+    expect(priceWrites).toEqual([{ priceBookId: "retail", productId: row.id, price: 130000, unitName: "m", unitPriceMode: "keep",
+      expected: { baseUnit: "m", retailPrice: 120000, basePrice: 120000, units: [] } }]);
   });
 
   test("price inputs preserve fractional prices from a synchronized unit source", () => {

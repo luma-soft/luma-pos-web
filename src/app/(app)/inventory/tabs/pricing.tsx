@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
-import { getProducts, getProductFormOptions } from "@/lib/data/products";
+import { getProductFormOptions } from "@/lib/data/products";
+import { getPricingPage } from "@/lib/data/pricing";
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
@@ -11,9 +12,23 @@ import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 import { ListSearchFilterBar } from "@/components/list-search-filter";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { canViewPurchasePrices, comparePriceBooks, isSystemPriceBook, resolvePriceBookPrice } from "@/lib/pricing/system-price-books";
+import { priceFormulaFiltersSchema } from "@/lib/pricing/price-edit";
+import type { PricingSort } from "@/lib/pricing/pricing-policy";
 
 type SP = Record<string, string | undefined>;
 type PriceBook = Awaited<ReturnType<typeof getPriceBooks>>[number];
+
+/** Inventory URL aliases must become the same validated predicate for list and bulk. */
+export function inventoryPricingFilters(params: SP) {
+  const ids = (value?: string) => value ? value.split(",").map((id) => id.trim()).filter(Boolean) : undefined;
+  const stock = params.stock ? ({ instock: "available", low: "lowStock", out: "outOfStock" }[params.stock] ?? params.stock) : undefined;
+  const lifecycle = params.lifecycle || (params.status === "inactive" ? "paused" : params.status) || "active";
+  return priceFormulaFiltersSchema.parse({
+    q: params.q, categoryIds: ids(params.categoryIds ?? params.category),
+    brandIds: ids(params.brandIds ?? params.brandId), supplierIds: ids(params.supplierIds ?? params.supplierId),
+    productKind: params.productKind || undefined, stock, lifecycle, warehouseId: params.warehouseId || undefined,
+  });
+}
 
 export async function PricingTab({ searchParams }: { searchParams: SP }) {
   const context = await requireStoreContext();
@@ -52,14 +67,15 @@ async function PricingContent({
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
 
-  const { rows, total, pageCount } = await getProducts(context.storeId, { view: "flat", q: params.q, categoryId: params.category, brandId: params.brandId, supplierId: params.supplierId, productKind: params.productKind as "product" | "service" | "combo" | undefined, stock: params.stock as "instock" | "low" | "out" | undefined, sort: params.sort as "name" | "stock" | "updated" | undefined, status: (params.status as "active" | "inactive" | "all" | undefined) ?? "active", page, pageSize });
+  const filters = inventoryPricingFilters(params);
+  const { rows, total, pageCount } = await getPricingPage(context.storeId, { ...filters, sort: params.sort as PricingSort | undefined, page, pageSize });
 
   const visibleIds = rows.map((p) => p.id);
   const overrideByBook = await getPriceOverridesForProducts(context.storeId, visibleIds);
   const tableRows = rows.map((p) => ({
     id: p.id, sku: p.sku, name: p.name, baseUnit: p.baseUnit,
-    units: (p.unitDefinitions ?? []).map((unit) => ({
-      unitName: unit.unitName, multiplier: Number(unit.multiplier),
+    units: (p.units ?? []).map((unit) => ({
+      id: unit.id, unitName: unit.unitName, multiplier: Number(unit.multiplier),
       priceOverride: unit.priceOverride == null ? null : Number(unit.priceOverride),
     })),
     costPrice: includePurchasePrices ? Number(p.costPrice) : null,
@@ -68,7 +84,7 @@ async function PricingContent({
       const ov = overrideByBook[b.id]?.[p.id];
       if (!isSystemPriceBook(b)) return [b.id, ov != null ? Number(ov) : null];
       return [b.id, resolvePriceBookPrice(b, {
-        retailPrice: Number(p.retailPrice),
+        retailPrice: Number(p.baseRetailPrice),
         costPrice: includePurchasePrices ? Number(p.costPrice) : null,
         lastPurchaseNetPrice: includePurchasePrices && p.lastPurchaseNetPrice != null ? Number(p.lastPurchaseNetPrice) : null,
       }, ov)];
@@ -81,7 +97,7 @@ async function PricingContent({
         <h2 className="shrink-0 text-sm font-bold">{t("pricing.booksCount", { n: books.length })}</h2>
         <ListSearchFilterBar
           search={<InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
-          filter={<InventoryFilterDrawer title="Bộ lọc thiết lập giá" values={params} resultCount={total} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
+          filter={<InventoryFilterDrawer title="Bộ lọc thiết lập giá" values={params} countEndpoint="" fields={["category", "brand", "supplier", "kind", "status", "stock", "sort"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
         />
       </div>
       <PricingTable
@@ -89,6 +105,7 @@ async function PricingContent({
         books={books}
         rows={tableRows}
         total={total}
+        filters={filters}
         canViewPurchasePrices={includePurchasePrices}
         resetScrollKey={[
           params.q,

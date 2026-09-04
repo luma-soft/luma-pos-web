@@ -220,3 +220,25 @@ test("bulk unit sync clears overrides only inside the filtered applicable scope"
   expect((await pg.query("select price_override from product_units where product_id=$1 and unit_name='cây'", [knownId])).rows[0].price_override).toBe("700.00");
   expect((await pg.query("select price_override from product_units where product_id=$1", [unknownId])).rows.every((row) => row.price_override == null)).toBe(true);
 });
+
+test("a concurrent unit-factor change rejects the reviewed sync without any price writes", async () => {
+  await addUnits();
+  const expected = { baseUnit: "m", retailPrice: 200, basePrice: 200, units: [
+    { unitName: "m", multiplier: 1, priceOverride: 999 },
+    { unitName: "cây", multiplier: 4, priceOverride: 700 },
+    { unitName: "bó", multiplier: 20, priceOverride: null },
+  ] };
+  await pg.query("update product_units set multiplier=5 where product_id=$1 and unit_name='cây'", [knownId]);
+  expect(await setProductPrice({ productId: knownId, priceBookId: retailId, unitName: "cây", price: 64000, unitPriceMode: "sync", expected }))
+    .toEqual({ ok: false, error: "pricing.errors.priceChanged" });
+  expect((await pg.query("select retail_price from products where id=$1", [knownId])).rows[0].retail_price).toBe("200.00");
+  expect((await pg.query("select price_override from product_units where product_id=$1 and unit_name='cây'", [knownId])).rows[0].price_override).toBe("700.00");
+});
+
+test("matching snapshot permits save; changed book base is rejected", async () => {
+  const expected = { baseUnit: "m", retailPrice: 200, basePrice: null, units: [] };
+  const input = { productId: knownId, priceBookId: listId, price: 123.33, expected };
+  expect((await setProductPrice(input)).ok).toBe(true);
+  expect(await setProductPrice({ ...input, price: 100 })).toEqual({ ok: false, error: "pricing.errors.priceChanged" });
+  expect(await getPriceOverrides(storeId, listId)).toEqual({ [knownId]: "123.33" });
+});

@@ -1,8 +1,8 @@
 import { and, asc, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
-import { categories, customers, orderItems, orders, paymentBankAccounts, products, productComboItems, productPrices, productUnits, projects, promotions, stockLevels, warehouses } from "@/db/schema";
-import { isPromoActive, type PromoTier } from "@/lib/promo";
+import { categories, customers, orderItems, orders, paymentBankAccounts, products, productComboItems, productPrices, productUnits, projects, stockLevels, warehouses } from "@/db/schema";
+import { getActivePromotions } from "@/lib/data/active-promotions";
 import { getPriceBooks } from "@/lib/data/price-books";
 import type { Role } from "@/lib/actions/common";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
@@ -247,17 +247,8 @@ export async function getPosData(storeId: string, options?: {
     includeManagerOnly: canViewPurchasePrices(options?.role),
   });
 
-  const [promoRows, projectRows, defaultBankAccount] = await Promise.all([
-    db
-      .select({
-        productId: promotions.productId,
-        tiers: promotions.tiers,
-        isActive: promotions.isActive,
-        startsAt: promotions.startsAt,
-        endsAt: promotions.endsAt,
-      })
-      .from(promotions)
-      .where(and(eq(promotions.storeId, storeId), eq(promotions.isActive, true))),
+  const [promoByProduct, projectRows, defaultBankAccount] = await Promise.all([
+    getActivePromotions(storeId),
     db
       .select({ id: projects.id, name: projects.name, customerId: projects.customerId })
       .from(projects)
@@ -282,12 +273,6 @@ export async function getPosData(storeId: string, options?: {
       .orderBy(sql`${paymentBankAccounts.isDefault} desc`, asc(paymentBankAccounts.createdAt))
       .limit(1),
   ]);
-
-  // map productId → tiers đang hiệu lực
-  const promoByProduct: Record<string, PromoTier[]> = {};
-  for (const p of promoRows) {
-    if (isPromoActive(p)) promoByProduct[p.productId] = p.tiers ?? [];
-  }
 
   applySystemPriceBooks(productsForPos as Parameters<typeof applySystemPriceBooks>[0], priceBookRows);
 

@@ -10,7 +10,7 @@ import { isSystemPriceBook, isPriceBookReadOnly, isReservedPriceBookName } from 
 import { pricingFilterCondition, pricingSellableProductCondition } from "@/lib/data/pricing";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
-import { planPriceEdit, priceFormulaFiltersSchema, type PriceFormulaFilters, type UnitPriceMode } from "@/lib/pricing/price-edit";
+import { matchesPriceEditSnapshot, planPriceEdit, priceEditSnapshot, priceEditSnapshotSchema, priceFormulaFiltersSchema, type PriceEditSnapshot, type PriceFormulaFilters, type UnitPriceMode } from "@/lib/pricing/price-edit";
 
 export type PriceFormulaBase = "current" | "cost" | "lastPurchase" | "list";
 
@@ -177,8 +177,11 @@ export async function setProductPrice(input: {
   price: number | null;
   unitName?: string;
   unitPriceMode?: UnitPriceMode;
+  expected?: PriceEditSnapshot;
 }): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;
+  const expected = input.expected === undefined ? undefined : priceEditSnapshotSchema.safeParse(input.expected);
+  if (expected && !expected.success) return { ok: false, error: "errors.invalidData" };
   if (input.price !== null && (!Number.isFinite(input.price) || input.price < 0)) return { ok: false, error: "errors.invalidData" };
   if ((input.unitName !== undefined && (typeof input.unitName !== "string" || !input.unitName.trim())) || (input.unitPriceMode !== undefined && input.unitPriceMode !== "keep" && input.unitPriceMode !== "sync")) return { ok: false, error: "errors.invalidData" };
   try {
@@ -195,9 +198,11 @@ export async function setProductPrice(input: {
       const [override] = book.isDefault ? [] : await tx.select({ price: productPrices.price }).from(productPrices)
         .where(and(eq(productPrices.storeId, gate.storeId), eq(productPrices.priceBookId, input.priceBookId), eq(productPrices.productId, input.productId))).limit(1);
       const beforePrice = book.isDefault ? Number(product.retailPrice) : override ? Number(override.price) : null;
+      const priceProduct = { baseUnit: product.baseUnit, retailPrice: Number(product.retailPrice), units };
+      if (expected?.success && !matchesPriceEditSnapshot(expected.data, priceEditSnapshot(priceProduct, beforePrice))) return "pricing.errors.priceChanged";
       let planned;
       try {
-        planned = planPriceEdit({ baseUnit: product.baseUnit, retailPrice: Number(product.retailPrice), units }, book, beforePrice, input.price, input.unitName, input.unitPriceMode);
+        planned = planPriceEdit(priceProduct, book, beforePrice, input.price, input.unitName, input.unitPriceMode);
       } catch { return "errors.invalidData"; }
       const afterPrice = planned.basePrice;
       const changedUnits = planned.units.filter((unit) => unit.priceOverride !== units.find((before) => before.id === unit.id)?.priceOverride);

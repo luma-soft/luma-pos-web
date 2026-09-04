@@ -50,4 +50,15 @@ describe("product multi-unit confirmation UI", () => {
     expect(html).toContain("Giá riêng theo đơn vị của các sản phẩm đó cũng sẽ được xóa");
     expect(html).toContain("Bảng trên chỉ xem trước sản phẩm đang sửa");
   });
+  test("admin resolver controls the displayed exact plan without changing product-editor defaults", () => {
+    let selected;
+    const html = render({ mode: "sync", source: "unit:tree", resolveChoice: (mode, source) => {
+      selected = [mode, source];
+      return { ...before, retailPrice: 10.08, units: [{ ...before.units[0], priceOverride: null }] };
+    } });
+    expect(selected).toEqual(["sync", "unit:tree"]);
+    expect(html).toContain("10,08 đ");
+    expect(html).toContain("40 đ");
+    expect(html).not.toContain("64.000 đ");
+  });
 });

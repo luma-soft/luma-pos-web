@@ -6,6 +6,8 @@ import {
 import type { ProductListView, ProductStatusFilter } from "@/lib/data/products";
 import { parseProductListSort } from "@/lib/inventory/product-list-policy";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
+import { getPriceBooks } from "@/lib/data/price-books";
+import { getActivePromotions } from "@/lib/data/active-promotions";
 import {
   requireMobileStockAccess,
   requireMobileStockReadAccess,
@@ -23,7 +25,7 @@ export async function GET(request: Request) {
   const gate = await requireMobileStockReadAccess();
   if (!gate.ok) return mobileGate(gate)!;
 
-  const [products, options] = await Promise.all([
+  const [products, options, priceBooks, promoByProduct] = await Promise.all([
     getMobileProducts(gate.storeId, {
       q: searchParam(request, "q"),
       categoryId: searchParam(request, "categoryId"),
@@ -44,6 +46,8 @@ export async function GET(request: Request) {
       pageSize: numberParam(request, "pageSize", 50),
     }),
     getMobileProductOptions(gate.storeId),
+    getPriceBooks(gate.storeId, { includeManagerOnly: canViewPurchasePrices(gate.role) }),
+    getActivePromotions(gate.storeId),
   ]);
 
   const includeNetPurchase = canViewPurchasePrices(gate.role);
@@ -56,7 +60,7 @@ export async function GET(request: Request) {
         ...member, lastPurchaseNetPrice: includeNetPurchase ? member.lastPurchaseNetPrice : null,
       })) } } : {}),
     })),
-  }, options });
+  }, options, priceBooks, promoByProduct });
 }
 
 export async function POST(request: Request) {

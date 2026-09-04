@@ -5,17 +5,19 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Calculator, Check, ChevronDown, Loader2, Pencil, Plus, X } from "lucide-react";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { MoneyInput } from "@/components/ui/money-input";
-import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
+import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { createPriceBook, renamePriceBook, deletePriceBook, setProductPrice, applyPriceFormulaAll, type PriceFormulaBase } from "@/lib/actions/price-books";
 import { comparePriceBooks, isPriceBookReadOnly, isSystemPriceBook, systemPriceBookType, type SystemPriceBookType } from "@/lib/pricing/system-price-books";
 import { reconcilePricingRows } from "./pricing-rows";
-import { preparePricingPriceEdit } from "./pricing-price-edit";
+import { preparePricingPriceEdit, resolvePricingPriceEdit, type PricingPriceEdit } from "./pricing-price-edit";
+import { PricingUnitEditors, pricingMoneyLabel } from "./pricing-unit-editors";
+import { formulaPrice, type PriceFormulaFilters, type UnitPriceMode } from "@/lib/pricing/price-edit";
 import { UnitPriceConfirmation } from "../products/new/unit-price-confirmation";
-import type { EditablePriceUnit, UnitPricingSnapshot } from "@/lib/products/unit-price-edit";
+import type { EditablePriceUnit, UnitPriceChoice, UnitPricingSnapshot } from "@/lib/products/unit-price-edit";
 
 export interface PricingBook {
   id: string;
@@ -61,7 +63,7 @@ function PricingBookLabel({ book }: { book: PricingBook }) {
   return description ? <span tabIndex={0} title={description} className="cursor-help underline decoration-dotted underline-offset-4">{book.name}</span> : book.name;
 }
 
-export function PriceBookEditor({
+function PriceBookBaseEditor({
   row,
   book,
   defaultBookId,
@@ -91,7 +93,7 @@ export function PriceBookEditor({
         aria-label={book.name}
         className={cn("block py-2 text-sm tabular-nums", mobile ? "font-semibold" : "text-right", value == null && "text-slate-500")}
       >
-        {value == null ? labels.noData : formatCurrency(value)}
+        {value == null ? labels.noData : pricingMoneyLabel(value)}
       </span>
     );
   }
@@ -123,7 +125,7 @@ export function PriceBookEditor({
         <MoneyInput
           decimals={2}
           value={value ?? ""}
-          placeholder={fallback ? formatCurrency(row.prices[defaultBookId] ?? 0) : catalogue ? labels.noData : "—"}
+          placeholder={fallback ? pricingMoneyLabel(row.prices[defaultBookId] ?? 0) : catalogue ? labels.noData : "—"}
           onChange={onChange}
           disabled={saving}
           onKeyDown={(event) => {
@@ -157,6 +159,16 @@ export function PriceBookEditor({
   );
 }
 
+export function PriceBookEditor(props: Parameters<typeof PriceBookBaseEditor>[0] & { onUnitCommit?: (value: number | null, unitName: string) => void }) {
+  const hasAlternates = props.row.units?.some((unit) => unit.unitName !== props.row.baseUnit);
+  return <div className="min-w-0">
+    {hasAlternates && <p className="mb-1 text-left text-xs font-semibold">{props.row.baseUnit} <span className="font-normal text-slate-500">· Đơn vị gốc</span></p>}
+    <div className="min-h-11"><PriceBookBaseEditor {...props} /></div>
+    <PricingUnitEditors row={props.row} book={props.book} retailId={props.defaultBookId} disabled={props.saving}
+      onCommit={(value, unitName) => props.onUnitCommit?.(value, unitName)} />
+  </div>;
+}
+
 export function PricingMobileRow({
   row,
   books,
@@ -176,7 +188,7 @@ export function PricingMobileRow({
   labels: PriceEditorLabels;
   onOpenFormula: (rowId: string, bookId: string) => void;
   onPriceChange: (rowId: string, bookId: string, value: number | null) => void;
-  onPriceCommit: (row: PricingRow, bookId: string, value: number | null) => void;
+  onPriceCommit: (row: PricingRow, bookId: string, value: number | null, unitName?: string) => void;
 }) {
   return (
     <article className="min-w-0 p-4">
@@ -203,6 +215,7 @@ export function PricingMobileRow({
                 onOpenFormula={() => onOpenFormula(row.id, book.id)}
                 onChange={(value) => onPriceChange(row.id, book.id, value)}
                 onCommit={(value) => onPriceCommit(row, book.id, value)}
+                onUnitCommit={(value, unitName) => onPriceCommit(row, book.id, value, unitName)}
               />
             </div>
           );
@@ -212,15 +225,17 @@ export function PricingMobileRow({
   );
 }
 
-export function PricingTable({ books: initialBooks, rows: initialRows, total, resetScrollKey, canViewPurchasePrices = false }: { books: PricingBook[]; rows: PricingRow[]; total: number; resetScrollKey?: string | number; canViewPurchasePrices?: boolean }) {
+export function PricingTable({ books: initialBooks, rows: initialRows, total, resetScrollKey, canViewPurchasePrices = false, filters = {} }: { books: PricingBook[]; rows: PricingRow[]; total: number; resetScrollKey?: string | number; canViewPurchasePrices?: boolean; filters?: PriceFormulaFilters }) {
   const t = useTranslations();
   const router = useRouter();
+  const { confirm: confirmDialog } = useConfirmDialog();
   const [books, setBooks] = useState(() => [...initialBooks].sort(comparePriceBooks));
   const [rows, setRows] = useState(initialRows);
   const [previousRows, setPreviousRows] = useState(initialRows);
   const [committedRows, setCommittedRows] = useState(initialRows);
   const [pendingPriceEdit, setPendingPriceEdit] = useState<NonNullable<ReturnType<typeof preparePricingPriceEdit>> | null>(null);
   const savingCellsRef = useRef(new Set<string>());
+  const staleRowsRef = useRef(new Set<string>());
   const [error, setError] = useState("");
   const [savingCell, setSavingCell] = useState<Set<string>>(new Set());
   const [savedCell, setSavedCell] = useState<Set<string>>(new Set());
@@ -233,6 +248,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
     setRows(reconcilePricingRows(rows, previousRows, initialRows));
     setCommittedRows(initialRows);
   }
+  useEffect(() => { staleRowsRef.current.clear(); }, [initialRows]);
 
   // popover "Đặt giá theo công thức"
   const [formula, setFormula] = useState<{ rowId: string; bookId: string } | null>(null);
@@ -241,12 +257,14 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   const [fAmount, setFAmount] = useState(0);
   const [fUnit, setFUnit] = useState<"vnd" | "pct">("pct");
   const [fAll, setFAll] = useState(false);
+  const [fMode, setFMode] = useState<UnitPriceMode>("keep");
   const [applying, setApplying] = useState(false);
 
   function openFormula(rowId: string, bookId: string) {
     const book = books.find((item) => item.id === bookId);
     if (!book || isPriceBookReadOnly(book)) return;
-    setFBase("current"); setFOp("+"); setFAmount(0); setFUnit("pct"); setFAll(false);
+    setError("");
+    setFBase("current"); setFOp("+"); setFAmount(0); setFUnit("pct"); setFAll(false); setFMode("keep");
     setFormula({ rowId, bookId });
   }
   function computeNew(row: PricingRow, bookId: string): number | null {
@@ -257,22 +275,29 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
       : fBase === "list" ? row.prices[listBookId] ?? null
       : (row.prices[bookId] ?? (book && systemPriceBookType(book) === "list" ? null : row.prices[defaultBookId] ?? 0));
     if (base == null) return null;
-    const delta = fUnit === "pct" ? (base * fAmount) / 100 : fAmount;
-    return Math.max(0, Math.round(base + (fOp === "-" ? -delta : delta)));
+    return formulaPrice(base, fOp, fAmount, fUnit);
   }
   async function applyFormula(row: PricingRow, bookId: string) {
     const book = books.find((item) => item.id === bookId);
     const nextPrice = computeNew(row, bookId);
-    if (!book || isPriceBookReadOnly(book) || nextPrice == null) return;
+    if (!book || isPriceBookReadOnly(book) || (!fAll && nextPrice == null)) return;
     if (fAll) {
+      const sourceLabel = fBase === "current" ? "giá hiện tại" : fBase === "cost" ? "giá vốn" : fBase === "lastPurchase" ? "giá nhập cuối" : books.find((item) => item.id === listBookId)?.name ?? "giá niêm yết";
+      const adjustment = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(fAmount);
+      const approved = await confirmDialog({ title: "Xác nhận cập nhật bảng giá",
+        description: `Giá mới = ${sourceLabel} ${fOp === "-" ? "−" : "+"} ${adjustment} ${fUnit === "pct" ? "%" : "đ"}.\nÁp dụng cho tối đa ${total} sản phẩm thuộc bộ lọc hiện tại, trên mọi trang, trong ${book.name}. Chỉ hàng đang bán có giá nền được cập nhật.${book.isDefault ? fMode === "sync" ? " Đồng bộ theo tỷ lệ sẽ xóa tất cả giá riêng theo đơn vị của các sản phẩm được cập nhật." : " Giữ nguyên giá riêng theo đơn vị; giá quy đổi theo giá gốc mới." : " Giá sẽ đổi cho mọi đơn vị của sản phẩm theo quy tắc của bảng giá."} Chứng từ đã lập không thay đổi.`,
+        confirmLabel: "Xác nhận áp dụng", cancelLabel: "Quay lại", variant: "warning" });
+      if (!approved) return;
       setApplying(true); setError("");
-      const res = await applyPriceFormulaAll({ priceBookId: bookId, base: fBase, op: fOp, amount: fAmount, unit: fUnit });
-      setApplying(false);
-      if (res.ok) { setFormula(null); router.refresh(); }
-      else setError(t(res.error as never));
+      try {
+        const res = await applyPriceFormulaAll({ priceBookId: bookId, base: fBase, op: fOp, amount: fAmount, unit: fUnit, filters, unitPriceMode: book.isDefault ? fMode : "keep" });
+        if (res.ok) { setFormula(null); router.refresh(); }
+        else setError(t(res.error as never));
+      } catch { setError(t("errors.serverError")); }
+      finally { setApplying(false); }
     } else {
-      await requestSaveCell(row, bookId, nextPrice);
       setFormula(null);
+      await requestSaveCell(row, bookId, nextPrice, row.baseUnit, true);
     }
   }
 
@@ -288,7 +313,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   const defaultBookId = books.find((b) => b.isDefault)?.id ?? books[0]?.id ?? "";
   const listBookId = books.find((b) => systemPriceBookType(b) === "list")?.id ?? "";
   const cellKey = (rowId: string, bookId: string) => `${rowId}:${bookId}`;
-  const formulaRow = formula ? rows.find((row) => row.id === formula.rowId) : null;
+  const formulaRow = formula ? committedRows.find((row) => row.id === formula.rowId) : null;
   const formulaBook = formula ? books.find((book) => book.id === formula.bookId) : null;
 
   useEffect(() => {
@@ -353,22 +378,20 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
     setDeletingBook(false);
   }
 
-  async function saveCell(row: PricingRow, bookId: string, value: number | null, syncUnitPrices = false) {
-    const book = books.find((item) => item.id === bookId);
-    if (!book || isPriceBookReadOnly(book)) return;
+  async function saveCell(edit: PricingPriceEdit, mode: UnitPriceChoice = "keep", source: string | null = "base") {
+    const { row, bookId } = edit;
     const k = cellKey(row.id, bookId);
-    if (savingCellsRef.current.has(k)) return;
+    if (savingCellsRef.current.has(k) || staleRowsRef.current.has(row.id)) return;
+    const resolved = resolvePricingPriceEdit(edit, mode, source);
     savingCellsRef.current.add(k);
-    setRows((rs) => rs.map((r) => (r.id === row.id ? { ...r, prices: { ...r.prices, [bookId]: value } } : r)));
     setSavingCell((s) => new Set(s).add(k));
     setSavedCell((s) => { const n = new Set(s); n.delete(k); return n; });
     setError("");
     try {
-      const res = await setProductPrice({ priceBookId: bookId, productId: row.id, price: value, ...(syncUnitPrices ? { unitPriceMode: "sync" as const } : {}) });
+      const res = await setProductPrice(resolved.payload);
       if (!res.ok) throw new Error(res.error);
       const acknowledge = (current: PricingRow[]) => current.map((r) => r.id === row.id ? {
-        ...r, prices: { ...r.prices, [bookId]: value },
-        ...(syncUnitPrices ? { units: r.units?.map((unit) => ({ ...unit, priceOverride: null })) } : {}),
+        ...r, prices: { ...r.prices, [bookId]: resolved.row.prices[bookId] }, units: resolved.row.units,
       } : r);
       setCommittedRows(acknowledge);
       setRows(acknowledge);
@@ -378,23 +401,32 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
       updateCell(row.id, bookId, row.prices[bookId] ?? null);
       const message = cause instanceof Error && /^(errors|pricing\.errors)\./.test(cause.message) ? cause.message : "errors.serverError";
       setError(t(message as never));
+      if (message === "pricing.errors.priceChanged") {
+        staleRowsRef.current.add(row.id);
+        router.refresh();
+      }
     } finally {
       savingCellsRef.current.delete(k);
       setSavingCell((s) => { const n = new Set(s); n.delete(k); return n; });
     }
   }
 
-  async function requestSaveCell(row: PricingRow, bookId: string, value: number | null) {
-    if (pendingPriceEdit || savingCellsRef.current.has(cellKey(row.id, bookId))) return;
+  async function requestSaveCell(row: PricingRow, bookId: string, value: number | null, unitName = row.baseUnit, forceConfirmation = false) {
+    if (pendingPriceEdit || savingCellsRef.current.has(cellKey(row.id, bookId)) || staleRowsRef.current.has(row.id)) return;
     const committed = committedRows.find((candidate) => candidate.id === row.id);
     if (!committed) return;
-    const edit = preparePricingPriceEdit(committed, books, bookId, value);
-    if (!edit) {
+    try {
+      const edit = preparePricingPriceEdit(committed, books, bookId, value, unitName, forceConfirmation);
+      if (!edit) {
+        updateCell(row.id, bookId, committed.prices[bookId] ?? null);
+        return;
+      }
+      if (edit.required) setPendingPriceEdit(edit);
+      else await saveCell(edit);
+    } catch {
       updateCell(row.id, bookId, committed.prices[bookId] ?? null);
-      return;
+      setError(t("errors.invalidData"));
     }
-    if (edit.required) setPendingPriceEdit(edit);
-    else await saveCell(committed, bookId, edit.price);
   }
 
   function cancelPriceEdit() {
@@ -403,14 +435,10 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
     setPendingPriceEdit(null);
   }
 
-  function confirmPriceEdit(draft: UnitPricingSnapshot) {
+  function confirmPriceEdit(_draft: UnitPricingSnapshot, mode: UnitPriceChoice, source: string | null) {
     if (!pendingPriceEdit) return;
-    const { row, bookId, price, before } = pendingPriceEdit;
-    const retail = books.find((book) => book.id === bookId)?.isDefault;
-    const syncUnits = !!retail && before.units.some((unit) => unit.priceOverride != null)
-      && draft.units.every((unit) => unit.priceOverride == null);
     setPendingPriceEdit(null);
-    void saveCell(row, bookId, retail ? draft.retailPrice : price, syncUnits);
+    void saveCell(pendingPriceEdit, mode, source);
   }
 
   function updateCell(rowId: string, bookId: string, value: number | null) {
@@ -441,7 +469,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
       render: (r) => (
         <div>
           <div className="font-medium">{r.name}</div>
-          <div className="text-xs text-slate-400">{r.sku} · {r.baseUnit}</div>
+          <div className="text-xs text-slate-400">{r.sku} · {[r.baseUnit, ...(r.units ?? []).filter((unit) => unit.unitName !== r.baseUnit).map((unit) => unit.unitName)].join(" / ")}</div>
         </div>
       ),
     },
@@ -465,6 +493,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
             onOpenFormula={() => openFormula(r.id, b.id)}
             onChange={(value) => updateCell(r.id, b.id, value)}
             onCommit={(value) => requestSaveCell(r, b.id, value)}
+            onUnitCommit={(value, unitName) => requestSaveCell(r, b.id, value, unitName)}
           />
         );
       },
@@ -638,7 +667,9 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
         )}
       />
       {pendingPriceEdit && <UnitPriceConfirmation name={pendingPriceEdit.row.name} before={pendingPriceEdit.before}
-        draft={pendingPriceEdit.draft} books={pendingPriceEdit.books} onCancel={cancelPriceEdit} onConfirm={confirmPriceEdit} />}
+        draft={pendingPriceEdit.draft} books={pendingPriceEdit.books}
+        resolveChoice={(mode, source) => resolvePricingPriceEdit(pendingPriceEdit, mode, source).draft}
+        onCancel={cancelPriceEdit} onConfirm={confirmPriceEdit} />}
       {deleteCandidate && (
         <div
           className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-3 sm:p-6"
@@ -699,7 +730,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
               </button>
             </div>
             <div className="mt-4 text-sm">
-              {t("pricing.formula.newPrice")} <span className="font-bold text-primary-600">[{computeNew(formulaRow, formulaBook.id) == null ? priceEditorLabels.noData : formatCurrency(computeNew(formulaRow, formulaBook.id)!)}]</span>
+              {t("pricing.formula.newPrice")} <span className="font-bold text-primary-600">[{computeNew(formulaRow, formulaBook.id) == null ? priceEditorLabels.noData : pricingMoneyLabel(computeNew(formulaRow, formulaBook.id))}] / {formulaRow.baseUnit}</span>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-1.5 text-sm">
               <span className="text-slate-500">{t("pricing.formula.newPrice")} =</span>
@@ -720,7 +751,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
               />
               <button type="button" onClick={() => setFOp("+")} className={cn("grid h-11 w-11 place-items-center rounded-full border text-sm lg:h-7 lg:w-7", fOp === "+" ? "border-primary-600 bg-primary-600 text-white" : "border-border")}>+</button>
               <button type="button" onClick={() => setFOp("-")} className={cn("grid h-11 w-11 place-items-center rounded-full border text-sm lg:h-7 lg:w-7", fOp === "-" ? "border-primary-600 bg-primary-600 text-white" : "border-border")}>−</button>
-              <NumberInput min={0} value={fAmount} onChange={(value) => setFAmount(value ?? 0)} thousandSeparator={fUnit === "vnd"} suffix={fUnit === "pct" ? "%" : undefined} className="min-h-11 w-20 rounded-md px-2 text-right text-sm" />
+              <MoneyInput min={0} decimals={2} value={fAmount} onChange={(value) => setFAmount(value ?? 0)} aria-label="Mức điều chỉnh" className="min-h-11 w-24 rounded-md border border-border px-2 text-right text-sm" />
               <div className="inline-flex overflow-hidden rounded-md border border-border text-xs">
                 <button type="button" onClick={() => setFUnit("vnd")} className={cn("min-h-11 min-w-11 px-2 lg:min-h-0 lg:min-w-0 lg:py-1.5", fUnit === "vnd" ? "bg-primary-600 text-white" : "")}>VND</button>
                 <button type="button" onClick={() => setFUnit("pct")} className={cn("min-h-11 min-w-11 px-2 lg:min-h-0 lg:min-w-0 lg:py-1.5", fUnit === "pct" ? "bg-primary-600 text-white" : "")}>%</button>
@@ -728,12 +759,20 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
             </div>
             <label className="mt-4 flex min-h-11 min-w-11 items-start gap-2 text-sm lg:min-h-0 lg:min-w-0">
               <Checkbox checked={fAll} onChange={(e) => setFAll(e.target.checked)} className="mt-0.5" />
-              <span>{t("pricing.formula.applyAll", { n: total })} <b>{formulaBook.name}</b></span>
+              <span>Áp dụng cho kết quả lọc trên mọi trang (tối đa {total} sản phẩm) trong <b>{formulaBook.name}</b></span>
             </label>
-            {fAll && <p className="mt-1 text-xs text-slate-500">Chỉ áp dụng cho sản phẩm có giá nền.</p>}
+            {fAll && <>
+              <p className="mt-1 text-xs text-slate-500">Chỉ hàng đang bán có giá nền được cập nhật. Số thực tế có thể ít hơn tổng kết quả lọc.</p>
+              {formulaBook.isDefault && <fieldset className="mt-3 space-y-2 rounded-lg border border-border p-3 text-sm">
+                <legend className="px-1 font-semibold">Giá theo đơn vị</legend>
+                <label className="flex min-h-11 items-center gap-2"><input type="radio" name="bulk-unit-mode" checked={fMode === "keep"} onChange={() => setFMode("keep")} className="accent-teal-700" />Giữ giá riêng</label>
+                <label className="flex min-h-11 items-center gap-2"><input type="radio" name="bulk-unit-mode" checked={fMode === "sync"} onChange={() => setFMode("sync")} className="accent-teal-700" />Đồng bộ theo tỷ lệ (xóa giá riêng)</label>
+              </fieldset>}
+            </>}
+            {error && <p role="alert" className="mt-3 text-sm text-er">{error}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setFormula(null)} className="min-h-11 rounded-lg border border-border px-3 text-sm min-w-11">{t("common.cancel")}</button>
-              <button type="button" onClick={() => applyFormula(formulaRow, formulaBook.id)} disabled={applying || computeNew(formulaRow, formulaBook.id) == null} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white disabled:opacity-50 min-w-11">
+              <button type="button" onClick={() => applyFormula(formulaRow, formulaBook.id)} disabled={applying || (!fAll && computeNew(formulaRow, formulaBook.id) == null)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white disabled:opacity-50 min-w-11">
                 {applying && <Loader2 className="h-4 w-4 animate-spin" />} {t("common.done")}
               </button>
             </div>

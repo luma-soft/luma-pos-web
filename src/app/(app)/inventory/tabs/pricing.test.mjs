@@ -11,7 +11,7 @@ const books = [
   { id: "list", name: "Giá chưa chiết khấu", systemType: "list", isDefault: false, managerOnly: false, sortOrder: 3 },
   { id: "trade", name: "Giá thợ", systemType: null, isDefault: false, managerOnly: false, sortOrder: 4 },
 ];
-const product = { id: "p1", sku: "SP001", name: "Ống nhựa", baseUnit: "m", costPrice: "90000", lastPurchasePrice: "100000", lastPurchaseNetPrice: null, retailPrice: "120000" };
+const product = { id: "p1", sku: "SP001", name: "Ống nhựa", baseUnit: "m", costPrice: 90000, lastPurchasePrice: 100000, lastPurchaseNetPrice: null, baseRetailPrice: 120000 };
 const overrides = { retail: { p1: "9" }, cost: { p1: "8" }, purchase: { p1: "7" }, list: { p1: "140000" }, trade: { p1: "110000" } };
 
 mock.module("@/lib/auth/store-context", () => ({ requireStoreContext: async () => ({ storeId: "store-1", role }) }));
@@ -23,11 +23,13 @@ mock.module("@/lib/data/price-books", () => ({
   getPriceOverridesForProducts: async () => overrides,
 }));
 mock.module("@/lib/data/products", () => ({
-  getProducts: async (_storeId, filters) => {
+  getProductFormOptions: async () => ({ categories: [], brands: [], suppliers: [] }),
+}));
+mock.module("@/lib/data/pricing", () => ({
+  getPricingPage: async (_storeId, filters) => {
     productFilters = filters;
     return { rows: productRows, total: productRows.length, pageCount: 1 };
   },
-  getProductFormOptions: async () => ({ categories: [], brands: [], suppliers: [] }),
 }));
 mock.module("next-intl/server", () => ({ getTranslations: async () => (key) => key }));
 mock.module("./inventory-filter-drawer", () => ({ InventoryFilterDrawer: () => null }));
@@ -39,7 +41,7 @@ mock.module("@/lib/actions/price-books", () => ({
   applyPriceFormulaAll: async () => ({ ok: false }),
 }));
 
-const { PricingTab } = await import("./pricing.tsx");
+const { PricingTab, inventoryPricingFilters } = await import("./pricing.tsx");
 const { PricingTable } = await import("../../pricing/pricing-table.tsx");
 
 async function clientTable(searchParams = {}) {
@@ -63,22 +65,22 @@ beforeEach(() => {
 
 describe("pricing server-to-client data", () => {
   test("passes fixed, zero and linked unit prices to the confirmation boundary", async () => {
-    productRows = [{ ...product, unitDefinitions: [
-      { unitName: "Cây", multiplier: "4.0000", priceOverride: "60000.00" },
-      { unitName: "Bó", multiplier: "20.0000", priceOverride: null },
-      { unitName: "Mẫu", multiplier: "0.2500", priceOverride: "0.00" },
+    productRows = [{ ...product, units: [
+      { id: "cay", unitName: "Cây", multiplier: 4, priceOverride: 60000 },
+      { id: "bo", unitName: "Bó", multiplier: 20, priceOverride: null },
+      { id: "mau", unitName: "Mẫu", multiplier: 0.25, priceOverride: 0 },
     ] }];
     expect((await clientProps()).rows[0].units).toEqual([
-      { unitName: "Cây", multiplier: 4, priceOverride: 60000 },
-      { unitName: "Bó", multiplier: 20, priceOverride: null },
-      { unitName: "Mẫu", multiplier: 0.25, priceOverride: 0 },
+      { id: "cay", unitName: "Cây", multiplier: 4, priceOverride: 60000 },
+      { id: "bo", unitName: "Bó", multiplier: 20, priceOverride: null },
+      { id: "mau", unitName: "Mẫu", multiplier: 0.25, priceOverride: 0 },
     ]);
   });
 
   test("price revalidation preserves the table identity and scroll reset key", async () => {
     const before = await clientTable({ page: "2", q: "Ống" });
     overrides.list.p1 = "150000";
-    productRows = [{ ...product, retailPrice: "130000" }];
+    productRows = [{ ...product, baseRetailPrice: 130000 }];
     const after = await clientTable({ page: "2", q: "Ống" });
     expect(after.props.rows[0].prices.list).toBe(150000);
     expect(after.props.rows[0].prices.retail).toBe(130000);
@@ -118,11 +120,14 @@ describe("pricing server-to-client data", () => {
 
   test("pricing requests individual SKUs and preserves search and filters", async () => {
     productRows = [
-      { ...product, id: "rap-e", sku: "RAP2200(E)", name: "Ruijie RAP2200(E)", retailPrice: "1490000" },
-      { ...product, id: "rap-f", sku: "RAP2200(F)", name: "Ruijie RAP2200(F)", retailPrice: "1190000" },
+      { ...product, id: "rap-e", sku: "RAP2200(E)", name: "Ruijie RAP2200(E)", baseRetailPrice: 1490000 },
+      { ...product, id: "rap-f", sku: "RAP2200(F)", name: "Ruijie RAP2200(F)", baseRetailPrice: 1190000 },
     ];
-    const props = await clientProps({ q: "2200", category: "network", brandId: "ruijie", status: "active" });
-    expect(productFilters).toMatchObject({ view: "flat", q: "2200", categoryId: "network", brandId: "ruijie", status: "active" });
+    const category = "11111111-1111-4111-8111-111111111111", brand = "22222222-2222-4222-8222-222222222222";
+    const props = await clientProps({ q: "2200", category, brandId: brand, status: "active" });
+    expect(productFilters).toMatchObject({ q: "2200", categoryIds: [category], brandIds: [brand], lifecycle: "active" });
+    const { page, pageSize, sort, ...listingFilters } = productFilters;
+    expect(props.filters).toEqual(listingFilters);
     expect(props.rows.map((row) => [row.id, row.sku, row.name, row.prices.retail])).toEqual([
       ["rap-e", "RAP2200(E)", "Ruijie RAP2200(E)", 1490000],
       ["rap-f", "RAP2200(F)", "Ruijie RAP2200(F)", 1190000],
@@ -133,6 +138,19 @@ describe("pricing server-to-client data", () => {
   test("custom books retain an empty override for the retail placeholder", async () => {
     delete overrides.trade.p1;
     expect((await clientProps()).rows[0].prices.trade).toBeNull();
+  });
+
+  test("pagination never changes the bulk predicate and aliases stay explicit", async () => {
+    const params = { q: "Ống C3", status: "inactive", stock: "instock", productKind: "product" };
+    const first = await clientProps({ ...params, page: "1" });
+    const last = await clientProps({ ...params, page: "9" });
+    expect(first.filters).toEqual(last.filters);
+    expect(first.filters).toMatchObject({ q: "Ống C3", lifecycle: "paused", stock: "available", productKind: "product" });
+    expect(inventoryPricingFilters({ stock: "low" }).stock).toBe("lowStock");
+    expect(inventoryPricingFilters({ stock: "out" }).stock).toBe("outOfStock");
+    expect(inventoryPricingFilters({ status: "all" }).lifecycle).toBe("all");
+    expect(() => inventoryPricingFilters({ category: "invalid-id" })).toThrow();
+    expect(() => inventoryPricingFilters({ stock: "overStock" })).toThrow();
   });
 
   test.each(["owner", "manager"])("%s can see purchase sources", async (allowedRole) => {

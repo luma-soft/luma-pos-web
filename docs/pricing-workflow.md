@@ -42,8 +42,33 @@ Form hiển thị giá gốc cùng tên đơn vị; đơn vị bổ sung có gi�
 
 Mobile POS đọc giá riêng theo cùng chính sách web. Đổi đơn vị/bảng giá lấy giá hiện hành; chỉ sửa số lượng/chiết khấu của dòng đã lưu giữ giá và hệ số lịch sử. Đơn giá nhập tay thuộc đơn vị đang bán, không bị nhân hệ số hai lần.
 
+## Thiết lập giá trên web và mobile
+
+Mỗi SKU hiển thị đơn vị gốc và các đơn vị bổ sung cùng hệ số, giá hiện hành. Một dòng `product_units` trùng tên đơn vị gốc không được coi là đơn vị bổ sung; đơn vị khác tên có hệ số 1 vẫn hợp lệ.
+
+- Giá chung: sửa đơn vị bổ sung ở chế độ **Giữ giá riêng** chỉ đổi giá riêng của đơn vị đó; xóa giá riêng để trở lại quy đổi. Chọn **Đồng bộ theo tỷ lệ** lấy đơn vị vừa sửa làm nguồn, cập nhật giá gốc và xóa giá riêng của SKU trong một giao dịch.
+- Giá chưa chiết khấu: giá đơn vị bổ sung quy đổi theo hệ số. Sửa giá đơn vị bổ sung quy ngược về giá gốc của bảng này, không đổi Giá chung.
+- Bảng tự tạo: giữ chính sách tỷ lệ giá riêng hiện có so với Giá chung. Khi không thể quy ngược duy nhất (giá gốc/giá riêng bằng 0), đơn vị bổ sung chỉ đọc và yêu cầu sửa giá theo đơn vị gốc. Xóa giá bảng chỉ thực hiện tại đơn vị gốc.
+- Giá vốn/Giá nhập cuối chỉ đọc. Giá thiếu khác giá 0; nhập sai định dạng không được hiểu là xóa giá. Giá đầu vào được chuẩn hóa 2 số lẻ trước quy đổi; phép tính tiền dùng số thập phân chính xác, gồm trường hợp đúng nửa xu.
+- Xác nhận hiển thị trước/sau và mặc định giữ giá riêng. Hủy hoặc lưu không thay đổi không gửi cập nhật. Payload của màn Thiết lập giá gửi snapshot đã xem; server so sánh giá gốc, Giá chung, tên/hệ số/giá riêng các đơn vị dưới khóa trước khi ghi. Nếu dữ liệu đã đổi, yêu cầu tải lại và xác nhận lại, không ghi đè âm thầm. Client cũ chưa gửi snapshot vẫn tương thích.
+
+Công thức hàng loạt dùng cùng bộ lọc với danh sách, qua **mọi trang**, và chỉ áp dụng SKU đang bán, bán trực tiếp, có giá nền. Số hiển thị là số lượng **tối đa** trong danh sách lọc, không cam kết tất cả có giá nền. Bộ lọc không hợp lệ bị từ chối, không bỏ qua để mở rộng phạm vi. Đồng bộ đơn vị hàng loạt chỉ có ở Giá chung và chỉ xóa giá riêng của SKU thực sự được cập nhật. Giá chưa chiết khấu là một nguồn công thức; kết quả làm tròn 2 số lẻ và không âm.
+
+## Bảng giá POS và làm mới catalog
+
+Web/mobile dùng cùng chính sách khi đổi bảng giá:
+
+- Toàn hóa đơn: giữ dòng giá nhập tay cùng chiết khấu; lấy giá mới và bỏ chiết khấu dòng không nhập tay. Nếu có ảnh hưởng giá/chiết khấu thì xác nhận trước khi thay đổi.
+- Từng dòng: đổi bảng giá hoặc đơn vị có xác nhận khi cần bỏ giá nhập tay/chiết khấu. Không cập nhật một phần giỏ nếu một dòng không có giá ở bảng đích.
+- Chọn khách hàng không tự đổi bảng giá theo các nhãn retail/wholesale/vip cố định. Giá chung vẫn là mặc định.
+- Khuyến mại tự động dùng số lượng đã quy đổi về đơn vị gốc và không cộng vào Giá chưa chiết khấu, giá nhập tay hoặc dòng có chiết khấu riêng. Chiết khấu tiền nhập ở POS là tiền trên mỗi đơn vị; draft mobile cũ lưu tiền cả dòng được chuyển đổi một lần để giữ nguyên tổng tiền.
+
+Catalog mobile lưu bảng giá và khuyến mại theo cửa hàng/người dùng; tập rỗng từ server xóa dữ liệu cũ, trường vắng mặt từ API cũ không xóa nhầm. Khi ứng dụng trở lại hoặc catalog thay đổi, cập nhật danh mục nhưng giữ snapshot giá/hệ số đang bán. Trước checkout, mobile kiểm tra lại catalog/khuyến mại, kể cả khi revision không đổi (khuyến mại có thể bắt đầu/kết thúc theo giờ). Nếu giá, hệ số hoặc tổng tiền thay đổi, dừng trước tạo đơn/thu tiền để người bán xem lại. Báo giá đã lưu dùng snapshot riêng. Bước kiểm tra này không phải khóa giá phía server trong khoảng giữa kiểm tra và tạo đơn.
+
 ## Migration và kiểm tra
 
 `0129_four_price_books.sql` đã áp dụng bằng migration runner có tracking/session lock. Giữ ID bảng nhập nội bộ cũ; tạo ID mới cho bảng công ty và lưu tên bảng cũ trên các dòng đơn lịch sử trước khi đổi tên. Không sửa giá trị sản phẩm hoặc tổng chứng từ. Catalog web tăng schema version để bỏ giá nhập gross đã cache dưới loại purchase cũ.
+
+`0130_pricing_catalog_revision.sql` đã áp dụng ngày 2026-09-04 sau xác nhận của người dùng, bằng migration runner có session/advisory lock và tracking. Migration bổ sung trigger revision cho thay đổi bảng giá và khuyến mại, đồng thời làm mới các snapshot cũ một lần. Không đổi giá hoặc chứng từ. Kiểm thử biệt lập xác nhận phạm vi theo cửa hàng; hậu kiểm database xác nhận cả hai trigger bật và không còn migration chờ.
 
 Kiểm tra tập trung bao gồm migration/RLS, giá net theo chứng từ và đơn vị, nguồn giá/role POS, giá thiếu/0, hai biến thể RAP2200, công thức và ghi giá, opt-in nhập hàng, snapshot chiết khấu, đơn cũ và bản in A4/K80, làm tròn và mở lại đơn trên mobile. Bộ chọn giá nền đã được kiểm tra trạng thái mở trong trình duyệt.

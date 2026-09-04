@@ -4178,6 +4178,7 @@
     },
     "errors": {
       "priceUnavailable": "This product has no price in this price book. Choose another price book.",
+      "priceChanged": "Prices or units changed elsewhere. Reload and review the changes before saving.",
       "systemReadOnly": "System price books update automatically and cannot be edited or deleted.",
       "cannotDeleteDefault": "Cannot delete default price book"
     },

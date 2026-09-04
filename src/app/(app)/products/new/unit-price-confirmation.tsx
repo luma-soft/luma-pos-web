@@ -35,17 +35,18 @@ export function UnitPricePreview({ title, rows, baseUnit }: { title: string; row
 }
 
 /** Content is independently renderable for semantic/preview tests. */
-export function UnitPriceConfirmationContent({ name, before, draft, books = [], siblingScope, mode, source, onMode, onSource, onCancel, onConfirm, titleId, descriptionId }: {
+export function UnitPriceConfirmationContent({ name, before, draft, books = [], siblingScope, mode, source, resolveChoice, onMode, onSource, onCancel, onConfirm, titleId, descriptionId }: {
   name: string; before: UnitPricingSnapshot; draft: UnitPricingSnapshot; books?: UnitPriceBook[];
   siblingScope?: SiblingScope;
   mode: UnitPriceChoice; source: string | null;
+  resolveChoice?: (mode: UnitPriceChoice, source: string | null) => UnitPricingSnapshot;
   onMode: (mode: UnitPriceChoice) => void; onSource: (source: string) => void;
   onCancel: () => void; onConfirm: () => void; titleId: string; descriptionId: string;
 }) {
   const initialReview = buildUnitPriceReview(before, draft, books);
   const validSource = initialReview.sources.some((candidate) => candidate.key === source);
   const awaitingSource = mode === "sync" && !validSource;
-  const projected = awaitingSource ? draft : applyUnitPriceChoice(draft, mode, source);
+  const projected = awaitingSource ? draft : resolveChoice ? resolveChoice(mode, source) : applyUnitPriceChoice(draft, mode, source);
   const preview = buildUnitPriceReview(before, projected, books);
 
   return <>
@@ -94,10 +95,11 @@ export function UnitPriceConfirmationContent({ name, before, draft, books = [], 
   </>;
 }
 
-export function UnitPriceConfirmation<T extends UnitPricingSnapshot>({ name, before, draft, books, siblingScope, onCancel, onConfirm }: {
+export function UnitPriceConfirmation<T extends UnitPricingSnapshot>({ name, before, draft, books, siblingScope, resolveChoice, onCancel, onConfirm }: {
   name: string; before: UnitPricingSnapshot; draft: T; books: UnitPriceBook[];
   siblingScope?: SiblingScope;
-  onCancel: () => void; onConfirm: (value: T) => void;
+  resolveChoice?: (mode: UnitPriceChoice, source: string | null) => T;
+  onCancel: () => void; onConfirm: (value: T, mode: UnitPriceChoice, source: string | null) => void;
 }) {
   const id = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -128,8 +130,8 @@ export function UnitPriceConfirmation<T extends UnitPricingSnapshot>({ name, bef
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`} tabIndex={-1}
       className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-surface text-foreground shadow-2xl outline-none"
       onMouseDown={(event) => event.stopPropagation()}>
-      <UnitPriceConfirmationContent name={name} before={before} draft={draft} books={books} siblingScope={siblingScope} mode={mode} source={source} onMode={setMode} onSource={setSource}
-        titleId={`${id}-title`} descriptionId={`${id}-description`} onCancel={onCancel} onConfirm={() => onConfirm(applyUnitPriceChoice(draft, mode, source))} />
+      <UnitPriceConfirmationContent name={name} before={before} draft={draft} books={books} siblingScope={siblingScope} mode={mode} source={source} resolveChoice={resolveChoice} onMode={setMode} onSource={setSource}
+        titleId={`${id}-title`} descriptionId={`${id}-description`} onCancel={onCancel} onConfirm={() => onConfirm(resolveChoice ? resolveChoice(mode, source) : applyUnitPriceChoice(draft, mode, source), mode, source)} />
     </div>
   </div>, document.body);
 }
