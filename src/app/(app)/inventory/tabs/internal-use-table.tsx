@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 import { LayoutList } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
@@ -91,19 +92,15 @@ function ExpandedIssue({ row }: { row: InternalUseRow }) {
 
   return (
     <div className="bg-surface px-4 py-4">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-extrabold">{row.code}</h3>
-            <StatusBadge status={row.status} />
-          </div>
-          <div className="mt-3 grid gap-x-8 gap-y-2 text-sm md:grid-cols-2 xl:grid-cols-4">
-            <Info label={isVi ? "Người tạo" : "Created by"} value={row.createdByName ?? "—"} />
-            <Info label={isVi ? "Loại xuất" : t("internalUse.reason")} value={internalUseReasonLabel(row.reason, locale)} />
-            <Info label={isVi ? "Người nhận" : t("internalUse.department")} value={row.department ?? "—"} />
-            <Info label={isVi ? "Ngày xuất" : t("orders.cols.date")} value={formatDate(row.createdAt)} />
-          </div>
-        </div>
+      <div className="mb-4 grid min-w-0 gap-4 rounded-lg border border-border-soft bg-canvas p-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+        <Info label={isVi ? "Người tạo" : "Created by"} value={row.createdByName ?? "—"} />
+        <Info label={isVi ? "Loại xuất" : t("internalUse.reason")} value={internalUseReasonLabel(row.reason, locale)} />
+        <Info label={isVi ? "Người nhận" : t("internalUse.department")} value={row.department ?? "—"} />
+        <Info label={isVi ? "Ngày xuất" : t("orders.cols.date")} value={formatDate(row.createdAt)} />
+        <Info label={isVi ? "Trạng thái" : t("orders.cols.status")} value={<StatusBadge status={row.status} />} />
+        <Info label={isVi ? "Tổng số lượng" : "Total quantity"} value={formatNumber(totalQty)} />
+        <Info label={isVi ? "Tổng giá trị" : "Total value"} value={formatCurrency(row.totalCost)} />
+        <Info label={t("internalUse.note")} value={row.note ?? (isVi ? "Không có ghi chú" : "No note")} />
       </div>
 
       <div className="overflow-hidden rounded-card border border-border">
@@ -160,15 +157,6 @@ function ExpandedIssue({ row }: { row: InternalUseRow }) {
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-        <div className="min-h-24 rounded-card border border-border bg-canvas px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
-          {row.note ?? (isVi ? "Không có ghi chú" : "No note")}
-        </div>
-        <div className="rounded-card bg-canvas px-4 py-3 text-sm">
-          <SummaryLine label={isVi ? "Tổng số lượng" : "Total quantity"} value={formatNumber(totalQty)} />
-          <SummaryLine label={isVi ? "Tổng giá trị" : "Total value"} value={formatCurrency(row.totalCost)} strong />
-        </div>
-      </div>
 
     </div>
   );
@@ -184,20 +172,11 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="border-b border-border-soft pb-2">
-      <div className="text-xs font-semibold text-slate-500">{label}</div>
-      <div className="mt-1 truncate text-sm font-medium">{value}</div>
-    </div>
-  );
-}
-
-function SummaryLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-1.5">
-      <span className="text-slate-500">{label}</span>
-      <span className={cn("font-mono tabular-nums", strong && "font-extrabold text-foreground")}>{value}</span>
+    <div className="min-w-0 space-y-1">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="break-words text-sm font-medium tabular-nums">{value}</div>
     </div>
   );
 }
