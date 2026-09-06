@@ -182,11 +182,11 @@ function ShopPolicyForm({
         <input type="hidden" name="warehouseId" value={policy.warehouseId ?? ""} />
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Tồn đệm" : "Stock buffer"}</span>
-          <NumberInput name="stockBuffer" min={0} defaultValue={policy.stockBuffer} className="bg-canvas" />
+          <NumberInput name="stockBuffer" decimals={4} min={0} defaultValue={policy.stockBuffer} className="bg-canvas" />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Ngưỡng tồn thấp" : "Min stock"}</span>
-          <NumberInput name="minStockThreshold" min={0} defaultValue={policy.minStockThreshold} className="bg-canvas" />
+          <NumberInput name="minStockThreshold" decimals={4} min={0} defaultValue={policy.minStockThreshold} className="bg-canvas" />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Khi hết hàng" : "Out of stock"}</span>

@@ -16,7 +16,7 @@ export function formatCurrency(value: number | string): string {
 
 export function formatNumber(value: number | string): string {
   const n = typeof value === "string" ? parseFloat(value) : value;
-  return new Intl.NumberFormat("vi-VN").format(n);
+  return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 4 }).format(n);
 }
 
 export function formatDate(d: Date | string): string {

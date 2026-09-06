@@ -119,7 +119,7 @@ export function PromoQuickCreate() {
             {tiers.map((tier, i) => (
               <div key={i} className="grid grid-cols-[auto_minmax(132px,1fr)_44px] items-center gap-2 text-sm sm:grid-cols-[auto_minmax(132px,132px)_minmax(0,1fr)_minmax(64px,88px)_auto_44px] lg:grid-cols-[auto_minmax(72px,96px)_minmax(0,1fr)_minmax(64px,88px)_auto_auto]">
                 <Text as="span" variant="muted" text="≥" />
-                <QuantityInput min={1} value={tier.minQty}
+                <QuantityInput min={0.0001} value={tier.minQty}
                   onChange={(minQty) => setTiers((ts) => ts.map((x, j) => j === i ? { ...x, minQty } : x))}
                   className="w-full text-right" />
                 <Text as="span" variant="muted" className="col-span-3 row-start-2 truncate sm:col-auto sm:row-auto" text={`${product?.baseUnit ?? t("purchases.unitLabel")} → ${t("promos.discount")}`} />

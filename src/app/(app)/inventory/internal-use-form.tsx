@@ -242,7 +242,7 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
                       <div className="col-span-2 space-y-1 text-xs font-semibold text-slate-500">
                         <span>{t("internalUse.qty")}</span>
                         <QuantityInput
-                          min={1}
+                          min={0.0001}
                           value={l.quantity}
                           onChange={(quantity) => upd(l.key, { quantity })}
                           touchTargets
@@ -313,7 +313,7 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
                           className="bg-canvas"
                         />
                       </td>
-                      <td className="px-3 py-2"><QuantityInput min={1} value={l.quantity} onChange={(quantity) => upd(l.key, { quantity })} size="sm" className="w-28" /></td>
+                      <td className="px-3 py-2"><QuantityInput min={0.0001} value={l.quantity} onChange={(quantity) => upd(l.key, { quantity })} size="sm" className="w-28" /></td>
                       <td className="px-3 py-3 text-right font-mono text-slate-700 dark:text-slate-200">{formatCurrency(l.unitCost)}</td>
                       <td className="px-3 py-3 text-right font-mono font-bold">{formatCurrency(l.unitCost * l.quantity)}</td>
                       <td className="sticky right-0 bg-surface px-3 py-2 text-right shadow-[-10px_0_18px_rgba(15,23,42,0.04)]">

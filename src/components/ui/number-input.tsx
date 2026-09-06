@@ -4,6 +4,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Input, type InputProps } from "./input";
 import { Text } from "./text";
+import { parseNumberInput } from "./number-input-format";
 
 export interface NumberInputProps
   extends Omit<InputProps, "type" | "value" | "onChange" | "defaultValue"> {
@@ -21,6 +22,8 @@ export interface NumberInputProps
   min?: number;
   max?: number;
   decimals?: number;
+  /** Keep incomplete edits local until blur (e.g. quantity 1 → 0 → 0.5). */
+  commitOnBlur?: boolean;
 }
 
 const formatNumber = (val: number, sep: boolean, decimals = 0): string => {
@@ -35,18 +38,11 @@ const formatNumber = (val: number, sep: boolean, decimals = 0): string => {
   return String(Math.round(val * factor) / factor);
 };
 
-const parseNumber = (str: string): number | null => {
-  const cleaned = str.replace(/[^\d.,-]/g, "").replace(/\./g, "").replace(",", ".");
-  if (cleaned === "" || cleaned === "-") return null;
-  const n = parseFloat(cleaned);
-  return isNaN(n) ? null : n;
-};
-
 const affixPadding = (value: string) =>
   `calc(1rem + ${Math.max(1, Array.from(value.trim()).length)}ch)`;
 
 export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
-  ({ value, defaultValue, onChange, thousandSeparator = true, formatOnChange = false, suffix, prefix, min, max, decimals = 0, className, name, style, ...props }, ref) => {
+  ({ value, defaultValue, onChange, thousandSeparator = true, formatOnChange = false, suffix, prefix, min, max, decimals = 0, commitOnBlur = false, className, name, style, onFocus, onBlur, onKeyDown, ...props }, ref) => {
     const initialValue = value ?? defaultValue ?? null;
     const [text, setText] = React.useState<string>(
       value != null ? formatNumber(value, thousandSeparator, decimals) :
@@ -56,7 +52,11 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
       initialValue,
     );
 
+    const editing = React.useRef(false);
+    const parseNumber = (raw: string) => parseNumberInput(raw, { thousandSeparator, decimals });
+
     React.useEffect(() => {
+      if (editing.current) return;
       if (value != null) {
         setText(formatNumber(value, thousandSeparator, decimals));
         setNumericValue(value);
@@ -69,6 +69,10 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
     function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
       const raw = e.target.value;
       const parsed = parseNumber(raw);
+      if (commitOnBlur) {
+        setText(raw);
+        return;
+      }
 
       if (parsed !== null) {
         const clamped = Math.min(
@@ -89,7 +93,8 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
       onChange?.(null);
     }
 
-    function handleBlur() {
+    function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
+      editing.current = false;
       const parsed = parseNumber(text);
       if (parsed !== null) {
         const clamped = Math.min(
@@ -98,10 +103,13 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
         );
         setText(formatNumber(clamped, thousandSeparator, decimals));
         setNumericValue(clamped);
+        if (commitOnBlur) onChange?.(clamped);
       } else {
         setText("");
         setNumericValue(null);
+        if (commitOnBlur) onChange?.(null);
       }
+      onBlur?.(e);
     }
 
     return (
@@ -118,6 +126,15 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
           value={text}
           onChange={handleChange}
           onBlur={handleBlur}
+          onFocus={(e) => {
+            editing.current = true;
+            if (decimals > 0 && !formatOnChange) setText(numericValue == null ? "" : String(numericValue));
+            onFocus?.(e);
+          }}
+          onKeyDown={(e) => {
+            if (commitOnBlur && e.key === "Enter") e.currentTarget.blur();
+            onKeyDown?.(e);
+          }}
           style={{
             ...style,
             ...(prefix ? { paddingLeft: affixPadding(prefix) } : null),

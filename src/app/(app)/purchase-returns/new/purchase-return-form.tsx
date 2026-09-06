@@ -1,5 +1,6 @@
 "use client";
 
+import { positiveQuantityOrDefault } from "@/lib/quantity";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -127,7 +128,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
       const product = matches.find((row) => row.sku.toLowerCase() === query.toLowerCase()) ?? matches[0];
       if (!product || seen.has(product.id)) continue;
       seen.add(product.id);
-      const quantity = Math.max(1, Number(item.quantity) || 1);
+      const quantity = positiveQuantityOrDefault(item.quantity);
       const unitCost = Number(item.unitCost) || Number(product.costPrice) || 0;
       nextLines.push({ ...productToLine(product), quantity, returnUnitCost: unitCost });
     }

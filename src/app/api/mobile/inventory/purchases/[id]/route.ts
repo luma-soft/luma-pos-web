@@ -20,6 +20,9 @@ export async function GET(
     id: purchase.id,
     code: purchase.code,
     status: purchase.status,
+    canEdit: purchase.status === "received" || purchase.status === "draft",
+    canCancel: (purchase.status === "received" || purchase.status === "draft")
+      && (gate.role === "owner" || gate.role === "manager"),
     createdAt: purchase.createdAt,
     supplierId: purchase.supplierId,
     supplierName: purchase.supplierName,

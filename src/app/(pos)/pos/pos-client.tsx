@@ -1,5 +1,6 @@
 "use client";
 
+import { positiveQuantityOrDefault } from "@/lib/quantity";
 import { posBasePrice, posUnitPrice } from "@/lib/pos/price-book-price";
 import { approvePriceBookSwitch, prepareInvoicePriceBookSwitch, prepareLinePriceBookSwitch, selectedPosUnitPrice } from "@/lib/pos/price-book-switch";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
@@ -391,7 +392,7 @@ function pendingAiCartItem(raw: unknown, index: number): PosAiUnresolvedItem | n
     key: `ai-unresolved-${index}-${item.sku ?? label}`,
     label,
     sku: item.sku?.trim() || undefined,
-    quantity: Math.max(1, Math.trunc(Number(item.quantity) || 1)),
+    quantity: positiveQuantityOrDefault(item.quantity),
     reason: item.reason === "inactive_or_not_found" ? "Sản phẩm không active hoặc không có trong danh mục" : "Không tìm thấy sản phẩm active trong danh mục",
   };
 }
@@ -417,7 +418,7 @@ function matchAiCartDraftItems(rawItems: unknown[], products: PosProduct[]) {
       if (pending) unresolved.push(pending);
       return;
     }
-    matched.push({ product, quantity: Math.max(1, Math.trunc(Number(item.quantity) || 1)) });
+    matched.push({ product, quantity: positiveQuantityOrDefault(item.quantity) });
   });
   return { matched, unresolved };
 }
@@ -1177,7 +1178,7 @@ export function PosClient({
   }
 
   const addQuantityToCart = useCallback((p: PosProduct, quantity: number) => {
-    const safeQuantity = Math.max(1, Math.trunc(Number(quantity) || 1));
+    const safeQuantity = positiveQuantityOrDefault(quantity);
     if (!Number.isFinite(basePriceFor(p, priceBook, data.priceBooks))) {
       setError(t("pricing.errors.priceUnavailable"));
       return;

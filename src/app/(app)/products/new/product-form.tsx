@@ -1530,6 +1530,7 @@ function StockFields() {
       </Field>
       <Field labelTx="products.stock.min">
         <NumberInput
+          decimals={4}
           value={watch("minLevel")}
           onChange={(v) => setValue("minLevel", v ?? 0)}
           min={0}
@@ -1537,6 +1538,7 @@ function StockFields() {
       </Field>
       <Field labelTx="products.stock.max">
         <NumberInput
+          decimals={4}
           value={watch("maxLevel")}
           onChange={(v) => setValue("maxLevel", v ?? 999_999_999)}
           min={0}

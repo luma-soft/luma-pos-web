@@ -894,7 +894,7 @@ function SyncFields({ form, set, L }: { form: FormState; set: <K extends keyof F
             className="w-full"
           />
         </Field>
-        <Field label={L ? "Ngưỡng tồn thấp" : "Min stock threshold"}><NumberInput className={FIELD} min={0} value={form.minStockThreshold} onChange={(value) => set("minStockThreshold", value ?? 0)} /></Field>
+        <Field label={L ? "Ngưỡng tồn thấp" : "Min stock threshold"}><NumberInput className={FIELD} min={0} decimals={4} value={form.minStockThreshold} onChange={(value) => set("minStockThreshold", value ?? 0)} /></Field>
         <Field label={L ? "Khi hết hàng" : "Out of stock"}>
           <Select
             value={form.outOfStockBehavior}

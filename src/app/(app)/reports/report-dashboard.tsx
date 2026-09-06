@@ -83,7 +83,7 @@ export function ProductsReport({ data, rows }: { data: ReportsData; rows: Report
     <div className="space-y-4">
       <KpiGrid>
         <KpiCard label="Sản phẩm bán" value={formatNumber(data.summary.productCount)} delta={data.comparison.productCount} />
-        <KpiCard label="Số lượng" value={formatNumber(Math.round(data.summary.quantitySold))} delta={data.comparison.quantitySold} />
+        <KpiCard label="Số lượng" value={formatNumber(data.summary.quantitySold)} delta={data.comparison.quantitySold} />
         <KpiCard label="Doanh thu thuần" value={compactMoney(data.summary.revenue)} delta={data.comparison.revenue} thirdMobile />
         <KpiCard label="Lãi gộp" value={compactMoney(data.summary.grossProfit)} delta={data.comparison.grossProfit} thirdMobile />
         <KpiCard label="Biên lãi gộp" value={percent(data.summary.grossMargin)} delta={data.comparison.grossMargin} point thirdMobile />

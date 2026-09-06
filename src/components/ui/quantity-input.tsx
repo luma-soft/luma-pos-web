@@ -132,6 +132,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
           max={upperBound}
           decimals={decimals}
           thousandSeparator={false}
+          commitOnBlur
           size={size}
           disabled={disabled}
           readOnly={readOnly}

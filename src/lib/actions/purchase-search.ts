@@ -1,5 +1,6 @@
 "use server";
 
+import { positiveQuantityOrDefault } from "@/lib/quantity";
 import { getPurchaseProductRowsByIds, searchPurchaseProductRows, type PurchaseProductRow } from "@/lib/data/inventory";
 import { resolveAiProductUnit } from "@/lib/ai/entity-matching";
 import { requireStockAccess } from "./common";
@@ -131,7 +132,7 @@ export async function resolvePurchaseDraftProducts(
     const seedProductId = product?.id ?? productId;
     const unitName = resolvedUnit.unitName || sourceUnitName;
     const multiplier = resolvedUnit.unitName ? resolvedUnit.multiplier : Math.max(1, Number(item.unitMultiplier) || 1);
-    const quantity = Math.max(1, Number(item.quantity) || 1);
+    const quantity = positiveQuantityOrDefault(item.quantity);
     const unitCost = Math.max(0, Number(item.unitCost) || 0);
     const discount = Math.max(0, Number(item.discount) || 0);
     out.push({
