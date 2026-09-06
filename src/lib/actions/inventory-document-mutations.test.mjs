@@ -9,18 +9,20 @@ const pg = new PGlite();
 const database = drizzle(pg, { schema });
 const storeId = randomUUID(), userId = randomUUID(), supplierId = randomUUID(), warehouseId = randomUUID();
 let allowed = true;
+let role = "owner";
 mock.module("@/db", () => ({ db: database }));
 mock.module("@/lib/auth/store-context", () => ({
-  requireStoreContext: async () => ({ storeId, userId, role: allowed ? "owner" : "cashier", features: {} }),
+  requireStoreContext: async () => ({ storeId, userId, role: allowed ? role : "cashier", features: {} }),
   getAuthenticatedUser: async () => ({ id: userId }),
-  resolveStoreContextForUser: async () => ({ storeId, userId, role: allowed ? "owner" : "cashier", features: {} }),
+  resolveStoreContextForUser: async () => ({ storeId, userId, role: allowed ? role : "cashier", features: {} }),
   UnauthorizedError: class UnauthorizedError extends Error {},
 }));
 mock.module("@/lib/sync/revalidate-app-data", () => ({ revalidateAppData: () => {} }));
 mock.module("@/lib/notifications/events-core", () => ({ createDebtChangedEventInTx: async () => null }));
 mock.module("@/lib/notifications/outbox", () => ({ publishCommittedNotification: async () => {} }));
 const { createPurchaseReturn, updatePurchaseReturn, deletePurchaseReturn } = await import("./purchase-returns");
-const { createInternalUse, updateInternalUse, deleteInternalUse } = await import("./internal-use");
+const { createInternalUse, updateInternalUse, deleteInternalUse, approveInternalUse } = await import("./internal-use");
+const { getInternalUseCostSummary } = await import("../data/inventory");
 const tables = [schema.products, schema.purchaseOrders, schema.purchaseReturns, schema.purchaseReturnItems,
   schema.stockLevels, schema.stockLots, schema.stockLotMovements, schema.stockMovements,
   schema.profiles, schema.shifts, schema.suppliers, schema.warehouses, schema.auditLogs, schema.notificationEvents,
@@ -51,7 +53,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  allowed = true;
+  allowed = true; role = "owner";
   await pg.exec(`truncate ${tables.map(table => `"${getTableConfig(table).name}"`).join(",")}`);
   await database.insert(schema.profiles).values({ id: userId, storeId, fullName: "Owner", role: "owner" });
   await database.insert(schema.suppliers).values({ id: supplierId, storeId, code: "NCC", name: "Supplier", currentDebt: "30" });
@@ -156,4 +158,62 @@ test("unchanged edit preserves historical deficit but cannot increase it",async(
  expect((await snapshot()).stock).toBe(-2);
  const reversed=(await pg.query("select unit_cost from stock_movements where ref_type='purchase_return_reversal'")).rows;
  expect(reversed.every(row=>row.unit_cost===null)).toBe(true);
+});
+
+
+test("internal-use draft create/edit/delete do not move stock; complete posts exactly once", async () => {
+  const p = await product();
+  const input = { warehouseId, intent: "draft", items: [{ productId: p, productName: "Product", unitName: "kg", unitMultiplier: 1, quantity: 0.5, unitCost: 10 }] };
+  const before = await snapshot();
+  const draft = await createInternalUse(input);
+  expect(draft.ok).toBe(true);
+  expect(draft.data.status).toBe("draft");
+  expect((await getInternalUseCostSummary(storeId)).total).toBe(0);
+  expect(await snapshot()).toEqual(before);
+  expect((await pg.query("select count(*)::int as n from stock_movements")).rows[0].n).toBe(0);
+  expect((await pg.query("select approved_at,approved_by from internal_use_issues where id=$1", [draft.data.id])).rows[0]).toEqual({ approved_at: null, approved_by: null });
+  const edited = await updateInternalUse(draft.data.id, { ...input, items: [{ ...input.items[0], quantity: 1.5 }] });
+  expect(edited.data.status).toBe("draft");
+  expect(await snapshot()).toEqual(before);
+  const complete = await updateInternalUse(draft.data.id, { ...input, intent: "complete", items: [{ ...input.items[0], quantity: 1.5 }] });
+  expect(complete.data.status).toBe("approved");
+  expect((await getInternalUseCostSummary(storeId)).total).toBe(15);
+  expect((await snapshot()).stock).toBe(18.5);
+  expect((await approveInternalUse(draft.data.id)).ok).toBe(false);
+  expect((await snapshot()).stock).toBe(18.5);
+  expect((await updateInternalUse(draft.data.id, input)).ok).toBe(false);
+  expect((await snapshot()).stock).toBe(18.5);
+  const second = await createInternalUse(input);
+  const beforeDelete = await snapshot();
+  expect((await deleteInternalUse(second.data.id)).ok).toBe(true);
+  expect(await snapshot()).toEqual(beforeDelete);
+});
+
+test("explicit approval of a saved draft and legacy pending is guarded against double posting", async () => {
+  const p = await product();
+  for (const status of ["draft", "pending"]) {
+    const saved = await createInternalUse({ warehouseId, intent: "draft", items: [{ productId: p, productName: "Product", unitName: "kg", unitMultiplier: 2, quantity: 0.5, unitCost: 10 }] });
+    await pg.query("update internal_use_issues set status=$1 where id=$2", [status, saved.data.id]);
+    const before = (await snapshot()).stock;
+    expect((await approveInternalUse(saved.data.id)).ok).toBe(true);
+    expect((await snapshot()).stock).toBe(before - 1);
+    expect((await approveInternalUse(saved.data.id)).ok).toBe(false);
+    expect((await snapshot()).stock).toBe(before - 1);
+  }
+});
+
+
+test("warehouse may complete a draft but cannot bypass legacy pending approval", async () => {
+  const p = await product();
+  role = "warehouse";
+  const input = { warehouseId, intent: "draft", items: [{ productId: p, productName: "Product", unitName: "kg", unitMultiplier: 1, quantity: 0.5, unitCost: 10 }] };
+  const draft = await createInternalUse(input);
+  expect(draft.ok).toBe(true);
+  expect((await approveInternalUse(draft.data.id)).ok).toBe(true);
+  const pending = await createInternalUse(input);
+  await pg.query("update internal_use_issues set status='pending' where id=$1", [pending.data.id]);
+  const before = await snapshot();
+  expect(await approveInternalUse(pending.data.id)).toEqual({ ok: false, error: "errors.forbidden" });
+  expect(await updateInternalUse(pending.data.id, { ...input, intent: "complete" })).toEqual({ ok: false, error: "errors.forbidden" });
+  expect(await snapshot()).toEqual(before);
 });

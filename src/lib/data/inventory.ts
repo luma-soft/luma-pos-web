@@ -192,6 +192,7 @@ export async function getInternalUseCostSummary(storeId: string) {
     .from(internalUseIssues)
     .where(and(
       eq(internalUseIssues.storeId, storeId),
+      eq(internalUseIssues.status, "approved"),
       gte(internalUseIssues.createdAt, periodStart),
     ));
   return {

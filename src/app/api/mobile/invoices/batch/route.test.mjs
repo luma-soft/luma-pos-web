@@ -1,0 +1,16 @@
+import {beforeEach, expect, mock, test} from "bun:test";
+let gate;
+const merge = mock();
+const cancel = mock();
+mock.module("@/lib/actions/order-edit", () => ({mergeOrders: merge}));
+mock.module("@/lib/actions/orders", () => ({cancelOrders: cancel}));
+mock.module("@/lib/mobile/auth", () => ({requireMobileManager: async () => gate, requireMobileSalesAccess: async () => gate}));
+const {GET, POST} = await import("./route");
+const ids = ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"];
+const req = (body) => new Request("http://localhost/api/mobile/invoices/batch", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+beforeEach(() => {gate={ok:true,role:"manager"}; merge.mockReset(); cancel.mockReset(); merge.mockResolvedValue({ok:true,data:{id:ids[0],code:"DHG1"}});cancel.mockResolvedValue({ok:true,data:{cancelled:1,failedIds:[ids[1]]}});});
+test("capability is fail-closed for sales staff", async () => {gate={ok:true,role:"cashier"};expect((await (await GET()).json()).data.canManage).toBe(false);});
+test("manager authorization precedes batch mutations", async () => {gate={ok:false,error:"errors.forbidden"};expect((await POST(req({action:"merge",ids}))).status).toBe(403);expect(merge).not.toHaveBeenCalled();expect(cancel).not.toHaveBeenCalled();});
+test("merge delegates to shared action and propagates lifecycle rejection", async () => {merge.mockResolvedValue({ok:false,error:"merge.errors.hasReturns"});expect((await (await POST(req({action:"merge",ids}))).json()).error).toBe("merge.errors.hasReturns");expect(merge).toHaveBeenCalledWith(ids);});
+test("batch cancellation preserves shared partial results", async () => {expect((await (await POST(req({action:"cancel",ids}))).json()).data).toEqual({cancelled:1,failedIds:[ids[1]]});expect(cancel).toHaveBeenCalledWith(ids);});
+test("invalid, duplicate, oversized and incomplete selections cannot mutate", async () => {for(const body of [{action:"merge",ids:[ids[0]]},{action:"cancel",ids:[]},{action:"cancel",ids:[ids[0],ids[0]]},{action:"cancel",ids:["invalid"]},{action:"cancel",ids:Array(21).fill(ids[0])},{action:"unknown",ids}])expect((await POST(req(body))).status).toBe(400);expect(merge).not.toHaveBeenCalled();expect(cancel).not.toHaveBeenCalled();});

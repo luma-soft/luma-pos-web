@@ -106,7 +106,7 @@ export async function createInternalUse(
     if (!warehouseId) return { ok: false, error: "errors.invalidData" };
 
     const totalCost = v.items.reduce((s, i) => s + i.unitCost * i.quantity, 0);
-    const status = "approved";
+    const status = v.intent === "draft" ? "draft" : "approved";
 
     const result = await db.transaction(async (tx) => {
       await validateReferences(tx, gate.storeId, warehouseId, v.items);
@@ -179,7 +179,10 @@ export async function updateInternalUse(id: string, input: CreateInternalUseInpu
       const [issue] = await tx.select().from(internalUseIssues)
         .where(and(eq(internalUseIssues.storeId, gate.storeId), eq(internalUseIssues.id, id))).limit(1).for("update");
       if (!issue) throw new Error("NOT_FOUND");
-      if (issue.status !== "pending" && issue.status !== "approved") throw new Error("INVALID_STATE");
+      if (issue.status !== "draft" && issue.status !== "pending" && issue.status !== "approved") throw new Error("INVALID_STATE");
+      if (v.intent === "draft" && issue.status === "approved") throw new Error("INVALID_STATE");
+      if (v.intent === "complete" && issue.status === "pending" && gate.role !== "owner" && gate.role !== "manager") throw new Error("FORBIDDEN");
+      const nextStatus = v.intent === "complete" ? "approved" : issue.status;
       const warehouseId = v.warehouseId ?? issue.warehouseId;
       if (!warehouseId) throw new Error("INVALID_REFERENCE");
       await validateReferences(tx, gate.storeId, warehouseId, v.items);
@@ -194,21 +197,23 @@ export async function updateInternalUse(id: string, input: CreateInternalUseInpu
       }));
       await tx.insert(internalUseItems).values(items);
       const totalCost = toMoney(v.items.reduce((sum, item) => sum + item.quantity * item.unitCost, 0));
-      await tx.update(internalUseIssues).set({ warehouseId, department: v.department || null, reason: v.reason || null, note: v.note || null, totalCost })
+      await tx.update(internalUseIssues).set({ warehouseId, department: v.department || null, reason: v.reason || null, note: v.note || null, totalCost, status: nextStatus,
+          ...(nextStatus === "approved" && issue.status !== "approved" ? { approvedBy: profileId, approvedAt: sql`now()` } : {}) })
         .where(and(eq(internalUseIssues.storeId, gate.storeId), eq(internalUseIssues.id, id)));
-      if (issue.status === "approved") await postStock(tx, gate.storeId, { ...issue, warehouseId, reason: v.reason || null }, items, profileId);
+      if (nextStatus === "approved") await postStock(tx, gate.storeId, { ...issue, warehouseId, reason: v.reason || null }, items, profileId);
       await recordActivity(tx, {
         storeId: gate.storeId, actorId: profileId, action: "internal_use.updated", entityType: "internal_use", entityId: id,
-        before: { ...issue, items: oldItems }, after: { code: issue.code, status: issue.status, warehouseId, totalCost, items },
+        before: { ...issue, items: oldItems }, after: { code: issue.code, status: nextStatus, warehouseId, totalCost, items },
         affectedRecords: v.items.map((item) => ({ type: "product", id: item.productId, name: item.productName, quantity: item.quantity })),
         metadata: { code: issue.code, warehouseId },
       });
-      return { id, code: issue.code, status: issue.status };
+      return { id, code: issue.code, status: nextStatus };
     });
     revalidatePath(Routes.Inventory);
     return { ok: true, data: result };
   } catch (e) {
     if (e instanceof Error) {
+      if (e.message === "FORBIDDEN") return { ok: false, error: "errors.forbidden" };
       if (e.message === "NOT_FOUND") return { ok: false, error: "errors.notFound" };
       if (e.message === "INVALID_REFERENCE" || e.message === "INVALID_STATE") return { ok: false, error: "errors.invalidData" };
       if (e.message === "INSUFFICIENT_BATCH_STOCK") return { ok: false, error: "inventory.errors.insufficientBatchStock" };
@@ -229,7 +234,7 @@ export async function deleteInternalUse(id: string): Promise<ActionResult> {
       const [issue] = await tx.select().from(internalUseIssues)
         .where(and(eq(internalUseIssues.storeId, gate.storeId), eq(internalUseIssues.id, id))).limit(1).for("update");
       if (!issue) throw new Error("NOT_FOUND");
-      if (issue.status !== "pending" && issue.status !== "approved") throw new Error("INVALID_STATE");
+      if (issue.status !== "draft" && issue.status !== "pending" && issue.status !== "approved") throw new Error("INVALID_STATE");
       const items = await tx.select().from(internalUseItems)
         .where(and(eq(internalUseItems.storeId, gate.storeId), eq(internalUseItems.issueId, id)));
       await reverseStock(tx, gate.storeId, issue, items, profileId);
@@ -255,14 +260,17 @@ export async function deleteInternalUse(id: string): Promise<ActionResult> {
 export async function approveInternalUse(id: string): Promise<ActionResult> {
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
-  if (gate.role !== "owner" && gate.role !== "manager") return { ok: false, error: "errors.forbidden" };
+  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "errors.invalidData" };
 
   try {
     const profileId = await getProfileId(gate.userId);
     await db.transaction(async (tx) => {
       const [issue] = await tx.select().from(internalUseIssues).where(and(eq(internalUseIssues.storeId, gate.storeId), eq(internalUseIssues.id, id))).limit(1).for("update");
-      if (!issue || issue.status !== "pending") throw new Error("INVALID_STATE");
+      if (!issue || (issue.status !== "pending" && issue.status !== "draft")) throw new Error("INVALID_STATE");
+      if (issue.status === "pending" && gate.role !== "owner" && gate.role !== "manager") throw new Error("FORBIDDEN");
       const items = await tx.select().from(internalUseItems).where(and(eq(internalUseItems.storeId, gate.storeId), eq(internalUseItems.issueId, id)));
+      if (!issue.warehouseId || items.length === 0) throw new Error("INVALID_STATE");
+      await validateReferences(tx, gate.storeId, issue.warehouseId, items);
       await postStock(tx, gate.storeId, { id: issue.id, code: issue.code, warehouseId: issue.warehouseId, reason: issue.reason }, items, profileId);
       await tx.update(internalUseIssues).set({ status: "approved", approvedBy: profileId, approvedAt: sql`now()` }).where(and(eq(internalUseIssues.storeId, gate.storeId), eq(internalUseIssues.id, id)));
       await recordActivity(tx, {
@@ -279,6 +287,8 @@ export async function approveInternalUse(id: string): Promise<ActionResult> {
     if (e instanceof Error && e.message === "INSUFFICIENT_BATCH_STOCK") {
       return { ok: false, error: "inventory.errors.insufficientBatchStock" };
     }
+    if (e instanceof Error && e.message === "FORBIDDEN") return { ok: false, error: "errors.forbidden" };
+    if (e instanceof Error && (e.message === "INVALID_STATE" || e.message === "INVALID_REFERENCE")) return { ok: false, error: "errors.invalidData" };
     console.error("approveInternalUse failed:", e);
     return { ok: false, error: "errors.serverError" };
   }

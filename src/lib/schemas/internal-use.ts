@@ -10,6 +10,7 @@ export const internalUseItemSchema = z.object({
 });
 
 export const createInternalUseSchema = z.object({
+  intent: z.enum(["draft", "complete"]).optional(),
   warehouseId: z.string().uuid().optional(),
   department: z.string().optional(),
   reason: z.string().optional(),

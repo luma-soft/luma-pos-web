@@ -103,6 +103,7 @@ export function InventoryFilterDrawer({
   const isInternalUseFilter = fields.includes("reason");
   const internalUseStatuses = [
     all,
+    { value: "draft", label: t("internalUse.status.draft") },
     { value: "approved", label: t("internalUse.status.approved") },
     { value: "pending", label: t("internalUse.status.pending") },
   ];

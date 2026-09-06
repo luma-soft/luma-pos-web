@@ -42,7 +42,7 @@ type Line = {
   units: { name: string; mult: number }[]; unitName: string; unitMultiplier: number; quantity: number; unitCost: number;
 };
 
-export function InternalUseForm({ warehouse, initial }: { warehouse: InternalUseWarehouse | null; initial?: InternalUseIssueRow }) {
+export function InternalUseForm({ warehouse, initial, canCompletePending = false }: { warehouse: InternalUseWarehouse | null; initial?: InternalUseIssueRow; canCompletePending?: boolean }) {
   const t = useTranslations();
   const locale = useLocale();
   const L = locale === "vi";
@@ -160,10 +160,11 @@ export function InternalUseForm({ warehouse, initial }: { warehouse: InternalUse
     upd(l.key, { unitName: u.name, unitMultiplier: u.mult, unitCost: Math.round(l.costPrice * u.mult) });
   };
 
-  function submit() {
+  function submit(intent?: "draft" | "complete") {
     if (lines.length === 0) return;
     start(async () => {
       const payload = {
+        intent,
         warehouseId: warehouse?.id,
         department: department ? labelOf(deptOpts, department) : undefined,
         reason: reason ? (initial?.reason === reason ? reason : labelOf(reasonOpts, reason)) : undefined,
@@ -174,7 +175,7 @@ export function InternalUseForm({ warehouse, initial }: { warehouse: InternalUse
       const res = await (initial ? updateInternalUse(initial.id, payload) : createInternalUse(payload));
       if (res.ok) {
         void catalog.refresh();
-        setToast(t("internalUse.submitted"));
+        setToast(res.data.status === "draft" || res.data.status === "pending" ? (L ? "Đã lưu nháp" : "Draft saved") : t("internalUse.submitted"));
         setLines([]); setNote(""); setReason(""); setDepartment("");
         router.push(`${Routes.Inventory}?tab=internal${initial ? `&expanded=${initial.id}` : ""}`);
         router.refresh();
@@ -220,7 +221,7 @@ export function InternalUseForm({ warehouse, initial }: { warehouse: InternalUse
             <FormMetric label={t("internalUse.cols.items")} value={String(lines.length)} />
             <FormMetric label={t("internalUse.qty")} value={String(lines.reduce((sum, line) => sum + line.quantity, 0))} />
             <FormMetric label={t("internalUse.totalCost")} value={formatCurrency(totalCost)} tone="primary" />
-            <FormMetric label={t("internalUse.statusLabel")} value={t(initial?.status === "pending" ? "internalUse.status.pending" : "internalUse.status.approved")} tone="ok" />
+            <FormMetric label={t("internalUse.statusLabel")} value={t(initial?.status === "approved" ? "internalUse.status.approved" : initial?.status === "pending" ? "internalUse.status.pending" : "internalUse.status.draft")} tone="ok" />
           </div>
 
           <div className="flex-1 min-h-[320px] overflow-visible bg-surface border border-border rounded-card lg:overflow-auto">
@@ -352,7 +353,7 @@ export function InternalUseForm({ warehouse, initial }: { warehouse: InternalUse
 
           <div className="space-y-4 text-sm">
             <PanelRow label={t("internalUse.autoCodeLabel")}><span className="rounded-lg border border-border-soft bg-canvas px-3 py-2 font-semibold text-slate-400">{initial?.code ?? t("internalUse.autoCode")}</span></PanelRow>
-            <PanelRow label={t("internalUse.statusLabel")}><span className="font-semibold">{t(initial ? (initial.status === "pending" ? "internalUse.status.pending" : "internalUse.status.approved") : "internalUse.status.draft")}</span></PanelRow>
+            <PanelRow label={t("internalUse.statusLabel")}><span className="font-semibold">{t(initial?.status === "approved" ? "internalUse.status.approved" : initial?.status === "pending" ? "internalUse.status.pending" : "internalUse.status.draft")}</span></PanelRow>
             <PanelRow label={t("internalUse.reason")}><SearchableSelect options={reasonOpts} value={reason} onChange={setReason} placeholder={t("internalUse.reasonPlaceholder")} /></PanelRow>
             <PanelRow label={t("internalUse.department")}><SearchableSelect options={deptOpts} value={department} onChange={setDepartment} placeholder={t("internalUse.departmentPlaceholder")} /></PanelRow>
             <PanelRow label={t("internalUse.totalCost")}><span className="font-mono text-lg font-extrabold text-primary-700">{formatCurrency(totalCost)}</span></PanelRow>
@@ -366,14 +367,14 @@ export function InternalUseForm({ warehouse, initial }: { warehouse: InternalUse
           />
 
           <div className="sticky bottom-0 z-10 -mx-3 mt-auto grid grid-cols-2 gap-3 bg-surface px-3 pt-6 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0">
-            {!initial && <Button type="button" variant="outline" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={submit} block>
+            {initial?.status !== "approved" && <Button type="button" variant="outline" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={() => submit("draft")} block>
               {!pending && <Save className="h-4 w-4" />}
               {t("stocktakes.saveDraft")}
             </Button>}
-            <Button type="button" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={submit} block>
+            {(initial?.status !== "pending" || canCompletePending) && <Button type="button" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={() => submit("complete")} block>
               {!pending && <Check className="w-4 h-4" />}
-              {initial ? "Lưu thay đổi" : t("internalUse.complete")}
-            </Button>
+              {initial?.status === "approved" ? (L ? "Lưu thay đổi" : "Save changes") : t("internalUse.complete")}
+            </Button>}
           </div>
       </aside>
 

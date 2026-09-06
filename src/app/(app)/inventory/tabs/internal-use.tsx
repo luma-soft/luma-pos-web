@@ -49,7 +49,7 @@ export async function InternalUseTab({ searchParams }: { searchParams: SP }) {
         </a>
       </InstantFilterForm>
 
-      <InternalUseTable rows={rows} capabilities={inventoryDocumentCapabilities("internal-use", context.role)} />
+      <InternalUseTable rows={rows} capabilities={{ ...inventoryDocumentCapabilities("internal-use", context.role), canApprovePending: context.role === "owner" || context.role === "manager" }} />
     </>
   );
 }

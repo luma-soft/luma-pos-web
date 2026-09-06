@@ -12,7 +12,7 @@ import { InventoryDocumentActions } from "./inventory-document-actions";
 
 type InternalUseRow = Awaited<ReturnType<typeof getInternalUseIssues>>[number];
 
-export function InternalUseTable({ rows, capabilities }: { rows: InternalUseRow[]; capabilities?: { canEdit: boolean; canDelete: boolean } }) {
+export function InternalUseTable({ rows, capabilities }: { rows: InternalUseRow[]; capabilities?: { canEdit: boolean; canDelete: boolean; canApprovePending?: boolean } }) {
   const t = useTranslations();
   const locale = useLocale();
   const isVi = locale === "vi";
@@ -78,7 +78,7 @@ export function InternalUseTable({ rows, capabilities }: { rows: InternalUseRow[
         rowClassName={(row) => cn(row.status === "pending" && "bg-warn-soft/25")}
         renderDetail={(row) => <ExpandedIssue row={row} />}
         detailSize="full"
-        detailFooter={(row) => <InventoryDocumentActions kind="internal-use" id={row.id} code={row.code} capabilities={capabilities} inFooter />}
+        detailFooter={(row) => <InventoryDocumentActions kind="internal-use" id={row.id} code={row.code} status={row.status} capabilities={capabilities} inFooter />}
       />
     </section>
   );
@@ -164,10 +164,10 @@ function ExpandedIssue({ row }: { row: InternalUseRow }) {
 
 function StatusBadge({ status }: { status: string }) {
   const t = useTranslations();
-  const normalized = status === "pending" ? "pending" : "approved";
+  const normalized = status === "draft" ? "draft" : status === "pending" ? "pending" : "approved";
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", normalized === "pending" ? "bg-warn-soft text-warn" : "bg-ok-soft text-ok")}>
-      {normalized === "pending" ? t("internalUse.status.pending") : t("internalUse.status.approved")}
+    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", normalized !== "approved" ? "bg-warn-soft text-warn" : "bg-ok-soft text-ok")}>
+      {t(`internalUse.status.${normalized}`)}
     </span>
   );
 }
