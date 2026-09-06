@@ -112,7 +112,7 @@ export function InventoryFilterDrawer({
       category: values.category ?? "",
       status: values.status ?? "",
       view: values.view ?? "grouped",
-      warehouse: values.warehouseId ?? values.warehouse ?? "",
+      warehouse: fields.includes("warehouse") ? values.warehouseId ?? values.warehouse ?? "" : "",
       supplier: values.supplierId ?? "",
       stock: values.stock ?? "",
       time: values.timePreset ?? DEFAULT_TIME_FILTER_PRESET,
@@ -125,7 +125,7 @@ export function InventoryFilterDrawer({
       kind: values.productKind ?? "",
       sort: values.sort ?? defaultSort,
     }),
-    [defaultSort, values],
+    [defaultSort, fields, values],
   );
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(initial);

@@ -697,11 +697,7 @@ export function PurchaseForm({
               placeholder={t("purchases.noSuppliers")}
               options={options.suppliers.map((s) => ({ value: s.id, label: s.name }))} />
           </div>
-          <div>
-            <Text as="div" variant="muted" size="xs" weight="medium" className="mb-1" text={t("purchases.cols.warehouse")} />
-            <Combobox value={warehouseId} onChange={setWarehouseId} allowClear={false}
-              options={options.warehouses.map((w) => ({ value: w.id, label: w.name }))} />
-          </div>
+          {/* Receiving warehouse is temporarily hidden; retain the saved/default ID. */}
           <div>
             <Text as="div" variant="muted" size="xs" weight="medium" className="mb-1" text={t("purchases.invoiceNumber")} />
             <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder={t("purchases.invoiceNumberPlaceholder")} />
@@ -711,12 +707,10 @@ export function PurchaseForm({
             <div className="flex justify-between items-center"><span className="text-slate-500">{t("purchases.subtotal")} ({lines.length})</span><span className="tabular-nums">{formatCurrency(subtotal)}</span></div>
             <div className="flex justify-between items-center gap-2"><span className="text-slate-500">{t("pos.discount")}</span><MoneyInput value={discount || ""} placeholder="0" onChange={(v) => setDiscount(v ?? 0)} className={cn(numCls, "w-32")} /></div>
             <div className="flex justify-between items-center gap-2">
-              <span className="text-slate-500">VAT %</span>
-              <div className="flex items-center gap-2">
-                <NumberInput min={0} max={100} value={vatRate} placeholder="0" suffix="%" thousandSeparator={false} onChange={(value) => setVatRate(value ?? 0)} className={cn(numCls, "w-20")} />
-                <span className="tabular-nums text-slate-500 w-24 text-right">{formatCurrency(tax)}</span>
-              </div>
+              <label htmlFor="purchase-vat-rate" className="text-slate-500">VAT %</label>
+              <NumberInput id="purchase-vat-rate" min={0} max={100} value={vatRate} placeholder="0" suffix="%" thousandSeparator={false} onChange={(value) => setVatRate(value ?? 0)} className={cn(numCls, "w-32")} />
             </div>
+            <div className="text-right tabular-nums text-xs text-slate-500">{formatCurrency(tax)}</div>
             <div className="flex justify-between items-center gap-2">
               <label htmlFor="purchase-shipping-fee" className="text-slate-500">Phí vận chuyển</label>
               <MoneyInput id="purchase-shipping-fee" min={0} value={shippingFee || ""} placeholder="0" onChange={(value) => setShippingFee(value ?? 0)} className={cn(numCls, "w-32")} />

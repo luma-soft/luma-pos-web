@@ -179,7 +179,6 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
               <span className="text-slate-500">{t("purchases.cols.supplier")}</span>
               <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} className="justify-end text-right font-medium" />
             </div>
-            <div className="flex justify-between gap-3"><span className="text-slate-500">{t("purchases.cols.warehouse")}</span><span className="text-right">{purchase.warehouseName}</span></div>
             <div className="flex justify-between gap-3"><span className="text-slate-500">{t("orders.cols.date")}</span><span className="text-right">{formatDate(purchase.createdAt)}</span></div>
             {purchase.createdByName && <div className="flex justify-between gap-3"><span className="text-slate-500">{t("purchases.detail.receiver")}</span><span className="text-right">{purchase.createdByName}</span></div>}
             {purchase.invoiceNumber && <div className="flex justify-between gap-3"><span className="text-slate-500">{t("purchases.invoiceNumber")}</span><span className="text-right">{purchase.invoiceNumber}</span></div>}

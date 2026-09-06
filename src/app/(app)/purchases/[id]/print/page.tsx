@@ -44,8 +44,6 @@ export default async function PrintPurchasePage({ params, searchParams }: Props)
           partyLabel={t("purchases.cols.supplier")}
           partyName={po.supplierName}
           partyPhone={po.supplierPhone}
-          deliveryAddress={po.warehouseName}
-          deliverToLabel={t("purchases.cols.warehouse")}
           sellerLabel={t("print.sellerSign")}
           sellerName={po.createdByName}
           items={po.items.map((i) => ({

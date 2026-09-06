@@ -43,7 +43,6 @@ export function PurchasesTable({ rows, printTemplates, detailPurchase = null }: 
     { key: "code", label: t("purchases.cols.code"), required: true, render: (purchase) => <span className="font-semibold text-primary-600">{purchase.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, render: (purchase) => <span className="text-slate-500">{formatDate(purchase.createdAt)}</span> },
     { key: "supplier", label: t("purchases.cols.supplier"), defaultVisible: true, render: (purchase) => <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} /> },
-    { key: "warehouse", label: t("purchases.cols.warehouse"), defaultVisible: true, render: (purchase) => <span className="text-slate-500">{purchase.warehouseName}</span> },
     { key: "total", label: t("orders.cols.total"), defaultVisible: true, align: "right", cellClassName: "font-semibold", render: (purchase) => formatCurrency(Number(purchase.total)) },
     { key: "owed", label: t("purchases.cols.owed"), defaultVisible: true, align: "right", cellClassName: (purchase) => purchaseOwed(purchase) > 0 ? "font-semibold text-warn" : "text-slate-400", render: (purchase) => purchaseOwed(purchase) > 0 ? formatCurrency(purchaseOwed(purchase)) : "—" },
     { key: "status", label: t("orders.cols.status"), defaultVisible: true, render: (purchase) => <StatusBadge status={purchase.status} /> },
@@ -198,7 +197,6 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
             <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} className="text-right font-medium" />
           </InfoLine>
           {purchase.supplierPhone && <InfoLine label={t("customers.cols.phone")} value={purchase.supplierPhone} />}
-          <InfoLine label={t("purchases.cols.warehouse")} value={purchase.warehouseName} />
           <InfoLine label={t("orders.cols.date")} value={formatDate(purchase.createdAt)} />
           {purchase.createdByName && <InfoLine label={t("purchases.detail.receiver")} value={purchase.createdByName} />}
           {purchase.invoiceNumber && <InfoLine label={t("purchases.invoiceNumber")} value={purchase.invoiceNumber} />}

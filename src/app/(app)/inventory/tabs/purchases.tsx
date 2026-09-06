@@ -35,7 +35,7 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
   const pageSize = parsePageSize(params.size);
   const status = PSTATUS.includes(params.status as typeof PSTATUS[number]) ? (params.status ?? "") : "";
   const [{ rows, total, pageCount }, printTemplates, options] = await Promise.all([
-    getPurchases(context.storeId, { q: params.q, status: status || undefined, supplierId: params.supplierId, warehouseId: params.warehouseId, from: params.from, to: params.to, debtOnly: params.debtOnly === "1", page, pageSize }),
+    getPurchases(context.storeId, { q: params.q, status: status || undefined, supplierId: params.supplierId, from: params.from, to: params.to, debtOnly: params.debtOnly === "1", page, pageSize }),
     getPrintTemplatesForDoc(context.storeId, "purchase"),
     getPurchaseFormOptions(context.storeId),
   ]);
@@ -52,7 +52,7 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
           <input type="hidden" name="tab" value="purchases" />
           <ListSearchFilterBar
             search={<ListSearchInput name="q" defaultValue={params.q ?? ""} placeholder={t("purchases.searchPlaceholder")} />}
-            filter={<InventoryFilterDrawer title="Bộ lọc phiếu nhập" values={params} resultCount={total} resultLabel="phiếu nhập" countEndpoint="/api/inventory/purchases/count" fields={["status", "supplier", "warehouse", "time", "debt"]} suppliers={options.suppliers.map((item) => ({ value: item.id, label: item.name }))} warehouses={options.warehouses.map((item) => ({ value: item.id, label: item.name }))} />}
+            filter={<InventoryFilterDrawer title="Bộ lọc phiếu nhập" values={params} resultCount={total} resultLabel="phiếu nhập" countEndpoint="/api/inventory/purchases/count" fields={["status", "supplier", "time", "debt"]} suppliers={options.suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
           />
           <Link href={Routes.PurchaseNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"><Plus className="w-4 h-4" />{t("purchases.createNew")}</Link>
         </InstantFilterForm>
