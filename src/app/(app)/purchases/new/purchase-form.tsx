@@ -690,7 +690,8 @@ export function PurchaseForm({
         </div>
 
         {/* phải: NCC + tổng tiền */}
-        <div className="w-full lg:w-[380px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto [&>*]:shrink-0">
+        <div className="w-full lg:w-[380px] min-h-0 shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col pb-20 lg:pb-0 lg:overflow-hidden">
+          <div className="flex flex-col gap-3 p-3 sm:p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto [&>*]:shrink-0">
           <div>
             <Text as="div" variant="muted" size="xs" weight="medium" className="mb-1" text={`${t("purchases.cols.supplier")} *`} />
             <Combobox value={supplierId} onChange={setSupplierId} allowClear={false}
@@ -727,12 +728,12 @@ export function PurchaseForm({
           <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("orders.detail.notePlaceholder")} rows={3} className="h-24 shrink-0 resize-none" />
 
           {error && <Text as="p" variant="destructive" text={error} />}
+          </div>
 
-          <div className="sticky bottom-0 z-10 -mx-3 mt-auto bg-surface px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:static lg:mx-0 lg:bg-transparent lg:p-0">
+          <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 shrink-0 border-t border-border bg-surface p-3 sm:p-4 lg:static">
             <Button type="button" onClick={submit} disabled={lines.length === 0 || !supplierId} loading={busy} block className="h-12 rounded-card font-semibold">
               {mode === "edit" ? t("purchases.saveChanges") : t("purchases.receiveNow")} · {formatCurrency(total)}
             </Button>
-            <Text as="p" variant="muted" className="mt-2 text-[11px]" text={t("purchases.receiveHint")} />
           </div>
         </div>
       </div>
