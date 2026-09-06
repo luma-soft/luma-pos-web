@@ -1,7 +1,8 @@
+import { updatePurchase } from "@/lib/actions/purchases";
 import { getPurchase } from "@/lib/data/inventory";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import { isMobileEntityId } from "@/lib/mobile/exact-entity";
-import { mobileError, mobileOk } from "@/lib/mobile/response";
+import { mobileAction, mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 
 export async function GET(
   _request: Request,
@@ -52,4 +53,22 @@ export async function GET(
       expiryDate: item.expiryDate,
     })),
   });
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const gate = await requireMobileStockAccess();
+  if (!gate.ok) return mobileGate(gate)!;
+  const { id } = await params;
+  if (!isMobileEntityId(id)) return mobileError("errors.notFound", 404);
+  const body = await readJson(request);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return mobileError("errors.invalidData", 400);
+  }
+  return mobileAction(await updatePurchase({
+    ...body,
+    id,
+  } as Parameters<typeof updatePurchase>[0]));
 }

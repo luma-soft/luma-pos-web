@@ -168,3 +168,14 @@ test("cancelling an earlier post-baseline receipt after a sale replays later rec
   expect(await values(productId)).toEqual({ quantity: 10, cost: 100, gross: 90, retail: 999 });
   expect((await pg.query("select status from purchase_orders order by code")).rows).toEqual([{ status: "cancelled" }, { status: "cancelled" }]);
 });
+
+test("fractional purchase edits preserve stock, receipt totals and supplier debt", async () => {
+  const productId = await product(10, 100);
+  const id = await received(payload(productId, 0.5, 100));
+  expect((await values(productId)).quantity).toBe(10.5);
+  expect((await updatePurchase({ id, ...payload(productId, 1.5, 100) })).ok).toBe(true);
+  expect((await values(productId)).quantity).toBe(11.5);
+  expect((await pg.query("select quantity,total from purchase_order_items where purchase_order_id=$1", [id])).rows)
+    .toEqual([{ quantity: "1.5000", total: "150.00" }]);
+  expect((await pg.query("select current_debt from suppliers where id=$1", [supplierId])).rows[0].current_debt).toBe("150.00");
+});
