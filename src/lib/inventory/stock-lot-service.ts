@@ -57,6 +57,7 @@ export async function consumeTrackedStockLots(
         sql`${stockLots.availableQuantity} >= ${toQty(allocation.quantity)}`,
       ));
     await tx.insert(stockLotMovements).values({
+      storeId: input.storeId,
       stockLotId: allocation.lotId,
       quantity: toQty(-allocation.quantity),
       refType: input.refType,

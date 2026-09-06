@@ -8,6 +8,7 @@ import {
 } from "@/lib/inventory/internal-use-warehouse";
 
 type InternalUseFilters = {
+  id?: string;
   q?: string;
   status?: string;
   warehouseId?: string;
@@ -17,7 +18,7 @@ type InternalUseFilters = {
   to?: string;
 };
 
-function internalUseFilterConditions({ q, status, warehouseId, reason, department, from, to }: InternalUseFilters) {
+function internalUseFilterConditions({ id, q, status, warehouseId, reason, department, from, to }: InternalUseFilters) {
   const search = q?.trim();
   const searchCondition = search
     ? or(
@@ -29,6 +30,7 @@ function internalUseFilterConditions({ q, status, warehouseId, reason, departmen
     )
     : undefined;
   return [
+    id ? eq(internalUseIssues.id, id) : undefined,
     searchCondition,
     status ? eq(internalUseIssues.status, status) : undefined,
     warehouseId ? eq(internalUseIssues.warehouseId, warehouseId) : undefined,
@@ -56,6 +58,7 @@ export async function getInternalUseIssues(storeId: string, { limit = 50, ...fil
     .select({
       id: internalUseIssues.id,
       code: internalUseIssues.code,
+      warehouseId: internalUseIssues.warehouseId,
       warehouseName: warehouses.name,
       department: internalUseIssues.department,
       reason: internalUseIssues.reason,
@@ -84,6 +87,7 @@ export async function getInternalUseIssues(storeId: string, { limit = 50, ...fil
       sku: products.sku,
       productName: internalUseItems.productName,
       unitName: internalUseItems.unitName,
+      unitMultiplier: internalUseItems.unitMultiplier,
       quantity: internalUseItems.quantity,
       unitCost: internalUseItems.unitCost,
       total: internalUseItems.total,
@@ -114,3 +118,7 @@ export async function getInternalUseIssueCount(storeId: string, filters: Interna
 }
 
 export type InternalUseIssueRow = Awaited<ReturnType<typeof getInternalUseIssues>>[number];
+
+export async function getInternalUseIssue(storeId: string, id: string) {
+  return (await getInternalUseIssues(storeId, { id, limit: 1 }))[0] ?? null;
+}

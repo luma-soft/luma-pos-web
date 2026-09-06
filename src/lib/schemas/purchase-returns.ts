@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const purchaseReturnItemSchema = z.object({
   productId: z.uuid(),
+  unitName: z.string().min(1).optional(),
+  unitMultiplier: z.number().positive().optional(),
   quantity: z.number().positive(),
   unitCost: z.number().min(0),
   returnUnitCost: z.number().min(0),

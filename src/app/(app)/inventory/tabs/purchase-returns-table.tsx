@@ -9,6 +9,8 @@ import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { getPurchaseReturns } from "@/lib/data/purchase-returns";
 
+import { InventoryDocumentActions } from "./inventory-document-actions";
+
 type PurchaseReturnRow = Awaited<ReturnType<typeof getPurchaseReturns>>["rows"][number];
 
 function statusClass(status: string) {
@@ -138,6 +140,7 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
           </table>
         </div>
       </div>
+      <InventoryDocumentActions kind="purchase-returns" id={row.id} code={row.code} />
     </div>
   );
 }

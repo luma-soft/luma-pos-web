@@ -1,11 +1,13 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { Copy, FileDown, LayoutList, Printer, Save } from "lucide-react";
+import { LayoutList } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { getInternalUseIssues } from "@/lib/data/internal-use";
 import { internalUseReasonLabel } from "@/lib/inventory/internal-use-reason";
+
+import { InventoryDocumentActions } from "./inventory-document-actions";
 
 type InternalUseRow = Awaited<ReturnType<typeof getInternalUseIssues>>[number];
 
@@ -167,16 +169,7 @@ function ExpandedIssue({ row }: { row: InternalUseRow }) {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border-soft pt-3">
-        <div className="flex flex-wrap items-center gap-4">
-          <TextAction><Copy className="h-4 w-4" />{isVi ? "Sao chép" : "Copy"}</TextAction>
-          <TextAction><FileDown className="h-4 w-4" />{isVi ? "Xuất file" : "Export"}</TextAction>
-        </div>
-        <div className="flex items-center gap-2">
-          <SmallAction><Save className="h-4 w-4" />{isVi ? "Lưu" : "Save"}</SmallAction>
-          <SmallAction><Printer className="h-4 w-4" />{isVi ? "In" : "Print"}</SmallAction>
-        </div>
-      </div>
+      <InventoryDocumentActions kind="internal-use" id={row.id} code={row.code} />
     </div>
   );
 }
@@ -207,12 +200,4 @@ function SummaryLine({ label, value, strong }: { label: string; value: string; s
       <span className={cn("font-mono tabular-nums", strong && "font-extrabold text-foreground")}>{value}</span>
     </div>
   );
-}
-
-function TextAction({ children }: { children: React.ReactNode }) {
-  return <button type="button" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-slate-600 transition hover:text-primary-700 dark:text-slate-300 lg:min-h-0 lg:px-0 min-w-11 lg:min-w-0">{children}</button>;
-}
-
-function SmallAction({ children }: { children: React.ReactNode }) {
-  return <button type="button" className="inline-flex min-h-11 items-center gap-1.5 rounded-card border border-border bg-surface px-3 text-sm font-semibold text-slate-600 transition hover:bg-surface-2 dark:text-slate-200 lg:min-h-9 min-w-11 lg:min-w-0">{children}</button>;
 }

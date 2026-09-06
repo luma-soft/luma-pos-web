@@ -1,5 +1,6 @@
 "use client";
 
+import { getCatalogWarehouseStock } from "@/lib/product-catalog";
 import { positiveQuantityOrDefault } from "@/lib/quantity";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useState } from "react";
@@ -19,16 +20,18 @@ import { NumberInput } from "@/components/ui/number-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
-import { createPurchaseReturn } from "@/lib/actions/purchase-returns";
+import { createPurchaseReturn, updatePurchaseReturn } from "@/lib/actions/purchase-returns";
 import type { AiActionPreview } from "@/lib/ai/actions";
 import type { PurchaseFormOptions } from "@/lib/data/inventory";
-import type { PurchaseReturnProductRow } from "@/lib/data/purchase-returns";
+import type { getPurchaseReturn, PurchaseReturnProductRow } from "@/lib/data/purchase-returns";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPurchaseReturnProduct } from "@/lib/inventory/product-catalog-adapter";
 
 type Line = {
+  key: string;
+  unitMultiplier: number;
   productId: string;
   sku: string;
   name: string;
@@ -42,6 +45,8 @@ type Line = {
 function productToLine(product: PurchaseReturnProductRow): Line {
   const cost = Number(product.costPrice) || 0;
   return {
+    key: product.id,
+    unitMultiplier: 1,
     productId: product.id,
     sku: product.sku,
     name: product.name,
@@ -53,21 +58,33 @@ function productToLine(product: PurchaseReturnProductRow): Line {
   };
 }
 
-export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }) {
+export function PurchaseReturnForm({ options, initial }: { options: PurchaseFormOptions; initial?: NonNullable<Awaited<ReturnType<typeof getPurchaseReturn>>> }) {
   const t = useTranslations();
   const router = useRouter();
   const catalog = useProductCatalog();
-  const [supplierId, setSupplierId] = useState(options.suppliers[0]?.id ?? "");
-  const [warehouseId] = useState(options.warehouses[0]?.id ?? "");
+  const [documentDate] = useState(() => (initial ? new Date(initial.createdAt) : new Date()).toLocaleDateString("vi-VN"));
+  const [supplierId, setSupplierId] = useState(initial?.supplierId ?? options.suppliers[0]?.id ?? "");
+  const [warehouseId] = useState(initial?.warehouseId ?? options.warehouses[0]?.id ?? "");
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<PurchaseReturnProductRow[]>([]);
-  const [lines, setLines] = useState<Line[]>([]);
-  const [discount, setDiscount] = useState(0);
-  const [vatRate, setVatRate] = useState(0);
-  const [refundAmount, setRefundAmount] = useState(0);
-  const [refundMethod, setRefundMethod] = useState<"cash" | "bank_transfer">("cash");
-  const [applyDebt, setApplyDebt] = useState(true);
-  const [note, setNote] = useState("");
+  const [lines, setLines] = useState<Line[]>(() => initial?.items.map((item) => {
+    const product = catalog.products.find((p) => p.id === item.productId);
+    const quantity = Number(item.quantity);
+    return {
+      key: item.id, productId: item.productId, sku: item.sku, name: item.productName,
+      unitName: item.unitName, unitMultiplier: Number(item.unitMultiplier) || 1,
+      quantity, unitCost: Number(item.unitCost),
+      returnUnitCost: quantity > 0 ? Number(item.total) / quantity : Number(item.returnUnitCost),
+      stock: product ? getCatalogWarehouseStock(product, initial.warehouseId) : 0,
+    };
+  }) ?? []);
+  const [discount, setDiscount] = useState(Number(initial?.discount ?? 0));
+  const [vatRate, setVatRate] = useState(Number(initial?.vatRate ?? 0));
+  const [refundAmount, setRefundAmount] = useState(Number(initial?.refundAmount ?? 0));
+  const [refundMethod, setRefundMethod] = useState<"cash" | "bank_transfer">(initial?.refundMethod === "bank_transfer" ? "bank_transfer" : "cash");
+  const [applyDebt, setApplyDebt] = useState(initial ? Number(initial.debtAmount) > 0 : true);
+  const [editedDebt, setEditedDebt] = useState(Number(initial?.debtAmount ?? 0));
+  const [note, setNote] = useState(initial?.note ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
@@ -98,7 +115,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
   const tax = Math.round((afterDiscount * vatRate) / 100);
   const totalRefund = afterDiscount + tax;
   const clampedRefund = Math.min(refundAmount, totalRefund);
-  const debtAmount = applyDebt ? Math.max(0, totalRefund - clampedRefund) : 0;
+  const debtAmount = applyDebt ? Math.min(initial ? editedDebt : Infinity, Math.max(0, totalRefund - clampedRefund)) : 0;
   const unsettled = Math.max(0, totalRefund - clampedRefund - debtAmount);
 
   function addProduct(product: PurchaseReturnProductRow) {
@@ -140,20 +157,31 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
     }
   }
 
-  function patch(productId: string, next: Partial<Line>) {
-    setLines((current) => current.map((line) => line.productId === productId ? { ...line, ...next } : line));
+  function patch(key: string, next: Partial<Line>) {
+    setLines((current) => current.map((line) => line.key === key ? { ...line, ...next } : line));
+  }
+
+  function availableStock(line: Line) {
+    // Return quantities are recorded in their selected unit; inventory is in base units.
+    const restored = initial?.status === "completed" ? initial.items.reduce((sum, item) =>
+      item.productId === line.productId ? sum + Number(item.quantity) * (Number(item.unitMultiplier) || 1) : sum, 0) : 0;
+    const otherLines = lines.reduce((sum, item) => item.productId === line.productId && item.key !== line.key
+      ? sum + item.quantity * item.unitMultiplier : sum, 0);
+    const currentStock = restored > 0 ? Math.max(0, line.stock) : line.stock;
+    return Math.max(0, (currentStock + restored - otherLines) / line.unitMultiplier);
   }
 
   async function submit() {
     if (busy || !supplierId || !warehouseId || lines.length === 0) return;
-    const invalid = lines.some((line) => line.quantity <= 0 || line.returnUnitCost < 0 || line.quantity > line.stock + 1e-9);
+    const invalid = lines.some((line) => line.quantity <= 0 || line.returnUnitCost < 0 || line.quantity > availableStock(line) + 1e-9);
     if (invalid) {
       setError(t("purchaseReturns.errors.insufficientStock"));
       return;
     }
     setBusy(true);
     setError("");
-    const res = await createPurchaseReturn({
+    const payload = {
+      purchaseOrderId: initial?.purchaseOrderId,
       supplierId,
       warehouseId,
       discount,
@@ -164,17 +192,24 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
       note: note || undefined,
       items: lines.map((line) => ({
         productId: line.productId,
+        unitName: line.unitName,
+        unitMultiplier: line.unitMultiplier,
         quantity: line.quantity,
         unitCost: line.unitCost,
         returnUnitCost: line.returnUnitCost,
       })),
-    });
+    };
+    try {
+    const res = await (initial ? updatePurchaseReturn(initial.id, payload) : createPurchaseReturn(payload));
     setBusy(false);
     if (res.ok) {
       void catalog.refresh();
       router.push(`${Routes.Inventory}?tab=purchase-returns&expanded=${res.data.id}`);
+      router.refresh();
     }
     else setError(t(res.error as never));
+    } catch { setError("Không thể lưu phiếu. Vui lòng thử lại."); }
+    finally { setBusy(false); }
   }
 
   const numCls = "no-spinner min-h-11 w-full px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums lg:min-h-0";
@@ -185,7 +220,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
         flush
         backHref={`${Routes.Inventory}?tab=purchase-returns`}
         backLabel={t("common.back")}
-        title={t("purchaseReturns.createTitle")}
+        title={initial ? `Sửa phiếu ${initial.code}` : t("purchaseReturns.createTitle")}
       />
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-visible lg:overflow-hidden bg-canvas">
@@ -212,10 +247,10 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
               ) : (
                 <div className="space-y-2 p-3">
                   {lines.map((line) => {
-                    const overStock = line.quantity > line.stock + 1e-9;
+                    const overStock = line.quantity > availableStock(line) + 1e-9;
                     return (
                       <MobileFormLineCard
-                        key={line.productId}
+                        key={line.key}
                         title={line.name}
                         subtitle={line.sku}
                         amount={formatCurrency(line.quantity * line.returnUnitCost)}
@@ -223,7 +258,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
                           <Button
                             type="button"
                             variant="ghost"
-                            onClick={() => setLines((current) => current.filter((item) => item.productId !== line.productId))}
+                            onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))}
                             className="min-h-11 text-er"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -233,16 +268,16 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
                       >
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
-                            <div className="text-xs font-semibold text-slate-500">{t("purchaseReturns.availableStock", { stock: formatNumber(line.stock), unit: line.unitName })}</div>
+                            <div className="text-xs font-semibold text-slate-500">{t("purchaseReturns.availableStock", { stock: formatNumber(availableStock(line)), unit: line.unitName })}</div>
                             <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{line.unitName}</div>
                           </div>
                           <div className="col-span-2 space-y-1 text-xs font-semibold text-slate-500">
                             <span>{t("purchaseReturns.cols.qty")}</span>
                             <QuantityInput
                               min={0}
-                              max={line.stock}
+                              max={availableStock(line)}
                               value={line.quantity}
-                              onChange={(quantity) => patch(line.productId, { quantity })}
+                              onChange={(quantity) => patch(line.key, { quantity })}
                               touchTargets
                               decrementLabel={t("common.decreaseProductQuantity", { product: line.name })}
                               inputLabel={t("common.productQuantity", { product: line.name })}
@@ -258,7 +293,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
                           </div>
                           <div className="space-y-1 text-xs font-semibold text-slate-500">
                             <span>{t("purchaseReturns.cols.returnUnitCost")}</span>
-                            <MoneyInput aria-label={t("purchaseReturns.cols.returnUnitCost")} value={line.returnUnitCost} onChange={(value) => patch(line.productId, { returnUnitCost: value ?? 0 })} className={cn(numCls, "h-11")} />
+                            <MoneyInput aria-label={t("purchaseReturns.cols.returnUnitCost")} value={line.returnUnitCost} onChange={(value) => patch(line.key, { returnUnitCost: value ?? 0 })} className={cn(numCls, "h-11")} />
                           </div>
                         </div>
                       </MobileFormLineCard>
@@ -268,13 +303,13 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
               )}
             </div>
             <div className="hidden lg:block">
-              <table className="w-full min-w-[820px] table-fixed text-sm">
+              <table className="w-full min-w-[1080px] table-fixed text-sm">
               <colgroup>
                 <col className="w-14" />
                 <col className="w-28" />
-                <col />
+                <col className="w-60" />
                 <col className="w-24" />
-                <col className="w-24" />
+                <col className="w-32" />
                 <col className="w-28" />
                 <col className="w-30" />
                 <col className="w-32" />
@@ -302,24 +337,24 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
                     </td>
                   </tr>
                 ) : lines.map((line, index) => {
-                  const overStock = line.quantity > line.stock + 1e-9;
+                  const overStock = line.quantity > availableStock(line) + 1e-9;
                   return (
-                    <tr key={line.productId}>
+                    <tr key={line.key}>
                       <td className="px-3 py-2 text-center text-slate-500">{index + 1}</td>
                       <td className="px-3 py-2 font-medium text-primary-600">{line.sku}</td>
                       <td className="px-3 py-2">
                         <div className="truncate font-medium">{line.name}</div>
                         <div className={cn("text-xs", overStock ? "text-er" : "text-slate-400")}>
-                          {t("purchaseReturns.availableStock", { stock: formatNumber(line.stock), unit: line.unitName })}
+                          {t("purchaseReturns.availableStock", { stock: formatNumber(availableStock(line)), unit: line.unitName })}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-slate-500">{line.unitName}</td>
                       <td className="px-3 py-2">
                         <QuantityInput
                           min={0}
-                          max={line.stock}
+                          max={availableStock(line)}
                           value={line.quantity}
-                          onChange={(quantity) => patch(line.productId, { quantity })}
+                          onChange={(quantity) => patch(line.key, { quantity })}
                           size="sm"
                           className={cn("w-28", overStock && "border-er text-er")}
                           inputClassName={cn(overStock && "border-er text-er")}
@@ -327,11 +362,11 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-slate-500">{formatCurrency(line.unitCost)}</td>
                       <td className="px-3 py-2">
-                        <MoneyInput value={line.returnUnitCost} onChange={(value) => patch(line.productId, { returnUnitCost: value ?? 0 })} className={numCls} />
+                        <MoneyInput value={line.returnUnitCost} onChange={(value) => patch(line.key, { returnUnitCost: value ?? 0 })} className={numCls} />
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(line.quantity * line.returnUnitCost)}</td>
                       <td className="sticky right-0 bg-surface px-3 py-2 text-right shadow-[-10px_0_18px_rgba(15,23,42,0.04)]">
-                        <Button type="button" variant="ghost" size="iconSm" aria-label={t("common.delete")} onClick={() => setLines((current) => current.filter((item) => item.productId !== line.productId))} className="text-slate-400 hover:text-er">
+                        <Button type="button" variant="ghost" size="iconSm" aria-label={t("common.delete")} onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))} className="text-slate-400 hover:text-er">
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </td>
@@ -346,7 +381,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
 
         <aside className="w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto">
           <div className="grid gap-2">
-            <Input value={new Date().toLocaleDateString("vi-VN")} readOnly className="text-slate-500" />
+            <Input value={documentDate} readOnly className="text-slate-500" />
           </div>
 
           <Combobox
@@ -358,8 +393,8 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
           />
 
           <div className="space-y-2 pt-2 text-sm">
-            <SummaryLine label={t("purchaseReturns.code")} value={t("purchaseReturns.autoCode")} />
-            <SummaryLine label={t("orders.cols.status")} value={t("purchaseReturns.status.draft")} />
+            <SummaryLine label={t("purchaseReturns.code")} value={initial?.code ?? t("purchaseReturns.autoCode")} />
+            <SummaryLine label={t("orders.cols.status")} value={t(initial?.status === "completed" ? "purchaseReturns.status.completed" : "purchaseReturns.status.draft")} />
             <SummaryLine label={t("purchaseReturns.cols.subtotal")} value={formatCurrency(subtotal)} />
             <div className="flex justify-between items-center gap-2">
               <span className="text-slate-500">{t("purchaseReturns.cols.discount")}</span>
@@ -393,7 +428,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
               <span className="text-slate-600 dark:text-slate-300">{t("purchaseReturns.applyDebt")}</span>
               <Checkbox checked={applyDebt} onChange={(event) => setApplyDebt(event.target.checked)}  />
             </label>
-            <SummaryLine label={t("purchaseReturns.debtAmount")} value={formatCurrency(debtAmount)} />
+            {initial && applyDebt ? <label className="flex items-center justify-between gap-3"><span>{t("purchaseReturns.debtAmount")}</span><MoneyInput aria-label={t("purchaseReturns.debtAmount")} value={editedDebt} onChange={(value) => setEditedDebt(value ?? 0)} className={cn(numCls, "w-36")} /></label> : <SummaryLine label={t("purchaseReturns.debtAmount")} value={formatCurrency(debtAmount)} />}
             {unsettled > 0 && <SummaryLine label={t("purchaseReturns.unsettledAmount")} value={formatCurrency(unsettled)} tone="warn" />}
           </div>
 
@@ -401,11 +436,11 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
           {error && <Text as="p" variant="destructive" text={error} />}
 
           <div className="sticky bottom-0 z-10 -mx-3 mt-auto grid grid-cols-2 gap-3 bg-surface px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:static lg:mx-0 lg:bg-transparent lg:p-0">
-              <Button type="button" variant="outline" disabled title={t("purchaseReturns.draftTodo")} className="h-12 rounded-card font-semibold">
+              {!initial && <Button type="button" variant="outline" disabled title={t("purchaseReturns.draftTodo")} className="h-12 rounded-card font-semibold">
                 {t("purchaseReturns.saveDraft")}
-              </Button>
+              </Button>}
               <Button type="button" onClick={submit} disabled={lines.length === 0 || !supplierId || !warehouseId} loading={busy} className="h-12 rounded-card font-semibold">
-                {t("purchaseReturns.complete")}
+                {initial ? (initial.status === "draft" ? "Hoàn tất phiếu trả" : "Lưu thay đổi") : t("purchaseReturns.complete")}
               </Button>
           </div>
         </aside>

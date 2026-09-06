@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
-import { createInternalUse } from "@/lib/actions/internal-use";
+import { createInternalUse, updateInternalUse } from "@/lib/actions/internal-use";
 import { getCatalogWarehouseStock } from "@/lib/product-catalog";
 import { Routes } from "@/lib/routes";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
@@ -22,6 +22,9 @@ import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPurchaseProduct } from "@/lib/inventory/product-catalog-adapter";
 import type { InternalUseWarehouse } from "@/lib/inventory/internal-use-warehouse";
 import type { PurchaseProductRow } from "@/lib/data/inventory";
+
+import { internalUseReasonLabel } from "@/lib/inventory/internal-use-reason";
+import type { InternalUseIssueRow } from "@/lib/data/internal-use";
 
 const DEPARTMENTS = [
   ["kitchen", "Kitchen", "Bếp"], ["office", "Office", "Văn phòng"], ["marketing", "Marketing", "Tiếp thị"],
@@ -39,7 +42,7 @@ type Line = {
   units: { name: string; mult: number }[]; unitName: string; unitMultiplier: number; quantity: number; unitCost: number;
 };
 
-export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse | null }) {
+export function InternalUseForm({ warehouse, initial }: { warehouse: InternalUseWarehouse | null; initial?: InternalUseIssueRow }) {
   const t = useTranslations();
   const locale = useLocale();
   const L = locale === "vi";
@@ -47,10 +50,16 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
   const catalog = useProductCatalog();
   const [pending, start] = useTransition();
 
-  const [department, setDepartment] = useState("");
-  const [reason, setReason] = useState("");
-  const [note, setNote] = useState("");
-  const [lines, setLines] = useState<Line[]>([]);
+  const [documentDate] = useState(() => (initial ? new Date(initial.createdAt) : new Date()).toLocaleDateString("vi-VN"));
+  const [department, setDepartment] = useState(initial?.department ?? "");
+  const [reason, setReason] = useState(initial?.reason ?? "");
+  const [note, setNote] = useState(initial?.note ?? "");
+  const [lines, setLines] = useState<Line[]>(() => initial?.items.map((item) => {
+    const product = catalog.products.find((p) => p.id === item.productId);
+    const multiplier = Number(item.unitMultiplier);
+    const units = product ? [{ name: product.baseUnit, mult: 1 }, ...catalogItemToPurchaseProduct(product).units.map((u) => ({ name: u.unitName, mult: Number(u.multiplier) }))] : [];
+    return { key: item.id, productId: item.productId, sku: item.sku ?? "", productName: item.productName, baseUnit: product?.baseUnit ?? item.unitName, costPrice: Number(item.unitCost) / multiplier, units: [{ name: item.unitName, mult: multiplier }, ...units.filter((u) => u.name !== item.unitName)], unitName: item.unitName, unitMultiplier: multiplier, quantity: Number(item.quantity), unitCost: Number(item.unitCost) };
+  }) ?? []);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<PurchaseProductRow[]>([]);
   const [searching, setSearching] = useState(false);
@@ -58,8 +67,10 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
   const tRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const deptOpts = DEPARTMENTS.map(([v, en, vi]) => ({ value: v, label: L ? vi : en }));
-  const reasonOpts = REASONS.map(([v, en, vi]) => ({ value: v, label: L ? vi : en }));
+  const deptOpts: { value: string; label: string }[] = DEPARTMENTS.map(([v, en, vi]) => ({ value: v, label: L ? vi : en }));
+  const reasonOpts: { value: string; label: string }[] = REASONS.map(([v, en, vi]) => ({ value: v, label: L ? vi : en }));
+  if (department && !deptOpts.some((o) => o.value === department)) deptOpts.push({ value: department, label: department });
+  if (reason && !reasonOpts.some((o) => o.value === reason)) reasonOpts.push({ value: reason, label: internalUseReasonLabel(reason, locale) });
   const labelOf = (opts: { value: string; label: string }[], v: string) => opts.find((o) => o.value === v)?.label ?? v;
 
   const totalCost = useMemo(() => lines.reduce((s, l) => s + l.unitCost * l.quantity, 0), [lines]);
@@ -152,23 +163,27 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
   function submit() {
     if (lines.length === 0) return;
     start(async () => {
-      const res = await createInternalUse({
+      const payload = {
         warehouseId: warehouse?.id,
         department: department ? labelOf(deptOpts, department) : undefined,
-        reason: reason ? labelOf(reasonOpts, reason) : undefined,
+        reason: reason ? (initial?.reason === reason ? reason : labelOf(reasonOpts, reason)) : undefined,
         note: note || undefined,
         items: lines.map((l) => ({ productId: l.productId, productName: l.productName, unitName: l.unitName, unitMultiplier: l.unitMultiplier, quantity: l.quantity, unitCost: l.unitCost })),
-      });
+      };
+      try {
+      const res = await (initial ? updateInternalUse(initial.id, payload) : createInternalUse(payload));
       if (res.ok) {
         void catalog.refresh();
         setToast(t("internalUse.submitted"));
         setLines([]); setNote(""); setReason(""); setDepartment("");
-        router.push(`${Routes.Inventory}?tab=internal`);
+        router.push(`${Routes.Inventory}?tab=internal${initial ? `&expanded=${initial.id}` : ""}`);
+        router.refresh();
         setTimeout(() => setToast(""), 3500);
       } else {
         setToast(t(res.error as never));
         setTimeout(() => setToast(""), 3500);
       }
+      } catch { setToast("Không thể lưu phiếu. Vui lòng thử lại."); }
     });
   }
 
@@ -205,7 +220,7 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
             <FormMetric label={t("internalUse.cols.items")} value={String(lines.length)} />
             <FormMetric label={t("internalUse.qty")} value={String(lines.reduce((sum, line) => sum + line.quantity, 0))} />
             <FormMetric label={t("internalUse.totalCost")} value={formatCurrency(totalCost)} tone="primary" />
-            <FormMetric label={t("internalUse.status.draft")} value={t("internalUse.status.approved")} tone="ok" />
+            <FormMetric label={t("internalUse.statusLabel")} value={t(initial?.status === "pending" ? "internalUse.status.pending" : "internalUse.status.approved")} tone="ok" />
           </div>
 
           <div className="flex-1 min-h-[320px] overflow-visible bg-surface border border-border rounded-card lg:overflow-auto">
@@ -274,11 +289,11 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
               })}
             </div>
             <div className="hidden lg:block">
-              <table className="w-full min-w-[760px] table-fixed text-sm">
+              <table className="w-full min-w-[1080px] table-fixed text-sm">
               <colgroup>
                 <col className="w-14" />
                 <col className="w-28" />
-                <col />
+                <col className="w-60" />
                 <col className="w-28" />
                 <col className="w-24" />
                 <col className="w-30" />
@@ -332,12 +347,12 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
 
       <aside className="w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto">
           <div className="mb-5 flex items-center justify-between gap-3">
-            <div className="h-10 rounded-lg border border-border-soft bg-canvas px-3 py-2 text-sm font-semibold text-slate-400">{new Date().toLocaleDateString("vi-VN")}</div>
+            <div className="h-10 rounded-lg border border-border-soft bg-canvas px-3 py-2 text-sm font-semibold text-slate-400">{documentDate}</div>
           </div>
 
           <div className="space-y-4 text-sm">
-            <PanelRow label={t("internalUse.autoCodeLabel")}><span className="rounded-lg border border-border-soft bg-canvas px-3 py-2 font-semibold text-slate-400">{t("internalUse.autoCode")}</span></PanelRow>
-            <PanelRow label={t("internalUse.statusLabel")}><span className="font-semibold">{t("internalUse.status.draft")}</span></PanelRow>
+            <PanelRow label={t("internalUse.autoCodeLabel")}><span className="rounded-lg border border-border-soft bg-canvas px-3 py-2 font-semibold text-slate-400">{initial?.code ?? t("internalUse.autoCode")}</span></PanelRow>
+            <PanelRow label={t("internalUse.statusLabel")}><span className="font-semibold">{t(initial ? (initial.status === "pending" ? "internalUse.status.pending" : "internalUse.status.approved") : "internalUse.status.draft")}</span></PanelRow>
             <PanelRow label={t("internalUse.reason")}><SearchableSelect options={reasonOpts} value={reason} onChange={setReason} placeholder={t("internalUse.reasonPlaceholder")} /></PanelRow>
             <PanelRow label={t("internalUse.department")}><SearchableSelect options={deptOpts} value={department} onChange={setDepartment} placeholder={t("internalUse.departmentPlaceholder")} /></PanelRow>
             <PanelRow label={t("internalUse.totalCost")}><span className="font-mono text-lg font-extrabold text-primary-700">{formatCurrency(totalCost)}</span></PanelRow>
@@ -351,13 +366,13 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
           />
 
           <div className="sticky bottom-0 z-10 -mx-3 mt-auto grid grid-cols-2 gap-3 bg-surface px-3 pt-6 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0">
-            <Button type="button" variant="outline" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={submit} block>
+            {!initial && <Button type="button" variant="outline" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={submit} block>
               {!pending && <Save className="h-4 w-4" />}
               {t("stocktakes.saveDraft")}
-            </Button>
+            </Button>}
             <Button type="button" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={submit} block>
               {!pending && <Check className="w-4 h-4" />}
-              {t("internalUse.complete")}
+              {initial ? "Lưu thay đổi" : t("internalUse.complete")}
             </Button>
           </div>
       </aside>
