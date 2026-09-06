@@ -1060,7 +1060,7 @@ export function ServiceMaterialStockSync({
   const t = useTranslations();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [warehouseId, setWarehouseId] = useState(
+  const [warehouseId] = useState(
     material.stockWarehouseId ?? warehouses.find((warehouse) => warehouse.isDefault)?.id ?? warehouses[0]?.id ?? "",
   );
   const [busy, setBusy] = useState(false);
@@ -1117,16 +1117,6 @@ export function ServiceMaterialStockSync({
         )}
       >
         <div className="space-y-3">
-          <div>
-            <Select
-              value={warehouseId}
-              onChange={(event) => setWarehouseId(event.target.value)}
-              options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
-              disabled={Boolean(material.stockWarehouseId)}
-              aria-label={t("purchases.cols.warehouse")}
-              className="w-full"
-            />
-          </div>
           <Text as="p" size="sm" text={t("services.materials.syncStockHint", {
             used: Number(material.usedQuantity),
             issued: Number(issuedQuantity.toFixed(4)),
@@ -1158,7 +1148,7 @@ export function ServiceMaterialReservation({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [warehouseId, setWarehouseId] = useState(material.reservedWarehouseId ?? warehouses.find((warehouse) => warehouse.isDefault)?.id ?? warehouses[0]?.id ?? "");
+  const [warehouseId] = useState(material.reservedWarehouseId ?? warehouses.find((warehouse) => warehouse.isDefault)?.id ?? warehouses[0]?.id ?? "");
   const [quantity, setQuantity] = useState<number | null>(Math.max(0, Number(material.plannedQuantity) - Number(material.usedQuantity)));
   const multiplier = Number(material.unitMultiplier);
   const reservedQuantity = multiplier > 0 ? Number(material.reservedBaseQuantity) / multiplier : 0;
@@ -1206,7 +1196,6 @@ export function ServiceMaterialReservation({
         )}
       >
         <div className="space-y-3">
-          <Select value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)} options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))} />
           <NumberInput value={quantity} onChange={setQuantity} min={0} max={remainingQuantity} decimals={4} suffix={material.unitName} placeholder={t("services.materials.reserveQuantity")} />
           <Text as="p" size="sm" text={t("services.materials.reserveHint", { quantity: Number(remainingQuantity.toFixed(4)), unit: material.unitName })} />
         </div>

@@ -57,7 +57,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
   const router = useRouter();
   const catalog = useProductCatalog();
   const [supplierId, setSupplierId] = useState(options.suppliers[0]?.id ?? "");
-  const [warehouseId, setWarehouseId] = useState(options.warehouses[0]?.id ?? "");
+  const [warehouseId] = useState(options.warehouses[0]?.id ?? "");
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<PurchaseReturnProductRow[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
@@ -344,8 +344,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
         </div>
 
         <aside className="w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto">
-          <div className="grid grid-cols-2 gap-2">
-            <Combobox value={warehouseId} onChange={setWarehouseId} allowClear={false} options={options.warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))} />
+          <div className="grid gap-2">
             <Input value={new Date().toLocaleDateString("vi-VN")} readOnly className="text-slate-500" />
           </div>
 

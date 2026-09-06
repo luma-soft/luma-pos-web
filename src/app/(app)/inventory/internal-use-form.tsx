@@ -233,7 +233,7 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
                     <div className="grid grid-cols-2 gap-3">
                       {warehouse && availableStock != null && (
                         <div className="space-y-1">
-                          <div className="text-xs font-semibold text-slate-500">{t("internalUse.availableStock", { warehouse: warehouse.name })}</div>
+                          <div className="text-xs font-semibold text-slate-500">{t("products.expand.cols.stock")}</div>
                           <div className="flex h-11 items-center rounded-md bg-canvas px-3 text-sm font-semibold tabular-nums">
                             {formatNumber(availableStock)} {l.baseUnit}
                           </div>
@@ -332,7 +332,6 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
 
       <aside className="w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto">
           <div className="mb-5 flex items-center justify-between gap-3">
-            <SearchableSelect options={[{ value: "main", label: warehouse?.name ?? t("internalUse.defaultBranch") }]} value="main" onChange={() => undefined} placeholder={warehouse?.name ?? t("internalUse.defaultBranch")} />
             <div className="h-10 rounded-lg border border-border-soft bg-canvas px-3 py-2 text-sm font-semibold text-slate-400">{new Date().toLocaleDateString("vi-VN")}</div>
           </div>
 

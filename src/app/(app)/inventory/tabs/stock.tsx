@@ -7,7 +7,6 @@ import { formatNumber } from "@/lib/utils";
 import {
   getInventory,
   getInventoryOverview,
-  getPurchaseFormOptions,
   getRecentMovements,
   type InventoryStatusCounts,
 } from "@/lib/data/inventory";
@@ -88,19 +87,16 @@ async function StockStatusDetail({
   const page = Number(searchParams.page) || 1;
   const pageSize = parsePageSize(searchParams.size);
   const category = searchParams.category ?? "";
-  const warehouse = searchParams.warehouse ?? "";
-  const [{ rows, total, pageCount }, productOptions, purchaseOptions] =
+  const [{ rows, total, pageCount }, productOptions] =
     await Promise.all([
       getInventory(context.storeId, {
         q: searchParams.q,
         stock: status,
         categoryId: category || undefined,
-        warehouseId: warehouse || undefined,
         page,
         pageSize,
       }),
       getProductFormOptions(context.storeId),
-      getPurchaseFormOptions(context.storeId),
     ]);
 
   return (
@@ -132,7 +128,7 @@ async function StockStatusDetail({
             <ListSearchInput name="q" defaultValue={searchParams.q ?? ""} placeholder={t("inventory.searchPlaceholder")} />
           </InstantFilterForm>
         )}
-        filter={<InventoryFilterDrawer title="Bộ lọc kho hàng" values={searchParams} fields={["warehouse", "category", "stock"]} warehouses={purchaseOptions.warehouses.map((item) => ({ value: item.id, label: item.name }))} categories={productOptions.categories.map((item) => ({ value: item.id, label: item.name }))} />}
+        filter={<InventoryFilterDrawer title="Bộ lọc kho hàng" values={searchParams} fields={["category", "stock"]} categories={productOptions.categories.map((item) => ({ value: item.id, label: item.name }))} />}
       />
 
       <section aria-labelledby="inventory-product-list-heading">

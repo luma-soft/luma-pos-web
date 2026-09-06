@@ -37,7 +37,6 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
             <InfoLine label={t("orders.cols.date")} value={formatDate(ret.createdAt)} />
             <InfoLine label={t("returns.reason")} value={ret.reason ? t(`returns.reasons.${ret.reason}` as never) : "—"} />
             <InfoLine label={t("returns.refundVia")} value={t(`returns.refundMethods.${ret.refundMethod}`)} />
-            <InfoLine label={t("returns.cols.warehouse")} value={ret.warehouseName ?? "—"} />
             <InfoLine label={t("returns.cols.createdBy")} value={ret.createdByName ?? "—"} />
             <InfoLine label={t("customers.cols.phone")} value={ret.customerPhone ?? "—"} />
           </div>

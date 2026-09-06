@@ -65,12 +65,6 @@ export function ReturnsTable({
       render: (row) => t(`returns.refundMethods.${row.refundMethod}`),
     },
     {
-      key: "warehouse",
-      label: t("returns.cols.warehouse"),
-      defaultVisible: false,
-      render: (row) => row.warehouseName ?? <span className="text-slate-400">-</span>,
-    },
-    {
       key: "createdBy",
       label: t("returns.cols.createdBy"),
       defaultVisible: false,
@@ -149,7 +143,6 @@ export function ReturnsTable({
               <div className="grid gap-4 bg-surface px-4 py-4 md:grid-cols-4">
                 <Info label={t("returns.sourceOrder")} value={row.orderCode ?? "-"} />
                 <Info label={t("returns.refundVia")} value={t(`returns.refundMethods.${row.refundMethod}`)} />
-                <Info label={t("returns.cols.warehouse")} value={row.warehouseName ?? "-"} />
                 <Info label={t("returns.cols.createdBy")} value={row.createdByName ?? "-"} />
                 {row.note && <div className="md:col-span-4"><Info label={t("orders.detail.notePlaceholder")} value={row.note} /></div>}
               </div>

@@ -77,7 +77,15 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
   const t = useTranslations();
   return (
     <div className="border-t border-border-soft bg-surface px-4 py-4">
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+      <div className="grid min-w-0 gap-4">
+        <div className="grid min-w-0 gap-4 rounded-lg border border-border-soft bg-canvas p-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          <Info label={t("purchaseReturns.cols.supplier")} value={<PartnerDetailLink kind="supplier" partnerId={row.supplierId} name={row.supplierName} />} />
+          <Info label={t("purchaseReturns.refundAmount")} value={formatCurrency(Number(row.refundAmount))} />
+          <Info label={t("purchaseReturns.debtAmount")} value={formatCurrency(Number(row.debtAmount))} />
+          <Info label={t("purchaseReturns.settlementLabel")} value={t(`purchaseReturns.settlement.${row.settlementStatus}` as never)} />
+          {row.createdByName && <Info label={t("purchases.detail.receiver")} value={row.createdByName} />}
+          {row.note && <Info label={t("purchases.detail.note")} value={row.note} />}
+        </div>
         <div className="divide-y divide-border-soft overflow-hidden rounded-lg border border-border lg:hidden" data-mobile-audit="inventory-purchase-return-items">
           {row.items.map((item) => (
             <article key={item.id} className="space-y-2 p-3 text-sm">
@@ -98,8 +106,8 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
             </article>
           ))}
         </div>
-        <div className="hidden overflow-x-auto rounded-lg border border-border lg:block">
-          <table className="w-full min-w-[760px] text-sm">
+        <div className="hidden min-w-0 overflow-x-auto rounded-lg border border-border lg:block">
+          <table className="w-full min-w-[760px] text-sm [&_th]:whitespace-nowrap [&_td:not(:nth-child(2))]:whitespace-nowrap">
             <thead>
               <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                 <th className="px-3 py-2.5 font-semibold">{t("products.fields.sku")}</th>
@@ -117,7 +125,7 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
                     <Link href={Routes.product(item.productId)} className="font-medium text-primary-600 hover:underline">{item.sku}</Link>
                   </td>
                   <td className="px-3 py-3">
-                    <div className="font-medium">{item.productName}</div>
+                    <div className="min-w-40 break-words font-medium">{item.productName}</div>
                     <div className="text-xs text-slate-400">{item.unitName}</div>
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
@@ -129,15 +137,6 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
             </tbody>
           </table>
         </div>
-        <div className="space-y-2 rounded-lg border border-border-soft p-3 text-sm">
-          <Info label={t("purchaseReturns.cols.supplier")} value={<PartnerDetailLink kind="supplier" partnerId={row.supplierId} name={row.supplierName} />} />
-          <Info label={t("purchases.cols.warehouse")} value={row.warehouseName} />
-          <Info label={t("purchaseReturns.refundAmount")} value={formatCurrency(Number(row.refundAmount))} />
-          <Info label={t("purchaseReturns.debtAmount")} value={formatCurrency(Number(row.debtAmount))} />
-          <Info label={t("purchaseReturns.settlementLabel")} value={t(`purchaseReturns.settlement.${row.settlementStatus}` as never)} />
-          {row.createdByName && <Info label={t("purchases.detail.receiver")} value={row.createdByName} />}
-          {row.note && <Info label={t("purchases.detail.note")} value={row.note} />}
-        </div>
       </div>
     </div>
   );
@@ -145,9 +144,9 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
 
 function Info({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex justify-between gap-3">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-right font-medium">{value}</span>
+    <div className="min-w-0 space-y-1">
+      <span className="block text-xs text-slate-500">{label}</span>
+      <span className="block break-words font-medium tabular-nums">{value}</span>
     </div>
   );
 }

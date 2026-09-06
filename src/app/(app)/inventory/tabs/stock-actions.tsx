@@ -4,7 +4,7 @@ import { Select } from "@/components/ui/select";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { ChevronDown, ClipboardCheck, Filter, History, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, ClipboardCheck, Filter, History, Plus, Search, X } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
 
@@ -77,15 +77,13 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [type, setType] = useState("all");
-  const [warehouse, setWarehouse] = useState("all");
   const [page, setPage] = useState(1);
   const pageSize = 10;
-  const warehouses = useMemo(() => Array.from(new Set(movements.map((item) => item.warehouseName))), [movements]);
   const types = useMemo(() => Array.from(new Set(movements.map((item) => item.type))), [movements]);
   const filtered = useMemo(() => movements.filter((item) => {
     const matchQuery = !query.trim() || `${item.productName} ${item.id} ${item.note ?? ""}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
-    return matchQuery && (type === "all" || item.type === type) && (warehouse === "all" || item.warehouseName === warehouse);
-  }), [movements, query, type, warehouse]);
+    return matchQuery && (type === "all" || item.type === type);
+  }), [movements, query, type]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
 
@@ -118,7 +116,6 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
                     <div className="truncate text-sm font-semibold">{movement.productName}</div>
                     <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-slate-400">
                       <span>{t(`inventory.moveTypes.${movement.type}` as never)}</span>
-                      <span>{movement.warehouseName}</span>
                     </div>
                   </div>
                   <div className={cn("text-right font-mono text-sm font-bold", MOVE_STYLES[movement.type] ?? "text-slate-600")}>
@@ -136,7 +133,6 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
                     <th className="px-4 py-3">{t("inventory.historyColumns.product")}</th>
                     <th className="px-4 py-3">{t("inventory.historyColumns.change")}</th>
                     <th className="px-4 py-3">{t("inventory.historyColumns.type")}</th>
-                    <th className="px-4 py-3">{t("inventory.historyColumns.warehouse")}</th>
                     <th className="px-4 py-3">{t("inventory.historyColumns.actor")}</th>
                   </tr>
                 </thead>
@@ -154,7 +150,6 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
                         {movement.quantity > 0 ? "+" : ""}{formatNumber(movement.quantity)} {movement.baseUnit}
                       </td>
                       <td className="whitespace-nowrap px-4 py-4">{t(`inventory.moveTypes.${movement.type}` as never)}</td>
-                      <td className="whitespace-nowrap px-4 py-4">{movement.warehouseName}</td>
                       <td className="whitespace-nowrap px-4 py-4">{movement.byName ?? "—"}</td>
                     </tr>
                   ))}
@@ -173,10 +168,9 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
               <div className="min-w-0 flex-1"><h2 className="text-lg font-bold">{t("inventory.movementsTitle")}</h2><p className="text-xs text-slate-400">{t("inventory.actions.ledgerSubtitle")}</p></div>
               <button type="button" onClick={() => setDrawerOpen(false)} aria-label={t("common.close")} className="grid h-10 w-10 place-items-center rounded-xl text-slate-500 hover:bg-surface-2 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"><X className="h-5 w-5 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" /></button>
             </header>
-            <div className="grid gap-2 border-b border-border bg-canvas/60 p-4 sm:grid-cols-[minmax(0,1fr)_160px_160px]">
+            <div className="grid gap-2 border-b border-border bg-canvas/60 p-4 sm:grid-cols-[minmax(0,1fr)_160px]">
               <label className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder={t("inventory.actions.searchMovements")} className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 min-h-11 lg:min-h-0 min-h-11 lg:min-h-0" /></label>
               <div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" /><Select value={type} onValueChange={(value) => { setType(value); setPage(1); }} aria-label={t("inventory.actions.allTypes")} className="pl-9" rootClassName="w-full" options={[{ value: "all", label: t("inventory.actions.allTypes") }, ...types.map((value) => ({ value, label: t(`inventory.moveTypes.${value}` as never) }))]} /></div>
-              <div className="relative"><SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" /><Select value={warehouse} onValueChange={(value) => { setWarehouse(value); setPage(1); }} aria-label={t("inventory.actions.allWarehouses")} className="pl-9" rootClassName="w-full" options={[{ value: "all", label: t("inventory.actions.allWarehouses") }, ...warehouses.map((value) => ({ value, label: value }))]} /></div>
             </div>
             <div className="min-h-0 flex-1 overflow-auto"><MovementList rows={pageRows} /></div>
             <footer className="flex items-center justify-between border-t border-border px-5 py-3 text-sm"><span className="text-slate-500">{t("inventory.actions.showing", { count: filtered.length })}</span><div className="flex items-center gap-2"><button type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-40 lg:min-h-0 lg:min-w-0">{t("inventory.actions.previous")}</button><span className="min-w-14 text-center font-mono text-xs">{page}/{pageCount}</span><button type="button" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)} className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-40 lg:min-h-0 lg:min-w-0">{t("inventory.actions.next")}</button></div></footer>
@@ -189,5 +183,5 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
 
 function MovementList({ rows, compact = false }: { rows: MovementItem[]; compact?: boolean }) {
   const t = useTranslations();
-  return <div className={cn("divide-y divide-border-soft", compact && "max-h-[520px] overflow-auto")}>{rows.map((movement) => <article key={movement.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-4 py-3.5 hover:bg-surface-2"><div className="min-w-0"><div className="truncate text-sm font-semibold" title={movement.productName}>{movement.productName}</div><div className="mt-1 flex flex-wrap gap-x-2 text-xs text-slate-400"><span className="font-mono">#{movement.id.slice(0, 8).toUpperCase()}</span><span>{t(`inventory.moveTypes.${movement.type}` as never)}</span><span>{movement.warehouseName}</span></div></div><div className={cn("text-right font-mono text-sm font-bold tabular-nums", MOVE_STYLES[movement.type] ?? "text-slate-600")}><div>{movement.quantity > 0 ? "+" : ""}{formatNumber(movement.quantity)} {movement.baseUnit}</div><div className="mt-1 text-[11px] font-normal text-slate-400">{formatDate(movement.createdAt)}</div></div></article>)}</div>;
+  return <div className={cn("divide-y divide-border-soft", compact && "max-h-[520px] overflow-auto")}>{rows.map((movement) => <article key={movement.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-4 py-3.5 hover:bg-surface-2"><div className="min-w-0"><div className="truncate text-sm font-semibold" title={movement.productName}>{movement.productName}</div><div className="mt-1 flex flex-wrap gap-x-2 text-xs text-slate-400"><span className="font-mono">#{movement.id.slice(0, 8).toUpperCase()}</span><span>{t(`inventory.moveTypes.${movement.type}` as never)}</span></div></div><div className={cn("text-right font-mono text-sm font-bold tabular-nums", MOVE_STYLES[movement.type] ?? "text-slate-600")}><div>{movement.quantity > 0 ? "+" : ""}{formatNumber(movement.quantity)} {movement.baseUnit}</div><div className="mt-1 text-[11px] font-normal text-slate-400">{formatDate(movement.createdAt)}</div></div></article>)}</div>;
 }

@@ -44,12 +44,6 @@ export function InternalUseTable({ rows }: { rows: InternalUseRow[] }) {
       render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span>,
     },
     {
-      key: "warehouse",
-      label: isVi ? "Chi nhánh" : "Branch",
-      defaultVisible: true,
-      render: (row) => <span className="text-slate-700 dark:text-slate-200">{row.warehouseName ?? "—"}</span>,
-    },
-    {
       key: "note",
       label: t("internalUse.note"),
       defaultVisible: true,
@@ -106,7 +100,6 @@ function ExpandedIssue({ row }: { row: InternalUseRow }) {
             <Info label={isVi ? "Ngày xuất" : t("orders.cols.date")} value={formatDate(row.createdAt)} />
           </div>
         </div>
-        <div className="text-right text-sm font-semibold text-slate-500">{row.warehouseName ?? "—"}</div>
       </div>
 
       <div className="overflow-hidden rounded-card border border-border">

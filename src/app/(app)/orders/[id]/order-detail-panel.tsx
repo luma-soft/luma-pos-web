@@ -98,7 +98,6 @@ export async function OrderDetailPanel({
           <div className="mt-3 grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-3">
             <InfoLine label={t("orders.detail.seller")} value={order.sellerName ?? "—"} />
             <InfoLine label={t("orders.cols.date")} value={formatDate(order.createdAt)} />
-            <InfoLine label={t("purchases.cols.warehouse")} value={order.warehouseName ?? "—"} />
             <InfoLine label={t("orders.cols.project")} value={order.projectName ?? "—"} />
             <InfoLine label="Bảng giá" value="Bảng giá chung" />
             <InfoLine label={t("customers.cols.phone")} value={order.customerPhone ?? "—"} />

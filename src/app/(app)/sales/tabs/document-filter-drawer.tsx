@@ -14,7 +14,6 @@ import {
   Building2,
   FileText,
   UserRound,
-  Warehouse,
   X,
 } from "lucide-react";
 import { FilterTriggerButton, ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
@@ -162,8 +161,8 @@ function createDraftFromValues(kind: DocumentFilterKind, values: DocumentFilterV
     projectQuery: values.projectQuery ?? "",
     orderId: values.orderId ?? "",
     orderLabel: values.orderLabel ?? "",
-    warehouseId: values.warehouseId ?? "",
-    warehouseLabel: values.warehouseLabel ?? "",
+    warehouseId: "",
+    warehouseLabel: "",
     timePreset: isOrderTimePreset(values.timePreset) && values.timePreset !== "all"
       ? values.timePreset
       : values.timePreset === "all"
@@ -492,12 +491,6 @@ export function DocumentFilterDrawer({
           {values.orderLabel && (
             <input type="hidden" name="orderLabel" value={values.orderLabel} />
           )}
-          {values.warehouseId && (
-            <input type="hidden" name="warehouseId" value={values.warehouseId} />
-          )}
-          {values.warehouseLabel && (
-            <input type="hidden" name="warehouseLabel" value={values.warehouseLabel} />
-          )}
           {values.timePreset && <input type="hidden" name="timePreset" value={values.timePreset} />}
           {values.deliveryPreset && (
             <input type="hidden" name="deliveryPreset" value={values.deliveryPreset} />
@@ -633,20 +626,6 @@ export function DocumentFilterDrawer({
                         icon={<FileText className="size-4" />}
                         onChange={({ value, label }) =>
                           updateDraft({ orderId: value, orderLabel: label })
-                        }
-                      />
-                      <LumaEntityPicker
-                        label="Kho nhận"
-                        name="warehouseId"
-                        labelName="warehouseLabel"
-                        value={draft.warehouseId}
-                        labelValue={draft.warehouseLabel}
-                        kind="warehouse"
-                        queryName="warehouseLabel"
-                        placeholder="Chọn kho nhận"
-                        icon={<Warehouse className="size-4" />}
-                        onChange={({ value, label }) =>
-                          updateDraft({ warehouseId: value, warehouseLabel: label })
                         }
                       />
                     </>

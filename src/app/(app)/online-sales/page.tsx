@@ -111,7 +111,7 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
                 <Layers3 className="h-3.5 w-3.5" /> {L ? "Quản lý kênh" : "Manage channels"}
               </Link>
             </div>
-            <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
               {PROVIDERS.map((provider) => (
                 <ProviderCard key={provider.id} provider={provider} shop={provider.id === "shopee" ? shop : null} L={L} />
               ))}
@@ -151,7 +151,6 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
 
 function ShopPolicyForm({
   shop,
-  warehouses,
   L,
 }: {
   shop: NonNullable<Awaited<ReturnType<typeof getShopeeDashboard>>["shops"]>[number];
@@ -179,16 +178,8 @@ function ShopPolicyForm({
         <div className="font-semibold">{shop.shopName || shop.shopId}</div>
         <div className="mt-1 text-xs text-slate-500">Shopee · {shop.region} · {shop.status}</div>
       </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <label className="flex flex-col gap-1">
-          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Kho nguồn" : "Source warehouse"}</span>
-          <Select
-            name="warehouseId"
-            defaultValue={policy.warehouseId}
-            options={[{ value: "", label: L ? "Kho mặc định" : "Default warehouse" }, ...warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))]}
-            className="w-full bg-canvas"
-          />
-        </label>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <input type="hidden" name="warehouseId" value={policy.warehouseId ?? ""} />
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Tồn đệm" : "Stock buffer"}</span>
           <NumberInput name="stockBuffer" min={0} defaultValue={policy.stockBuffer} className="bg-canvas" />

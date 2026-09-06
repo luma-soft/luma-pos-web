@@ -1394,10 +1394,7 @@ function ProductStockPanel({
   if (!isProductStockManaged(product.categoryName))
     return <EmptyPanel message={t("products.stock.notTracked")} />;
 
-  const rows =
-    product.stockLocations.length > 0
-      ? product.stockLocations
-      : [
+  const rows = [
           {
             warehouseId: "summary",
             warehouseName:
@@ -1416,7 +1413,6 @@ function ProductStockPanel({
         return (
           <article key={row.warehouseId} className="rounded-card border border-border-soft p-3 text-sm">
             <div className="flex items-start justify-between gap-3">
-              <div className="break-words font-semibold">{row.warehouseName}</div>
               <span className={cn("shrink-0 rounded-md px-2 py-1 text-xs font-semibold", effectiveActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500")}>
                 {effectiveActive ? t("products.expand.selling") : t("products.expand.stopped")}
               </span>
@@ -1434,9 +1430,6 @@ function ProductStockPanel({
       <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
-            <th className="px-3 py-3 font-semibold">
-              {t("products.expand.cols.warehouse")}
-            </th>
             <th className="px-3 py-3 text-right font-semibold">
               {t("products.expand.cols.stock")}
             </th>
@@ -1456,7 +1449,6 @@ function ProductStockPanel({
             const low = row.minLevel > 0 && row.quantity <= row.minLevel;
             return (
               <tr key={row.warehouseId}>
-                <td className="px-3 py-3 font-medium">{row.warehouseName}</td>
                 <td className="px-3 py-3 text-right tabular-nums">
                   {formatNumber(row.quantity)}
                 </td>

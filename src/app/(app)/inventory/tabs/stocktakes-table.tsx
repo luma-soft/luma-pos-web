@@ -39,7 +39,7 @@ export function StocktakeMobileRow({
         <div className="min-w-0">
           <h3 className="break-words text-sm font-semibold text-primary-600">{row.code}</h3>
           <p className="mt-1 break-words text-xs text-slate-500">
-            {formatDate(row.createdAt)} · {row.warehouseName}
+            {formatDate(row.createdAt)}
           </p>
         </div>
         <Status row={row} />
@@ -51,7 +51,6 @@ export function StocktakeMobileRow({
         <Info label={t("internalUse.cols.by")} value={row.byName ?? "—"} />
       </dl>
       <div className="mt-4 grid gap-3">
-        <Info label={t("purchases.cols.warehouse")} value={row.warehouseName} />
         <Info label={t("customers.fields.note")} value={row.note ?? "—"} />
       </div>
       <div className="mt-4 flex min-h-11 flex-wrap items-center justify-end gap-2 border-t border-border-soft pt-3">
@@ -66,7 +65,6 @@ export function StocktakesTable({ rows }: { rows: StocktakeRow[] }) {
   const columns: DataTableColumn<StocktakeRow>[] = [
     { key: "code", label: t("stocktakes.cols.code"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
-    { key: "warehouse", label: t("purchases.cols.warehouse"), defaultVisible: true, render: (row) => row.warehouseName },
     { key: "items", label: t("stocktakes.cols.items"), defaultVisible: true, align: "right", render: (row) => row.itemCount },
     { key: "diff", label: t("stocktakes.cols.totalDiff"), defaultVisible: true, align: "right", cellClassName: (row) => diffClass(Number(row.totalDiff)), render: (row) => diffText(Number(row.totalDiff)) },
     { key: "balancedAt", label: t("stocktakes.cols.balancedAt"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.balancedAt ? formatDate(row.balancedAt) : "—"}</span> },
@@ -92,7 +90,6 @@ export function StocktakesTable({ rows }: { rows: StocktakeRow[] }) {
       renderDetail={(row) => (
         <div className="grid gap-4 bg-surface px-4 py-4 md:grid-cols-4">
           <Info label={t("stocktakes.cols.code")} value={row.code} />
-          <Info label={t("purchases.cols.warehouse")} value={row.warehouseName} />
           <Info label={t("stocktakes.cols.items")} value={String(row.itemCount)} />
           <Info label={t("stocktakes.cols.totalDiff")} value={diffText(Number(row.totalDiff))} tone={diffTone(Number(row.totalDiff))} />
           <Info label={t("orders.cols.date")} value={formatDate(row.createdAt)} />

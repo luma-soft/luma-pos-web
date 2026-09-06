@@ -31,7 +31,7 @@ async function PurchaseReturnsContent({ searchParams }: { searchParams: SP }) {
   const page = Number(searchParams.page) || 1;
   const pageSize = parsePageSize(searchParams.size);
   const [{ rows, total, pageCount }, options] = await Promise.all([
-    getPurchaseReturns(context.storeId, { q: searchParams.q, status: searchParams.status, settlement: searchParams.settlement, supplierId: searchParams.supplierId, warehouseId: searchParams.warehouseId, from: searchParams.from, to: searchParams.to, page, pageSize }),
+    getPurchaseReturns(context.storeId, { q: searchParams.q, status: searchParams.status, settlement: searchParams.settlement, supplierId: searchParams.supplierId, from: searchParams.from, to: searchParams.to, page, pageSize }),
     getPurchaseReturnFormOptions(context.storeId),
   ]);
 
@@ -42,7 +42,7 @@ async function PurchaseReturnsContent({ searchParams }: { searchParams: SP }) {
           <input type="hidden" name="tab" value="purchase-returns" />
           <ListSearchFilterBar
             search={<ListSearchInput name="q" defaultValue={searchParams.q ?? ""} placeholder={t("purchaseReturns.searchPlaceholder")} />}
-            filter={<PurchaseReturnsFilter suppliers={options.suppliers} warehouses={options.warehouses} values={searchParams} resultCount={total} />}
+            filter={<PurchaseReturnsFilter suppliers={options.suppliers} values={searchParams} resultCount={total} />}
           />
           <Link href={Routes.PurchaseReturnNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary-600 text-primary-600 bg-surface hover:bg-primary-50 text-sm font-semibold transition active:scale-[0.98] ml-auto shrink-0 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
             <Plus className="w-4 h-4" />

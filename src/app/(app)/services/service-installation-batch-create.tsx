@@ -67,7 +67,7 @@ export function ServiceInstallationBatchCreate({
   const [drafts, setDrafts] = useState<InstallationDraft[]>([]);
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [stockMode, setStockMode] = useState<StockMode>("plan");
-  const [warehouseId, setWarehouseId] = useState(
+  const [warehouseId] = useState(
     warehouses.find((warehouse) => warehouse.isDefault)?.id ?? warehouses[0]?.id ?? "",
   );
   const [invoiceMode, setInvoiceMode] = useState<InvoiceMode>("none");
@@ -449,19 +449,6 @@ export function ServiceInstallationBatchCreate({
                 <ModeCard icon={Box} title="Giữ hàng" description="Giữ tồn cho công trình" selected={effectiveStockMode === "reserve"} onClick={() => setStockMode("reserve")} disabled={invoiceMode !== "none"} />
                 <ModeCard icon={Warehouse} title="Xuất theo đã dùng" description="Trừ kho khi bấm Lưu" selected={effectiveStockMode === "issue"} onClick={() => setStockMode("issue")} disabled={invoiceMode !== "none"} />
               </div>
-              {effectiveStockMode !== "plan" && (
-                <div className="mt-3 max-w-sm">
-                  <Field label="Kho xuất">
-                    <SearchableSelect
-                      value={warehouseId}
-                      allowClear={false}
-                      onChange={setWarehouseId}
-                      placeholder="Chọn kho"
-                      options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name, hint: warehouse.isDefault ? "Mặc định" : undefined }))}
-                    />
-                  </Field>
-                </div>
-              )}
             </section>
 
             <section className="p-4 lg:p-5" aria-labelledby="installation-invoice-title">

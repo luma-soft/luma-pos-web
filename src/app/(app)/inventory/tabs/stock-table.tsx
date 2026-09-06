@@ -113,7 +113,6 @@ function ExpandedStock({ row }: { row: StockRow }) {
           <div className="rounded-lg border border-border p-3 lg:hidden" data-mobile-audit="inventory-stock-location">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="font-semibold">{t("products.expand.defaultWarehouse")}</div>
                 <div className={cn("mt-1 text-sm font-semibold tabular-nums", (sev === "crit" || sev === "out") && "text-er")}>
                   {formatNumber(stock)} {row.baseUnit}
                 </div>
@@ -129,7 +128,6 @@ function ExpandedStock({ row }: { row: StockRow }) {
             <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-3 py-3 font-semibold">{t("products.expand.cols.warehouse")}</th>
                   <th className="px-3 py-3 text-right font-semibold">{t("products.expand.cols.stock")}</th>
                   <th className="px-3 py-3 text-right font-semibold">{t("inventory.cols.min")}</th>
                   <th className="px-3 py-3 font-semibold">{t("inventory.cols.level")}</th>
@@ -138,7 +136,6 @@ function ExpandedStock({ row }: { row: StockRow }) {
               </thead>
               <tbody className="divide-y divide-border-soft">
                 <tr>
-                  <td className="px-3 py-3 font-medium">{t("products.expand.defaultWarehouse")}</td>
                   <td className={cn("px-3 py-3 text-right tabular-nums font-semibold", (sev === "crit" || sev === "out") && "text-er")}>
                     {formatNumber(stock)} {row.baseUnit}
                   </td>

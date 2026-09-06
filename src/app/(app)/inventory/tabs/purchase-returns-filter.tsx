@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Building2, CalendarDays, Warehouse, X } from "lucide-react";
+import { Building2, CalendarDays, X } from "lucide-react";
 import { FilterTriggerButton } from "@/components/list-search-filter";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -29,7 +29,6 @@ type Draft = {
 };
 type Props = {
   suppliers: Option[];
-  warehouses: Option[];
   values: Record<string, string | undefined>;
   resultCount?: number;
 };
@@ -46,7 +45,7 @@ const settlements = [
   { value: "settled", label: "Đã đối trừ" },
 ];
 
-export function PurchaseReturnsFilter({ suppliers, warehouses, values, resultCount }: Props) {
+export function PurchaseReturnsFilter({ suppliers, values, resultCount }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -54,7 +53,7 @@ export function PurchaseReturnsFilter({ suppliers, warehouses, values, resultCou
   const applied = useMemo<Draft>(
     () => ({
       supplierId: values.supplierId ?? "",
-      warehouseId: values.warehouseId ?? "",
+      warehouseId: "",
       status: values.status ?? "all",
       settlement: values.settlement ?? "all",
       timePreset: values.timePreset ?? DEFAULT_TIME_FILTER_PRESET,
@@ -192,7 +191,6 @@ export function PurchaseReturnsFilter({ suppliers, warehouses, values, resultCou
                 <h3 className="mb-3 text-base font-bold">Tìm theo</h3>
                 <div className="space-y-3">
                   <LumaEntityPicker label="Nhà cung cấp" name="supplierId" labelName="supplierLabel" kind="supplier" endpoint="/api/inventory/filter-options" value={draft.supplierId} labelValue={entityLabels.supplier || suppliers.find((option) => option.id === draft.supplierId)?.name || ""} placeholder="Tìm nhà cung cấp" icon={<Building2 className="size-5" />} onChange={(next) => { setDraft((current) => ({ ...current, supplierId: next.value })); setEntityLabels((current) => ({ ...current, supplier: next.label })); }} />
-                  <LumaEntityPicker label="Kho xuất" name="warehouseId" labelName="warehouseLabel" kind="warehouse" endpoint="/api/inventory/filter-options" value={draft.warehouseId} labelValue={entityLabels.warehouse || warehouses.find((option) => option.id === draft.warehouseId)?.name || ""} placeholder="Tìm kho xuất" icon={<Warehouse className="size-5" />} onChange={(next) => { setDraft((current) => ({ ...current, warehouseId: next.value })); setEntityLabels((current) => ({ ...current, warehouse: next.label })); }} />
                 </div>
               </section>
 
