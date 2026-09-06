@@ -213,7 +213,7 @@ export function PurchaseForm({
   const t = useTranslations();
   const router = useRouter();
 
-  const [supplierId, setSupplierId] = useState(initialValues?.supplierId ?? options.suppliers[0]?.id ?? "");
+  const [supplierId, setSupplierId] = useState(initialValues?.supplierId ?? "");
   const [warehouseId, setWarehouseId] = useState(initialValues?.warehouseId ?? options.warehouses[0]?.id ?? "");
   const [lines, setLines] = useState<Line[]>(() => {
     if (!initialValues) return initialProducts.map((p) => productToLine(p));
@@ -444,7 +444,7 @@ export function PurchaseForm({
       ? t("purchases.copyTitle", { code: purchaseCode ?? "" })
       : t("purchases.createNew");
   const backHref = mode === "edit" && purchaseId ? Routes.purchaseDetail(purchaseId) : Routes.Purchases;
-  const defaultSupplierId = initialValues?.supplierId ?? options.suppliers[0]?.id ?? "";
+  const defaultSupplierId = initialValues?.supplierId ?? "";
   const defaultWarehouseId = initialValues?.warehouseId ?? options.warehouses[0]?.id ?? "";
   const hasAiMergeRisk =
     lines.length > 0 ||
@@ -695,7 +695,7 @@ export function PurchaseForm({
           <div>
             <Text as="div" variant="muted" size="xs" weight="medium" className="mb-1" text={`${t("purchases.cols.supplier")} *`} />
             <Combobox value={supplierId} onChange={setSupplierId} allowClear={false}
-              placeholder={t("purchases.noSuppliers")}
+              placeholder={t(options.suppliers.length ? "products.fields.supplierPlaceholder" : "purchases.noSuppliers")}
               options={options.suppliers.map((s) => ({ value: s.id, label: s.name }))} />
           </div>
           {/* Receiving warehouse is temporarily hidden; retain the saved/default ID. */}

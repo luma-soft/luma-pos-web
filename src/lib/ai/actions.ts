@@ -1419,7 +1419,7 @@ export async function inboundPreview(storeId: string, prompt: string, parsedAtta
   const supplierMatch = matchNamed(prompt, context.suppliers);
   const product = productMatch.match;
   const warehouse = warehouseMatch.match ?? context.warehouses.find((item) => item.isDefault) ?? context.warehouses[0] ?? null;
-  const supplier = supplierMatch.match ?? context.suppliers[0] ?? null;
+  const supplier = supplierMatch.match ?? null;
   const unitCost = defaultCost(product);
   const missingFields = [
     ...(product ? [] : ["product"]),

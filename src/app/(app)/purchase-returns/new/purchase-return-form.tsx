@@ -63,7 +63,7 @@ export function PurchaseReturnForm({ options, initial }: { options: PurchaseForm
   const router = useRouter();
   const catalog = useProductCatalog();
   const [documentDate] = useState(() => (initial ? new Date(initial.createdAt) : new Date()).toLocaleDateString("vi-VN"));
-  const [supplierId, setSupplierId] = useState(initial?.supplierId ?? options.suppliers[0]?.id ?? "");
+  const [supplierId, setSupplierId] = useState(initial?.supplierId ?? "");
   const [warehouseId] = useState(initial?.warehouseId ?? options.warehouses[0]?.id ?? "");
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<PurchaseReturnProductRow[]>([]);
