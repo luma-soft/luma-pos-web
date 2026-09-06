@@ -70,6 +70,7 @@ export const Routes = {
   productSameType: (id: string) => `/products/new?sameTypeAs=${id}` as const,
   productLabels: (id: string) => `/products/${id}/labels` as const,
   purchase: (id: string) => `/purchases/${id}` as const,
+  purchaseDetail: (id: string) => `/inventory?tab=purchases&detailPurchaseId=${encodeURIComponent(id)}` as const,
   purchaseEdit: (id: string) => `/purchases/${id}/edit` as const,
   purchaseCopy: (id: string) => `/purchases/new?copyFrom=${id}` as const,
   purchaseNewForProduct: (id: string) => `/purchases/new?productId=${id}` as const,

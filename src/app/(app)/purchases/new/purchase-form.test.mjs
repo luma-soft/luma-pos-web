@@ -109,3 +109,19 @@ describe("receipt company price opt-in", () => {
     }
   });
 });
+
+
+describe("purchase edit return navigation", () => {
+  test("back opens the same purchase in the inventory detail modal", () => {
+    const html = renderToStaticMarkup(createElement(PurchaseForm, {
+      options, initialProducts: products, initialValues: initialValues(0), mode: "edit", purchaseId,
+    }));
+    expect(html).toContain(`href="/inventory?tab=purchases&amp;detailPurchaseId=${purchaseId}"`);
+  });
+
+  test("new purchases still return to the purchase list", () => {
+    const html = renderToStaticMarkup(createElement(PurchaseForm, { options }));
+    expect(html).toContain('href="/purchases"');
+    expect(html).not.toContain("detailPurchaseId=");
+  });
+});

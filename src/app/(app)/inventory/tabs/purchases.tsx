@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Plus, Truck } from "lucide-react";
 import { Routes } from "@/lib/routes";
-import { getPurchaseFormOptions, getPurchases } from "@/lib/data/inventory";
+import { getPurchase, getPurchaseFormOptions, getPurchases } from "@/lib/data/inventory";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
 import { InstantFilterForm } from "@/components/instant-filter-form";
@@ -40,6 +40,11 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
     getPurchaseFormOptions(context.storeId),
   ]);
 
+  const detailPurchaseId = params.detailPurchaseId;
+  const detailPurchase = detailPurchaseId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(detailPurchaseId)
+    ? rows.find((row) => row.id === detailPurchaseId) ?? await getPurchase(context.storeId, detailPurchaseId)
+    : null;
+
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -53,7 +58,7 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
         </InstantFilterForm>
       </div>
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && !detailPurchase ? (
         <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
           <Truck className="w-10 h-10 mx-auto mb-3 opacity-60" />
           <p className="font-medium">{t("purchases.empty")}</p>
@@ -61,7 +66,7 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
         </div>
       ) : (
         <>
-          <PurchasesTable rows={rows} printTemplates={printTemplates} />
+          <PurchasesTable rows={rows} printTemplates={printTemplates} detailPurchase={detailPurchase} />
         </>
       )}
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Copy, FilePenLine, ReceiptText } from "lucide-react";
@@ -8,12 +9,12 @@ import { PurchaseCancelButton } from "../../purchases/purchase-cancel-button";
 import { DataTableShell, RowPreviewModal, type DataTableColumn } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
-import type { getPurchases } from "@/lib/data/inventory";
+import type { getPurchase, getPurchases } from "@/lib/data/inventory";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 
-type PurchaseRow = Awaited<ReturnType<typeof getPurchases>>["rows"][number];
+type PurchaseRow = Awaited<ReturnType<typeof getPurchases>>["rows"][number] | NonNullable<Awaited<ReturnType<typeof getPurchase>>>;
 
 function statusClass(status: string) {
   if (status === "cancelled") return "bg-er-soft text-er";
@@ -26,10 +27,18 @@ function purchaseOwed(purchase: PurchaseRow) {
   return Math.max(0, Number(purchase.total) - Number(purchase.amountPaid));
 }
 
-export function PurchasesTable({ rows, printTemplates }: { rows: PurchaseRow[]; printTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[] }) {
+export function PurchasesTable({ rows, printTemplates, detailPurchase = null }: { rows: PurchaseRow[]; detailPurchase?: PurchaseRow | null; printTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[] }) {
   const t = useTranslations();
-  const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
-  const selectedPurchase = rows.find((row) => row.id === selectedPurchaseId) ?? null;
+  const searchParams = useSearchParams();
+  const selectedPurchaseId = searchParams.get("detailPurchaseId");
+  const selectedPurchase = rows.find((row) => row.id === selectedPurchaseId)
+    ?? (detailPurchase?.id === selectedPurchaseId ? detailPurchase : null);
+  function setSelectedPurchaseId(id: string | null) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (id) params.set("detailPurchaseId", id);
+    else params.delete("detailPurchaseId");
+    window.history.replaceState(null, "", `?${params.toString()}`);
+  }
   const columns: DataTableColumn<PurchaseRow>[] = [
     { key: "code", label: t("purchases.cols.code"), required: true, render: (purchase) => <span className="font-semibold text-primary-600">{purchase.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, render: (purchase) => <span className="text-slate-500">{formatDate(purchase.createdAt)}</span> },

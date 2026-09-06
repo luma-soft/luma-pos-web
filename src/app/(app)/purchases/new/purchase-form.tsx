@@ -443,7 +443,7 @@ export function PurchaseForm({
     : mode === "copy"
       ? t("purchases.copyTitle", { code: purchaseCode ?? "" })
       : t("purchases.createNew");
-  const backHref = mode === "edit" && purchaseId ? Routes.purchase(purchaseId) : Routes.Purchases;
+  const backHref = mode === "edit" && purchaseId ? Routes.purchaseDetail(purchaseId) : Routes.Purchases;
   const defaultSupplierId = initialValues?.supplierId ?? options.suppliers[0]?.id ?? "";
   const defaultWarehouseId = initialValues?.warehouseId ?? options.warehouses[0]?.id ?? "";
   const hasAiMergeRisk =
@@ -690,7 +690,7 @@ export function PurchaseForm({
         </div>
 
         {/* phải: NCC + tổng tiền */}
-        <div className="w-full lg:w-[380px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto">
+        <div className="w-full lg:w-[380px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto [&>*]:shrink-0">
           <div>
             <Text as="div" variant="muted" size="xs" weight="medium" className="mb-1" text={`${t("purchases.cols.supplier")} *`} />
             <Combobox value={supplierId} onChange={setSupplierId} allowClear={false}
@@ -730,7 +730,7 @@ export function PurchaseForm({
             <div className="flex justify-between items-center"><span className="text-slate-500">{t("purchases.cols.owed")}</span><span className={cn("tabular-nums font-semibold", owed > 0 ? "text-warn" : "text-slate-400")}>{formatCurrency(owed)}</span></div>
           </div>
 
-          <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("orders.detail.notePlaceholder")} rows={2} className="resize-none" />
+          <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("orders.detail.notePlaceholder")} rows={3} className="h-24 shrink-0 resize-none" />
 
           {error && <Text as="p" variant="destructive" text={error} />}
 
