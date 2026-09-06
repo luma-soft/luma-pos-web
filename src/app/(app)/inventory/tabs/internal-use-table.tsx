@@ -74,6 +74,7 @@ export function InternalUseTable({ rows }: { rows: InternalUseRow[] }) {
         )}
         rowClassName={(row) => cn(row.status === "pending" && "bg-warn-soft/25")}
         renderDetail={(row) => <ExpandedIssue row={row} />}
+        detailSize="full"
       />
     </section>
   );
@@ -144,7 +145,7 @@ function ExpandedIssue({ row }: { row: InternalUseRow }) {
             {row.items.map((item) => (
               <tr key={item.id} className="hover:bg-surface-2/70">
                 <td className="px-3 py-3 font-mono font-semibold text-primary-600">{item.sku ?? "—"}</td>
-                <td className="truncate px-3 py-3 font-medium">{item.productName}</td>
+                <td className="break-words px-3 py-3 font-medium">{item.productName}</td>
                 <td className="px-3 py-3">{item.unitName}</td>
                 <td className="px-3 py-3 text-right font-mono tabular-nums">{formatNumber(item.quantity)}</td>
                 <td className="px-3 py-3 text-right font-mono tabular-nums">{formatCurrency(item.unitCost)}</td>
