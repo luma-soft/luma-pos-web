@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { productSuppliers, suppliers, warehouses } from "@/db/schema";
-import { createPurchase } from "@/lib/actions/purchases";
+import { createPurchase, savePurchaseDraft } from "@/lib/actions/purchases";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileGate, readJson } from "@/lib/mobile/response";
 
@@ -37,8 +37,15 @@ export async function POST(request: Request) {
   if (blocked) return blocked;
 
   const body = await readJson(request);
-  if (!body) return mobileAction({ ok: false, error: "errors.invalidData" });
+  if (!body || typeof body !== "object" || Array.isArray(body)) return mobileAction({ ok: false, error: "errors.invalidData" });
   const payload = body as Record<string, unknown>;
+  if (payload.intent === "draft") {
+    // Drafts require an explicit supplier and warehouse and never receive stock.
+    return mobileAction(await savePurchaseDraft({ ...payload, id: undefined } as Parameters<typeof savePurchaseDraft>[0]));
+  }
+  if (payload.intent != null && payload.intent !== "receive") {
+    return mobileAction({ ok: false, error: "errors.invalidData" });
+  }
   const items = Array.isArray(payload.items) ? payload.items : [];
   const firstProductId =
     typeof (items[0] as { productId?: unknown } | undefined)?.productId === "string"

@@ -1,3 +1,4 @@
+import { inventoryDocumentCapabilities } from "@/lib/inventory/document-capabilities";
 import { Suspense } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
@@ -57,7 +58,7 @@ async function PurchaseReturnsContent({ searchParams }: { searchParams: SP }) {
           <p className="text-sm mt-1">{t("purchaseReturns.emptyHint")}</p>
         </div>
       ) : (
-        <PurchaseReturnsTable rows={rows} />
+        <PurchaseReturnsTable rows={rows} capabilities={inventoryDocumentCapabilities("purchase-returns", context.role)} />
       )}
       <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("purchaseReturns.unitLabel")} />
     </>

@@ -21,18 +21,21 @@ mock.module("@/lib/auth/store-context", () => ({
   UnauthorizedError: class UnauthorizedError extends Error {},
 }));
 mock.module("@/lib/sync/revalidate-app-data", () => ({ revalidateAppData: () => {} }));
-mock.module("@/lib/cash", () => ({ recordCashTx: async () => {} }));
+const cashEffect = mock(async () => {});
+const receiptNotification = mock(async () => ({ created: false }));
+const debtNotification = mock(async () => ({ created: false }));
+mock.module("@/lib/cash", () => ({ recordCashTx: cashEffect }));
 mock.module("@/lib/notifications/events-core", () => ({
-  createDebtChangedEventInTx: async () => ({ created: false }),
-  createNotificationEventInTx: async () => ({ created: false }),
+  createDebtChangedEventInTx: debtNotification,
+  createNotificationEventInTx: receiptNotification,
 }));
 mock.module("@/lib/notifications/outbox", () => ({ publishCommittedNotification: async () => {} }));
-const { createPurchase, updatePurchase, cancelPurchase } = await import("./purchases");
+const { createPurchase, updatePurchase, cancelPurchase, savePurchaseDraft } = await import("./purchases");
 
 const tables = [schema.products, schema.productSuppliers, schema.purchaseOrders,
   schema.purchaseOrderItems, schema.stockLevels, schema.stockLots, schema.stockLotMovements,
   schema.stockMovements, schema.inventoryCostBaselines, schema.inventoryCostAdjustments,
-  schema.returns, schema.profiles, schema.shifts, schema.suppliers, schema.auditLogs];
+  schema.warehouses, schema.returns, schema.profiles, schema.shifts, schema.suppliers, schema.auditLogs];
 const dialect = new PgDialect();
 const quote = value => `'${value.replaceAll("'", "''")}'`;
 beforeAll(async () => {
@@ -58,8 +61,10 @@ beforeAll(async () => {
   await pg.exec(await readFile(new URL("../../../supabase/denormalize-stock.sql", import.meta.url), "utf8"));
 });
 beforeEach(async () => {
+  cashEffect.mockClear(); receiptNotification.mockClear(); debtNotification.mockClear();
   await pg.exec(`truncate ${tables.map(table => `"${getTableConfig(table).name}"`).join(",")}`);
   await database.insert(schema.profiles).values({ id: userId, storeId, fullName: "Cost test owner", role: "owner" });
+  await database.insert(schema.warehouses).values({ id: warehouseId, storeId, name: "Main" });
   await database.insert(schema.suppliers).values({ id: supplierId, storeId, code: "NCC-COST", name: "Cost test supplier", currentDebt: "0" });
 });
 afterAll(async () => { await pg.close(); });
@@ -178,4 +183,71 @@ test("fractional purchase edits preserve stock, receipt totals and supplier debt
   expect((await pg.query("select quantity,total from purchase_order_items where purchase_order_id=$1", [id])).rows)
     .toEqual([{ quantity: "1.5000", total: "150.00" }]);
   expect((await pg.query("select current_debt from suppliers where id=$1", [supplierId])).rows[0].current_debt).toBe("150.00");
+});
+
+
+test("draft create and repeated edit persist fractional lines without receipt side effects", async () => {
+  const productId = await product();
+  const before = await state();
+  const created = await savePurchaseDraft(payload(productId, 0.5, 200, { amountPaid: 100 }));
+  expect(created.ok).toBe(true);
+  const id = created.data.id;
+  const updated = await savePurchaseDraft({ id, ...payload(productId, 1.5, 200, { amountPaid: 200 }) });
+  expect(updated.ok).toBe(true);
+  expect(updated.data.id).toBe(id);
+  expect(updated.data.code).toBe(created.data.code);
+  expect(cashEffect).not.toHaveBeenCalled();
+  expect(receiptNotification).not.toHaveBeenCalled();
+  expect(debtNotification).not.toHaveBeenCalled();
+  const after = await state();
+  for (const table of ["products", "stock_levels", "stock_movements", "stock_lots", "stock_lot_movements", "inventory_cost_baselines", "inventory_cost_adjustments", "suppliers", "product_suppliers"]) expect(after[table]).toEqual(before[table]);
+  expect((await pg.query("select status,amount_paid,cost_effective_at,total from purchase_orders where id=$1", [id])).rows[0])
+    .toEqual({ status: "draft", amount_paid: "0.00", cost_effective_at: null, total: "300.00" });
+  expect((await pg.query("select quantity,total from purchase_order_items where purchase_order_id=$1", [id])).rows)
+    .toEqual([{ quantity: "1.5000", total: "300.00" }]);
+});
+
+test("receiving a saved draft applies stock and debt once; received cannot be downgraded", async () => {
+  const productId = await product();
+  const input = payload(productId, 0.5, 200);
+  const saved = await savePurchaseDraft(input);
+  expect(saved.ok).toBe(true);
+  const id = saved.data.id;
+  expect((await updatePurchase({ id, ...input })).ok).toBe(true);
+  expect((await values(productId)).quantity).toBe(10.5);
+  expect((await pg.query("select current_debt from suppliers where id=$1", [supplierId])).rows[0].current_debt).toBe("100.00");
+  const before = await state();
+  expect(await savePurchaseDraft({ id, ...input })).toEqual({ ok: false, error: "purchases.errors.notEditable" });
+  expect(await state()).toEqual(before);
+  expect((await updatePurchase({ id, ...input })).ok).toBe(true);
+  expect((await values(productId)).quantity).toBe(10.5);
+});
+
+test("draft accepts incomplete batch details but rejects cross-store references atomically", async () => {
+  const productId = await product();
+  await pg.query("update products set track_batches=true where id=$1", [productId]);
+  const input = payload(productId, 0.0001, 200);
+  expect((await savePurchaseDraft(input)).ok).toBe(true);
+  const before = await state();
+  for (const invalid of [{ ...input, supplierId: randomUUID() }, { ...input, warehouseId: randomUUID() },
+    { ...input, items: [{ productId: randomUUID(), quantity: 1, unitCost: 1 }] }, { ...input, items: [] }]) {
+    expect((await savePurchaseDraft(invalid)).ok).toBe(false);
+    expect(await state()).toEqual(before);
+  }
+});
+
+
+test("cancelling a saved draft leaves stock, costs, supplier debt and cash unchanged", async () => {
+  const productId = await product();
+  const saved = await savePurchaseDraft(payload(productId, 1.5, 200));
+  expect(saved.ok).toBe(true);
+  const before = await state();
+  expect((await cancelPurchase(saved.data.id)).ok).toBe(true);
+  const after = await state();
+  for (const table of ["products", "stock_levels", "stock_movements", "stock_lots", "stock_lot_movements", "inventory_cost_baselines", "inventory_cost_adjustments", "suppliers", "product_suppliers"]) expect(after[table]).toEqual(before[table]);
+  expect(cashEffect).not.toHaveBeenCalled();
+  expect(receiptNotification).not.toHaveBeenCalled();
+  expect(debtNotification).not.toHaveBeenCalled();
+  expect((await pg.query("select status from purchase_orders where id=$1", [saved.data.id])).rows[0].status).toBe("cancelled");
+  expect((await savePurchaseDraft({ id: saved.data.id, ...payload(productId, 1, 200) })).ok).toBe(false);
 });

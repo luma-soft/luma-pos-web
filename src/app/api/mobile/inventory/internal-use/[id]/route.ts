@@ -1,3 +1,4 @@
+import { inventoryDocumentCapabilities } from "@/lib/inventory/document-capabilities";
 import { z } from "zod";
 import { deleteInternalUse, updateInternalUse } from "@/lib/actions/internal-use";
 import { getInternalUseIssue } from "@/lib/data/internal-use";
@@ -12,7 +13,7 @@ export async function GET(_request: Request, { params }: Context) {
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return mobileError("errors.invalidData");
   const issue = await getInternalUseIssue(gate.storeId, id);
-  return issue ? mobileOk(issue) : mobileError("errors.notFound", 404);
+  return issue ? mobileOk({ ...issue, ...inventoryDocumentCapabilities("internal-use", gate.role) }) : mobileError("errors.notFound", 404);
 }
 
 export async function PATCH(request: Request, { params }: Context) {

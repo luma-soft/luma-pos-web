@@ -28,6 +28,7 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
       mode="edit"
       purchaseId={purchase.id}
       purchaseCode={purchase.code}
+      purchaseStatus={purchase.status}
       initialValues={{
         supplierId: purchase.supplierId,
         warehouseId: purchase.warehouseId,

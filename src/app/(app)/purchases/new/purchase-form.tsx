@@ -20,7 +20,7 @@ import { Text } from "@/components/ui/text";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
-import { createPurchase, updatePurchase } from "@/lib/actions/purchases";
+import { createPurchase, savePurchaseDraft, updatePurchase } from "@/lib/actions/purchases";
 import { resolvePurchaseDraftProducts } from "@/lib/actions/purchase-search";
 import type { PurchaseFormOptions, PurchaseProductRow } from "@/lib/data/inventory";
 import type { AiActionPreview } from "@/lib/ai/actions";
@@ -196,6 +196,7 @@ export function PurchaseForm({
   mode = "create",
   purchaseId,
   purchaseCode,
+  purchaseStatus,
   aiPreview = false,
   canEditCompanyPrices = false,
 }: {
@@ -205,6 +206,7 @@ export function PurchaseForm({
   mode?: "create" | "copy" | "edit";
   purchaseId?: string;
   purchaseCode?: string;
+  purchaseStatus?: "draft" | "received";
   aiPreview?: boolean;
   canEditCompanyPrices?: boolean;
 }) {
@@ -231,7 +233,8 @@ export function PurchaseForm({
   const [amountPaid, setAmountPaid] = useState(initialValues?.amountPaid ?? 0);
   const [payFull, setPayFull] = useState(false);
   const [note, setNote] = useState(initialValues?.note ?? "");
-  const [busy, setBusy] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"receive" | "draft" | null>(null);
+  const busy = pendingAction !== null;
   const [error, setError] = useState("");
   const [aiPendingLines, setAiPendingLines] = useState<AiPendingLine[]>([]);
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
@@ -398,43 +401,51 @@ export function PurchaseForm({
     }));
   }
 
-  async function submit() {
-    if (!supplierId || !warehouseId || lines.length === 0 || busy) return;
-    setBusy(true); setError("");
+  const canSaveDraft = mode !== "edit" || purchaseStatus === "draft";
+  const canSubmit = Boolean(supplierId && warehouseId && lines.length > 0 && lines.every((line) =>
+    Number.isFinite(line.quantity) && line.quantity > 0 &&
+    Number.isFinite(line.multiplier) && line.multiplier > 0 &&
+    Number.isFinite(line.unitCost) && line.unitCost >= 0
+  ));
+
+  async function submit(action: "receive" | "draft" = "receive") {
+    if (!canSubmit || busy || (action === "draft" && !canSaveDraft)) return;
+    setPendingAction(action); setError("");
     const payload = {
       supplierId, warehouseId,
       discount, vatRate, shippingFee,
       invoiceNumber: invoiceNumber || undefined,
       note: note || undefined,
-      amountPaid: paid,
+      amountPaid: action === "draft" ? 0 : paid,
       // quy về đơn vị gốc cho action (SL gốc = SL×hệ số; giá vốn/đơn vị gốc = giá nhập/hệ số)
       items: lines.map((l) => ({
         productId: l.productId,
         quantity: l.quantity * l.multiplier,
         unitCost: l.multiplier > 0 ? l.unitCost / l.multiplier : l.unitCost,
         discount: purchaseLineDiscount(l),
-        updateCompanyPrice: l.updateCompanyPrice === true,
+        updateCompanyPrice: action !== "draft" && l.updateCompanyPrice === true,
       })),
     };
 
-    if (mode === "edit" && purchaseId) {
-      const res = await updatePurchase({ id: purchaseId, ...payload });
-      setBusy(false);
+    try {
+      const res = action === "draft"
+        ? await savePurchaseDraft({ ...payload, ...(mode === "edit" && purchaseId ? { id: purchaseId } : {}) })
+        : mode === "edit" && purchaseId
+          ? await updatePurchase({ id: purchaseId, ...payload })
+          : await createPurchase(payload);
       if (res.ok) {
-        void catalog.refresh();
-        router.push(Routes.purchase(purchaseId));
+        if (action === "receive") void catalog.refresh();
+        const savedId = mode === "edit" && purchaseId ? purchaseId : "id" in res.data ? res.data.id : undefined;
+        if (savedId) router.push(Routes.purchase(savedId));
+        router.refresh();
+      } else {
+        setError(t(res.error as never));
       }
-      else setError(t(res.error as never));
-      return;
+    } catch {
+      setError(t("common.error"));
+    } finally {
+      setPendingAction(null);
     }
-
-    const res = await createPurchase(payload);
-    setBusy(false);
-    if (res.ok) {
-      void catalog.refresh();
-      router.push(Routes.purchase(res.data.id));
-    }
-    else setError(t(res.error as never));
   }
 
   const numCls = "no-spinner min-h-11 w-full px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums lg:min-h-0";
@@ -690,7 +701,7 @@ export function PurchaseForm({
         </div>
 
         {/* phải: NCC + tổng tiền */}
-        <div className="w-full lg:w-[380px] min-h-0 shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col pb-20 lg:pb-0 lg:overflow-hidden">
+        <div className="w-full lg:w-[380px] min-h-0 shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col pb-32 lg:pb-0 lg:overflow-hidden">
           <div className="flex flex-col gap-3 p-3 sm:p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto [&>*]:shrink-0">
           <div>
             <Text as="div" variant="muted" size="xs" weight="medium" className="mb-1" text={`${t("purchases.cols.supplier")} *`} />
@@ -731,9 +742,15 @@ export function PurchaseForm({
           </div>
 
           <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 shrink-0 border-t border-border bg-surface p-3 sm:p-4 lg:static">
-            <Button type="button" onClick={submit} disabled={lines.length === 0 || !supplierId} loading={busy} block className="h-12 rounded-card font-semibold">
-              {mode === "edit" ? t("purchases.saveChanges") : t("purchases.receiveNow")} · {formatCurrency(total)}
-            </Button>
+            {canSaveDraft && <p className="mb-2 text-xs text-slate-500">{t("purchases.draftHint")}</p>}
+            <div className="flex gap-2">
+              {canSaveDraft && <Button type="button" onClick={() => void submit("draft")} disabled={!canSubmit || busy} loading={pendingAction === "draft"} variant="outline" className="h-12 shrink-0 rounded-card font-semibold">
+                {t("purchases.saveDraft")}
+              </Button>}
+              <Button type="button" onClick={() => void submit("receive")} disabled={!canSubmit || busy} loading={pendingAction === "receive"} className="h-12 min-w-0 flex-1 rounded-card font-semibold">
+                {mode === "edit" && purchaseStatus !== "draft" ? t("purchases.saveChanges") : t("purchases.receiveNow")} · {formatCurrency(total)}
+              </Button>
+            </div>
           </div>
         </div>
       </div>

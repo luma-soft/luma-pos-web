@@ -4,7 +4,7 @@ import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-d
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  products, productSuppliers, purchaseOrders, purchaseOrderItems, stockLevels, stockLots, stockMovements, suppliers,
+  products, productSuppliers, purchaseOrders, purchaseOrderItems, stockLevels, stockLots, stockMovements, suppliers, warehouses,
 } from "@/db/schema";
 import { createPurchaseSchema, type CreatePurchaseOutput, updatePurchaseSchema, type UpdatePurchaseOutput } from "@/lib/schemas/order";
 import { type ActionResult, requireStockAccess, requireManager, getProfileId, generateCode, toMoney, toQty } from "./common";
@@ -39,6 +39,78 @@ function revalidatePurchasePaths(id?: string) {
   revalidatePath(Routes.Products);
   revalidatePath(Routes.Suppliers);
   if (id) revalidatePath(`${Routes.Purchases}/${id}`);
+}
+
+/** Persist an editable draft only; receiving remains a separate explicit action. */
+export async function savePurchaseDraft(
+  input: CreatePurchaseOutput & { id?: string },
+): Promise<ActionResult<{ id: string; code: string; updatedAt: string }>> {
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
+  const parsed = createPurchaseSchema.extend({ id: updatePurchaseSchema.shape.id.optional() }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const v = parsed.data;
+  const totals = calcPurchaseTotals({ ...v, amountPaid: 0 });
+  try {
+    const profileId = await getProfileId(gate.userId);
+    const result = await db.transaction(async (tx) => {
+      const [existing] = v.id ? await tx.select().from(purchaseOrders)
+        .where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, v.id)))
+        .limit(1).for("update") : [];
+      if (v.id && !existing) throw new Error("PURCHASE_NOT_FOUND");
+      if (existing && existing.status !== "draft") throw new Error("NOT_EDITABLE");
+      const [supplier] = await tx.select({ id: suppliers.id }).from(suppliers)
+        .where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.supplierId))).limit(1);
+      const [warehouse] = await tx.select({ id: warehouses.id }).from(warehouses)
+        .where(and(eq(warehouses.storeId, gate.storeId), eq(warehouses.id, v.warehouseId))).limit(1);
+      if (!supplier || !warehouse) throw new Error("INVALID_REFERENCE");
+      const ids = v.items.map((item) => item.productId);
+      const found = await tx.select({ id: products.id, isVariantParent: products.isVariantParent })
+        .from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
+      if (found.length !== new Set(ids).size) throw new Error("INVALID_REFERENCE");
+      if (found.some((product) => product.isVariantParent)) throw new Error("PRODUCT_VARIANT_PARENT");
+      const values = {
+        supplierId: v.supplierId, warehouseId: v.warehouseId, status: "draft",
+        subtotal: toMoney(totals.subtotal), discount: toMoney(totals.discount),
+        vatRate: String(v.vatRate), tax: toMoney(totals.tax), shippingFee: toMoney(v.shippingFee),
+        total: toMoney(totals.total), amountPaid: toMoney(0), costEffectiveAt: null,
+        invoiceNumber: v.invoiceNumber?.trim().slice(0, 50) || null, note: v.note || null,
+      };
+      const [po] = existing
+        ? await tx.update(purchaseOrders).set(values)
+          .where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, existing.id)))
+          .returning({ id: purchaseOrders.id, code: purchaseOrders.code })
+        : await tx.insert(purchaseOrders).values({ ...values, storeId: gate.storeId,
+          code: generateCode("PN"), createdBy: profileId })
+          .returning({ id: purchaseOrders.id, code: purchaseOrders.code });
+      if (existing) await tx.delete(purchaseOrderItems)
+        .where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
+      await tx.insert(purchaseOrderItems).values(v.items.map((item, index) => ({
+        storeId: gate.storeId, purchaseOrderId: po.id, productId: item.productId,
+        quantity: toQty(item.quantity), unitCost: toMoney(item.unitCost), discount: toMoney(item.discount),
+        total: toMoney(totals.lines[index].netTotal), batchNumber: item.batchNumber ?? null,
+        expiryDate: item.expiryDate ?? null,
+      })));
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: profileId, action: existing ? "purchase.updated" : "purchase.created",
+        entityType: "purchase", entityId: po.id,
+        ...(existing ? { before: { status: "draft", total: Number(existing.total) } } : {}),
+        after: { code: po.code, status: "draft", total: totals.total, itemCount: v.items.length },
+        metadata: { purchaseCode: po.code, supplierId: v.supplierId, warehouseId: v.warehouseId },
+      });
+      return { ...po, updatedAt: new Date().toISOString() };
+    });
+    revalidatePurchasePaths(result.id);
+    return { ok: true, data: result };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "PURCHASE_NOT_FOUND") return { ok: false, error: "errors.notFound" };
+    if (message === "NOT_EDITABLE") return { ok: false, error: "purchases.errors.notEditable" };
+    if (message === "INVALID_REFERENCE") return { ok: false, error: "errors.invalidData" };
+    if (message === "PRODUCT_VARIANT_PARENT") return { ok: false, error: "products.variants.selectSku" };
+    console.error("savePurchaseDraft failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
 }
 
 /** Tạo phiếu nhập + nhận hàng ngay: cộng kho, cập nhật giá vốn, ghi nợ NCC. */

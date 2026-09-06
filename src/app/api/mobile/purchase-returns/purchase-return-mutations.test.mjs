@@ -3,9 +3,9 @@ let gate;
 const update = mock(async () => ({ ok:true,data:{id:"saved"} }));
 const remove = mock(async () => ({ ok:true,data:undefined }));
 mock.module("@/lib/actions/purchase-returns",()=>({updatePurchaseReturn:update,deletePurchaseReturn:remove}));
-mock.module("@/lib/data/purchase-returns",()=>({getPurchaseReturn:async()=>null}));
+mock.module("@/lib/data/purchase-returns",()=>({getPurchaseReturn:async()=>({id:"returned"})}));
 mock.module("@/lib/mobile/auth",()=>({requireMobileManager:async()=>gate,requireMobileStockReadAccess:async()=>gate}));
-const {PATCH,DELETE}=await import("./[id]/route");
+const {GET,PATCH,DELETE}=await import("./[id]/route");
 const id="11111111-1111-4111-8111-111111111111";
 const context={params:Promise.resolve({id})};
 const req=body=>new Request("http://localhost/api/mobile/purchase-returns/"+id,{method:"PATCH",body:JSON.stringify(body)});
@@ -24,4 +24,13 @@ test("path identity is authoritative and errors are rejected",async()=>{
  expect((await PATCH(req({}),bad)).status).toBe(404);
  expect((await DELETE(req({}),bad)).status).toBe(404);
  expect((await PATCH(req([]),context)).status).toBe(400);
+});
+
+test("detail exposes manager-only mutation capabilities",async()=>{
+ for (const role of ["owner","manager","warehouse","cashier"]) {
+   gate={ok:true,storeId:"store",role};
+   const body=await (await GET(req({}),context)).json();
+   expect(body.data.canEdit).toBe(["owner","manager"].includes(role));
+   expect(body.data.canDelete).toBe(["owner","manager"].includes(role));
+ }
 });

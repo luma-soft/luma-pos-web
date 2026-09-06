@@ -1,3 +1,4 @@
+import { inventoryDocumentCapabilities } from "@/lib/inventory/document-capabilities";
 import { updatePurchaseReturn, deletePurchaseReturn } from "@/lib/actions/purchase-returns";
 import { isMobileEntityId } from "@/lib/mobile/exact-entity";
 import { getPurchaseReturn } from "@/lib/data/purchase-returns";
@@ -15,7 +16,7 @@ export async function GET(
   if (!isMobileEntityId(id)) return mobileError("errors.notFound", 404);
   const purchaseReturn = await getPurchaseReturn(gate.storeId, id);
   return purchaseReturn
-    ? mobileOk(purchaseReturn)
+    ? mobileOk({ ...purchaseReturn, ...inventoryDocumentCapabilities("purchase-returns", gate.role) })
     : mobileError("errors.notFound", 404);
 }
 

@@ -2897,6 +2897,8 @@
     "unitLabel": "suppliers"
   },
   "purchases": {
+    "saveDraft": "Save draft",
+    "draftHint": "Choose a supplier and at least one product with a positive quantity. Drafts do not update stock or debt.",
     "title": "Purchasing",
     "total": "{total} receipts",
     "createNew": "New purchase",

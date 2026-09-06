@@ -1,4 +1,4 @@
-import { updatePurchase } from "@/lib/actions/purchases";
+import { updatePurchase, savePurchaseDraft } from "@/lib/actions/purchases";
 import { getPurchase } from "@/lib/data/inventory";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import { isMobileEntityId } from "@/lib/mobile/exact-entity";
@@ -70,6 +70,11 @@ export async function PATCH(
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return mobileError("errors.invalidData", 400);
   }
+  const payload = body as Record<string, unknown>;
+  if (payload.intent === "draft") {
+    return mobileAction(await savePurchaseDraft({ ...payload, id } as Parameters<typeof savePurchaseDraft>[0]));
+  }
+  if (payload.intent != null && payload.intent !== "receive") return mobileError("errors.invalidData", 400);
   return mobileAction(await updatePurchase({
     ...body,
     id,

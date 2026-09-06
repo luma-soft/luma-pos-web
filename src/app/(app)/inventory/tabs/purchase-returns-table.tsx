@@ -24,7 +24,7 @@ function settlementClass(status: string) {
   return "text-slate-400";
 }
 
-export function PurchaseReturnsTable({ rows }: { rows: PurchaseReturnRow[] }) {
+export function PurchaseReturnsTable({ rows, capabilities }: { rows: PurchaseReturnRow[]; capabilities?: { canEdit: boolean; canDelete: boolean } }) {
   const t = useTranslations();
   const columns: DataTableColumn<PurchaseReturnRow>[] = [
     { key: "code", label: t("purchaseReturns.cols.code"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
@@ -52,7 +52,7 @@ export function PurchaseReturnsTable({ rows }: { rows: PurchaseReturnRow[] }) {
             <span className="text-slate-500">{t("purchaseReturns.cols.totalRefund")}</span>
             <span className="ml-3 font-semibold tabular-nums">{formatCurrency(Number(row.totalRefund))}</span>
           </div>
-          <InventoryDocumentActions kind="purchase-returns" id={row.id} code={row.code} inFooter />
+          <InventoryDocumentActions kind="purchase-returns" id={row.id} code={row.code} capabilities={capabilities} inFooter />
         </div>
       )}
       renderMobileRow={({ row, toggle }) => (

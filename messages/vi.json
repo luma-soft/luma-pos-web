@@ -2897,6 +2897,8 @@
     "unitLabel": "nhà cung cấp"
   },
   "purchases": {
+    "saveDraft": "Lưu nháp",
+    "draftHint": "Cần nhà cung cấp và ít nhất một sản phẩm có số lượng lớn hơn 0. Nháp chưa cập nhật tồn kho hoặc công nợ.",
     "title": "Nhập hàng",
     "total": "{total} phiếu",
     "createNew": "Tạo phiếu nhập",

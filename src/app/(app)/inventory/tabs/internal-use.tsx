@@ -1,3 +1,4 @@
+import { inventoryDocumentCapabilities } from "@/lib/inventory/document-capabilities";
 import Link from "next/link";
 import { FileDown, Plus } from "lucide-react";
 import { getInternalUseIssueCount, getInternalUseIssues } from "@/lib/data/internal-use";
@@ -42,13 +43,13 @@ export async function InternalUseTab({ searchParams }: { searchParams: SP }) {
           <Plus className="h-4 w-4" />
           Xuất nội bộ
         </Link>
-        <button type="button" className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-surface-2 active:scale-[0.98] dark:text-slate-200 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+        <a href={`/api/inventory/internal-use/export?${new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => typeof entry[1] === "string"))}`} download className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-surface-2 active:scale-[0.98] dark:text-slate-200 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
           <FileDown className="h-4 w-4" />
           Xuất file
-        </button>
+        </a>
       </InstantFilterForm>
 
-      <InternalUseTable rows={rows} />
+      <InternalUseTable rows={rows} capabilities={inventoryDocumentCapabilities("internal-use", context.role)} />
     </>
   );
 }

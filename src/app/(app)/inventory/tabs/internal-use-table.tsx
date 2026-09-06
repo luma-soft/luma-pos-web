@@ -11,7 +11,7 @@ import { InventoryDocumentActions } from "./inventory-document-actions";
 
 type InternalUseRow = Awaited<ReturnType<typeof getInternalUseIssues>>[number];
 
-export function InternalUseTable({ rows }: { rows: InternalUseRow[] }) {
+export function InternalUseTable({ rows, capabilities }: { rows: InternalUseRow[]; capabilities?: { canEdit: boolean; canDelete: boolean } }) {
   const t = useTranslations();
   const locale = useLocale();
   const isVi = locale === "vi";
@@ -77,7 +77,7 @@ export function InternalUseTable({ rows }: { rows: InternalUseRow[] }) {
         rowClassName={(row) => cn(row.status === "pending" && "bg-warn-soft/25")}
         renderDetail={(row) => <ExpandedIssue row={row} />}
         detailSize="full"
-        detailFooter={(row) => <InventoryDocumentActions kind="internal-use" id={row.id} code={row.code} inFooter />}
+        detailFooter={(row) => <InventoryDocumentActions kind="internal-use" id={row.id} code={row.code} capabilities={capabilities} inFooter />}
       />
     </section>
   );

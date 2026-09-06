@@ -23,7 +23,7 @@ mock.module("@/components/tenant-client-scope", () => ({ useTenantClientScope: (
 mock.module("@/components/product-catalog-provider", () => ({ useProductCatalog: () => ({ search: () => [], refresh: async () => {} }) }));
 mock.module("@/components/ai-quick-actions/ai-quick-action-button", () => ({ AiQuickActionButton: () => null }));
 mock.module("@/components/ai-quick-actions/ai-quick-action-modal", () => ({ AiQuickActionModal: () => null }));
-mock.module("@/lib/actions/purchases", () => ({ createPurchase: async () => ({ ok: false }), updatePurchase: async () => ({ ok: false }), cancelPurchase: async () => ({ ok: false }) }));
+mock.module("@/lib/actions/purchases", () => ({ createPurchase: async () => ({ ok: false }), savePurchaseDraft: async () => ({ ok: false }), updatePurchase: async () => ({ ok: false }), cancelPurchase: async () => ({ ok: false }) }));
 mock.module("@/lib/actions/purchase-search", () => ({ resolvePurchaseDraftProducts: async () => [] }));
 mock.module("@/lib/data/inventory", () => ({ getPurchase: async () => purchase, getPurchaseFormOptions: async () => options, getPurchaseProductRowsByIds: async () => products }));
 mock.module("@/lib/print/template", () => ({ getPrintTemplate: async () => ({ paperDefault: "a4", options: { showDebt: true } }), getPrintTemplatesForDoc: async () => [] }));
@@ -35,7 +35,7 @@ const { default: PurchaseDetailPage } = await import("../[id]/page.tsx");
 const { default: PrintPurchasePage } = await import("../[id]/print/page.tsx");
 const { ConfirmDialogProvider } = await import("@/components/confirm-dialog-provider");
 
-beforeEach(() => { purchase.shippingFee = "20000"; });
+beforeEach(() => { purchase.shippingFee = "20000"; purchase.status = "received"; });
 
 function initialValues(shippingFee) {
   return {
@@ -123,5 +123,58 @@ describe("purchase edit return navigation", () => {
     const html = renderToStaticMarkup(createElement(PurchaseForm, { options }));
     expect(html).toContain('href="/purchases"');
     expect(html).not.toContain("detailPurchaseId=");
+  });
+});
+
+
+describe("purchase draft actions", () => {
+  function renderForm(props = {}) {
+    return renderToStaticMarkup(createElement(PurchaseForm, { options, initialProducts: products, ...props }));
+  }
+  function button(html, label) {
+    return [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map((match) => match[0]).find((value) => value.includes(label));
+  }
+  test("new purchase exposes draft and receive with a positive fractional quantity", () => {
+    const values = initialValues(0);
+    values.items[0].quantity = 0.5;
+    const html = renderForm({ initialValues: values });
+    expect(button(html, "purchases.saveDraft")).toBeDefined();
+    expect(button(html, "purchases.saveDraft")).not.toContain('disabled=""');
+    expect(button(html, "purchases.receiveNow")).not.toContain('disabled=""');
+    expect(html).toContain("purchases.draftHint");
+  });
+  test("empty or invalid quantities disable both mutations", () => {
+    for (const quantity of [0, -1, NaN]) {
+      const values = initialValues(0);
+      values.items[0].quantity = quantity;
+      const html = renderForm({ initialValues: values });
+      expect(button(html, "purchases.saveDraft")).toContain('disabled=""');
+      expect(button(html, "purchases.receiveNow")).toContain('disabled=""');
+    }
+    const html = renderForm({ initialProducts: [] });
+    expect(button(html, "purchases.saveDraft")).toContain('disabled=""');
+  });
+  test("missing supplier or warehouse disables saving", () => {
+    for (const key of ["supplierId", "warehouseId"]) {
+      const html = renderForm({ initialValues: { ...initialValues(0), [key]: "" } });
+      expect(button(html, "purchases.saveDraft")).toContain('disabled=""');
+      expect(button(html, "purchases.receiveNow")).toContain('disabled=""');
+    }
+  });
+  test("editing a draft can keep the draft or receive it", async () => {
+    purchase.status = "draft";
+    const page = await EditPurchasePage({ params: Promise.resolve({ id: purchaseId }) });
+    expect(page.props.purchaseStatus).toBe("draft");
+    const html = renderToStaticMarkup(page);
+    expect(button(html, "purchases.saveDraft")).toBeDefined();
+    expect(button(html, "purchases.receiveNow")).toBeDefined();
+    expect(button(html, "purchases.saveChanges")).toBeUndefined();
+  });
+  test("received receipt cannot downgrade from edit form", async () => {
+    const page = await EditPurchasePage({ params: Promise.resolve({ id: purchaseId }) });
+    expect(page.props.purchaseStatus).toBe("received");
+    const html = renderToStaticMarkup(page);
+    expect(button(html, "purchases.saveDraft")).toBeUndefined();
+    expect(button(html, "purchases.saveChanges")).toBeDefined();
   });
 });
