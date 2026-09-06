@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { deleteInternalUse } from "@/lib/actions/internal-use";
 import { deletePurchaseReturn } from "@/lib/actions/purchase-returns";
 
-export function InventoryDocumentActions({ kind, id, code }: { kind: "internal-use" | "purchase-returns"; id: string; code: string }) {
+export function InventoryDocumentActions({ kind, id, code, inFooter = false }: { inFooter?: boolean; kind: "internal-use" | "purchase-returns"; id: string; code: string }) {
   const router = useRouter();
   const t = useTranslations();
   const catalog = useProductCatalog();
@@ -32,7 +32,7 @@ export function InventoryDocumentActions({ kind, id, code }: { kind: "internal-u
     } catch { setError("Không thể xóa phiếu. Vui lòng thử lại."); }
     finally { setBusy(false); }
   }
-  return <div className="mt-4 border-t border-border-soft pt-3">
+  return <div className={inFooter ? undefined : "mt-4 border-t border-border-soft pt-3"}>
     <div className="flex flex-wrap justify-end gap-2">
       <Link className={cls} href={`/${kind}/${id}/print`} target="_blank" rel="noopener noreferrer"><Printer className="h-4 w-4" />In</Link>
       <Link className={cls} href={`/${kind}/${id}/edit`}><Pencil className="h-4 w-4" />Sửa</Link>

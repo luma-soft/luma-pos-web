@@ -46,6 +46,15 @@ export function PurchaseReturnsTable({ rows }: { rows: PurchaseReturnRow[] }) {
       minWidth="1180px"
       renderDetail={(row) => <ExpandedPurchaseReturn row={row} />}
       detailSize="full"
+      detailFooter={(row) => (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm">
+            <span className="text-slate-500">{t("purchaseReturns.cols.totalRefund")}</span>
+            <span className="ml-3 font-semibold tabular-nums">{formatCurrency(Number(row.totalRefund))}</span>
+          </div>
+          <InventoryDocumentActions kind="purchase-returns" id={row.id} code={row.code} inFooter />
+        </div>
+      )}
       renderMobileRow={({ row, toggle }) => (
         <div className="relative w-full p-3 text-left">
           <button type="button" onClick={toggle} aria-label={row.code} className="absolute inset-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" />
@@ -140,7 +149,6 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
           </table>
         </div>
       </div>
-      <InventoryDocumentActions kind="purchase-returns" id={row.id} code={row.code} />
     </div>
   );
 }
