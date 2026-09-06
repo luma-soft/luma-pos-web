@@ -77,6 +77,7 @@ export function InternalUseTable({ rows }: { rows: InternalUseRow[] }) {
         rowClassName={(row) => cn(row.status === "pending" && "bg-warn-soft/25")}
         renderDetail={(row) => <ExpandedIssue row={row} />}
         detailSize="full"
+        detailFooter={(row) => <InventoryDocumentActions kind="internal-use" id={row.id} code={row.code} inFooter />}
       />
     </section>
   );
@@ -169,7 +170,6 @@ function ExpandedIssue({ row }: { row: InternalUseRow }) {
         </div>
       </div>
 
-      <InventoryDocumentActions kind="internal-use" id={row.id} code={row.code} />
     </div>
   );
 }
