@@ -3,9 +3,9 @@
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   CalendarDays,
   Camera,
@@ -57,6 +57,7 @@ import type {
   WarrantyClaimRow,
 } from "@/lib/data/services";
 import { Routes } from "@/lib/routes";
+import { PROJECT_DELETED_EVENT, type ProjectDeletedEvent } from "@/lib/projects/client-events";
 import { cn, formatDate } from "@/lib/utils";
 import {
   canTransitionServiceJob,
@@ -110,12 +111,17 @@ export function ServiceDashboardFilters({
   tab,
   serviceType,
   status,
+  urgency = "",
+  sort = "starts_desc",
 }: {
   tab: string;
   serviceType: string;
   status: string;
+  urgency?: string;
+  sort?: string;
 }) {
   const t = useTranslations();
+  const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -125,10 +131,11 @@ export function ServiceDashboardFilters({
       ? claimStatusOptions(t)
       : ["planning", "quoted", "active", "paused", "completed", "warranty", "cancelled"].map((value) => ({ value, label: t(`services.stages.${value}` as never) }));
 
-  function update(key: "type" | "status", value: string) {
+  function update(key: "type" | "status" | "urgency" | "sort", value: string) {
     const next = new URLSearchParams(params.toString());
     if (value) next.set(key, value);
     else next.delete(key);
+    next.delete("page");
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
   }
 
@@ -144,14 +151,45 @@ export function ServiceDashboardFilters({
         ]}
         className="min-w-36"
       />
-      {tab !== "projects" && (
-        <Select
-          size="sm"
-          value={status}
-          onChange={(event) => update("status", event.target.value)}
-          options={[{ value: "", label: t("services.filters.allStatuses") }, ...statuses]}
-          className="min-w-44"
-        />
+      <Select
+        size="sm"
+        value={status}
+        onChange={(event) => update("status", event.target.value)}
+        options={tab === "projects"
+          ? [
+              { value: "", label: t("services.filters.allStatuses") },
+              { value: "active", label: t("projects.status.active") },
+              { value: "done", label: t("projects.status.done") },
+            ]
+          : [{ value: "", label: t("services.filters.allStatuses") }, ...statuses]}
+        className="min-w-44"
+      />
+      {tab === "projects" && (
+        <>
+          <Select
+            size="sm"
+            value={urgency}
+            onChange={(event) => update("urgency", event.target.value)}
+            options={[
+              { value: "", label: locale === "vi" ? "Tất cả tiến độ" : "All schedule states" },
+              { value: "attention", label: locale === "vi" ? "Cần chú ý" : "Needs attention" },
+              { value: "overdue", label: locale === "vi" ? "Quá hạn" : "Overdue" },
+            ]}
+            className="min-w-40"
+          />
+          <Select
+            size="sm"
+            value={sort}
+            onChange={(event) => update("sort", event.target.value)}
+            options={[
+              { value: "starts_desc", label: locale === "vi" ? "Bắt đầu · Mới nhất" : "Start · Newest" },
+              { value: "starts_asc", label: locale === "vi" ? "Bắt đầu · Cũ nhất" : "Start · Oldest" },
+              { value: "target_asc", label: locale === "vi" ? "Kết thúc · Gần nhất" : "Target · Nearest" },
+              { value: "target_desc", label: locale === "vi" ? "Kết thúc · Xa nhất" : "Target · Farthest" },
+            ]}
+            className="min-w-44"
+          />
+        </>
       )}
     </div>
   );
@@ -207,6 +245,18 @@ export function ServiceProjectMobileRow({
 export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProjectRow[]; customers: { id: string; name: string }[] }) {
   const t = useTranslations();
   const router = useRouter();
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
+  const visibleRows = rows.filter((row) => !deletedIds.has(row.id));
+  useEffect(() => {
+    const removeDeleted = (event: Event) => {
+      const projectId = (event as ProjectDeletedEvent).detail?.id;
+      if (projectId) {
+        setDeletedIds((current) => new Set(current).add(projectId));
+      }
+    };
+    window.addEventListener(PROJECT_DELETED_EVENT, removeDeleted);
+    return () => window.removeEventListener(PROJECT_DELETED_EVENT, removeDeleted);
+  }, []);
   const columns: DataTableColumn<ServiceProjectRow>[] = [
     {
       key: "name",
@@ -259,7 +309,7 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
   return (
     <DataTableShell
       tableId="services.projects"
-      rows={rows}
+      rows={visibleRows}
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="720px"

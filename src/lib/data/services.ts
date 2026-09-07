@@ -112,6 +112,7 @@ export async function getServiceProjectsPage(
       .leftJoin(customers, eq(projects.customerId, customers.id))
       .where(listWhere),
     db.select({
+      active: sql<number>`count(*) filter (where ${activeProjectPredicate})::int`,
       attention: sql<number>`count(*) filter (where ${attentionPredicate})::int`,
       overdue: sql<number>`count(*) filter (where ${overduePredicate})::int`,
     })
@@ -127,7 +128,7 @@ export async function getServiceProjectsPage(
     page,
     pageSize,
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
-    summary: summaryRows[0] ?? { attention: 0, overdue: 0 },
+    summary: summaryRows[0] ?? { active: 0, attention: 0, overdue: 0 },
     asOfDate,
   };
 }

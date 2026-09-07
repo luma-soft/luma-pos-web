@@ -8,6 +8,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { deleteProject } from "@/lib/actions/extras";
 import { Routes } from "@/lib/routes";
+import { PROJECT_DELETED_EVENT } from "@/lib/projects/client-events";
 
 export function ProjectDeleteButton({
   projectId,
@@ -35,6 +36,9 @@ export function ProjectDeleteButton({
     const result = await deleteProject(projectId);
     setBusy(false);
     if (result.ok) {
+      window.dispatchEvent(new CustomEvent(PROJECT_DELETED_EVENT, {
+        detail: { id: projectId },
+      }));
       router.replace(`${Routes.Services}?tab=projects`);
       router.refresh();
       return;
