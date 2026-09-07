@@ -1,12 +1,14 @@
 import { and, eq, inArray, or, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { products, profiles, projects, serviceJobs, serviceJobTradeRecords } from "@/db/schema";
-import { getAuditLogs } from "@/lib/audit";
+import { countAuditLogs, getAuditLogs } from "@/lib/audit";
 import { Routes } from "@/lib/routes";
 import { activityObject, activityText, type ActivityRecord, type NotificationActivity } from "./activity-presentation";
 
-export async function getNotificationActivities(storeId: string, userId: string): Promise<NotificationActivity[]> {
-  const rows = await getAuditLogs({ storeId, notificationUserId: userId, limit: 100 });
+async function presentNotificationActivities(
+  storeId: string,
+  rows: Awaited<ReturnType<typeof getAuditLogs>>,
+): Promise<NotificationActivity[]> {
   const actorIds = [...new Set(rows.filter((row) => !row.actorNameSnapshot?.trim()).flatMap((row) => row.actorId ? [row.actorId] : []))];
   const productIds = [...new Set(rows.flatMap((row) => ["product", "product_price"].includes(row.entityType) && row.entityId ? [row.entityId] : []))];
   const projectIds = [...new Set(rows.flatMap((row) => {
@@ -67,4 +69,36 @@ export async function getNotificationActivities(storeId: string, userId: string)
         return project ? { ...project, context: project.name } : null;
       })(),
   }));
+}
+
+export async function getNotificationActivities(storeId: string, userId: string): Promise<NotificationActivity[]> {
+  const rows = await getAuditLogs({ storeId, notificationUserId: userId, limit: 100 });
+  return presentNotificationActivities(storeId, rows);
+}
+
+export async function getNotificationActivityPage(
+  storeId: string,
+  userId: string,
+  page: number,
+  pageSize: number,
+) {
+  const filters = { storeId, notificationUserId: userId };
+  const requestedPage = Math.max(1, Math.floor(page));
+  const safePageSize = Math.min(100, Math.max(1, Math.floor(pageSize)));
+  const total = await countAuditLogs(filters);
+  const pageCount = Math.max(1, Math.ceil(total / safePageSize));
+  const safePage = Math.min(requestedPage, pageCount);
+  const rows = await getAuditLogs({
+    ...filters,
+    limit: safePageSize,
+    offset: (safePage - 1) * safePageSize,
+  });
+
+  return {
+    rows: await presentNotificationActivities(storeId, rows),
+    total,
+    page: safePage,
+    pageCount,
+    pageSize: safePageSize,
+  };
 }

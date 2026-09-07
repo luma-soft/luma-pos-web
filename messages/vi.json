@@ -327,6 +327,7 @@
     "processed": "Đã xử lý",
     "activity": {
       "description": "Nhật ký thao tác trên hệ thống. Chọn một hoạt động để xem chi tiết.",
+      "unitLabel": "hoạt động",
       "detailSubtitle": "Chi tiết hoạt động",
       "unknownActor": "Chưa ghi nhận",
       "fallbackTitle": "Thao tác với {entity}",
@@ -939,6 +940,21 @@
       "retry": "Thử lại",
       "empty": "Không có thông báo nào",
       "emptyFiltered": "Không có thông báo phù hợp bộ lọc",
+      "recent": "Cập nhật gần đây",
+      "unitLabel": "thông báo",
+      "columns": {
+        "notification": "Thông báo",
+        "category": "Danh mục",
+        "source": "Nguồn",
+        "status": "Trạng thái",
+        "time": "Thời gian",
+        "actions": "Thao tác"
+      },
+      "tableStatuses": {
+        "action": "Cần xử lý",
+        "unread": "Chưa đọc",
+        "processed": "Đã xử lý"
+      },
       "actions": {
         "restock": "Tạo phiếu nhập",
         "retry": "Thử lại",

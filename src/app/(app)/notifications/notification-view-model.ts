@@ -143,3 +143,17 @@ export function countActiveNotificationFilters(filters: NotificationFilters) {
     filters.source !== "all",
   ].filter(Boolean).length;
 }
+
+export function paginateNotificationRows<T>(rows: T[], page: number, pageSize: number) {
+  const safePageSize = Math.max(1, Math.floor(pageSize));
+  const total = rows.length;
+  const pageCount = Math.max(1, Math.ceil(total / safePageSize));
+  const safePage = Math.min(pageCount, Math.max(1, Math.floor(page)));
+  return {
+    rows: rows.slice((safePage - 1) * safePageSize, safePage * safePageSize),
+    total,
+    page: safePage,
+    pageCount,
+    pageSize: safePageSize,
+  };
+}

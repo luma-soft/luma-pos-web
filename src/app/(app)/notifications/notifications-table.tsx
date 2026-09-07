@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { Bot, CheckCircle2, Clock, ExternalLink, ShieldAlert, UserRound, XCircle } from "lucide-react";
+import { BarChart3, Bot, Box, CheckCircle2, ChevronRight, Clock, ExternalLink, FileWarning, PackageCheck, RefreshCw, ShieldAlert, UserRound, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn, formatDate } from "@/lib/utils";
@@ -17,6 +17,14 @@ import {
 } from "@/lib/audit/activity-presentation";
 import { useLocale, useTranslations } from "next-intl";
 import { activityChanges, activityFieldKinds, activityItems, type ActivityChange, type ActivityField } from "@/lib/audit/activity-details";
+import {
+  notificationCategory,
+  notificationCreatedAt,
+  notificationLevel,
+  notificationSource,
+  type NotificationRow,
+  type NotificationTab,
+} from "./notification-view-model";
 
 export type AuditRow = NotificationActivity;
 type Translator = ReturnType<typeof useTranslations>;
@@ -212,6 +220,130 @@ export function NotificationsTable({ rows }: { rows: AuditRow[] }) {
       detailTitle={(row) => titleFor(row, t)}
       detailSubtitle={() => t("notifications.activity.detailSubtitle")}
       detailSize="lg"
+    />
+  );
+}
+
+function InboxCategoryIcon({ row }: { row: NotificationRow }) {
+  switch (notificationCategory(row.category)) {
+    case "inventory": return <PackageCheck className="size-5" />;
+    case "einvoice": return <FileWarning className="size-5" />;
+    case "debt": return <UserRound className="size-5" />;
+    case "sales": return <BarChart3 className="size-5" />;
+    default: return <RefreshCw className="size-5" />;
+  }
+}
+
+function inboxStatus(row: NotificationRow, t: Translator) {
+  if (!row.unread) return t("notifications.inbox.tableStatuses.processed");
+  if (notificationLevel(row.priority) !== "info") return t("notifications.inbox.tableStatuses.action");
+  return t("notifications.inbox.tableStatuses.unread");
+}
+
+function inboxStatusTone(row: NotificationRow) {
+  if (!row.unread) return "bg-surface-2 text-slate-500";
+  if (notificationLevel(row.priority) === "high") return "bg-er-soft text-er";
+  if (notificationLevel(row.priority) === "warning") return "bg-warn-soft text-warn";
+  return "bg-in-soft text-in";
+}
+
+function inboxTime(row: NotificationRow, locale: string, recent: string) {
+  const value = notificationCreatedAt(row);
+  if (!value) return recent;
+  return new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(value);
+}
+
+function InboxNotificationCell({ row }: { row: NotificationRow }) {
+  const level = notificationLevel(row.priority);
+  return (
+    <div className="flex min-w-0 items-start gap-3 py-1">
+      <div className={cn(
+        "grid size-10 shrink-0 place-items-center rounded-xl",
+        level === "high" ? "bg-red-50 text-red-600" : level === "warning" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700",
+      )}>
+        <InboxCategoryIcon row={row} />
+      </div>
+      <div className="min-w-0">
+        <p className={cn("truncate", row.unread ? "font-bold text-slate-950" : "font-semibold")}>{row.title}</p>
+        <p className="mt-1 line-clamp-2 text-xs text-slate-500">{row.body}</p>
+      </div>
+    </div>
+  );
+}
+
+export function InboxNotificationsTable({
+  rows,
+  tab,
+  pendingId,
+  onAction,
+  onProcessed,
+}: {
+  rows: NotificationRow[];
+  tab: Exclude<NotificationTab, "activity">;
+  pendingId: string | null;
+  onAction: (row: NotificationRow) => void;
+  onProcessed: (row: NotificationRow) => void;
+}) {
+  const t = useTranslations();
+  const locale = useLocale();
+  const actionText = (row: NotificationRow) => {
+    if (row.action?.viLabel || row.action?.label) return row.action.viLabel ?? row.action.label!;
+    switch (row.action?.target) {
+      case "aiRestocking": case "restocking": return t("notifications.inbox.actions.restock");
+      case "invoices": case "einvoice": return t("notifications.inbox.actions.retry");
+      case "customers": case "crm": case "debt": return t("notifications.inbox.actions.customer");
+      case "purchases": return t("notifications.inbox.actions.purchase");
+      case "reports": case "sales": return t("notifications.inbox.actions.report");
+      default: return t("notifications.inbox.actions.open");
+    }
+  };
+  const actionButtons = (row: NotificationRow, mobile = false) => (
+    <div className={cn("flex items-center gap-1", mobile && "mt-3 flex-wrap")} onClick={stopRowToggle}>
+      {row.action && (
+        <Button variant="ghost" size="sm" disabled={pendingId !== null} onClick={() => onAction(row)}>
+          {actionText(row)}<ChevronRight className="size-4" />
+        </Button>
+      )}
+      {tab === "action" && (
+        <Button variant="ghost" size="sm" disabled={pendingId !== null} onClick={() => onProcessed(row)}>
+          {pendingId === row.id ? t("notifications.inbox.processing") : t("notifications.inbox.processed")}
+        </Button>
+      )}
+    </div>
+  );
+  const columns: DataTableColumn<NotificationRow>[] = [
+    { key: "notification", label: t("notifications.inbox.columns.notification"), required: true, render: (row) => <InboxNotificationCell row={row} /> },
+    { key: "category", label: t("notifications.inbox.columns.category"), width: "120px", render: (row) => <span className="inline-flex rounded-md bg-surface-2 px-2 py-1 text-[11px] font-bold">{t(`notifications.inbox.categories.${notificationCategory(row.category)}`)}</span> },
+    { key: "source", label: t("notifications.inbox.columns.source"), width: "100px", render: (row) => <span className="text-slate-600">{t(`notifications.filter.source.${notificationSource(row.category)}`)}</span> },
+    { key: "status", label: t("notifications.inbox.columns.status"), width: "130px", render: (row) => <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold", inboxStatusTone(row))}>{inboxStatus(row, t)}</span> },
+    { key: "time", label: t("notifications.inbox.columns.time"), width: "160px", render: (row) => <span className="text-slate-500">{inboxTime(row, locale, t("notifications.inbox.recent"))}</span> },
+    { key: "actions", label: t("notifications.inbox.columns.actions"), width: tab === "action" ? "260px" : "150px", sortable: false, render: (row) => actionButtons(row) },
+  ];
+
+  return (
+    <DataTableShell
+      tableId={`notifications.${tab}`}
+      rows={rows}
+      columns={columns}
+      getRowId={(row) => row.id}
+      minWidth="1080px"
+      renderMobileRow={({ row }) => (
+        <div className="p-3">
+          <InboxNotificationCell row={row} />
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1 text-slate-500"><Box className="size-3.5" />{t(`notifications.inbox.categories.${notificationCategory(row.category)}`)}</span>
+            <span className={cn("rounded-full px-2 py-0.5 font-bold", inboxStatusTone(row))}>{inboxStatus(row, t)}</span>
+            <span className="ml-auto text-slate-400">{inboxTime(row, locale, t("notifications.inbox.recent"))}</span>
+          </div>
+          {actionButtons(row, true)}
+        </div>
+      )}
     />
   );
 }

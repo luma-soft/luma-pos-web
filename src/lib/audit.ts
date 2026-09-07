@@ -87,9 +87,10 @@ export type AuditLogFilters = {
   dateFrom?: Date;
   dateTo?: Date;
   limit?: number;
+  offset?: number;
 };
 
-export async function getAuditLogs(filters: AuditLogFilters = {}) {
+function auditLogWhere(filters: AuditLogFilters) {
   const where: SQL[] = [];
   if (filters.storeId) where.push(eq(auditLogs.storeId, filters.storeId));
   if (filters.source) where.push(eq(auditLogs.source, filters.source));
@@ -108,8 +109,20 @@ export async function getAuditLogs(filters: AuditLogFilters = {}) {
   }
   if (filters.dateFrom) where.push(gte(auditLogs.createdAt, filters.dateFrom));
   if (filters.dateTo) where.push(lte(auditLogs.createdAt, filters.dateTo));
+  return where.length ? and(...where) : undefined;
+}
 
+export async function countAuditLogs(filters: AuditLogFilters = {}) {
+  const [row] = await db
+    .select({ value: sql<number>`count(*)::int` })
+    .from(auditLogs)
+    .where(auditLogWhere(filters));
+  return row?.value ?? 0;
+}
+
+export async function getAuditLogs(filters: AuditLogFilters = {}) {
   const limit = Math.min(Math.max(filters.limit ?? 100, 1), 250);
+  const offset = Math.max(filters.offset ?? 0, 0);
   return db
     .select({
       id: auditLogs.id,
@@ -129,9 +142,10 @@ export async function getAuditLogs(filters: AuditLogFilters = {}) {
       createdAt: auditLogs.createdAt,
     })
     .from(auditLogs)
-    .where(where.length ? and(...where) : undefined)
+    .where(auditLogWhere(filters))
     .orderBy(desc(auditLogs.createdAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 }
 
 export async function getAttentionNotificationCount(userId?: string | null) {

@@ -327,6 +327,7 @@
     "processed": "Processed",
     "activity": {
       "description": "A history of actions in your store. Select an activity to see its details.",
+      "unitLabel": "activities",
       "detailSubtitle": "Activity details",
       "unknownActor": "Not recorded",
       "fallbackTitle": "Activity for {entity}",
@@ -939,6 +940,21 @@
       "retry": "Try again",
       "empty": "No notifications",
       "emptyFiltered": "No notifications match these filters",
+      "recent": "Recently updated",
+      "unitLabel": "notifications",
+      "columns": {
+        "notification": "Notification",
+        "category": "Category",
+        "source": "Source",
+        "status": "Status",
+        "time": "Time",
+        "actions": "Actions"
+      },
+      "tableStatuses": {
+        "action": "Needs attention",
+        "unread": "Unread",
+        "processed": "Resolved"
+      },
       "actions": {
         "restock": "Create purchase",
         "retry": "Try again",

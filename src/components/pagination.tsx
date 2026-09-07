@@ -15,7 +15,7 @@ import { Text } from "@/components/ui/text";
  */
 export function Pagination({
   page, pageCount, total, pageSize, unitLabel, showRange = true,
-  pageSizes = PAGE_SIZES,
+  pageSizes = PAGE_SIZES, onPageChange, onPageSizeChange,
 }: {
   page: number;
   pageCount: number;
@@ -24,6 +24,8 @@ export function Pagination({
   unitLabel?: string;
   showRange?: boolean;
   pageSizes?: readonly number[];
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -40,6 +42,20 @@ export function Pagination({
     router.push(s ? `${pathname}?${s}` : pathname);
   };
 
+  const setPage = (nextPage: number) => {
+    const normalized = Math.min(pageCount, Math.max(1, nextPage));
+    if (onPageChange) onPageChange(normalized);
+    else go({ page: normalized <= 1 ? undefined : String(normalized) });
+  };
+
+  const setPageSize = (nextPageSize: number) => {
+    if (onPageSizeChange) {
+      onPageSizeChange(nextPageSize);
+    } else {
+      go({ size: String(nextPageSize), page: undefined });
+    }
+  };
+
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
 
@@ -49,7 +65,7 @@ export function Pagination({
         <Text variant="muted" text={t("pagination.show")} />
         <Select
           value={pageSize}
-          onChange={(e) => go({ size: e.target.value, page: undefined })}
+          onChange={(e) => setPageSize(Number(e.target.value))}
           size="sm"
           options={pageSizes.map((s) => ({ value: String(s), label: t("pagination.rows", { n: s }) }))}
           className="min-w-[116px]"
@@ -57,21 +73,21 @@ export function Pagination({
       </div>
 
       <div className="flex items-center gap-1">
-        <Button variant="outline" size="iconSm" disabled={page <= 1} onClick={() => go({ page: undefined })} title={t("pagination.first")}><ChevronsLeft className="w-4 h-4" /></Button>
-        <Button variant="outline" size="iconSm" disabled={page <= 1} onClick={() => go({ page: page - 1 <= 1 ? undefined : String(page - 1) })} title={t("pagination.prev")}><ChevronLeft className="w-4 h-4" /></Button>
+        <Button variant="outline" size="iconSm" disabled={page <= 1} onClick={() => setPage(1)} title={t("pagination.first")}><ChevronsLeft className="w-4 h-4" /></Button>
+        <Button variant="outline" size="iconSm" disabled={page <= 1} onClick={() => setPage(page - 1)} title={t("pagination.prev")}><ChevronLeft className="w-4 h-4" /></Button>
         <NumberInput
           min={1} max={pageCount}
           value={page}
           onChange={(value) => {
             const p = Math.min(pageCount, Math.max(1, value ?? 1));
-            go({ page: p <= 1 ? undefined : String(p) });
+            setPage(p);
           }}
           thousandSeparator={false}
           size="sm"
           className="w-12 text-center tabular-nums"
         />
-        <Button variant="outline" size="iconSm" disabled={page >= pageCount} onClick={() => go({ page: String(page + 1) })} title={t("pagination.next")}><ChevronRight className="w-4 h-4" /></Button>
-        <Button variant="outline" size="iconSm" disabled={page >= pageCount} onClick={() => go({ page: String(pageCount) })} title={t("pagination.last")}><ChevronsRight className="w-4 h-4" /></Button>
+        <Button variant="outline" size="iconSm" disabled={page >= pageCount} onClick={() => setPage(page + 1)} title={t("pagination.next")}><ChevronRight className="w-4 h-4" /></Button>
+        <Button variant="outline" size="iconSm" disabled={page >= pageCount} onClick={() => setPage(pageCount)} title={t("pagination.last")}><ChevronsRight className="w-4 h-4" /></Button>
       </div>
 
       {showRange && <Text as="div" variant="muted" className="ml-auto sm:ml-0 tabular-nums" text={`${t("pagination.range", { start, end, total })}${unitLabel ? ` ${unitLabel}` : ""}`} />}
