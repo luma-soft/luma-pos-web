@@ -18,7 +18,7 @@ import type { MediaFileMetadata } from "@/lib/media/file-metadata-types";
 import type { MediaLibraryItem } from "@/lib/media/library-types";
 import { cn } from "@/lib/utils";
 import { LibraryDialog } from "./library-dialog";
-import { formatLibraryBytes, libraryCanDelete, libraryCanExtractMetadata, libraryItemSizeKnown, libraryItemSourcePreset, libraryItemUploadedAt, libraryRequest } from "./library-utils";
+import { formatLibraryBytes, libraryCanDelete, libraryCanExtractMetadata, libraryImageDisplayUrl, libraryItemSizeKnown, libraryItemSourcePreset, libraryItemUploadedAt, libraryRequest } from "./library-utils";
 
 export function LibraryPreview({
   item,
@@ -143,7 +143,7 @@ export function LibraryPreview({
               <LumaImage
                 unoptimized
                 fill
-                src={resolved.url}
+                src={libraryImageDisplayUrl(resolved)}
                 alt={resolved.title}
                 containerClassName="absolute inset-0"
                 className="object-contain p-3"

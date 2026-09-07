@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   CheckCircle2,
+  Check,
   Download,
   FileText,
   Film,
@@ -42,6 +43,7 @@ import { useAppDataRevision } from "@/components/app-data-sync-provider";
 import {
   libraryCanDelete,
   formatLibraryBytes,
+  libraryImageDisplayUrl,
   libraryListPath,
   libraryManualAlbums,
   libraryRequest,
@@ -629,7 +631,7 @@ export function LibraryTile({
           <LumaImage
             unoptimized
             fill
-            src={item.thumbnailUrl ?? item.url}
+            src={libraryImageDisplayUrl(item)}
             alt={item.title}
             sizes="(max-width: 640px) 34vw, (max-width: 1024px) 25vw, 17vw"
             containerClassName="absolute inset-0"
@@ -655,10 +657,12 @@ export function LibraryTile({
             "absolute right-2 top-2 z-20 grid h-7 w-7 place-items-center rounded-full border-2 border-white text-white shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600",
             selected
               ? "bg-primary-600 opacity-100"
-              : "bg-slate-950/45 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100",
+              : selecting
+                ? "bg-slate-950/20 opacity-100"
+                : "bg-slate-950/20 opacity-0 group-hover:opacity-100 focus:opacity-100",
           )}
         >
-          {selected && <CheckCircle2 className="h-4 w-4" />}
+          {selected && <Check className="h-4 w-4 stroke-[3]" />}
         </button>
       )}
       {item.kind === "image" && selecting && deleteLocked && (

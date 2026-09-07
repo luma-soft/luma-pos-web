@@ -36,6 +36,16 @@ export function libraryItemSourcePreset(item: MediaLibraryItem) {
   return item.source ? MEDIA_LIBRARY_PRESETS.find((preset) => preset.name === item.album)?.source : undefined;
 }
 
+export function libraryImageDisplayUrl(item: MediaLibraryItem) {
+  if (item.thumbnailUrl?.trim()) return item.thumbnailUrl;
+  const mimeType = item.mimeType.trim().toLowerCase();
+  if (["image/heic", "image/heif"].includes(mimeType)
+      || /\.(?:heic|heif)$/i.test(item.fileName)) {
+    return `/api/mobile/library?preview=${encodeURIComponent(item.id)}`;
+  }
+  return item.url;
+}
+
 export function formatLibraryBytes(bytes: number, locale: string) {
   const units = ["B", "KB", "MB", "GB", "TB"];
   const index =

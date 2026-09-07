@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createMediaThumbnail } from "@/lib/media/image-variants";
 import type { MediaActor } from "@/lib/media/authorization";
 import {
   createMediaLibraryItem,
@@ -43,7 +44,10 @@ type MediaLibraryRouteDependencies = {
   remove?: typeof deleteMediaLibraryItem;
   removeMany?: typeof deleteMediaLibraryItems;
   fetchMedia?: typeof fetch;
+  createThumbnail?: typeof createMediaThumbnail;
 };
+
+const MAX_PREVIEW_SOURCE_BYTES = 32 * 1024 * 1024;
 
 export function createMediaLibraryHandlers(
   dependencies: MediaLibraryRouteDependencies = {},
@@ -70,13 +74,44 @@ export function createMediaLibraryHandlers(
       if (!authenticated.actor) return authenticated.response!;
       try {
         const params = request ? new URL(request.url).searchParams : new URLSearchParams();
-        if (params.has("resolve") || params.has("open") || params.has("download")) {
-          if (params.getAll("resolve").length + params.getAll("open").length + params.getAll("download").length !== 1) throw new MediaLibraryQueryError();
-          const candidateId = params.get("resolve") ?? params.get("open") ?? params.get("download") ?? "";
+        if (params.has("resolve") || params.has("open") || params.has("download") || params.has("preview")) {
+          const operationCount = ["resolve", "open", "download", "preview"]
+            .reduce((count, key) => count + params.getAll(key).length, 0);
+          if (operationCount !== 1) throw new MediaLibraryQueryError();
+          const candidateId = params.get("resolve") ?? params.get("open")
+            ?? params.get("download") ?? params.get("preview") ?? "";
           const item = await (dependencies.resolve ?? resolveMediaLibraryItem)(
             authenticated.actor,
             candidateId,
           );
+          if (params.has("preview")) {
+            const mimeType = item.mimeType.trim().toLowerCase();
+            if (!["image/heic", "image/heif"].includes(mimeType)
+                || item.sizeBytes > MAX_PREVIEW_SOURCE_BYTES) {
+              throw new MediaLibraryQueryError();
+            }
+            const source = await (dependencies.fetchMedia ?? fetch)(item.url, {
+              cache: "no-store",
+            });
+            const contentLength = Number(source.headers.get("Content-Length"));
+            if (!source.ok || (Number.isFinite(contentLength)
+                && contentLength > MAX_PREVIEW_SOURCE_BYTES)) {
+              throw new Error("media preview failed");
+            }
+            const bytes = new Uint8Array(await source.arrayBuffer());
+            if (bytes.byteLength > MAX_PREVIEW_SOURCE_BYTES) {
+              throw new MediaLibraryQueryError();
+            }
+            const thumbnail = await (dependencies.createThumbnail
+              ?? createMediaThumbnail)(bytes, mimeType);
+            return new NextResponse(Buffer.from(thumbnail), {
+              headers: {
+                "Cache-Control": "private, max-age=900",
+                "Content-Type": "image/webp",
+                "X-Content-Type-Options": "nosniff",
+              },
+            });
+          }
           if (params.has("download")) {
             const source = await (dependencies.fetchMedia ?? fetch)(item.url, { cache: "no-store" });
             if (!source.ok || !source.body) throw new Error("media download failed");
@@ -172,6 +207,7 @@ export function createMediaLibraryHandlers(
 }
 
 const handlers = createMediaLibraryHandlers();
+export const runtime = "nodejs";
 export const GET = handlers.GET;
 export const POST = handlers.POST;
 export const PATCH = handlers.PATCH;

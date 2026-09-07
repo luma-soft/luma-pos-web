@@ -84,3 +84,30 @@ test("download proxies the resolved image with a safe attachment header", async 
   expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
   expect(fetchMedia).toHaveBeenCalledWith("https://media.example/signed", { cache: "no-store" });
 });
+
+test("preview converts an authorized HEIC image to browser-compatible WebP", async () => {
+  const resolve = mock(async () => ({
+    id: ids[0],
+    fileName: "camera.heic",
+    mimeType: "image/heic",
+    url: "https://media.example/signed-heic",
+  }));
+  const fetchMedia = mock(async () => new Response(new Uint8Array([1, 2, 3]), {
+    headers: { "Content-Type": "image/heic" },
+  }));
+  const createThumbnail = mock(async () => new Uint8Array([8, 9]));
+  const { GET } = createMediaLibraryHandlers({
+    authenticate: async () => actor,
+    resolve,
+    fetchMedia,
+    createThumbnail,
+  });
+
+  const response = await GET(new Request(`http://localhost/api/mobile/library?preview=${ids[0]}`));
+  expect(response.status).toBe(200);
+  expect(response.headers.get("Content-Type")).toBe("image/webp");
+  expect(response.headers.get("Cache-Control")).toContain("private");
+  expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([8, 9]));
+  expect(fetchMedia).toHaveBeenCalledWith("https://media.example/signed-heic", { cache: "no-store" });
+  expect(createThumbnail).toHaveBeenCalledWith(new Uint8Array([1, 2, 3]), "image/heic");
+});
