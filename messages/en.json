@@ -170,7 +170,7 @@
     "delivery": "Delivery",
     "projects": "Projects",
     "services": "Projects & Services",
-    "library": "Media library",
+    "library": "Gallery",
     "promotions": "Promotions",
     "einvoices": "E-invoices",
     "groups": {
@@ -203,10 +203,28 @@
     "returns": "Returns"
   },
   "mediaLibrary": {
-    "title": "Media library",
-    "subtitle": "Shared product photos, videos, and quotation files for the whole store",
+    "title": "Gallery",
+    "subtitle": "Your store's photos, videos, and quotations",
     "upload": "Upload files",
-    "addShort": "Add files",
+    "addShort": "Add",
+    "storageUsage": "{count} files · {size} used",
+    "selectionCount": "{count} photos selected",
+    "selectionLimit": "Select up to 20 photos at a time.",
+    "selectImage": "Select {title}",
+    "deselectImage": "Deselect {title}",
+    "saveImages": "Download",
+    "shareImages": "Share",
+    "deleteImages": "Delete",
+    "saving": "Preparing photos…",
+    "sharing": "Preparing share…",
+    "deleting": "Deleting photos…",
+    "saveResult": "Downloaded {success} photos; {failed} failed.",
+    "shareResult": "Shared {success} photos; {failed} failed.",
+    "deleteResult": "Deleted {success} photos; {failed} failed.",
+    "deleteSelectedTitle": "Delete {count} selected photos?",
+    "deleteSelectedDescription": "The photos will be removed from the gallery and storage. This cannot be undone.",
+    "deleteUnavailable": "Linked photos cannot be deleted. Deselect photos marked with a lock.",
+    "shareUnavailable": "This browser cannot share multiple photos. You can still download them.",
     "storageDetails": "Storage details",
     "privateShort": "Your store only",
     "automatic": "Automatic",
@@ -227,6 +245,9 @@
     "filters": "File types",
     "filterTitle": "Filters",
     "filterButton": "Filter",
+    "fileType": "File type",
+    "viewFiles": "View {count} files",
+    "counting": "Counting…",
     "clearFilters": "Clear filters",
     "allShort": "All",
     "loading": "Loading library…",
@@ -287,7 +308,9 @@
     "errors": {
       "load": "Could not refresh the library.",
       "upload": "Could not upload this file. Please try again.",
-      "delete": "Could not delete this file. Please try again."
+      "delete": "Could not delete this file. Please try again.",
+      "save": "Could not download the photos. Please try again.",
+      "share": "Could not share the photos. Please try again."
     }
   },
   "notifications": {

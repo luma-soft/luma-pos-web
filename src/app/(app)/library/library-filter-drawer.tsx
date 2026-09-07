@@ -1,32 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Folder, LayoutGrid, Link2 } from "lucide-react";
+import { FileText, Film, Folder, Image, LayoutGrid, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { MediaLibrarySnapshot } from "@/lib/media/library-types";
 import { cn } from "@/lib/utils";
 import { LibraryDialog } from "./library-dialog";
-import { libraryAlbumKey, libraryAlbumSelection, libraryManualAlbums, type LibraryAlbumSelection } from "./library-utils";
+import { libraryAlbumKey, libraryAlbumSelection, libraryListPath, libraryManualAlbums, libraryRequest, type LibraryAlbumSelection } from "./library-utils";
+
+export type LibraryFilterSelection = LibraryAlbumSelection & { kind: string };
 
 export function LibraryFilterDrawer({
   albums,
-  totalCount,
+  allCount,
+  initialResultCount,
+  query,
   album,
   source = "",
+  kind,
   onApply,
   onClose,
 }: {
   albums: MediaLibrarySnapshot["albums"];
-  totalCount: number;
+  allCount: number;
+  initialResultCount: number;
+  query: string;
   album: string;
   source?: LibraryAlbumSelection["source"];
-  onApply: (selection: LibraryAlbumSelection) => void;
+  kind: string;
+  onApply: (selection: LibraryFilterSelection) => void;
   onClose: () => void;
 }) {
   const t = useTranslations("mediaLibrary");
-  const common = useTranslations("common");
-  const [draft, setDraft] = useState<LibraryAlbumSelection>({ album, source });
+  const [draft, setDraft] = useState<LibraryFilterSelection>({ album, source, kind });
+  const [resultCount, setResultCount] = useState(initialResultCount);
+  const [countLoading, setCountLoading] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setCountLoading(true);
+      try {
+        const next = await libraryRequest<MediaLibrarySnapshot>(
+          libraryListPath(query, draft.album, draft.kind, null, draft.source),
+          { signal: controller.signal },
+        );
+        if (!controller.signal.aborted) {
+          setResultCount(next.page?.totalItems ?? next.items.length);
+        }
+      } catch {
+        // Keep the most recent valid count while the preview request retries.
+      } finally {
+        if (!controller.signal.aborted) setCountLoading(false);
+      }
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [draft, query]);
 
   return (
     <LibraryDialog
@@ -35,7 +68,7 @@ export function LibraryFilterDrawer({
       onClose={onClose}
       footer={
         <div className="grid grid-cols-2 gap-3">
-          <Button variant="outline" onClick={() => setDraft({ album: "", source: "" })}>
+          <Button variant="outline" onClick={() => setDraft({ album: "", source: "", kind: "" })}>
             {t("clearFilters")}
           </Button>
           <Button
@@ -44,12 +77,44 @@ export function LibraryFilterDrawer({
               onClose();
             }}
           >
-            {common("apply")}
+            {countLoading ? t("counting") : t("viewFiles", { count: resultCount })}
           </Button>
         </div>
       }
     >
-      <LibraryAlbumOptions albums={albums} totalCount={totalCount} selection={draft} onChange={setDraft} />
+      <div className="space-y-2 px-4 pt-5 sm:px-6">
+        <p className="px-1 text-xs font-semibold text-slate-500">{t("fileType")}</p>
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label={t("fileType")}>
+          {[
+            { value: "", label: t("typeAll"), icon: LayoutGrid },
+            { value: "image", label: t("types.image"), icon: Image },
+            { value: "video", label: t("types.video"), icon: Film },
+            { value: "document", label: t("types.document"), icon: FileText },
+          ].map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={draft.kind === value}
+              onClick={() => setDraft((current) => ({ ...current, kind: value }))}
+              className={cn(
+                "flex min-h-11 items-center gap-2 rounded-lg border px-3 text-left text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-primary-600",
+                draft.kind === value
+                  ? "border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200"
+                  : "border-border text-slate-600 hover:bg-surface-2 dark:text-slate-300",
+              )}
+            >
+              <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <LibraryAlbumOptions
+        albums={albums}
+        totalCount={allCount}
+        selection={draft}
+        onChange={(selection) => setDraft((current) => ({ ...current, ...selection }))}
+      />
     </LibraryDialog>
   );
 }

@@ -1,5 +1,4 @@
 "use client";
-import NextImage from "next/image";
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -13,6 +12,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LumaImage } from "@/components/luma-image";
 import { FileInfoPanel } from "@/components/media/file-info-panel";
 import type { MediaFileMetadata } from "@/lib/media/file-metadata-types";
 import type { MediaLibraryItem } from "@/lib/media/library-types";
@@ -140,13 +140,15 @@ export function LibraryPreview({
                 className="h-6 w-6 animate-spin text-primary-600"
               />
             ) : resolved.kind === "image" ? (
-              <NextImage
+              <LumaImage
                 unoptimized
                 fill
                 src={resolved.url}
                 alt={resolved.title}
+                containerClassName="absolute inset-0"
                 className="object-contain p-3"
                 sizes="80vw"
+                fallbackLabel={t("errors.load")}
               />
             ) : resolved.kind === "video" ? (
               <video

@@ -40,6 +40,7 @@ type FilterTriggerButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   label: string;
   active?: boolean;
   hideLabelOnSmallScreens?: boolean;
+  resultCount?: number;
 };
 
 export const FilterTriggerButton = forwardRef<HTMLButtonElement, FilterTriggerButtonProps>(
@@ -50,6 +51,7 @@ export const FilterTriggerButton = forwardRef<HTMLButtonElement, FilterTriggerBu
       className,
       hideLabelOnSmallScreens = false,
       label,
+      resultCount,
       type = "button",
       ...props
     },
@@ -69,6 +71,11 @@ export const FilterTriggerButton = forwardRef<HTMLButtonElement, FilterTriggerBu
       >
         <SlidersHorizontal className="size-4" />
         <span className={cn(hideLabelOnSmallScreens && "hidden sm:inline")}>{label}</span>
+        {resultCount !== undefined && (
+          <span className="rounded-full bg-primary-50 px-1.5 py-0.5 text-[11px] tabular-nums text-primary-700 dark:bg-primary-950/50 dark:text-primary-200">
+            {resultCount}
+          </span>
+        )}
         {active && (
           <span className="absolute -right-1 -top-1 size-2.5 rounded-full border-2 border-surface bg-primary-600" />
         )}

@@ -265,3 +265,30 @@ export async function deleteMediaLibraryItem(actor: MediaActor, candidateId: str
     return { id: item.id, storagePending: media.outcome === "deleted" };
   });
 }
+
+export async function deleteMediaLibraryItems(actor: MediaActor, candidateIds: unknown) {
+  requireManagerActor(actor);
+  if (!Array.isArray(candidateIds) || candidateIds.length < 1 || candidateIds.length > 20) {
+    throw new MediaLibraryError("errors.invalidData", 400);
+  }
+  const ids = candidateIds.map((candidate) => {
+    const parsed = canonicalUuidCoordinateSchema.safeParse(candidate);
+    if (!parsed.success) throw new MediaLibraryError("errors.invalidData", 400);
+    return parsed.data;
+  });
+  if (new Set(ids).size !== ids.length) {
+    throw new MediaLibraryError("errors.invalidData", 400);
+  }
+
+  const deletedIds: string[] = [];
+  const failed: Array<{ id: string; error: string }> = [];
+  for (const id of ids) {
+    try {
+      await deleteMediaLibraryItem(actor, id);
+      deletedIds.push(id);
+    } catch (error) {
+      failed.push({ id, error: mediaLibraryError(error).error });
+    }
+  }
+  return { deletedIds, failed };
+}

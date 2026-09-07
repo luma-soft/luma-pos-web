@@ -4,6 +4,7 @@ import {
   createMediaLibraryItem,
   extractMediaLibraryMetadata,
   deleteMediaLibraryItem,
+  deleteMediaLibraryItems,
   getMediaLibrarySnapshot,
   mediaLibraryError,
   resolveMediaLibraryItem,
@@ -12,9 +13,16 @@ import {
 import { MediaLibraryQueryError, parseMediaLibraryQuery } from "@/lib/media/library-query";
 import type { MobileGate } from "@/lib/mobile/auth";
 import { requireMobileUser } from "@/lib/mobile/auth";
+import { isMobileEntityId } from "@/lib/mobile/exact-entity";
 import { mobileError, mobileOk, readJson } from "@/lib/mobile/response";
 
 type AllowedGate = Extract<MobileGate, { ok: true }>;
+
+function attachmentFileName(value: string) {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (character) =>
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
 
 function actorFromGate(gate: AllowedGate): MediaActor {
   return {
@@ -33,6 +41,8 @@ type MediaLibraryRouteDependencies = {
   extractMetadata?: typeof extractMediaLibraryMetadata;
   update?: typeof updateMediaLibraryItem;
   remove?: typeof deleteMediaLibraryItem;
+  removeMany?: typeof deleteMediaLibraryItems;
+  fetchMedia?: typeof fetch;
 };
 
 export function createMediaLibraryHandlers(
@@ -60,12 +70,24 @@ export function createMediaLibraryHandlers(
       if (!authenticated.actor) return authenticated.response!;
       try {
         const params = request ? new URL(request.url).searchParams : new URLSearchParams();
-        if (params.has("resolve") || params.has("open")) {
-          if (params.getAll("resolve").length + params.getAll("open").length !== 1) throw new MediaLibraryQueryError();
+        if (params.has("resolve") || params.has("open") || params.has("download")) {
+          if (params.getAll("resolve").length + params.getAll("open").length + params.getAll("download").length !== 1) throw new MediaLibraryQueryError();
+          const candidateId = params.get("resolve") ?? params.get("open") ?? params.get("download") ?? "";
           const item = await (dependencies.resolve ?? resolveMediaLibraryItem)(
             authenticated.actor,
-            params.get("resolve") ?? params.get("open") ?? "",
+            candidateId,
           );
+          if (params.has("download")) {
+            const source = await (dependencies.fetchMedia ?? fetch)(item.url, { cache: "no-store" });
+            if (!source.ok || !source.body) throw new Error("media download failed");
+            return new NextResponse(source.body, {
+              headers: {
+                "Cache-Control": "private, no-store",
+                "Content-Disposition": `attachment; filename*=UTF-8''${attachmentFileName(item.fileName)}`,
+                "Content-Type": source.headers.get("Content-Type") ?? item.mimeType,
+              },
+            });
+          }
           const response = params.has("open") ? NextResponse.redirect(item.url, 307) : mobileOk(item);
           response.headers.set("Cache-Control", "private, no-store");
           return response;
@@ -92,6 +114,18 @@ export function createMediaLibraryHandlers(
           const response = mobileOk(await (dependencies.extractMetadata ?? extractMediaLibraryMetadata)(authenticated.actor, body.id));
           response.headers.set("Cache-Control", "private, no-store");
           return response;
+        }
+        if (body && typeof body === "object" && "action" in body && body.action === "delete-many") {
+          if (!("ids" in body) || !Array.isArray(body.ids) || body.ids.length < 1 ||
+              body.ids.length > 20 || !body.ids.every(isMobileEntityId) ||
+              new Set(body.ids).size !== body.ids.length) {
+            return mobileError("errors.invalidData", 400);
+          }
+          const result = await (dependencies.removeMany ?? deleteMediaLibraryItems)(
+            authenticated.actor,
+            body.ids,
+          );
+          return mobileOk(result);
         }
         const item = await (dependencies.create ?? createMediaLibraryItem)(
           authenticated.actor,

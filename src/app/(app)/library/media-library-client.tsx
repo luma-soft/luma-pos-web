@@ -1,22 +1,20 @@
 "use client";
 
-import NextImage from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   CheckCircle2,
-  ChevronDown,
+  Download,
   FileText,
   Film,
-  HardDrive,
   Image as ImageIcon,
   Images,
-  LayoutGrid,
-  Link2,
   LockKeyhole,
-  Play,
+  LoaderCircle,
   Plus,
   RefreshCw,
+  Share2,
+  Trash2,
   X,
 } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
@@ -26,6 +24,7 @@ import {
   ListSearchInput,
 } from "@/components/list-search-filter";
 import { Button } from "@/components/ui/button";
+import { LumaImage } from "@/components/luma-image";
 import type {
   MediaLibraryItem,
   MediaLibrarySnapshot,
@@ -34,12 +33,15 @@ import { cn } from "@/lib/utils";
 import { LibraryPreview } from "./library-preview";
 import { LibraryFilterDrawer } from "./library-filter-drawer";
 import { LibraryUploadDialog } from "./library-upload-dialog";
+import {
+  prepareLibraryImages,
+  saveLibraryImages,
+  shareLibraryImages,
+} from "./library-image-actions";
 import { useAppDataRevision } from "@/components/app-data-sync-provider";
 import {
-  formatLibraryBytes,
   libraryCanDelete,
-  libraryItemSizeKnown,
-  libraryItemSourcePreset,
+  formatLibraryBytes,
   libraryListPath,
   libraryManualAlbums,
   libraryRequest,
@@ -48,6 +50,12 @@ import {
 
 export type LibraryNotice = { tone: "success" | "error"; text: string };
 const kindIcons = { image: ImageIcon, video: Film, document: FileText };
+const MAX_SELECTION = 20;
+type SelectionAction = "saving" | "sharing" | "deleting";
+type BatchDeleteResult = {
+  deletedIds: string[];
+  failed: Array<{ id: string; error: string }>;
+};
 
 export function MediaLibraryClient({
   initialSnapshot,
@@ -73,21 +81,45 @@ export function MediaLibraryClient({
   const [loading, setLoading] = useState(false);
   const [appending, setAppending] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [appendFailed, setAppendFailed] = useState(false);
   const [notice, setNotice] = useState<LibraryNotice | null>(null);
+  const [libraryTotal, setLibraryTotal] = useState(
+    initialSnapshot.page?.totalItems ?? initialSnapshot.items.length,
+  );
+  const [libraryBytes, setLibraryBytes] = useState(initialSnapshot.usage.totalBytes);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionAction, setSelectionAction] = useState<SelectionAction | null>(null);
+  const [selectionProgress, setSelectionProgress] = useState({ completed: 0, total: 0 });
   const requestVersion = useRef(0);
   const initialRender = useRef(true);
+  const loadMoreTarget = useRef<HTMLDivElement>(null);
+  const requestedCursor = useRef<string | null>(null);
 
   const load = useCallback(
     async (cursor?: string | null) => {
       const version = ++requestVersion.current;
+      if (!cursor) requestedCursor.current = null;
       setLoading(true);
       setAppending(Boolean(cursor));
-      setLoadFailed(false);
+      if (cursor) setAppendFailed(false);
+      else setLoadFailed(false);
       try {
         const next = await libraryRequest<MediaLibrarySnapshot>(
           libraryListPath(query, album, kind, cursor, source),
         );
         if (version !== requestVersion.current) return;
+        if (!cursor && !query.trim() && !album && !source && !kind) {
+          setLibraryTotal(next.page?.totalItems ?? next.items.length);
+        }
+        setLibraryBytes(next.usage.totalBytes);
+        if (!cursor) {
+          const visible = new Set(next.items.map((item) => item.id));
+          setSelectedIds((current) => {
+            if (current.size === 0) return current;
+            const selected = new Set([...current].filter((id) => visible.has(id)));
+            return selected.size === current.size ? current : selected;
+          });
+        }
         setSnapshot((current) => ({
           ...next,
           items: cursor
@@ -101,7 +133,8 @@ export function MediaLibraryClient({
         }));
       } catch {
         if (version !== requestVersion.current) return;
-        setLoadFailed(true);
+        if (cursor) setAppendFailed(true);
+        else setLoadFailed(true);
       } finally {
         if (version === requestVersion.current) {
           setLoading(false);
@@ -133,6 +166,141 @@ export function MediaLibraryClient({
     return () => clearTimeout(timer);
   }, [notice]);
 
+  useEffect(() => {
+    if (selectedIds.size === 0 || selectionAction) return;
+    const exitSelection = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedIds(new Set());
+    };
+    document.addEventListener("keydown", exitSelection);
+    return () => document.removeEventListener("keydown", exitSelection);
+  }, [selectedIds.size, selectionAction]);
+
+  useEffect(() => {
+    const target = loadMoreTarget.current;
+    const cursor = snapshot.page?.nextCursor ?? null;
+    if (!target || !cursor || !snapshot.page?.hasMore || loadFailed || appendFailed) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting || loading || requestedCursor.current === cursor) return;
+        requestedCursor.current = cursor;
+        void load(cursor);
+      },
+      { rootMargin: "600px 0px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [appendFailed, load, loadFailed, loading, snapshot.page?.hasMore, snapshot.page?.nextCursor]);
+
+  function toggleSelection(item: MediaLibraryItem) {
+    if (item.kind !== "image" || selectionAction) return;
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.delete(item.id)) return next;
+      if (next.size >= MAX_SELECTION) {
+        setNotice({ tone: "error", text: t("selectionLimit") });
+        return current;
+      }
+      next.add(item.id);
+      return next;
+    });
+  }
+
+  const selectedItems = snapshot.items.filter((item) => selectedIds.has(item.id));
+  const canDeleteSelection = selectedItems.length > 0 &&
+    selectedItems.every((item) => libraryCanDelete(item, snapshot.canManage));
+
+  async function refreshLibrarySummary() {
+    const next = await libraryRequest<MediaLibrarySnapshot>(
+      libraryListPath("", "", "", null, ""),
+    );
+    setLibraryTotal(next.page?.totalItems ?? next.items.length);
+    setLibraryBytes(next.usage.totalBytes);
+  }
+
+  async function exportSelection(mode: "save" | "share") {
+    if (selectionAction || selectedItems.length === 0) return;
+    const items = [...selectedItems];
+    setSelectionAction(mode === "save" ? "saving" : "sharing");
+    setSelectionProgress({ completed: 0, total: items.length });
+    try {
+      const prepared = await prepareLibraryImages(items, (completed, total) => {
+        setSelectionProgress({ completed, total });
+      });
+      if (prepared.files.length === 0) {
+        setNotice({
+          tone: "error",
+          text: t(mode === "save" ? "saveResult" : "shareResult", {
+            success: 0,
+            failed: prepared.failed,
+          }),
+        });
+        return;
+      }
+      if (mode === "save") {
+        await saveLibraryImages(prepared.files);
+      } else {
+        const shared = await shareLibraryImages(prepared.files);
+        if (!shared) return;
+      }
+      setNotice({
+        tone: prepared.failed > 0 ? "error" : "success",
+        text: t(mode === "save" ? "saveResult" : "shareResult", {
+          success: prepared.files.length,
+          failed: prepared.failed,
+        }),
+      });
+      if (prepared.files.length > 0) setSelectedIds(new Set());
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        text: error instanceof Error && error.message === "SHARE_UNAVAILABLE"
+          ? t("shareUnavailable")
+          : t(mode === "save" ? "errors.save" : "errors.share"),
+      });
+    } finally {
+      setSelectionAction(null);
+      setSelectionProgress({ completed: 0, total: 0 });
+    }
+  }
+
+  async function deleteSelection() {
+    if (selectionAction || !canDeleteSelection) return;
+    const items = [...selectedItems];
+    const confirmed = await confirmDialog.confirm({
+      title: t("deleteSelectedTitle", { count: items.length }),
+      description: t("deleteSelectedDescription", { count: items.length }),
+      confirmLabel: common("delete"),
+      cancelLabel: common("cancel"),
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+    setSelectionAction("deleting");
+    setSelectionProgress({ completed: 0, total: items.length });
+    try {
+      const result = await libraryRequest<BatchDeleteResult>("/api/mobile/library", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete-many", ids: items.map((item) => item.id) }),
+      });
+      setSelectionProgress({ completed: items.length, total: items.length });
+      setNotice({
+        tone: result.failed.length > 0 ? "error" : "success",
+        text: t("deleteResult", {
+          success: result.deletedIds.length,
+          failed: result.failed.length,
+        }),
+      });
+      setLibraryTotal((current) => Math.max(0, current - result.deletedIds.length));
+      setSelectedIds(new Set());
+      if (result.deletedIds.length > 0) await load();
+    } catch {
+      setNotice({ tone: "error", text: t("errors.delete") });
+    } finally {
+      setSelectionAction(null);
+      setSelectionProgress({ completed: 0, total: 0 });
+    }
+  }
+
   async function removeItem(item: MediaLibraryItem) {
     if (!libraryCanDelete(item, snapshot.canManage)) return;
     setPreviewId(null);
@@ -149,6 +317,7 @@ export function MediaLibraryClient({
         `/api/mobile/library?id=${encodeURIComponent(item.id)}`,
         { method: "DELETE" },
       );
+      setLibraryTotal((current) => Math.max(0, current - 1));
       await load();
     } catch {
       setNotice({ tone: "error", text: t("errors.delete") });
@@ -158,7 +327,7 @@ export function MediaLibraryClient({
   const filtered = Boolean(query || album || kind || source);
   const total = snapshot.page?.totalItems ?? snapshot.items.length;
   return (
-    <div className="min-h-full bg-canvas">
+    <div className={cn("min-h-full bg-canvas", selectedIds.size > 0 && "pb-24")}>
       <header className="border-b border-border bg-surface">
         <div className="mx-auto max-w-[1600px] px-4 py-4 sm:px-6 lg:px-8 lg:py-5">
           <div className="flex items-center justify-between gap-3">
@@ -169,12 +338,16 @@ export function MediaLibraryClient({
                   {t("title")}
                 </h1>
               </div>
-              <p className="mt-1.5 hidden text-sm text-slate-500 sm:block dark:text-slate-400">
-                {t("subtitle")}
+              <p className="mt-1.5 text-xs tabular-nums text-slate-500 sm:text-sm dark:text-slate-400">
+                {t("storageUsage", {
+                  count: libraryTotal,
+                  size: formatLibraryBytes(libraryBytes, locale),
+                })}
               </p>
             </div>
             {snapshot.canManage && (
               <Button
+                disabled={Boolean(selectionAction)}
                 onClick={() => setUploadOpen(true)}
                 className="shrink-0 gap-2"
               >
@@ -184,37 +357,12 @@ export function MediaLibraryClient({
               </Button>
             )}
           </div>
-          <details className="group mt-2 text-xs text-slate-500 dark:text-slate-400">
-            <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-600 [&::-webkit-details-marker]:hidden">
-              <HardDrive className="h-3.5 w-3.5" />
-              <span className="tabular-nums">
-                {t("uploadedUsage", { count: snapshot.usage.libraryObjects, size: formatLibraryBytes(snapshot.usage.libraryBytes, locale) })}
-              </span>
-              <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" />
-              <span className="sr-only">{t("storageDetails")}</span>
-            </summary>
-            <div className="flex flex-col gap-2 rounded-lg bg-surface-2 px-3 py-3 sm:flex-row sm:gap-6">
-              <span>
-                {t("usageTotal")}:{" "}
-                <strong className="font-semibold tabular-nums">
-                  {formatLibraryBytes(snapshot.usage.totalBytes, locale)}
-                </strong>{" "}
-                · {t("itemsCount", { count: snapshot.usage.totalObjects })}
-              </span>
-              <span>{t("unlimitedHint")}</span>
-              <span className="flex items-center gap-1.5">
-                <LockKeyhole className="h-3 w-3" />
-                {t("privateShort")}
-              </span>
-            </div>
-            <p className="mt-2 max-w-3xl leading-5">{t("linkedStorageHint")}</p>
-          </details>
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1600px] px-3 py-4 sm:px-6 lg:px-8 lg:py-6">
+      <div className="mx-auto max-w-[1600px] py-3 sm:px-4 lg:px-6">
         <div className="min-w-0 space-y-4">
-          <section aria-label={t("filters")} className="space-y-3">
+          <section aria-label={t("filters")} className="px-3 sm:px-0">
             <div className="flex items-center gap-2">
               <ListSearchFilterBar
                 search={
@@ -228,7 +376,8 @@ export function MediaLibraryClient({
                 filter={
                   <FilterTriggerButton
                     label={t("filterButton")}
-                    active={Boolean(album || source)}
+                    active={Boolean(album || source || kind)}
+                    resultCount={filtered ? total : undefined}
                     aria-haspopup="dialog"
                     aria-expanded={filterOpen}
                     onClick={() => setFilterOpen(true)}
@@ -241,47 +390,10 @@ export function MediaLibraryClient({
                 disabled={loading}
                 aria-label={common("refresh")}
                 title={common("refresh")}
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-border bg-surface text-slate-500 transition hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary-600 disabled:opacity-50"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-border bg-surface text-slate-500 transition hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary-600 disabled:opacity-50"
               >
-                <RefreshCw
-                  className={cn("h-4 w-4", loading && "animate-spin")}
-                />
+                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
               </button>
-            </div>
-            <div className="flex items-center justify-between gap-2 border-b border-border">
-              <div
-                className="flex min-w-0 gap-1 overflow-x-auto"
-                role="group"
-                aria-label={t("typeAll")}
-              >
-                {[
-                  { value: "", label: t("allShort"), icon: LayoutGrid },
-                  ...(["image", "video", "document"] as const).map((value) => ({
-                    value,
-                    label: t(`types.${value}`),
-                    icon: kindIcons[value],
-                  })),
-                ].map(({ value, label, icon: Icon }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={kind === value}
-                    onClick={() => setKind(value)}
-                    className={cn(
-                      "relative flex min-h-11 min-w-11 shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-2.5 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-primary-600 sm:px-3 sm:text-sm",
-                      kind === value
-                        ? "border-primary-600 text-primary-700 dark:text-primary-300"
-                        : "border-transparent text-slate-500 hover:text-foreground",
-                    )}
-                  >
-                    <Icon className="hidden h-4 w-4 sm:block" />
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <span className="hidden text-xs tabular-nums text-slate-500 sm:block">
-                {t("itemsCount", { count: total })}
-              </span>
             </div>
           </section>
           {notice && (
@@ -306,38 +418,14 @@ export function MediaLibraryClient({
               </button>
             </div>
           )}
-          {filtered && (
-            <div className="flex min-h-11 items-center justify-between gap-2 text-xs text-slate-500">
-              <span>
-                {source ? t(`sourceAlbums.${source}`) : album || t("albumAll")} · {t("itemsCount", { count: total })}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setAlbum("");
-                  setSource("");
-                  setKind("");
-                  setQuery("");
-                }}
-                className="min-h-11 min-w-11 rounded-lg px-2 font-semibold text-primary-600 hover:bg-primary-50"
-              >
-                {common("clear")}
-              </button>
-            </div>
-          )}
-          {source && <p className="flex items-start gap-2 text-xs leading-5 text-slate-500"><Link2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />{t("sourceReadOnlyHint")}</p>}
           {loading && !appending ? (
             <div
               aria-busy="true"
               aria-label={t("loading")}
-              className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4"
+              className="grid min-h-[calc(100dvh-13rem)] grid-cols-3 content-start gap-0.5 sm:grid-cols-4 lg:grid-cols-6 2xl:grid-cols-8"
             >
-              {Array.from({ length: 8 }, (_, index) => (
-                <div key={index} className="motion-safe:animate-pulse">
-                  <div className="aspect-[4/3] rounded-xl bg-surface-2" />
-                  <div className="mt-3 h-3 w-3/4 rounded bg-surface-2" />
-                  <div className="mt-2 h-3 w-1/2 rounded bg-surface-2" />
-                </div>
+              {Array.from({ length: 40 }, (_, index) => (
+                <div key={index} className="aspect-square animate-pulse bg-surface-2" />
               ))}
             </div>
           ) : loadFailed ? (
@@ -354,14 +442,20 @@ export function MediaLibraryClient({
           ) : snapshot.items.length > 0 ? (
             <section
               aria-label={t("title")}
-              className="grid grid-cols-2 items-start gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-x-4 xl:grid-cols-4"
+              className="grid grid-cols-3 gap-0.5 sm:grid-cols-4 lg:grid-cols-6 2xl:grid-cols-8"
             >
               {snapshot.items.map((item) => (
                 <LibraryTile
                   key={item.id}
                   item={item}
-                  locale={locale}
-                  onOpen={() => setPreviewId(item.id)}
+                  selected={selectedIds.has(item.id)}
+                  selecting={selectedIds.size > 0}
+                  deleteLocked={snapshot.canManage && !libraryCanDelete(item, true)}
+                  onOpen={() => {
+                    if (selectedIds.size > 0 && item.kind === "image") toggleSelection(item);
+                    else setPreviewId(item.id);
+                  }}
+                  onToggle={() => toggleSelection(item)}
                 />
               ))}
             </section>
@@ -387,26 +481,94 @@ export function MediaLibraryClient({
               </div>
             </section>
           )}
-          {snapshot.page?.hasMore && !loadFailed && (
-            <div className="flex justify-center pt-2">
+          <div ref={loadMoreTarget} aria-hidden="true" className="h-1" />
+          {appending && (
+            <div role="status" aria-label={t("loading")} className="grid h-14 place-items-center">
+              <LoaderCircle className="h-5 w-5 animate-spin text-primary-600" />
+            </div>
+          )}
+          {appendFailed && snapshot.page?.nextCursor && (
+            <div className="flex justify-center py-3">
               <Button
                 variant="outline"
-                loading={loading}
-                onClick={() => void load(snapshot.page?.nextCursor)}
+                onClick={() => {
+                  requestedCursor.current = null;
+                  void load(snapshot.page?.nextCursor);
+                }}
               >
-                {t("loadMore")}
+                {t("retry")}
               </Button>
             </div>
           )}
         </div>
       </div>
+      {selectedIds.size > 0 && (
+        <div className="fixed inset-x-0 bottom-4 z-40 px-3">
+          <div className="mx-auto flex max-w-2xl items-center gap-1 rounded-2xl border border-border bg-surface/95 p-2 shadow-e2 backdrop-blur">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={common("cancel")}
+              disabled={Boolean(selectionAction)}
+              onClick={() => setSelectedIds(new Set())}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <span className="hidden shrink-0 px-2 text-sm font-semibold sm:block">
+              {t("selectionCount", { count: selectedIds.size })}
+            </span>
+            {selectionAction && (
+              <div className="min-w-0 flex-1 px-3 text-xs text-slate-500">
+                <p className="truncate">{t(selectionAction)}</p>
+                <div className="mt-1 h-1 overflow-hidden rounded-full bg-surface-2">
+                  <div
+                    className="h-full bg-primary-600 transition-[width]"
+                    style={{ width: `${selectionProgress.total ? (selectionProgress.completed / selectionProgress.total) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {!selectionAction && (
+              <>
+                <Button variant="ghost" className="min-w-0 flex-1 gap-2" onClick={() => void exportSelection("save")}>
+                  <Download className="h-4 w-4" />
+                  {t("saveImages")}
+                </Button>
+                <Button variant="ghost" className="min-w-0 flex-1 gap-2" onClick={() => void exportSelection("share")}>
+                  <Share2 className="h-4 w-4" />
+                  {t("shareImages")}
+                </Button>
+                {snapshot.canManage && (
+                  <Button
+                    variant="ghost"
+                    disabled={!canDeleteSelection}
+                    title={!canDeleteSelection ? t("deleteUnavailable") : undefined}
+                    className="min-w-0 flex-1 gap-2 text-red-600 disabled:text-slate-400"
+                    onClick={() => void deleteSelection()}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {t("deleteImages")}
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {filterOpen && (
         <LibraryFilterDrawer
           albums={snapshot.albums}
-          totalCount={snapshot.albums.reduce((count, entry) => count + entry.count, 0)}
+          allCount={libraryTotal}
+          initialResultCount={total}
+          query={query}
           album={album}
           source={source}
-          onApply={(selection) => { setAlbum(selection.album); setSource(selection.source); }}
+          kind={kind}
+          onApply={(selection) => {
+            setAlbum(selection.album);
+            setSource(selection.source);
+            setKind(selection.kind);
+          }}
           onClose={() => setFilterOpen(false)}
         />
       )}
@@ -419,6 +581,7 @@ export function MediaLibraryClient({
           onUploaded={async (message) => {
             setNotice(message);
             await load();
+            if (filtered) await refreshLibrarySummary();
           }}
         />
       )}
@@ -436,32 +599,42 @@ export function MediaLibraryClient({
 
 export function LibraryTile({
   item,
-  locale,
+  selected,
+  selecting,
+  deleteLocked,
   onOpen,
+  onToggle,
 }: {
   item: MediaLibraryItem;
-  locale: string;
+  selected: boolean;
+  selecting: boolean;
+  deleteLocked: boolean;
   onOpen: () => void;
+  onToggle: () => void;
 }) {
   const t = useTranslations("mediaLibrary");
   const Icon = kindIcons[item.kind];
-  const preset = libraryItemSourcePreset(item);
   return (
-    <article className="group min-w-0">
+    <article className="group relative aspect-square min-w-0 overflow-hidden bg-surface-2">
       <button
         type="button"
         onClick={onOpen}
         aria-label={`${t("open")}: ${item.title}`}
-        className="relative block aspect-[4/3] min-h-11 min-w-11 w-full overflow-hidden rounded-xl border border-border bg-surface transition hover:border-primary-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+        className={cn(
+          "relative block h-full min-h-11 min-w-11 w-full overflow-hidden focus-visible:z-10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-600",
+          selected && "ring-4 ring-inset ring-primary-600",
+        )}
       >
         {item.kind === "image" ? (
-          <NextImage
+          <LumaImage
             unoptimized
             fill
             src={item.thumbnailUrl ?? item.url}
             alt={item.title}
-            sizes="(max-width: 640px) 50vw, (max-width: 1280px) 30vw, 22vw"
-            className="object-contain p-2 transition duration-200 group-hover:scale-[1.025]"
+            sizes="(max-width: 640px) 34vw, (max-width: 1024px) 25vw, 17vw"
+            containerClassName="absolute inset-0"
+            className="object-cover group-hover:scale-[1.02]"
+            fallbackLabel={t("errors.load")}
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 bg-surface-2 p-4 text-slate-400">
@@ -471,31 +644,31 @@ export function LibraryTile({
             </span>
           </div>
         )}
-        {item.source && <span className="absolute left-2 top-2 flex items-center gap-1 rounded-md bg-surface/95 px-1.5 py-1 text-[10px] font-medium text-primary-700 shadow-sm dark:text-primary-300"><Link2 aria-hidden="true" className="h-3 w-3" />{t("automatic")}</span>}
-        <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-surface/95 px-1.5 py-1 text-[10px] font-medium text-slate-600 shadow-sm dark:text-slate-300">
-          {item.kind === "video" ? (
-            <Play className="h-3 w-3" />
-          ) : (
-            <Icon className="h-3 w-3" />
-          )}
-          {t(`types.${item.kind}`)}
-        </span>
       </button>
-      <div className="px-0.5 pt-2.5">
-        <h2
-          className="truncate text-[13px] font-semibold sm:text-sm"
-          title={item.title}
+      {item.kind === "image" && (
+        <button
+          type="button"
+          aria-label={selected ? t("deselectImage", { title: item.title }) : t("selectImage", { title: item.title })}
+          aria-pressed={selected}
+          onClick={onToggle}
+          className={cn(
+            "absolute right-2 top-2 z-20 grid h-7 w-7 place-items-center rounded-full border-2 border-white text-white shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600",
+            selected
+              ? "bg-primary-600 opacity-100"
+              : "bg-slate-950/45 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100",
+          )}
         >
-          {item.title}
-        </h2>
-        <p className="mt-1 truncate text-[11px] text-slate-500 sm:text-xs">
-          {preset ? t(`sourceAlbums.${preset}`) : item.album} <span className="px-0.5 opacity-50">·</span>{" "}
-          <span className="tabular-nums">
-            {libraryItemSizeKnown(item) ? formatLibraryBytes(item.sizeBytes, locale) : t("unknownSize")}
-          </span>
-        </p>
-        {item.source && <p className="mt-1 truncate text-[11px] text-slate-500" title={t("linkedSource", { source: item.source.label })}>{t("linkedSource", { source: item.source.label })}</p>}
-      </div>
+          {selected && <CheckCircle2 className="h-4 w-4" />}
+        </button>
+      )}
+      {item.kind === "image" && selecting && deleteLocked && (
+        <span
+          title={t("deleteUnavailable")}
+          className="absolute bottom-2 left-2 z-20 grid h-7 w-7 place-items-center rounded-full bg-slate-950/60 text-white"
+        >
+          <LockKeyhole className="h-3.5 w-3.5" />
+        </span>
+      )}
     </article>
   );
 }

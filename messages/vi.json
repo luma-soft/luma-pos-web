@@ -170,7 +170,7 @@
     "delivery": "Giao hàng",
     "projects": "Công trình",
     "services": "Thi công & Dịch vụ",
-    "library": "Thư viện mẫu",
+    "library": "Bộ sưu tập",
     "promotions": "Khuyến mãi",
     "einvoices": "HĐ điện tử",
     "groups": {
@@ -203,10 +203,28 @@
     "returns": "Trả hàng"
   },
   "mediaLibrary": {
-    "title": "Thư viện mẫu",
-    "subtitle": "Ảnh, video sản phẩm và file báo giá dùng chung cho cả cửa hàng",
+    "title": "Bộ sưu tập",
+    "subtitle": "Ảnh, video và báo giá của cửa hàng",
     "upload": "Tải tệp lên",
-    "addShort": "Thêm tệp",
+    "addShort": "Thêm",
+    "storageUsage": "{count} tệp · {size} đã sử dụng",
+    "selectionCount": "Đã chọn {count} ảnh",
+    "selectionLimit": "Mỗi lần chọn tối đa 20 ảnh.",
+    "selectImage": "Chọn ảnh {title}",
+    "deselectImage": "Bỏ chọn ảnh {title}",
+    "saveImages": "Lưu về máy",
+    "shareImages": "Chia sẻ",
+    "deleteImages": "Xóa",
+    "saving": "Đang chuẩn bị ảnh…",
+    "sharing": "Đang chuẩn bị chia sẻ…",
+    "deleting": "Đang xóa ảnh…",
+    "saveResult": "Đã lưu {success} ảnh; {failed} ảnh lỗi.",
+    "shareResult": "Đã chia sẻ {success} ảnh; {failed} ảnh lỗi.",
+    "deleteResult": "Đã xóa {success} ảnh; {failed} ảnh lỗi.",
+    "deleteSelectedTitle": "Xóa {count} ảnh đã chọn?",
+    "deleteSelectedDescription": "Ảnh sẽ bị xóa khỏi bộ sưu tập và kho lưu trữ. Thao tác này không thể hoàn tác.",
+    "deleteUnavailable": "Ảnh liên kết không thể xóa. Hãy bỏ chọn ảnh có biểu tượng khóa.",
+    "shareUnavailable": "Trình duyệt này không hỗ trợ chia sẻ nhiều ảnh. Bạn vẫn có thể lưu ảnh về máy.",
     "storageDetails": "Chi tiết dung lượng",
     "privateShort": "Chỉ cửa hàng của bạn",
     "automatic": "Tự động",
@@ -227,6 +245,9 @@
     "filters": "Loại tệp",
     "filterTitle": "Bộ lọc",
     "filterButton": "Lọc",
+    "fileType": "Loại tệp",
+    "viewFiles": "Xem {count} tệp",
+    "counting": "Đang đếm…",
     "clearFilters": "Xóa lọc",
     "allShort": "Tất cả",
     "loading": "Đang tải thư viện…",
@@ -287,7 +308,9 @@
     "errors": {
       "load": "Không thể tải lại thư viện.",
       "upload": "Không thể tải tệp lên. Hãy thử lại.",
-      "delete": "Không thể xóa tệp. Hãy thử lại."
+      "delete": "Không thể xóa tệp. Hãy thử lại.",
+      "save": "Không thể lưu ảnh. Hãy thử lại.",
+      "share": "Không thể chia sẻ ảnh. Hãy thử lại."
     }
   },
   "notifications": {
