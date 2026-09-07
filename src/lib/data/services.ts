@@ -10,6 +10,7 @@ import {
   warehouses,
   warrantyClaims,
 } from "@/db/schema";
+import { businessDateKey } from "@/lib/dates/business-date";
 
 export type ServiceProjectListQuery = {
   q?: string;
@@ -28,6 +29,8 @@ export async function getServiceProjectsPage(
   const page = Math.max(1, Math.floor(query.page ?? 1));
   const pageSize = Math.min(50, Math.max(1, Math.floor(query.pageSize ?? 20)));
   const q = query.q?.trim().slice(0, 100);
+  const asOfDate = businessDateKey();
+  const businessToday = sql`${asOfDate}::date`;
   const conditions: SQL[] = [
     eq(projects.storeId, storeId),
     isNotNull(projects.serviceType),
@@ -44,9 +47,9 @@ export async function getServiceProjectsPage(
     );
     if (search) conditions.push(search);
   }
-  const activeProjectPredicate = sql<boolean>`${projects.status} = 'active' and ${projects.serviceStage} is distinct from 'completed'`;
-  const overduePredicate = sql<boolean>`${activeProjectPredicate} and ${projects.targetEndsOn} is not null and ${projects.targetEndsOn} < current_date`;
-  const attentionPredicate = sql<boolean>`${activeProjectPredicate} and not (${overduePredicate}) and (${projects.serviceStage} = 'paused' or (${projects.targetEndsOn} is not null and ${projects.targetEndsOn} between current_date and current_date + 4) or exists (select 1 from ${warrantyClaims} where ${warrantyClaims.storeId} = ${storeId} and ${warrantyClaims.projectId} = ${projects.id} and ${warrantyClaims.status} not in ('closed','void')))`;
+  const activeProjectPredicate = sql<boolean>`${projects.status} = 'active' and ${projects.serviceStage} is distinct from 'cancelled'`;
+  const overduePredicate = sql<boolean>`${activeProjectPredicate} and ${projects.targetEndsOn} is not null and ${projects.targetEndsOn} < ${businessToday}`;
+  const attentionPredicate = sql<boolean>`${activeProjectPredicate} and not (${overduePredicate}) and (${projects.serviceStage} = 'paused' or (${projects.targetEndsOn} is not null and ${projects.targetEndsOn} between ${businessToday} and ${businessToday} + 4) or exists (select 1 from ${warrantyClaims} where ${warrantyClaims.storeId} = ${storeId} and ${warrantyClaims.projectId} = ${projects.id} and ${warrantyClaims.status} not in ('closed','void')))`;
   const summaryWhere = and(...conditions)!;
   const listWhere = and(
     ...conditions,
@@ -83,6 +86,7 @@ export async function getServiceProjectsPage(
     progressPercent: projects.progressPercent,
     startsOn: projects.startsOn,
     targetEndsOn: projects.targetEndsOn,
+    completedAt: projects.completedAt,
     siteContactName: projects.siteContactName,
     siteContactPhone: projects.siteContactPhone,
     orderCount: sql<number>`(select count(*) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} != 'cancelled')::int`,
@@ -124,6 +128,7 @@ export async function getServiceProjectsPage(
     pageSize,
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     summary: summaryRows[0] ?? { attention: 0, overdue: 0 },
+    asOfDate,
   };
 }
 
@@ -142,6 +147,7 @@ export async function getServiceDashboard(storeId: string) {
       progressPercent: projects.progressPercent,
       startsOn: projects.startsOn,
       targetEndsOn: projects.targetEndsOn,
+      completedAt: projects.completedAt,
       siteContactName: projects.siteContactName,
       siteContactPhone: projects.siteContactPhone,
       orderCount: sql<number>`(select count(*) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} != 'cancelled')::int`,
@@ -201,7 +207,7 @@ export async function getServiceDashboard(storeId: string) {
     claims: claimRows,
     metrics: {
       activeProjects: projectRows.filter((project) =>
-        project.serviceStage !== "completed" && project.serviceStage !== "cancelled"
+        project.status !== "done" && project.serviceStage !== "cancelled"
       ).length,
       openJobs: jobRows.filter((job) => job.status !== "completed" && job.status !== "cancelled").length,
       installedAssets: projectRows.reduce((sum, project) => sum + project.assetCount, 0),

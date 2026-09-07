@@ -25,7 +25,7 @@ type Actor = { storeId: string; userId: string };
 const snapshotFields = [
   "code", "name", "title", "description", "note", "assignedTo", "quoteOrderId", "materialOrderId", "projectId", "jobId", "productId", "assetKind", "brand", "model",
   "status", "priority", "serviceType", "serviceStage", "progressPercent", "scheduledAt",
-  "startsOn", "targetEndsOn", "unitName", "plannedQuantity", "usedQuantity", "quantity",
+  "startsOn", "targetEndsOn", "completedAt", "unitName", "plannedQuantity", "usedQuantity", "quantity",
   "unitCost", "amount", "type", "intervalDays", "nextDueOn", "isActive", "laborCharge",
   "materialCharge", "incurredOn", "locationLabel", "installedAt", "serialNumber", "signedAt", "signedBy", "customerWarrantyEndsOn", "supplierWarrantyEndsOn",
 ] as const;

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { PencilLine, Plus } from "lucide-react";
 import { RowPreviewModal } from "@/components/data-table";
+import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { CustomerCreateDialog, type CustomerCreateResult } from "@/components/partners/customer-create-dialog";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/label";
@@ -173,13 +174,24 @@ export function ProjectQuickCreate({
 export function ProjectToggle({ id, status }: { id: string; status: string }) {
   const t = useTranslations();
   const router = useRouter();
+  const { alert } = useConfirmDialog();
   const [busy, setBusy] = useState(false);
 
   async function toggle() {
     setBusy(true);
     const res = await toggleProjectStatus(id);
     setBusy(false);
-    if (res.ok) router.refresh();
+    if (res.ok) {
+      router.refresh();
+      return;
+    }
+    await alert({
+      title: t("common.error"),
+      description: res.error === "services.errors.projectCloseBlocked"
+        ? t("services.errors.projectCloseBlocked")
+        : t("errors.serverError"),
+      variant: "warning",
+    });
   }
 
   return (

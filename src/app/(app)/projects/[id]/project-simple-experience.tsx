@@ -21,6 +21,7 @@ import {
 import { ProjectCompletionButton } from "./project-completion-button";
 import { ProjectServiceTab, ProjectServiceTabs } from "./project-service-tabs";
 import { ProjectNotesClient } from "./notes/project-notes-client";
+import { BUSINESS_TIME_ZONE } from "@/lib/dates/business-date";
 
 type ServiceOptions = Awaited<ReturnType<typeof getServiceFormOptions>>;
 
@@ -33,7 +34,7 @@ export function ProjectSimpleExperience({
   canManage: boolean;
 }) {
   const { project, assets } = detail;
-  const completed = project.status === "done" || project.serviceStage === "completed";
+  const completed = project.status === "done";
   const installedCount = assets.filter((asset) => asset.status === "installed").length;
 
   return (
@@ -71,6 +72,9 @@ export function ProjectSimpleExperience({
                     label="Lịch dự kiến"
                     value={formatSchedule(project.startsOn, project.targetEndsOn)}
                   />
+                  {project.completedAt && (
+                    <InfoRow label="Ngày hoàn thành" value={formatCompletedAt(project.completedAt)} />
+                  )}
                 </dl>
               </section>
 
@@ -208,4 +212,13 @@ function formatProjectDay(value: string) {
     month: "2-digit",
     year: "numeric",
   }).format(new Date(`${value}T00:00:00`));
+}
+
+function formatCompletedAt(value: Date) {
+  return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: BUSINESS_TIME_ZONE,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(value);
 }

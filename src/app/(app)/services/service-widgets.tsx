@@ -29,6 +29,7 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 import { Toggle } from "@/components/ui/toggle";
+import { businessDateKey, calendarDayDistance } from "@/lib/dates/business-date";
 import {
   createInstalledAsset,
   createServiceJob,
@@ -276,7 +277,7 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
 }
 
 function ProjectStatusText({ row }: { row: ServiceProjectRow }) {
-  const completed = row.status === "done" || row.serviceStage === "completed";
+  const completed = row.status === "done";
   if (completed) {
     return (
       <span className="inline-flex items-center gap-1.5 font-semibold text-ok">
@@ -308,10 +309,7 @@ function ProjectStatusText({ row }: { row: ServiceProjectRow }) {
 }
 
 function projectDeadlineDays(value: string) {
-  const target = new Date(`${value}T00:00:00`);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+  return calendarDayDistance(value, businessDateKey());
 }
 
 function formatProjectDay(value: string) {

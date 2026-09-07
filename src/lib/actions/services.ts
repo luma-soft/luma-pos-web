@@ -221,6 +221,7 @@ export async function createServiceProject(
         progressPercent: value.status === "done" ? 100 : 0,
         startsOn: value.startsOn ?? null,
         targetEndsOn: value.targetEndsOn ?? null,
+        completedAt: value.status === "done" ? new Date() : null,
         siteContactName: value.siteContactName || null,
         siteContactPhone: value.siteContactPhone || null,
         note: initialNote || null,

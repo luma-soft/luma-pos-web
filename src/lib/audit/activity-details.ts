@@ -16,7 +16,7 @@ export const activityFieldKinds = {
   itemCount: "number", changedCount: "number", variantCount: "number", assetCount: "number", orderCount: "number",
   checklistCompleted: "number", checklistTotal: "number", progressPercent: "number", intervalDays: "number",
   vatRate: "number", shelfLifeDays: "number", version: "number",
-  dueOn: "date", lastCompletedOn: "date", scheduledAt: "date", startsOn: "date", targetEndsOn: "date", nextDueOn: "date", incurredOn: "date",
+  dueOn: "date", lastCompletedOn: "date", scheduledAt: "date", startsOn: "date", targetEndsOn: "date", completedAt: "date", nextDueOn: "date", incurredOn: "date",
   installedAt: "date", signedAt: "date", customerWarrantyEndsOn: "date", supplierWarrantyEndsOn: "date",
   name: "text", title: "text", sku: "text", code: "text", barcode: "text", baseUnit: "text", unitName: "text",
   warehouseName: "text", customerName: "text", supplierName: "text", projectName: "text", tableName: "text",

@@ -2,7 +2,7 @@
 
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { z } from "zod";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   customers,
@@ -14,6 +14,7 @@ import {
   serviceHandoverDocuments,
   serviceJobDependencies,
   serviceJobs,
+  warrantyClaims,
 } from "@/db/schema";
 import { type ActionResult, requireManager } from "./common";
 import { Routes } from "@/lib/routes";
@@ -23,6 +24,7 @@ import { evaluateServiceProjectClose } from "@/lib/services/project-close";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { trackServiceChange } from "@/lib/services/activity";
 import { deleteProjectCore } from "@/lib/projects/delete-project";
+import { deriveReopenedServiceProjectState } from "@/lib/projects/status";
 
 // ============ Công trình ============
 
@@ -100,6 +102,23 @@ async function canCloseServiceProject(
   }).canClose;
 }
 
+async function getReopenedServiceProjectState(storeId: string, projectId: string) {
+  const [jobs, claims] = await Promise.all([
+    db.select({ status: serviceJobs.status }).from(serviceJobs).where(and(
+      eq(serviceJobs.storeId, storeId),
+      eq(serviceJobs.projectId, projectId),
+    )),
+    db.select({ status: warrantyClaims.status }).from(warrantyClaims).where(and(
+      eq(warrantyClaims.storeId, storeId),
+      eq(warrantyClaims.projectId, projectId),
+    )),
+  ]);
+  return deriveReopenedServiceProjectState({
+    jobStatuses: jobs.map((job) => job.status),
+    warrantyClaimStatuses: claims.map((claim) => claim.status),
+  });
+}
+
 export async function createProject(input: CreateProjectInput): Promise<ActionResult<{ id: string }>> {
   let context;
   try {
@@ -155,6 +174,7 @@ export async function toggleProjectStatus(id: string): Promise<ActionResult> {
     const [current] = await db.select({
       status: projects.status,
       serviceType: projects.serviceType,
+      completedAt: projects.completedAt,
     }).from(projects).where(and(
       eq(projects.storeId, context.storeId),
       eq(projects.id, id),
@@ -167,18 +187,17 @@ export async function toggleProjectStatus(id: string): Promise<ActionResult> {
     ) {
       return { ok: false, error: "services.errors.projectCloseBlocked" };
     }
+    const reopeningState = current.status === "done" && current.serviceType
+      ? await getReopenedServiceProjectState(context.storeId, id)
+      : null;
+    const completing = current.status === "active";
     await db.transaction((tx) => trackServiceChange(tx, context, { action: "project.status.changed", entityType: "project", id }, async () => tx.update(projects).set({
-      status: sql`case when ${projects.status} = 'active' then 'done' else 'active' end`,
-      serviceStage: sql`case
-        when ${projects.serviceType} is null then ${projects.serviceStage}
-        when ${projects.status} = 'active' then 'completed'::service_project_stage
-        else 'active'::service_project_stage
-      end`,
-      progressPercent: sql`case
-        when ${projects.serviceType} is null then ${projects.progressPercent}
-        when ${projects.status} = 'active' then 100
-        else ${projects.progressPercent}
-      end`,
+      status: completing ? "done" : "active",
+      completedAt: completing ? current.completedAt ?? new Date() : null,
+      ...(current.serviceType ? {
+        serviceStage: completing ? "completed" : reopeningState!.serviceStage,
+        progressPercent: completing ? 100 : reopeningState!.progressPercent,
+      } : {}),
     }).where(and(eq(projects.storeId, context.storeId), eq(projects.id, id)))));
     revalidatePath(Routes.Partners);
     revalidatePath(Routes.Services);
@@ -319,6 +338,8 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
   try {
     const [current] = await db.select({
       serviceType: projects.serviceType,
+      status: projects.status,
+      completedAt: projects.completedAt,
     }).from(projects).where(and(
       eq(projects.storeId, gate.storeId),
       eq(projects.id, v.id),
@@ -337,13 +358,20 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
       return { ok: false, error: "services.errors.projectCloseBlocked" };
     }
     const isServiceProject = Boolean(effectiveServiceType);
-    const serviceStage = v.status === "done" ? "completed" : v.serviceStage;
+    const reopeningState = isServiceProject && current.status === "done" && v.status === "active"
+      ? await getReopenedServiceProjectState(gate.storeId, v.id)
+      : null;
+    const serviceStage = v.status === "done"
+      ? "completed"
+      : reopeningState?.serviceStage
+        ?? v.serviceStage;
     await db.transaction((tx) => trackServiceChange(tx, gate, { action: "project.updated", entityType: "project", id: v.id }, async () => tx.update(projects).set({
       name: v.name.trim(),
       customerId: v.customerId ?? null,
       address: v.address?.trim() || null,
       note: v.note?.trim() || null,
       status: v.status,
+      completedAt: v.status === "done" ? current.completedAt ?? new Date() : null,
       ...(isServiceProject ? {
         serviceType: effectiveServiceType,
         serviceStage,
@@ -351,7 +379,11 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
         targetEndsOn: v.targetEndsOn ?? null,
         siteContactName: v.siteContactName || null,
         siteContactPhone: v.siteContactPhone || null,
-        ...(v.status === "done" ? { progressPercent: 100 } : {}),
+        ...(v.status === "done"
+          ? { progressPercent: 100 }
+          : reopeningState
+            ? { progressPercent: reopeningState.progressPercent }
+            : {}),
       } : {}),
     }).where(and(eq(projects.storeId, gate.storeId), eq(projects.id, v.id)))));
     revalidatePath(Routes.Partners);
@@ -392,6 +424,7 @@ export async function completeServiceProjectManually(
       serviceType: projects.serviceType,
       serviceStage: projects.serviceStage,
       progressPercent: projects.progressPercent,
+      completedAt: projects.completedAt,
     }).from(projects).where(and(
       eq(projects.storeId, gate.storeId),
       eq(projects.id, parsed.data.id),
@@ -408,6 +441,7 @@ export async function completeServiceProjectManually(
       status: "done",
       serviceStage: "completed",
       progressPercent: 100,
+      completedAt: current.completedAt ?? new Date(),
     }).where(and(
       eq(projects.storeId, gate.storeId),
       eq(projects.id, parsed.data.id),

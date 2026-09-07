@@ -1594,6 +1594,7 @@ export const projects = pgTable("projects", {
   progressPercent: integer("progress_percent").notNull().default(0),
   startsOn: date("starts_on"),
   targetEndsOn: date("target_ends_on"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
   siteContactName: text("site_contact_name"),
   siteContactPhone: varchar("site_contact_phone", { length: 20 }),
   note: text("note"),
@@ -1601,6 +1602,15 @@ export const projects = pgTable("projects", {
 }, (t) => [
   unique("projects_store_id_id_unique").on(t.storeId, t.id),
   index("projects_customer_idx").on(t.customerId),
+  index("projects_store_target_active_idx")
+    .on(t.storeId, t.targetEndsOn)
+    .where(sql`${t.serviceType} is not null and ${t.status} = 'active' and ${t.targetEndsOn} is not null`),
+  check("projects_status_check", sql`${t.status} in ('active', 'done')`),
+  check("projects_done_stage_check", sql`
+    ${t.serviceType} is null
+    or ${t.status} <> 'done'
+    or ${t.serviceStage} = 'completed'
+  `),
 ]);
 
 export const projectNotes = pgTable("project_notes", {

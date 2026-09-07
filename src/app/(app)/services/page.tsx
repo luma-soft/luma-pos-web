@@ -45,7 +45,7 @@ export default async function ServicesPage({
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <Text variant="muted" size="sm" text={t("services.summary.activeProjects", { count: projectRows.filter((project) => project.status !== "done" && project.serviceStage !== "completed" && project.serviceStage !== "cancelled").length })} />
+            <Text variant="muted" size="sm" text={t("services.summary.activeProjects", { count: projectRows.filter((project) => project.status !== "done" && project.serviceStage !== "cancelled").length })} />
             <ServiceDashboardFilters tab="projects" serviceType={serviceType} status="" />
           </div>
           <ProjectQuickCreate customers={options.customerOptions} serviceMode />
