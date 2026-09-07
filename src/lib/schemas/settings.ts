@@ -37,8 +37,11 @@ export const NOTIF_TYPES = [
   "syncDone",
   "serviceDue",
   "invoiceCreated",
+  "invoiceCancelled",
   "purchaseReceived",
+  "purchaseCancelled",
   "debtChanged",
+  "paymentReceived",
   "qrPaymentConfirmed",
   "qrPaymentException",
 ] as const;
@@ -82,8 +85,11 @@ const notificationPrefs = z.object({
   syncDone: z.boolean().default(false),
   serviceDue: z.boolean().default(true),
   invoiceCreated: z.boolean().default(true),
+  invoiceCancelled: z.boolean().default(true),
   purchaseReceived: z.boolean().default(true),
+  purchaseCancelled: z.boolean().default(true),
   debtChanged: z.boolean().default(true),
+  paymentReceived: z.boolean().default(true),
   qrPaymentConfirmed: z.boolean().default(true),
   qrPaymentException: z.boolean().default(true),
   channels: z.record(z.string().trim().min(1).max(40), z.boolean())
@@ -120,10 +126,16 @@ const notificationPrefs = z.object({
       .min(1).default(["owner", "manager", "technician"]),
     invoiceCreated: z.array(z.enum(SALES_ACCESS_ROLES))
       .min(1).default([...defaultInternalNotificationRoleRouting.invoiceCreated]),
+    invoiceCancelled: z.array(z.enum(SALES_ACCESS_ROLES))
+      .min(1).default([...defaultInternalNotificationRoleRouting.invoiceCancelled]),
     purchaseReceived: z.array(z.enum(STOCK_ACCESS_ROLES))
       .min(1).default([...defaultInternalNotificationRoleRouting.purchaseReceived]),
+    purchaseCancelled: z.array(z.enum(STOCK_ACCESS_ROLES))
+      .min(1).default([...defaultInternalNotificationRoleRouting.purchaseCancelled]),
     debtChanged: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
       .min(1).default([...defaultInternalNotificationRoleRouting.debtChanged]),
+    paymentReceived: z.array(z.enum(SALES_ACCESS_ROLES))
+      .min(1).default([...defaultInternalNotificationRoleRouting.paymentReceived]),
     qrPaymentConfirmed: z.array(z.enum(SALES_ACCESS_ROLES))
       .min(1).default([...defaultInternalNotificationRoleRouting.qrPaymentConfirmed]),
     qrPaymentException: z.array(z.enum(["owner", "manager"]))
@@ -135,8 +147,11 @@ const notificationPrefs = z.object({
     syncDone: ["owner", "manager"],
     serviceDue: ["owner", "manager", "technician"],
     invoiceCreated: [...defaultInternalNotificationRoleRouting.invoiceCreated],
+    invoiceCancelled: [...defaultInternalNotificationRoleRouting.invoiceCancelled],
     purchaseReceived: [...defaultInternalNotificationRoleRouting.purchaseReceived],
+    purchaseCancelled: [...defaultInternalNotificationRoleRouting.purchaseCancelled],
     debtChanged: [...defaultInternalNotificationRoleRouting.debtChanged],
+    paymentReceived: [...defaultInternalNotificationRoleRouting.paymentReceived],
     qrPaymentConfirmed: [...defaultInternalNotificationRoleRouting.qrPaymentConfirmed],
     qrPaymentException: [...defaultInternalNotificationRoleRouting.qrPaymentException],
   }),
@@ -160,8 +175,11 @@ export const mobileNotificationSettingsPatchSchema = z.object({
   syncDone: z.boolean().optional(),
   serviceDue: z.boolean().optional(),
   invoiceCreated: z.boolean().optional(),
+  invoiceCancelled: z.boolean().optional(),
   purchaseReceived: z.boolean().optional(),
+  purchaseCancelled: z.boolean().optional(),
   debtChanged: z.boolean().optional(),
+  paymentReceived: z.boolean().optional(),
   qrPaymentConfirmed: z.boolean().optional(),
   qrPaymentException: z.boolean().optional(),
   channels: z.record(
@@ -194,8 +212,11 @@ export const mobileNotificationSettingsPatchSchema = z.object({
     syncDone: notificationRoutePatchSchema.optional(),
     serviceDue: notificationRoutePatchSchema.optional(),
     invoiceCreated: notificationSalesRoutePatchSchema.optional(),
+    invoiceCancelled: notificationSalesRoutePatchSchema.optional(),
     purchaseReceived: notificationStockRoutePatchSchema.optional(),
+    purchaseCancelled: notificationStockRoutePatchSchema.optional(),
     debtChanged: notificationDebtRoutePatchSchema.optional(),
+    paymentReceived: notificationSalesRoutePatchSchema.optional(),
     qrPaymentConfirmed: notificationSalesRoutePatchSchema.optional(),
     qrPaymentException: notificationManagerRoutePatchSchema.optional(),
   }).strict().refine(
@@ -287,8 +308,11 @@ export const storePrefsSchema = z.object({
     syncDone: false,
     serviceDue: true,
     invoiceCreated: true,
+    invoiceCancelled: true,
     purchaseReceived: true,
+    purchaseCancelled: true,
     debtChanged: true,
+    paymentReceived: true,
     qrPaymentConfirmed: true,
     qrPaymentException: true,
     channels: defaultNotificationChannelPreferences(),
@@ -301,8 +325,11 @@ export const storePrefsSchema = z.object({
       syncDone: ["owner", "manager"],
       serviceDue: ["owner", "manager", "technician"],
       invoiceCreated: [...defaultInternalNotificationRoleRouting.invoiceCreated],
+      invoiceCancelled: [...defaultInternalNotificationRoleRouting.invoiceCancelled],
       purchaseReceived: [...defaultInternalNotificationRoleRouting.purchaseReceived],
+      purchaseCancelled: [...defaultInternalNotificationRoleRouting.purchaseCancelled],
       debtChanged: [...defaultInternalNotificationRoleRouting.debtChanged],
+      paymentReceived: [...defaultInternalNotificationRoleRouting.paymentReceived],
       qrPaymentConfirmed: [...defaultInternalNotificationRoleRouting.qrPaymentConfirmed],
       qrPaymentException: [...defaultInternalNotificationRoleRouting.qrPaymentException],
     },

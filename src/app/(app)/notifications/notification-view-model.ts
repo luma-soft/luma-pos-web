@@ -44,8 +44,8 @@ export const defaultNotificationFilters: NotificationFilters = {
   source: "all",
 };
 
-const inventoryCategories = new Set(["lowStock", "purchaseReceived"]);
-const salesCategories = new Set(["invoiceCreated", "qrPaymentConfirmed"]);
+const inventoryCategories = new Set(["lowStock", "purchaseReceived", "purchaseCancelled"]);
+const salesCategories = new Set(["invoiceCreated", "invoiceCancelled", "paymentReceived", "qrPaymentConfirmed"]);
 const warningPriorities = new Set(["medium"]);
 const infoPriorities = new Set(["low", "normal"]);
 
@@ -59,7 +59,7 @@ export function notificationCategory(category: string) {
 
 export function notificationSource(category: string) {
   if (category === "lowStock") return "ai";
-  if (category === "qrPaymentConfirmed" || category === "qrPaymentException") return "pos";
+  if (category === "paymentReceived" || category === "qrPaymentConfirmed" || category === "qrPaymentException") return "pos";
   if (category === "serviceDue") return "mobile";
   return "system";
 }

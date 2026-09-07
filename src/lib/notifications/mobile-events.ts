@@ -56,11 +56,17 @@ const persistedMobileEventValidity = sql`
   AND events.priority IN ('normal', 'high')
   AND (
     (events.category = 'invoiceCreated' AND events.target = 'invoices')
+    OR (events.category = 'invoiceCancelled' AND events.target = 'invoices')
     OR (
       events.category = 'purchaseReceived'
       AND events.target = 'purchases'
     )
+    OR (
+      events.category = 'purchaseCancelled'
+      AND events.target = 'purchases'
+    )
     OR (events.category = 'debtChanged' AND events.target = 'debt')
+    OR (events.category = 'paymentReceived' AND events.target = 'invoices')
     OR (
       events.category = 'qrPaymentConfirmed'
       AND events.target = 'invoices'
@@ -121,11 +127,20 @@ function persistedMobileEventCountQuery(effectiveProfileId: string) {
         WHERE events.category = 'invoiceCreated'
       )::int AS "invoiceCreated",
       count(*) FILTER (
+        WHERE events.category = 'invoiceCancelled'
+      )::int AS "invoiceCancelled",
+      count(*) FILTER (
         WHERE events.category = 'purchaseReceived'
       )::int AS "purchaseReceived",
       count(*) FILTER (
+        WHERE events.category = 'purchaseCancelled'
+      )::int AS "purchaseCancelled",
+      count(*) FILTER (
         WHERE events.category = 'debtChanged'
       )::int AS "debtChanged",
+      count(*) FILTER (
+        WHERE events.category = 'paymentReceived'
+      )::int AS "paymentReceived",
       count(*) FILTER (
         WHERE events.category = 'qrPaymentConfirmed'
       )::int AS "qrPaymentConfirmed",
@@ -202,8 +217,11 @@ export type PersistedMobileEventCounts = {
   all: number;
   unread: number;
   invoiceCreated: number;
+  invoiceCancelled: number;
   purchaseReceived: number;
+  purchaseCancelled: number;
   debtChanged: number;
+  paymentReceived: number;
   qrPaymentConfirmed: number;
   qrPaymentException: number;
 };
@@ -219,8 +237,11 @@ export async function countPersistedMobileEvents(
     all: Number(row?.all ?? 0),
     unread: Number(row?.unread ?? 0),
     invoiceCreated: Number(row?.invoiceCreated ?? 0),
+    invoiceCancelled: Number(row?.invoiceCancelled ?? 0),
     purchaseReceived: Number(row?.purchaseReceived ?? 0),
+    purchaseCancelled: Number(row?.purchaseCancelled ?? 0),
     debtChanged: Number(row?.debtChanged ?? 0),
+    paymentReceived: Number(row?.paymentReceived ?? 0),
     qrPaymentConfirmed: Number(row?.qrPaymentConfirmed ?? 0),
     qrPaymentException: Number(row?.qrPaymentException ?? 0),
   };

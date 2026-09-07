@@ -29,7 +29,15 @@ export const notificationRoutingPolicy = {
     target: "invoices",
     entities: { order: SALES_ACCESS_ROLES },
   },
+  invoiceCancelled: {
+    target: "invoices",
+    entities: { order: SALES_ACCESS_ROLES },
+  },
   purchaseReceived: {
+    target: "purchases",
+    entities: { purchase: STOCK_ACCESS_ROLES },
+  },
+  purchaseCancelled: {
     target: "purchases",
     entities: { purchase: STOCK_ACCESS_ROLES },
   },
@@ -39,6 +47,10 @@ export const notificationRoutingPolicy = {
       customer: SALES_ACCESS_ROLES,
       supplier: STOCK_ACCESS_ROLES,
     },
+  },
+  paymentReceived: {
+    target: "invoices",
+    entities: { order: SALES_ACCESS_ROLES },
   },
   qrPaymentConfirmed: {
     target: "invoices",
@@ -52,8 +64,11 @@ export const notificationRoutingPolicy = {
 
 export const defaultInternalNotificationRoleRouting = {
   invoiceCreated: ["owner", "manager"],
+  invoiceCancelled: ["owner", "manager"],
   purchaseReceived: ["owner", "manager", "warehouse"],
+  purchaseCancelled: ["owner", "manager", "warehouse"],
   debtChanged: ["owner", "manager"],
+  paymentReceived: ["owner", "manager"],
   qrPaymentConfirmed: ["owner", "manager"],
   qrPaymentException: ["owner", "manager"],
 } as const satisfies Record<NotificationCategory, readonly Role[]>;

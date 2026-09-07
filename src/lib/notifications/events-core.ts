@@ -13,6 +13,7 @@ import type {
   QuietHoursPolicy,
 } from "@/lib/notifications/contracts";
 import { allowedRolesForNotificationTarget } from "@/lib/notifications/routing-policy";
+import { shouldExcludeNotificationActor } from "@/lib/notifications/recipient-policy";
 import { parseStorePrefs } from "@/lib/schemas/settings";
 
 // Drizzle's Postgres and PGlite transactions expose the same fluent API with
@@ -129,7 +130,12 @@ export async function createNotificationEventInTx(
   for (const recipient of directRecipients as Array<{ id: string }>) {
     recipientReasons.set(recipient.id, "direct");
   }
-  if (input.excludeActor && input.actorId && !directRecipientIds.has(input.actorId)) {
+  if (shouldExcludeNotificationActor({
+    excludeActor: input.excludeActor,
+    actorId: input.actorId,
+    directRecipientIds,
+    recipientIds: recipientReasons.keys(),
+  }) && input.actorId) {
     recipientReasons.delete(input.actorId);
   }
 

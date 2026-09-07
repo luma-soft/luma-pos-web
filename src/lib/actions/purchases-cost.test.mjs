@@ -246,7 +246,13 @@ test("cancelling a saved draft leaves stock, costs, supplier debt and cash uncha
   const after = await state();
   for (const table of ["products", "stock_levels", "stock_movements", "stock_lots", "stock_lot_movements", "inventory_cost_baselines", "inventory_cost_adjustments", "suppliers", "product_suppliers"]) expect(after[table]).toEqual(before[table]);
   expect(cashEffect).not.toHaveBeenCalled();
-  expect(receiptNotification).not.toHaveBeenCalled();
+  expect(receiptNotification).toHaveBeenCalledTimes(1);
+  expect(receiptNotification.mock.calls[0][1]).toMatchObject({
+    category: "purchaseCancelled",
+    entityType: "purchase",
+    entityId: saved.data.id,
+    target: "purchases",
+  });
   expect(debtNotification).not.toHaveBeenCalled();
   expect((await pg.query("select status from purchase_orders where id=$1", [saved.data.id])).rows[0].status).toBe("cancelled");
   expect((await savePurchaseDraft({ id: saved.data.id, ...payload(productId, 1, 200) })).ok).toBe(false);

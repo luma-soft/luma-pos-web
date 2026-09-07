@@ -16,7 +16,10 @@ import {
   toQty,
 } from "@/lib/actions/common";
 import { Routes } from "@/lib/routes";
-import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
+import {
+  createDebtChangedEventInTx,
+  createNotificationEventInTx,
+} from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { orderActivitySnapshot, orderActivityType } from "@/lib/orders/activity";
@@ -156,6 +159,25 @@ export async function cancelOrderForUser(
         });
       }
 
+      const cancellationNotification = await createNotificationEventInTx(tx, {
+        storeId,
+        eventKey: `invoice-cancelled:${order.id}`,
+        category: "invoiceCancelled",
+        entityType: "order",
+        entityId: order.id,
+        actorId: profileId,
+        target: "invoices",
+        priority: "high",
+        quietHoursPolicy: "bypass",
+        excludeActor: true,
+        metadata: {
+          previousStatus: order.status,
+          debtDelta: isCompletedSale
+            ? (-Math.max(0, Number(order.total) - Number(order.amountPaid))).toFixed(2)
+            : "0.00",
+        },
+      });
+
       await tx
         .update(orders)
         .set({
@@ -168,11 +190,13 @@ export async function cancelOrderForUser(
         storeId, actorId: profileId, action: `${orderActivityType(order)}.cancelled`, entityType: "order", entityId: orderId,
         before: orderActivitySnapshot(order), after: orderActivitySnapshot({ ...order, status: "cancelled" }),
       });
-      return { debtNotification };
+      return { debtNotification, cancellationNotification };
     });
 
-    if (result.debtNotification?.created) {
-      await publishCommittedNotification(result.debtNotification.eventId);
+    for (const notification of [result.debtNotification, result.cancellationNotification]) {
+      if (notification?.created) {
+        await publishCommittedNotification(notification.eventId);
+      }
     }
     revalidatePath(Routes.POS);
     revalidatePath(Routes.Sales);

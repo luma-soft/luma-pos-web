@@ -2,7 +2,10 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { customers, orders, payments } from "@/db/schema";
 import { recordCashTx, fundForMethod } from "@/lib/cash";
 import { addPaymentSchema, type AddPaymentInput } from "@/lib/schemas/order";
-import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
+import {
+  createDebtChangedEventInTx,
+  createNotificationEventInTx,
+} from "@/lib/notifications/events-core";
 import { recordActivity } from "@/lib/audit/activity-log";
 
 // Drizzle Postgres and PGlite expose the same runtime transaction API.
@@ -10,7 +13,7 @@ import { recordActivity } from "@/lib/audit/activity-log";
 type DbLike = any;
 
 export type ManualPaymentCoreResult =
-  | { ok: true; data: { replayed: boolean; notificationEventId?: string } }
+  | { ok: true; data: { replayed: boolean; notificationEventId?: string; notificationEventIds?: string[] } }
   | { ok: false; error: string };
 
 export async function addManualPaymentCore(
@@ -134,6 +137,23 @@ export async function addManualPaymentCore(
           actorId: actor.profileId,
         });
       }
+      const paymentNotification = await createNotificationEventInTx(tx, {
+        storeId: actor.storeId,
+        eventKey: `payment-received:${payment.id}`,
+        category: "paymentReceived",
+        entityType: "order",
+        entityId: order.id,
+        actorId: actor.profileId,
+        directUserIds: actor.profileId ? [actor.profileId] : [],
+        target: "invoices",
+        priority: "normal",
+        quietHoursPolicy: "defer",
+        metadata: {
+          paymentId: payment.id,
+          amount: value.amount.toFixed(2),
+          method: value.method,
+        },
+      });
       await recordActivity(tx, {
         storeId: actor.storeId, actorId: actor.profileId, action: "order.payment.recorded", entityType: "order", entityId: order.id,
         before: { code: order.code, amountPaid: alreadyPaid, paymentStatus: order.paymentStatus },
@@ -147,8 +167,15 @@ export async function addManualPaymentCore(
         ok: true as const,
         data: {
           replayed: false,
-          ...(notification?.created
-            ? { notificationEventId: notification.eventId }
+          ...((paymentNotification?.created || notification?.created)
+            ? {
+                notificationEventId: paymentNotification?.created
+                  ? paymentNotification.eventId
+                  : notification?.eventId,
+                notificationEventIds: [notification, paymentNotification]
+                  .filter((event) => event?.created)
+                  .map((event) => event!.eventId),
+              }
             : {}),
         },
       };

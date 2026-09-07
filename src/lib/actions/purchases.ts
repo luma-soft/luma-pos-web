@@ -734,6 +734,25 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
         });
       }
 
+      const cancellationNotification = await createNotificationEventInTx(tx, {
+        storeId: gate.storeId,
+        eventKey: `purchase-cancelled:${po.id}`,
+        category: "purchaseCancelled",
+        entityType: "purchase",
+        entityId: po.id,
+        actorId: profileId,
+        target: "purchases",
+        priority: "high",
+        quietHoursPolicy: "bypass",
+        excludeActor: true,
+        metadata: {
+          previousStatus: po.status,
+          debtDelta: po.status === "received"
+            ? (-Math.max(0, Number(po.total) - Number(po.amountPaid))).toFixed(2)
+            : "0.00",
+        },
+      });
+
       await tx.update(purchaseOrders).set({ status: "cancelled" }).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, po.id)));
       if (po.status === "received") {
         const items = await tx.select({ productId: purchaseOrderItems.productId }).from(purchaseOrderItems)
@@ -746,11 +765,13 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
         after: { code: po.code, status: "cancelled" },
         metadata: { purchaseCode: po.code, supplierId: po.supplierId, warehouseId: po.warehouseId },
       });
-      return { debtNotification };
+      return { debtNotification, cancellationNotification };
     });
 
-    if (result.debtNotification?.created) {
-      await publishCommittedNotification(result.debtNotification.eventId);
+    for (const notification of [result.debtNotification, result.cancellationNotification]) {
+      if (notification?.created) {
+        await publishCommittedNotification(notification.eventId);
+      }
     }
     revalidatePurchasePaths(id);
     return { ok: true, data: undefined };

@@ -1222,8 +1222,11 @@ function NotificationsSection({
     | "syncDone"
     | "serviceDue"
     | "invoiceCreated"
+    | "invoiceCancelled"
     | "purchaseReceived"
+    | "purchaseCancelled"
     | "debtChanged"
+    | "paymentReceived"
     | "qrPaymentConfirmed"
     | "qrPaymentException";
   const setType = (k: TK, v: boolean) => { setForm((p) => ({ ...p, [k]: v })); mark(); };
@@ -1259,8 +1262,11 @@ function NotificationsSection({
     { k: "syncDone", title: L ? "Đồng bộ hoàn tất" : "Sync completed", desc: L ? "Khi dữ liệu offline đồng bộ xong" : "When offline data syncs" },
     { k: "serviceDue", title: L ? "Công việc bảo trì đến hạn" : "Maintenance due", desc: L ? "Khi hệ thống tự tạo việc bảo trì" : "When a maintenance job is generated" },
     { k: "invoiceCreated", title: L ? "Hóa đơn mới" : "New invoice", desc: L ? "Khi hóa đơn hoàn tất được tạo" : "When a completed invoice is created" },
+    { k: "invoiceCancelled", title: L ? "Hủy hóa đơn" : "Invoice cancelled", desc: L ? "Khi hóa đơn hoặc đơn bán bị hủy" : "When an invoice or sales order is cancelled" },
     { k: "purchaseReceived", title: L ? "Nhập hàng đã nhận" : "Purchase received", desc: L ? "Khi phiếu nhập được ghi nhận đã nhận hàng" : "When a purchase receipt is recorded" },
+    { k: "purchaseCancelled", title: L ? "Hủy phiếu nhập" : "Purchase cancelled", desc: L ? "Khi phiếu nhập bị hủy" : "When a purchase receipt is cancelled" },
     { k: "debtChanged", title: L ? "Thay đổi công nợ" : "Debt changed", desc: L ? "Khi công nợ khách hàng hoặc nhà cung cấp thay đổi" : "When customer or supplier debt changes" },
+    { k: "paymentReceived", title: L ? "Nhận thanh toán" : "Payment received", desc: L ? "Khi ghi nhận khách hàng thanh toán" : "When a customer payment is recorded" },
     { k: "qrPaymentConfirmed", title: L ? "Thanh toán QR thành công" : "QR payment confirmed", desc: L ? "Khi hệ thống xác nhận thanh toán QR" : "When a QR payment is confirmed" },
     { k: "qrPaymentException", title: L ? "Giao dịch QR cần kiểm tra" : "QR payment needs review", desc: L ? "Khi giao dịch QR cần đối soát thủ công" : "When a QR payment needs manual review" },
   ];

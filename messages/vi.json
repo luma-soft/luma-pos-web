@@ -4266,8 +4266,11 @@
   "internalNotifications": {
     "titles": {
       "invoiceCreated": "Hóa đơn mới đã được tạo",
+      "invoiceCancelled": "Hóa đơn đã bị hủy",
       "purchaseReceived": "Đã ghi nhận phiếu nhập hàng",
+      "purchaseCancelled": "Phiếu nhập đã bị hủy",
       "debtChanged": "Công nợ vừa được cập nhật",
+      "paymentReceived": "Đã nhận thanh toán",
       "qrPaymentConfirmed": "Đã xác nhận thanh toán QR",
       "qrPaymentException": "Cần kiểm tra giao dịch QR"
     },

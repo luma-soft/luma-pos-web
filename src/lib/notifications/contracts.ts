@@ -1,7 +1,10 @@
 export const notificationCategories = [
   "invoiceCreated",
+  "invoiceCancelled",
   "purchaseReceived",
+  "purchaseCancelled",
   "debtChanged",
+  "paymentReceived",
   "qrPaymentConfirmed",
   "qrPaymentException",
 ] as const;

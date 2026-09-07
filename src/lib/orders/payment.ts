@@ -29,8 +29,10 @@ export async function addPaymentForUser(userId: string, input: AddPaymentInput):
       shiftId: currentShift?.id ?? null,
     });
     if (!result.ok) return result;
-    if (result.data.notificationEventId) {
-      await publishCommittedNotification(result.data.notificationEventId);
+    const notificationEventIds = result.data.notificationEventIds
+      ?? (result.data.notificationEventId ? [result.data.notificationEventId] : []);
+    for (const eventId of [...new Set(notificationEventIds)]) {
+      await publishCommittedNotification(eventId);
     }
 
     revalidatePath(Routes.Orders);

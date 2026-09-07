@@ -4266,8 +4266,11 @@
   "internalNotifications": {
     "titles": {
       "invoiceCreated": "A new invoice was created",
+      "invoiceCancelled": "An invoice was cancelled",
       "purchaseReceived": "A purchase receipt was recorded",
+      "purchaseCancelled": "A purchase receipt was cancelled",
       "debtChanged": "A debt balance was updated",
+      "paymentReceived": "Payment received",
       "qrPaymentConfirmed": "QR payment confirmed",
       "qrPaymentException": "QR payment needs review"
     },

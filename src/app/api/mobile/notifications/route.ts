@@ -161,10 +161,16 @@ export async function GET(request: Request) {
       warranty: countLegacyCategory("serviceDue"),
       invoiceCreated: persistedCounts.invoiceCreated
         + countLegacyCategory("invoiceCreated"),
+      invoiceCancelled: persistedCounts.invoiceCancelled
+        + countLegacyCategory("invoiceCancelled"),
       purchaseReceived: persistedCounts.purchaseReceived
         + countLegacyCategory("purchaseReceived"),
+      purchaseCancelled: persistedCounts.purchaseCancelled
+        + countLegacyCategory("purchaseCancelled"),
       debtChanged: persistedCounts.debtChanged
         + countLegacyCategory("debtChanged"),
+      paymentReceived: persistedCounts.paymentReceived
+        + countLegacyCategory("paymentReceived"),
       qrPaymentConfirmed: persistedCounts.qrPaymentConfirmed
         + countLegacyCategory("qrPaymentConfirmed"),
       qrPaymentException: persistedCounts.qrPaymentException

@@ -5,6 +5,8 @@ import type {
 import { localizedNotificationCopy } from "@/lib/notifications/notification-copy";
 
 const qrCategories = new Set<NotificationCategory>([
+  "invoiceCancelled",
+  "purchaseCancelled",
   "qrPaymentConfirmed",
   "qrPaymentException",
 ]);
