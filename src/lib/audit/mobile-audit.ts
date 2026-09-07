@@ -1,24 +1,16 @@
 import type { Role } from "@/lib/actions/common";
-import type { AuditSource, AuditStatus } from "@/lib/audit";
+import type { NotificationActivity } from "@/lib/audit/activity-presentation";
 
-export const MOBILE_AUDIT_ROLES = ["owner", "manager"] as const satisfies readonly Role[];
+export const MOBILE_AUDIT_ROLES = [
+  "owner",
+  "manager",
+] as const satisfies readonly Role[];
 
 export function canReadMobileAuditLog(role: Role) {
   return MOBILE_AUDIT_ROLES.some((allowedRole) => allowedRole === role);
 }
 
-type MobileAuditSourceRow = {
-  id: string;
-  actorNameSnapshot: string | null;
-  source: AuditSource;
-  action: string;
-  entityType: string;
-  entityId: string | null;
-  status: AuditStatus;
-  createdAt: Date;
-};
-
-export function toMobileAuditLog(row: MobileAuditSourceRow) {
+export function toMobileAuditLog(row: NotificationActivity) {
   return {
     id: row.id,
     actorNameSnapshot: row.actorNameSnapshot,
@@ -27,6 +19,13 @@ export function toMobileAuditLog(row: MobileAuditSourceRow) {
     entityType: row.entityType,
     entityId: row.entityId,
     status: row.status,
+    prompt: row.prompt,
+    parsedIntent: row.parsedIntent,
+    before: row.before,
+    after: row.after,
+    affectedRecords: row.affectedRecords,
+    metadata: row.metadata,
+    resolvedEntity: row.resolvedEntity ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }

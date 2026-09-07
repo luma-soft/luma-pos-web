@@ -1,21 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  AlertTriangle,
-  Bell,
-  Filter,
-  RefreshCw,
-  Settings,
-} from "lucide-react";
+import { AlertTriangle, Bell, Filter, RefreshCw, Settings } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/lib/routes";
 import { notificationHref } from "./notification-actions";
 import { NOTIFICATION_INBOX_CHANGED_EVENT } from "@/lib/notifications/inbox-count";
-import { InboxNotificationsTable, NotificationsTable, type AuditRow } from "./notifications-table";
+import {
+  InboxNotificationsTable,
+  NotificationsTable,
+  type AuditRow,
+} from "./notifications-table";
 import { NotificationsFilterDrawer } from "./notifications-filter-drawer";
 import { Pagination } from "@/components/pagination";
 import {
@@ -42,7 +47,11 @@ type ActivityPage = {
   pageSize: number;
 };
 
-export function NotificationsClient({ activities: initialActivities }: { activities: ActivityPage }) {
+export function NotificationsClient({
+  activities: initialActivities,
+}: {
+  activities: ActivityPage;
+}) {
   const t = useTranslations("notifications.inbox");
   const activityT = useTranslations("notifications.activity");
   const router = useRouter();
@@ -54,9 +63,19 @@ export function NotificationsClient({ activities: initialActivities }: { activit
   const [pendingId, setPendingId] = useState<string | null>(null);
   const updating = useRef(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [filters, setFilters] = useState<NotificationFilters>(defaultNotificationFilters);
-  const [pages, setPages] = useState<Record<NotificationTab, number>>({ action: 1, all: 1, activity: initialActivities.page });
-  const [pageSizes, setPageSizes] = useState<Record<NotificationTab, number>>({ action: 15, all: 15, activity: initialActivities.pageSize });
+  const [filters, setFilters] = useState<NotificationFilters>(
+    defaultNotificationFilters,
+  );
+  const [pages, setPages] = useState<Record<NotificationTab, number>>({
+    action: 1,
+    all: 1,
+    activity: initialActivities.page,
+  });
+  const [pageSizes, setPageSizes] = useState<Record<NotificationTab, number>>({
+    action: 15,
+    all: 15,
+    activity: initialActivities.pageSize,
+  });
   const [activities, setActivities] = useState(initialActivities);
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityError, setActivityError] = useState(false);
@@ -66,9 +85,15 @@ export function NotificationsClient({ activities: initialActivities }: { activit
     setLoading(true);
     setError(false);
     try {
-      const response = await fetch("/api/mobile/notifications?locale=vi", { cache: "no-store" });
-      const payload = await response.json() as { ok?: boolean; data?: NotificationsPayload };
-      if (!response.ok || !payload.ok || !Array.isArray(payload.data?.rows)) throw new Error("notifications_failed");
+      const response = await fetch("/api/mobile/notifications?locale=vi", {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as {
+        ok?: boolean;
+        data?: NotificationsPayload;
+      };
+      if (!response.ok || !payload.ok || !Array.isArray(payload.data?.rows))
+        throw new Error("notifications_failed");
       setRows(payload.data.rows);
     } catch {
       setError(true);
@@ -81,7 +106,10 @@ export function NotificationsClient({ activities: initialActivities }: { activit
     let active = true;
     fetch("/api/mobile/notifications?locale=vi", { cache: "no-store" })
       .then(async (response) => {
-        const payload = await response.json() as { ok?: boolean; data?: NotificationsPayload };
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          data?: NotificationsPayload;
+        };
         if (!response.ok || !payload.ok || !Array.isArray(payload.data?.rows)) {
           throw new Error("notifications_failed");
         }
@@ -108,24 +136,46 @@ export function NotificationsClient({ activities: initialActivities }: { activit
   );
   const activeFilterCount = countActiveNotificationFilters(filters);
   const inboxRows = tab === "action" ? actionableRows : visibleRows;
-  const inboxPageData = paginateNotificationRows(inboxRows, pages[tab], pageSizes[tab]);
+  const inboxPageData = paginateNotificationRows(
+    inboxRows,
+    pages[tab],
+    pageSizes[tab],
+  );
 
-  const loadActivityPage = useCallback(async (page: number, pageSize: number) => {
-    setActivityLoading(true);
-    setActivityError(false);
-    try {
-      const response = await fetch(`/api/notifications/activity?page=${page}&size=${pageSize}`, { cache: "no-store" });
-      const payload = await response.json() as { ok?: boolean; data?: ActivityPage };
-      if (!response.ok || !payload.ok || !payload.data || !Array.isArray(payload.data.rows)) throw new Error("activity_failed");
-      setActivities(payload.data);
-      setPages((current) => ({ ...current, activity: payload.data!.page }));
-      setPageSizes((current) => ({ ...current, activity: payload.data!.pageSize }));
-    } catch {
-      setActivityError(true);
-    } finally {
-      setActivityLoading(false);
-    }
-  }, []);
+  const loadActivityPage = useCallback(
+    async (page: number, pageSize: number) => {
+      setActivityLoading(true);
+      setActivityError(false);
+      try {
+        const response = await fetch(
+          `/api/notifications/activity?page=${page}&size=${pageSize}`,
+          { cache: "no-store" },
+        );
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          data?: ActivityPage;
+        };
+        if (
+          !response.ok ||
+          !payload.ok ||
+          !payload.data ||
+          !Array.isArray(payload.data.rows)
+        )
+          throw new Error("activity_failed");
+        setActivities(payload.data);
+        setPages((current) => ({ ...current, activity: payload.data!.page }));
+        setPageSizes((current) => ({
+          ...current,
+          activity: payload.data!.pageSize,
+        }));
+      } catch {
+        setActivityError(true);
+      } finally {
+        setActivityLoading(false);
+      }
+    },
+    [],
+  );
 
   async function updateNotification(row: NotificationRow, dismissed = false) {
     if (updating.current) return false;
@@ -133,16 +183,24 @@ export function NotificationsClient({ activities: initialActivities }: { activit
     setPendingId(row.id);
     setUpdateError(false);
     try {
-      const response = await fetch(`/api/mobile/notifications/${encodeURIComponent(row.id)}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ read: true, dismissed }),
-      });
-      const payload = await response.json() as { ok?: boolean };
-      if (!response.ok || !payload.ok) throw new Error("notification_update_failed");
-      setRows((current) => dismissed
-        ? current.filter((item) => item.id !== row.id)
-        : current.map((item) => item.id === row.id ? { ...item, unread: false } : item));
+      const response = await fetch(
+        `/api/mobile/notifications/${encodeURIComponent(row.id)}`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ read: true, dismissed }),
+        },
+      );
+      const payload = (await response.json()) as { ok?: boolean };
+      if (!response.ok || !payload.ok)
+        throw new Error("notification_update_failed");
+      setRows((current) =>
+        dismissed
+          ? current.filter((item) => item.id !== row.id)
+          : current.map((item) =>
+              item.id === row.id ? { ...item, unread: false } : item,
+            ),
+      );
       window.dispatchEvent(new Event(NOTIFICATION_INBOX_CHANGED_EVENT));
       return true;
     } catch {
@@ -160,19 +218,24 @@ export function NotificationsClient({ activities: initialActivities }: { activit
     startTransition(async () => {
       await updateNotification(row);
       if (!href) return;
-      if (/^https?:\/\//i.test(href)) window.open(href, "_blank", "noopener,noreferrer");
+      if (/^https?:\/\//i.test(href))
+        window.open(href, "_blank", "noopener,noreferrer");
       else router.push(href);
     });
   }
 
   return (
-    <div className="min-h-full bg-canvas px-4 py-5 sm:px-6 lg:px-8">
-      <header className="mx-auto max-w-6xl">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight">{t("title")}</h1>
-            <p className="mt-1 text-base font-semibold text-slate-500">
-              {tab === "activity" ? activityT("description") : t("needsActionCount", { count: actionableRows.length })}
+    <div className="min-h-full bg-canvas p-4 sm:p-6">
+      <header className="sticky top-0 z-20 -mx-4 -mt-4 mb-4 border-b border-border bg-surface sm:-mx-6 sm:-mt-6 lg:mb-5">
+        <div className="flex min-h-[68px] items-center gap-3 px-4 pt-2 sm:px-6 lg:min-h-13 lg:pt-2.5">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-xl font-bold tracking-[-0.01em] lg:text-[17px]">
+              {t("title")}
+            </h1>
+            <p className="mt-0.5 truncate text-xs font-semibold text-slate-500 lg:hidden">
+              {tab === "activity"
+                ? activityT("description")
+                : t("needsActionCount", { count: actionableRows.length })}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -207,24 +270,41 @@ export function NotificationsClient({ activities: initialActivities }: { activit
           </div>
         </div>
 
-        <div className="mt-5 flex gap-1 border-b border-border" role="tablist" aria-label={t("tabs.label")}>
-          <TabButton selected={tab === "action"} onClick={() => setTab("action")}>
-            {t("tabs.action")}
-            {actionableRows.length > 0 && <CountBadge tone="danger">{actionableRows.length}</CountBadge>}
-          </TabButton>
-          <TabButton selected={tab === "all"} onClick={() => setTab("all")}>
-            {t("tabs.all")}
-            <CountBadge>{rows.length}</CountBadge>
-          </TabButton>
-          <TabButton selected={tab === "activity"} onClick={() => setTab("activity")}>
-            {t("tabs.activity")}
-          </TabButton>
+        <div className="overflow-x-auto px-4 pb-2 sm:px-6">
+          <div
+            className="flex min-w-max gap-1"
+            role="tablist"
+            aria-label={t("tabs.label")}
+          >
+            <TabButton
+              selected={tab === "action"}
+              onClick={() => setTab("action")}
+            >
+              {t("tabs.action")}
+              {actionableRows.length > 0 && (
+                <CountBadge tone="danger">{actionableRows.length}</CountBadge>
+              )}
+            </TabButton>
+            <TabButton selected={tab === "all"} onClick={() => setTab("all")}>
+              {t("tabs.all")}
+              <CountBadge>{rows.length}</CountBadge>
+            </TabButton>
+            <TabButton
+              selected={tab === "activity"}
+              onClick={() => setTab("activity")}
+            >
+              {t("tabs.activity")}
+            </TabButton>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto mt-6 max-w-6xl">
+      <main>
         {updateError && (
-          <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          <p
+            role="alert"
+            className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+          >
             {t("updateError")}
           </p>
         )}
@@ -232,7 +312,13 @@ export function NotificationsClient({ activities: initialActivities }: { activit
           activityLoading ? (
             <LoadingState label={t("loading")} />
           ) : activityError ? (
-            <ErrorState label={t("loadError")} retry={t("retry")} onRetry={() => void loadActivityPage(pages.activity, pageSizes.activity)} />
+            <ErrorState
+              label={t("loadError")}
+              retry={t("retry")}
+              onRetry={() =>
+                void loadActivityPage(pages.activity, pageSizes.activity)
+              }
+            />
           ) : (
             <>
               <NotificationsTable rows={activities.rows} />
@@ -242,17 +328,27 @@ export function NotificationsClient({ activities: initialActivities }: { activit
                 total={activities.total}
                 pageSize={activities.pageSize}
                 unitLabel={activityT("unitLabel")}
-                onPageChange={(page) => void loadActivityPage(page, activities.pageSize)}
-                onPageSizeChange={(pageSize) => void loadActivityPage(1, pageSize)}
+                onPageChange={(page) =>
+                  void loadActivityPage(page, activities.pageSize)
+                }
+                onPageSizeChange={(pageSize) =>
+                  void loadActivityPage(1, pageSize)
+                }
               />
             </>
           )
         ) : loading ? (
           <LoadingState label={t("loading")} />
         ) : error ? (
-          <ErrorState label={t("loadError")} retry={t("retry")} onRetry={() => void load()} />
+          <ErrorState
+            label={t("loadError")}
+            retry={t("retry")}
+            onRetry={() => void load()}
+          />
         ) : visibleRows.length === 0 ? (
-          <EmptyState label={activeFilterCount > 0 ? t("emptyFiltered") : t("empty")} />
+          <EmptyState
+            label={activeFilterCount > 0 ? t("emptyFiltered") : t("empty")}
+          />
         ) : (
           <>
             <InboxNotificationsTable
@@ -268,7 +364,9 @@ export function NotificationsClient({ activities: initialActivities }: { activit
               total={inboxPageData.total}
               pageSize={inboxPageData.pageSize}
               unitLabel={t("unitLabel")}
-              onPageChange={(page) => setPages((current) => ({ ...current, [tab]: page }))}
+              onPageChange={(page) =>
+                setPages((current) => ({ ...current, [tab]: page }))
+              }
               onPageSizeChange={(pageSize) => {
                 setPageSizes((current) => ({ ...current, [tab]: pageSize }));
                 setPages((current) => ({ ...current, [tab]: 1 }));
@@ -293,7 +391,15 @@ export function NotificationsClient({ activities: initialActivities }: { activit
   );
 }
 
-function TabButton({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: React.ReactNode }) {
+function TabButton({
+  selected,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -311,27 +417,56 @@ function TabButton({ selected, onClick, children }: { selected: boolean; onClick
   );
 }
 
-function CountBadge({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "danger" }) {
+function CountBadge({
+  children,
+  tone = "neutral",
+}: {
+  children: React.ReactNode;
+  tone?: "neutral" | "danger";
+}) {
   return (
-    <span className={cn(
-      "grid min-w-5 place-items-center rounded-full px-1.5 py-0.5 text-[11px] font-extrabold",
-      tone === "danger" ? "bg-red-600 text-white" : "bg-slate-100 text-slate-600",
-    )}>
+    <span
+      className={cn(
+        "grid min-w-5 place-items-center rounded-full px-1.5 py-0.5 text-[11px] font-extrabold",
+        tone === "danger"
+          ? "bg-red-600 text-white"
+          : "bg-slate-100 text-slate-600",
+      )}
+    >
       {children}
     </span>
   );
 }
 
 function LoadingState({ label }: { label: string }) {
-  return <div className="flex min-h-72 items-center justify-center text-sm font-semibold text-slate-500"><RefreshCw className="mr-2 size-5 animate-spin" />{label}</div>;
+  return (
+    <div className="flex min-h-72 items-center justify-center text-sm font-semibold text-slate-500">
+      <RefreshCw className="mr-2 size-5 animate-spin" />
+      {label}
+    </div>
+  );
 }
 
-function ErrorState({ label, retry, onRetry }: { label: string; retry: string; onRetry: () => void }) {
+function ErrorState({
+  label,
+  retry,
+  onRetry,
+}: {
+  label: string;
+  retry: string;
+  onRetry: () => void;
+}) {
   return (
     <div className="flex min-h-72 flex-col items-center justify-center text-center">
       <AlertTriangle className="size-10 text-red-500" />
       <p className="mt-3 text-sm font-semibold text-slate-600">{label}</p>
-      <button type="button" onClick={onRetry} className="mt-4 min-h-11 rounded-xl border border-primary-600 px-4 font-bold text-primary-700 min-w-11 lg:min-w-0">{retry}</button>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-4 min-h-11 rounded-xl border border-primary-600 px-4 font-bold text-primary-700 min-w-11 lg:min-w-0"
+      >
+        {retry}
+      </button>
     </div>
   );
 }
