@@ -43,6 +43,14 @@ const projectUpdateSchema = projectSchema.extend({
   targetEndsOn: z.iso.date().nullable().optional(),
   siteContactName: z.string().trim().optional(),
   siteContactPhone: z.string().trim().max(20).optional(),
+}).superRefine((value, context) => {
+  if (value.startsOn && value.targetEndsOn && value.targetEndsOn < value.startsOn) {
+    context.addIssue({
+      code: "custom",
+      path: ["targetEndsOn"],
+      message: "targetEndsOn must be on or after startsOn",
+    });
+  }
 });
 export type UpdateProjectInput = z.input<typeof projectUpdateSchema>;
 

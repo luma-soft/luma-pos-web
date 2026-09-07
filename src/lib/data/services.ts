@@ -16,6 +16,7 @@ export type ServiceProjectListQuery = {
   status?: "active" | "done";
   serviceType?: "camera" | "electrical" | "plumbing" | "mixed";
   urgency?: "attention" | "overdue";
+  sort?: "starts_desc" | "starts_asc" | "target_asc" | "target_desc";
   page?: number;
   pageSize?: number;
 };
@@ -55,6 +56,19 @@ export async function getServiceProjectsPage(
         ? attentionPredicate
         : undefined,
   )!;
+  const dateOrder = (() => {
+    switch (query.sort) {
+      case "starts_asc":
+        return sql`${projects.startsOn} asc nulls last`;
+      case "target_asc":
+        return sql`${projects.targetEndsOn} asc nulls last`;
+      case "target_desc":
+        return sql`${projects.targetEndsOn} desc nulls last`;
+      case "starts_desc":
+      default:
+        return sql`${projects.startsOn} desc nulls last`;
+    }
+  })();
 
   const projectSelection = {
     id: projects.id,
@@ -86,7 +100,7 @@ export async function getServiceProjectsPage(
       .from(projects)
       .leftJoin(customers, eq(projects.customerId, customers.id))
       .where(listWhere)
-      .orderBy(desc(projects.createdAt), desc(projects.id))
+      .orderBy(dateOrder, desc(projects.createdAt), desc(projects.id))
       .limit(pageSize)
       .offset((page - 1) * pageSize),
     db.select({ value: count() })

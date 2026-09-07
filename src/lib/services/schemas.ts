@@ -32,6 +32,15 @@ export const serviceProjectCreateSchema = z.object({
   siteContactName: z.string().trim().optional(),
   siteContactPhone: z.string().trim().max(20).optional(),
   note: z.string().trim().optional(),
+  status: z.enum(["active", "done"]).default("active"),
+}).superRefine((value, context) => {
+  if (value.startsOn && value.targetEndsOn && value.targetEndsOn < value.startsOn) {
+    context.addIssue({
+      code: "custom",
+      path: ["targetEndsOn"],
+      message: "targetEndsOn must be on or after startsOn",
+    });
+  }
 });
 
 export type ServiceProjectCreateInput = z.input<typeof serviceProjectCreateSchema>;
