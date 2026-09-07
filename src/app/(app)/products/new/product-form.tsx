@@ -81,6 +81,44 @@ type AiWorkflowDraft = {
   action?: { payload?: Record<string, unknown> };
 };
 
+function blankProductValues(
+  creationKind: "product" | "service" | "combo",
+  requestId: string,
+): Partial<CreateProductInput> {
+  return {
+    sku: "",
+    productKind: creationKind,
+    barcode: "",
+    name: "",
+    categoryId: "",
+    brandId: "",
+    imageUrls: [],
+    imageMediaIds: [],
+    costPrice: 0,
+    retailPrice: 0,
+    initialStock: 0,
+    minLevel: 0,
+    maxLevel: 999_999_999,
+    weightUnit: "kg",
+    dimUnit: "mm",
+    baseUnit: creationKind === "combo" ? "combo" : "cái",
+    units: [],
+    variantContractVersion: 2,
+    variantOperation: "create",
+    excludedCombinationKeys: [],
+    requestId,
+    variantChildren: [],
+    comboItems: [],
+    priceBookPrices: {},
+    attributes: [],
+    applyToSiblings: {
+      enabled: false,
+      fields: ["name", "imageUrls"],
+    },
+    directSale: true,
+  };
+}
+
 function specsWithOrderNote(
   specs: Record<string, string[]> | null,
   invoiceNote: string | undefined,
@@ -139,6 +177,7 @@ export function NewProductForm({
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialValues?.variantOperation === "add" ? "variants" : "info");
   const [submitIntent, setSubmitIntent] = useState<"save" | "sameType">("save");
+  const [formGeneration, setFormGeneration] = useState(0);
   const isEdit = mode === "edit";
   const isModal = layout === "modal";
   const doneHref = closeHref ?? Routes.Products;
@@ -161,34 +200,7 @@ export function NewProductForm({
   const form = useForm<CreateProductInput, unknown, CreateProductOutput>({
     resolver: zodResolver(createProductSchema),
     defaultValues: {
-      sku: "",
-      productKind: creationKind,
-      barcode: "",
-      name: "",
-      categoryId: "",
-      brandId: "",
-      imageUrls: [],
-      imageMediaIds: [],
-      costPrice: 0,
-      retailPrice: 0,
-      initialStock: 0,
-      minLevel: 0,
-      maxLevel: 999_999_999,
-      weightUnit: "kg",
-      dimUnit: "mm",
-      baseUnit: creationKind === "combo" ? "combo" : "cái",
-      units: [],
-      variantContractVersion: 2,
-      variantOperation: "create",
-      excludedCombinationKeys: [],
-      requestId,
-      variantChildren: [],
-      comboItems: [],
-      applyToSiblings: {
-        enabled: false,
-        fields: ["name", "imageUrls"],
-      },
-      directSale: true,
+      ...blankProductValues(creationKind, requestId),
       ...initialValues,
       priceBookPrices: Object.fromEntries(Object.entries(initialValues?.priceBookPrices ?? {}).filter(([id]) => priceBooks.some((book) => book.id === id && !book.isDefault && !isPriceBookReadOnly(book)))),
       attributes: preparedAttributes,
@@ -291,6 +303,11 @@ export function NewProductForm({
     if (values.variantGroupId || values.variantChildren.length > 0) {
       const result = await saveProductVariantGroup(values);
       if (!result.ok) { form.setError("root", { message: result.error }); return; }
+      if (!isEdit && submitIntent === "sameType") {
+        resetForNextProduct();
+        router.refresh();
+        return;
+      }
       navigateAfterModal(submitIntent === "sameType" ? sameTypeHref(result.data.id) : isModal ? doneHref : Routes.product(result.data.id));
       router.refresh();
       return;
@@ -359,13 +376,33 @@ export function NewProductForm({
     }
     const res = await createProduct(values);
     if (res.ok) {
+      if (submitIntent === "sameType") {
+        resetForNextProduct();
+        router.refresh();
+        return;
+      }
       navigateAfterModal(
-        submitIntent === "sameType" ? sameTypeHref(res.data.id) : doneHref,
+        doneHref,
       );
       router.refresh();
       return;
     }
     form.setError("root", { message: res.error });
+  }
+
+  function resetForNextProduct() {
+    const nextValues = blankProductValues(creationKind, crypto.randomUUID());
+    form.reset(nextValues);
+    initialPricing.current = {
+      baseUnit: nextValues.baseUnit ?? "cái",
+      retailPrice: 0,
+      costPrice: 0,
+      priceBookPrices: {},
+      units: [],
+    };
+    setTab("info");
+    setSubmitIntent("save");
+    setFormGeneration((generation) => generation + 1);
   }
 
   function sameTypeHref(id: string) {
@@ -449,6 +486,7 @@ export function NewProductForm({
             registerDirectSale={form.register("directSale")}
             onCancel={close}
             onIntent={setSubmitIntent}
+            isEdit={isEdit}
           />
         )}
       </header>
@@ -491,6 +529,7 @@ export function NewProductForm({
         </div>}
         {tab === "info" && (
           <InfoTab
+            key={`info-${formGeneration}`}
             storeId={storeId}
             publicMediaBaseUrl={publicMediaBaseUrl}
             categories={categories}
@@ -505,6 +544,7 @@ export function NewProductForm({
         )}
         {tab === "variants" && (
           <VariantsTab
+            key={`variants-${formGeneration}`}
             isEdit={isEdit}
             isVariantChild={isVariantChild}
             siblingCount={siblingCount}
@@ -512,7 +552,7 @@ export function NewProductForm({
             groupId={variantGroup?.id}
           />
         )}
-        <VariantChildrenField visible={tab === "variants"} enabled={variantEnabled} />
+        <VariantChildrenField key={`variant-children-${formGeneration}`} visible={tab === "variants"} enabled={variantEnabled} />
         {tab === "description" && <DescriptionTab />}
         {hasVariants && !groupEditing && tab === "info" && <p className="text-sm text-slate-500">Giá chung dùng cho SKU mới. Nhập giá và tồn từng biến thể tại tab Đơn vị & thuộc tính.</p>}
       </div>
@@ -525,6 +565,7 @@ export function NewProductForm({
             registerDirectSale={form.register("directSale")}
             onCancel={close}
             onIntent={setSubmitIntent}
+            isEdit={isEdit}
             align="footer"
           />
         </footer>
@@ -542,12 +583,14 @@ function FormActions({
   onCancel,
   onIntent,
   showDirectSale = true,
+  isEdit,
   align = "header",
 }: {
   loading: boolean;
   registerDirectSale: UseFormRegisterReturn<"directSale">;
   onCancel: () => void;
   onIntent: (intent: "save" | "sameType") => void;
+  isEdit: boolean;
   showDirectSale?: boolean;
   align?: "header" | "footer";
 }) {
@@ -583,7 +626,7 @@ function FormActions({
           variant="secondary"
           disabled={loading}
           onClick={() => onIntent("sameType")}
-          tx="products.saveAndCreateSameType"
+          tx={isEdit ? "products.saveAndCreateSameType" : "products.saveAndCreate"}
           className={align === "footer" ? "order-3 col-span-2 w-full sm:order-none sm:w-auto" : undefined}
         />
         <Button

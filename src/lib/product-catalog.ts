@@ -1,4 +1,4 @@
-import { normalizeSearch } from "@/lib/normalize";
+import { normalizeSearch, matchesSearchTokens } from "@/lib/normalize";
 
 export const PRODUCT_CATALOG_SCHEMA_VERSION = 6;
 
@@ -112,7 +112,7 @@ export function searchProductCatalog(
       product.categoryName ?? "",
       ...product.units.flatMap((unit) => [unit.unitName, unit.barcode ?? ""]),
     ].join(" "));
-    if (!searchable.includes(normalizedQuery)) continue;
+    if (!matchesSearchTokens(searchable, normalizedQuery)) continue;
 
     result.push(product);
     if (result.length >= (options.limit ?? 20)) break;

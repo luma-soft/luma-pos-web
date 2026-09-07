@@ -1355,6 +1355,9 @@
       "title": "Held orders ({count})",
       "hold": "Hold",
       "holdHint": "Park this cart to serve another customer — restore from the held row",
+      "item": "Held order {n}",
+      "savedToast": "Order held",
+      "saveFailed": "Could not hold this order. Please try again.",
       "walkIn": "Walk-in"
     },
     "dragToReorder": "Drag to reorder",
@@ -1556,7 +1559,7 @@
       "empty": "This combo has no items yet.",
       "itemsRequired": "A combo must contain at least one item."
     },
-    "saveAndCreate": "Save & New",
+    "saveAndCreate": "Save & add another item",
     "saveAndCreateSameType": "Save & create similar",
     "directSale": "Direct sale",
     "tabs": {

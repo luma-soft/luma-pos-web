@@ -31,7 +31,7 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Field } from "@/components/ui/label";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { createInstalledAssetsBatch } from "@/lib/actions/services";
-import { normalizeSearch } from "@/lib/normalize";
+import { normalizeSearch, matchesSearchTokens } from "@/lib/normalize";
 import type { ProductCatalogItem } from "@/lib/product-catalog";
 import { serviceEvidencePhotoCapacity } from "@/lib/services/evidence-storage";
 import {
@@ -122,14 +122,14 @@ export function InstalledAssetBatchCreate({
     return products.filter((product) => {
       if (product.productKind !== "product" || product.isVariantParent) return false;
       if (!normalized) return true;
-      return normalizeSearch([
+      return matchesSearchTokens([
         product.name,
         product.sku,
         product.barcode ?? "",
         product.brandName ?? "",
         product.categoryName ?? "",
         product.model ?? "",
-      ].join(" ")).includes(normalized);
+      ].join(" "), normalized);
     }).slice(0, 40);
   }, [products, query]);
   const catalogFeedback = installedAssetCatalogFeedback(catalogStatus, products.length);

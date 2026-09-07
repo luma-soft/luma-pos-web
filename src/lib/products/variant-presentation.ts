@@ -1,4 +1,4 @@
-import { normalizeSearch } from "@/lib/normalize";
+import { normalizeSearch, matchesSearchTokens } from "@/lib/normalize";
 
 type VariantSummary = {
   id: string;
@@ -29,7 +29,7 @@ export function matchesProductVariant(product: VariantSummary, query: string, op
       ? []
       : Object.keys(product.specs ?? {}).filter((name) => !name.startsWith("__"))),
   ].join(" "));
-  return search.split(/\s+/).every((part) => text.includes(part));
+  return matchesSearchTokens(text, search);
 }
 
 export function selectableProductIds(product: {

@@ -23,7 +23,7 @@ import {
   suppliers,
   warehouses,
 } from "@/db/schema";
-import { accentInsensitiveLike } from "@/lib/search";
+import { productSearchCondition } from "@/lib/search";
 import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
 import { coercePageSize, DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import {
@@ -104,7 +104,7 @@ function productComplianceFields(hasColumns: boolean) {
 }
 
 /** All filters must match the same sellable SKU, including inside a group. */
-function productFilterPredicate(alias: "member" | "products", storeId: string, filters: ProductListFilters, hasCompliance: boolean, groupSearch?: SQL) {
+function productFilterPredicate(alias: "member" | "products", storeId: string, filters: ProductListFilters, hasCompliance: boolean, groupSearchFields: SQL[] = []) {
   const field = (name: string) => sql.raw(`${alias}.${name}`);
   const conditions: SQL[] = [];
   const status = filters.status ?? "active";
@@ -112,11 +112,10 @@ function productFilterPredicate(alias: "member" | "products", storeId: string, f
   else if (status === "inactive") conditions.push(sql`${field("is_active")} = false`);
   else if (hasCompliance && (status === "draft" || status === "archived")) conditions.push(sql`${field("lifecycle_status")} = ${status}`);
   const q = filters.q?.trim();
-  if (q) conditions.push(or(
-    accentInsensitiveLike(field("name"), q), accentInsensitiveLike(field("sku"), q),
-    accentInsensitiveLike(field("barcode"), q), accentInsensitiveLike(sql`${field("specs")}::text`, q),
-    groupSearch,
-  )!);
+  if (q) conditions.push(productSearchCondition([
+    field("name"), field("sku"), field("barcode"), sql`${field("specs")}::text`,
+    ...groupSearchFields,
+  ], q));
   for (const [column, single, multiple] of [
     ["category_id", filters.categoryId, filters.categoryIds],
     ["brand_id", filters.brandId, filters.brandIds],
@@ -173,7 +172,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
     conditions.push(eq(products.id, exactProductId));
   } else {
     const match = productFilterPredicate(view === "grouped" ? "member" : "products", storeId, filters, hasComplianceColumns,
-      view === "grouped" && filters.q?.trim() ? or(accentInsensitiveLike(products.name, filters.q.trim()), accentInsensitiveLike(products.sku, filters.q.trim())) : undefined);
+      view === "grouped" ? [sql`${products.name}`, sql`${products.sku}`] : []);
     if (view === "grouped") {
       conditions.push(sql`${products.parentProductId} is null`);
       if (hasRelatedProducts && groupRelated) conditions.push(sql`(${products.relatedProductId} is null or ${products.relatedProductId} = ${products.id}

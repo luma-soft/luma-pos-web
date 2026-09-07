@@ -1,5 +1,7 @@
 "use client";
 
+import { matchesSearchTokens } from "@/lib/normalize";
+
 import { useMemo, useState } from "react";
 import { Copy, Edit3, ExternalLink, ImageOff, Search, X } from "lucide-react";
 import Image from "next/image";
@@ -119,9 +121,7 @@ export function BrandPriceListClient({
     const normalized = query.trim().toLocaleLowerCase("vi");
     return normalized
       ? products.filter((product) =>
-          `${product.name} ${product.sku} ${product.category ?? ""}`
-            .toLocaleLowerCase("vi")
-            .includes(normalized),
+          matchesSearchTokens(`${product.name} ${product.sku} ${product.category ?? ""}`, normalized),
         )
       : products;
   }, [products, query]);

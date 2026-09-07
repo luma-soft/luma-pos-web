@@ -26,7 +26,7 @@ import { QuantityInput } from "@/components/ui/quantity-input";
 import { Field } from "@/components/ui/label";
 import { saveServiceInstallationBatch } from "@/lib/actions/services";
 import { inferServiceItemTracking } from "@/lib/services/installation-item-classification";
-import { normalizeSearch } from "@/lib/normalize";
+import { normalizeSearch, matchesSearchTokens } from "@/lib/normalize";
 import type { ProductCatalogItem } from "@/lib/product-catalog";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -85,14 +85,14 @@ export function ServiceInstallationBatchCreate({
     return products.filter((product) => {
       if (product.productKind !== "product" || product.isVariantParent) return false;
       if (!normalized) return true;
-      return normalizeSearch([
+      return matchesSearchTokens([
         product.name,
         product.sku,
         product.barcode ?? "",
         product.model ?? "",
         product.brandName ?? "",
         product.categoryName ?? "",
-      ].join(" ")).includes(normalized);
+      ].join(" "), normalized);
     }).slice(0, 80);
   }, [products, query]);
   const activeDraft = drafts.find((draft) => draft.clientDraftId === activeDraftId) ?? drafts[0] ?? null;

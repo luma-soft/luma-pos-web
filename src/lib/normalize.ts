@@ -12,3 +12,14 @@ export function normalizeSearch(s: string): string {
     .trim()
     .replace(/\s+/g, " ");
 }
+
+/** Product keywords can be separated by punctuation or other words. */
+export function searchTokens(query: string): string[] {
+  return [...new Set(normalizeSearch(query).match(/[\p{L}\p{N}]+/gu) ?? [])];
+}
+
+export function matchesSearchTokens(text: string, query: string): boolean {
+  const normalized = normalizeSearch(text);
+  const tokens = searchTokens(query);
+  return (!query.trim() || tokens.length > 0) && tokens.every((token) => normalized.includes(token));
+}

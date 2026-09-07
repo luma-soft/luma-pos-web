@@ -1,5 +1,7 @@
 "use client";
 
+import { matchesSearchTokens } from "@/lib/normalize";
+
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Loader2, Search, Trash2 } from "lucide-react";
@@ -31,7 +33,7 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return products;
-    return products.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+    return products.filter((p) => matchesSearchTokens(`${p.name} ${p.sku}`, q));
   }, [search, products]);
 
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);

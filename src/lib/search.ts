@@ -1,5 +1,5 @@
-import { sql, type SQL, type AnyColumn } from "drizzle-orm";
-import { normalizeSearch } from "./normalize";
+import { and, or, sql, type SQL, type AnyColumn } from "drizzle-orm";
+import { normalizeSearch, searchTokens } from "./normalize";
 
 export { normalizeSearch };
 
@@ -28,4 +28,17 @@ const VN_TO =
 export function accentInsensitiveLike(col: AnyColumn | SQL, q: string): SQL {
   const pattern = `%${normalizeSearch(q)}%`;
   return sql`translate(lower(${col}), ${VN_FROM}, ${VN_TO}) like ${pattern}`;
+}
+
+const COMBINING_MARKS = Array.from({ length: 0x70 }, (_, index) => String.fromCharCode(0x300 + index)).join("");
+
+/** AND keywords across a product's fields; each keyword may match any field. */
+export function productSearchCondition(columns: readonly (AnyColumn | SQL)[], query: string): SQL {
+  const tokens = searchTokens(query);
+  if (!tokens.length) return sql`false`;
+  // translate also removes decomposed Vietnamese combining marks from stored text.
+  const folded = columns.map((column) => sql`translate(lower(${column}), ${VN_FROM + COMBINING_MARKS}, ${VN_TO})`);
+  return and(...tokens.map((token) => or(...folded.map((column) =>
+    sql`${column} like ${`%${token}%`}`,
+  ))!))!;
 }

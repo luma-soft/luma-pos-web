@@ -10,7 +10,7 @@ import {
   stockLevels,
   warehouses,
 } from "@/db/schema";
-import { accentInsensitiveLike } from "@/lib/search";
+import { accentInsensitiveLike, productSearchCondition } from "@/lib/search";
 import { coercePageSize } from "@/lib/pagination";
 import { stockManagedCategoryCondition } from "@/lib/data/product-stock";
 
@@ -185,7 +185,7 @@ export async function searchPurchaseReturnProductRows(storeId: string, q: string
       eq(products.storeId, storeId),
       eq(products.isActive, true),
       stockManagedCategoryCondition(),
-      or(accentInsensitiveLike(products.name, term), accentInsensitiveLike(products.sku, term), accentInsensitiveLike(products.barcode, term)),
+      productSearchCondition([products.name, products.sku, products.barcode], term),
     ))
     .orderBy(asc(products.name))
     .limit(30);

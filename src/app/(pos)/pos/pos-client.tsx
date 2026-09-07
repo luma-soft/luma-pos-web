@@ -51,6 +51,7 @@ import {
   LEGACY_POS_ACTIVE_DRAFT_KEY,
   LEGACY_POS_DRAFTS_KEY,
   loadPosDraftSnapshot,
+  parkPosDraftSnapshot,
   savePosDraftSnapshot,
 } from "@/lib/pos/draft-storage";
 import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
@@ -237,6 +238,7 @@ interface PosDraft {
   returnOrderCode?: string;
   returnReason?: string;
   returnRestock?: boolean;
+  heldAt?: string;
 }
 
 const INV_KEY = LEGACY_POS_DRAFTS_KEY;
@@ -779,6 +781,27 @@ export function PosClient({
     setError("");
   }
 
+  function parkActiveDraft() {
+    if (cart.length === 0 || initialSourceInvoice || initialContext) return;
+    const nextDraft = makeInvoice();
+    const snapshot = parkPosDraftSnapshot(
+      localStorage,
+      storageScope,
+      invoices,
+      activeId,
+      nextDraft,
+    );
+    if (!snapshot) {
+      setError(t("pos.held.saveFailed"));
+      return;
+    }
+    setInvoices(snapshot.drafts);
+    setActiveId(nextDraft.id);
+    setError("");
+    setHeldSaved(true);
+    window.setTimeout(() => setHeldSaved(false), 3500);
+  }
+
   function toggleAddMenu() {
     const rect = addMenuButtonRef.current?.getBoundingClientRect();
     if (rect) {
@@ -883,6 +906,7 @@ export function PosClient({
   const [aiHighlightedProductIds, setAiHighlightedProductIds] = useState<string[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [offlineSaved, setOfflineSaved] = useState(false);
+  const [heldSaved, setHeldSaved] = useState(false);
 
   /** Khi chỉ có một tab, nút X sẽ làm trống hóa đơn thay vì đóng tab. */
   function clearInvoice(id: string) {
@@ -1227,7 +1251,7 @@ export function PosClient({
     setBrowsing(false);
     setSearch("");
     return true;
-  }, [addQuantityToCart, patchActive, searchableProducts]);
+  }, [addQuantityToCart, patchActive, searchableProducts, setAiHighlightedProductIds, setAiUnresolvedItems]);
 
   function applyAiCartPreview(preview: AiActionPreview) {
     if (preview.intent !== "pos_voice_cart_draft" && preview.intent !== "pos_image_cart_draft") return;
@@ -1686,7 +1710,11 @@ export function PosClient({
             )}
           >
             <TabIcon className={cn("w-4 h-4 shrink-0", isActive ? "text-primary-600" : "text-slate-400")} />
-            <span>{inv.cameraQuote ? t("pos.draftTabs.cameraQuote", { n: ordinal }) : t(`pos.draftTabs.${kind}`, { n: ordinal })}</span>
+            <span>{inv.heldAt
+              ? t("pos.held.item", { n: ordinal })
+              : inv.cameraQuote
+                ? t("pos.draftTabs.cameraQuote", { n: ordinal })
+                : t(`pos.draftTabs.${kind}`, { n: ordinal })}</span>
             {count > 0 && (
               <span className={cn(
                 "min-w-[20px] text-center rounded-full px-1.5 text-xs font-bold",
@@ -1996,6 +2024,12 @@ export function PosClient({
       style={keyboardInset > 0 ? { height: `calc(100% - ${keyboardInset}px)` } : undefined}
     >
       {/* trạng thái offline / đồng bộ */}
+      {heldSaved && (
+        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-ok px-4 py-3 text-sm font-semibold text-white shadow-e2" role="status">
+          <CheckCircle2 className="h-4 w-4" />
+          {t("pos.held.savedToast")}
+        </div>
+      )}
       {(!online || pending > 0 || pricingConflicts > 0 || syncing || offlineSaved) && (
         <div className="absolute top-2 left-1/2 w-max -translate-x-1/2 z-50 text-xs font-medium" style={{ maxWidth: "calc(100% - 1rem)" }} role="status">
           <span className={cn(
@@ -2512,6 +2546,17 @@ export function PosClient({
           )}
 
           <div className="flex gap-2">
+            {!initialSourceInvoice && !initialContext && (
+              <button
+                type="button"
+                disabled={cart.length === 0 || submitting}
+                onClick={parkActiveDraft}
+                title={t("pos.held.holdHint")}
+                className="px-3 py-3 rounded-xl border border-border text-sm font-medium disabled:opacity-50 whitespace-nowrap"
+              >
+                {t("pos.held.hold")}
+              </button>
+            )}
             <div className="relative">
               <button
                 disabled={(isReturnDraft ? !hasReturnQuantity : cart.length === 0) || submitting}

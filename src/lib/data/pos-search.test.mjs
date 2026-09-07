@@ -204,3 +204,25 @@ for (const role of ["owner", "cashier"]) {
     }
   });
 }
+
+
+test("web and mobile product search match separated keywords and Vietnamese tone variants", async () => {
+  const id = randomUUID();
+  const accentId = randomUUID();
+  await database.insert(schema.products).values([
+    { id, storeId, sku: "CUT-27", name: "Cút góc - 27", barcode: "8934567890123" },
+    { id: accentId, storeId, sku: "OA-UY", name: "Òa úy".normalize("NFD") },
+  ]);
+  accessRole = "owner";
+  for (const [query, expected] of [["cút 27", id], ["cút góc 27", id], ["27 CUT", id],
+    ["cút góc 27", id], ["8934567890123", id], ["CUT-27", id], ["oà uý", accentId], ["oa uy", accentId]]) {
+    const web = await searchPosProducts(query);
+    const response = await GET(new Request(`http://localhost/api/mobile/pos/search?q=${encodeURIComponent(query)}`));
+    const mobile = (await response.json()).data;
+    expect(web.map((row) => row.id)).toContain(expected);
+    expect(mobile.map((row) => row.id)).toContain(expected);
+  }
+  expect(await searchPosProductRows(storeId, "cút 99")).toEqual([]);
+  expect(await searchPosProductRows(otherStoreId, "cút 27")).toEqual([]);
+  expect(await searchPosProductRows(storeId, "% _")).toEqual([]);
+});

@@ -1,5 +1,7 @@
 "use client";
 
+import { matchesSearchTokens } from "@/lib/normalize";
+
 import Image from "next/image";
 import { Camera, Check, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -32,7 +34,7 @@ export function CameraPickerModal({ open, cameras, selectedCameras = {}, onClose
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("vi");
     if (!query) return cameras;
-    return cameras.filter((product) => `${product.name} ${product.sku} ${product.description ?? ""}`.toLocaleLowerCase("vi").includes(query));
+    return cameras.filter((product) => matchesSearchTokens(`${product.name} ${product.sku} ${product.description ?? ""}`, query));
   }, [cameras, search]);
 
   if (!open) return null;

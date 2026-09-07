@@ -89,3 +89,25 @@ export function savePosDraftSnapshot<TDraft extends object>(
     return false;
   }
 }
+
+/** Persist a held cart and its fresh replacement in one storage write. */
+export function parkPosDraftSnapshot<TDraft extends object>(
+  storage: PosDraftStorage,
+  scopeId: string,
+  drafts: readonly TDraft[],
+  activeId: string,
+  nextDraft: TDraft & { id: string },
+): PosDraftSnapshot<TDraft & { heldAt?: string }> | null {
+  const heldAt = new Date().toISOString();
+  const parked = drafts.map((draft) =>
+    (draft as TDraft & { id?: string }).id === activeId
+      ? { ...draft, heldAt }
+      : draft,
+  );
+  if (!parked.some((draft) => (draft as TDraft & { id?: string }).id === activeId)) {
+    return null;
+  }
+  const next = [...parked, nextDraft];
+  if (!savePosDraftSnapshot(storage, scopeId, next, nextDraft.id)) return null;
+  return { version: 2, activeId: nextDraft.id, drafts: next };
+}

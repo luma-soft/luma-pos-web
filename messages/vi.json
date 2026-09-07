@@ -1355,6 +1355,9 @@
       "title": "Đơn tạm ({count})",
       "hold": "Lưu tạm",
       "holdHint": "Cất giỏ này để bán khách khác — mở lại từ hàng Đơn tạm",
+      "item": "Đơn tạm {n}",
+      "savedToast": "Đã lưu đơn tạm",
+      "saveFailed": "Chưa lưu được đơn tạm. Vui lòng thử lại.",
       "walkIn": "Khách lẻ"
     },
     "dragToReorder": "Kéo để sắp xếp",
@@ -1556,7 +1559,7 @@
       "empty": "Combo chưa có thành phần nào.",
       "itemsRequired": "Combo phải có ít nhất một thành phần."
     },
-    "saveAndCreate": "Lưu & Tạo thêm",
+    "saveAndCreate": "Lưu & tạo thêm hàng",
     "saveAndCreateSameType": "Lưu & tạo tương tự",
     "directSale": "Bán trực tiếp",
     "tabs": {

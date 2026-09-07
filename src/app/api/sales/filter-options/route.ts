@@ -3,7 +3,7 @@ import { and, desc, eq, or } from "drizzle-orm";
 import { db } from "@/db";
 import { customers, orders, products, projects, warehouses } from "@/db/schema";
 import { requireSalesAccess } from "@/lib/actions/common";
-import { accentInsensitiveLike } from "@/lib/search";
+import { accentInsensitiveLike, productSearchCondition } from "@/lib/search";
 
 const kinds = ["customer", "product", "project", "order", "warehouse"] as const;
 type FilterOptionKind = (typeof kinds)[number];
@@ -51,11 +51,7 @@ async function getFilterOptions(kind: FilterOptionKind, query: string) {
   }
   if (kind === "product") {
     const match = query
-      ? or(
-          accentInsensitiveLike(products.name, query),
-          accentInsensitiveLike(products.sku, query),
-          accentInsensitiveLike(products.barcode, query),
-        )
+      ? productSearchCondition([products.name, products.sku, products.barcode], query)
       : undefined;
     return db
       .select({ id: products.id, label: products.name, hint: products.sku })

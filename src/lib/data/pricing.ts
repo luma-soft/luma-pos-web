@@ -21,7 +21,7 @@ import {
   suppliers,
 } from "@/db/schema";
 import { coercePageSize } from "@/lib/pagination";
-import { accentInsensitiveLike } from "@/lib/search";
+import { productSearchCondition } from "@/lib/search";
 import {
   pricingProjectionPolicy,
   pricingSortSpec,
@@ -134,11 +134,7 @@ export function pricingFilterCondition(storeId: string, query: PricingQuery = {}
   const q = query.q?.trim();
   if (q) {
     conditions.push(
-      or(
-        accentInsensitiveLike(products.name, q),
-        accentInsensitiveLike(products.sku, q),
-        accentInsensitiveLike(products.barcode, q),
-      )!,
+      productSearchCondition([products.name, products.sku, products.barcode], q)!,
     );
   }
   if (query.categoryIds?.length) {
