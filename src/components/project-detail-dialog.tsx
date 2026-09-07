@@ -22,15 +22,20 @@ export function ProjectDetailDialog({
   subtitle,
   closeLabel,
   children,
+  closeHref,
 }: {
   title: string;
   subtitle: ReactNode;
   closeLabel: string;
   children: ReactNode;
+  closeHref?: string;
 }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => router.back(), [router]);
+  const close = useCallback(() => {
+    if (closeHref) router.replace(closeHref);
+    else router.back();
+  }, [closeHref, router]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
