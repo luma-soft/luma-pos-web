@@ -893,7 +893,7 @@ function VariantsTab({
         collapsible={false}
       >
         <AttributesField locked={isEdit && !groupEditing} />
-        {isEdit && !groupEditing && <p className="mt-3 text-sm text-slate-500">Giá trị này xác định SKU đang sửa. {groupId && <a className="font-medium text-primary-600 underline" href={`${Routes.productEdit(groupId)}?groupEdit=1`}>Sửa nhóm biến thể</a>}</p>}
+        {isEdit && !groupEditing && <p className="mt-3 text-sm text-slate-500">Giá trị này xác định SKU đang sửa. {groupId && <a className="font-medium text-primary-600 underline" href={Routes.productGroupEdit(groupId)}>Sửa nhóm biến thể</a>}</p>}
       </Section>
       {isEdit && isVariantChild && !groupEditing && (
         <SiblingApplySection siblingCount={siblingCount} />

@@ -1,0 +1,27 @@
+import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+
+const detailPage = readFileSync(new URL("./[id]/page.tsx", import.meta.url), "utf8");
+const editPage = readFileSync(new URL("./[id]/edit/page.tsx", import.meta.url), "utf8");
+const newPage = readFileSync(new URL("./new/page.tsx", import.meta.url), "utf8");
+const routes = readFileSync(new URL("../../../lib/routes.ts", import.meta.url), "utf8");
+const aiActions = readFileSync(new URL("../../../lib/ai/actions.ts", import.meta.url), "utf8");
+
+test("hard-loaded product detail keeps the detail inside a dialog", () => {
+  expect(detailPage).toContain("<ProductDetailDialog");
+  expect(detailPage).not.toContain('surface="page"');
+});
+
+test("legacy product edit and create pages redirect into inventory modals", () => {
+  expect(editPage).toContain("redirect(");
+  expect(editPage).toContain('productModal: "edit"');
+  expect(newPage).toContain("redirect(");
+  expect(newPage).toContain('productModal: "create"');
+});
+
+test("internal product form links target modal URLs without a legacy page hop", () => {
+  expect(routes).not.toContain('ProductNew: "/products/new"');
+  expect(routes).not.toContain('productEdit: (id: string) => `/products/${id}/edit`');
+  expect(aiActions).not.toContain('href: "/products/new?source=ai-preview"');
+  expect(aiActions).not.toContain('`/products/${productId}/edit?source=ai-preview`');
+});

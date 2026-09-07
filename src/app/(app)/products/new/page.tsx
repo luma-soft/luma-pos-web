@@ -1,59 +1,29 @@
-import { notFound } from "next/navigation";
-import { getProduct, getProductFormOptions } from "@/lib/data/products";
-import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
-import { NewProductForm } from "./product-form";
-import { productToFormInitialValues, resolveProductFormSeed } from "../product-form-values";
-import { requireStoreContext } from "@/lib/auth/store-context";
-import { getPublicMediaConfig } from "@/lib/media/config";
+import { redirect } from "next/navigation";
+import { Routes } from "@/lib/routes";
 
 interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 export default async function NewProductPage({ searchParams }: Props) {
-  const context = await requireStoreContext();
-  const publicMedia = getPublicMediaConfig();
   const sp = await searchParams;
+  const target = new URLSearchParams({
+    tab: "products",
+    productModal: "create",
+  });
   const copyFrom = typeof sp.copyFrom === "string" ? sp.copyFrom : undefined;
   const sameTypeAs = typeof sp.sameTypeAs === "string" ? sp.sameTypeAs : undefined;
-  const aiPreview = sp.source === "ai-preview";
-  const creationKind = typeof sp.productKind === "string" &&
-    ["product", "service", "combo"].includes(sp.productKind)
-    ? sp.productKind as "product" | "service" | "combo"
-    : "product";
-  const seedId = copyFrom ?? sameTypeAs;
-  if (seedId && !UUID_RE.test(seedId)) notFound();
 
-  const [options, priceBooks, requestedProduct] = await Promise.all([
-    getProductFormOptions(context.storeId),
-    getPriceBooks(context.storeId),
-    seedId ? getProduct(context.storeId, seedId) : Promise.resolve(null),
-  ]);
-  if (seedId && !requestedProduct) notFound();
-  const seedMode = copyFrom ? "copy" : "sameType";
-  const seedProduct = requestedProduct ? await resolveProductFormSeed(requestedProduct, seedMode, (productId) => getProduct(context.storeId, productId)) : null;
-  if (seedId && !seedProduct) notFound();
-  const priceOverridesByBook = seedProduct ? await getPriceOverridesForProducts(context.storeId, [seedProduct.id]) : {};
-  const priceBookPrices = Object.fromEntries(
-    Object.entries(priceOverridesByBook).map(([bookId, prices]) => [bookId, prices[seedProduct!.id]])
-  );
+  if (copyFrom) {
+    target.set("productModal", "copy");
+    target.set("copyFrom", copyFrom);
+    if (sp.copyGroup === "1") target.set("copyGroup", "1");
+  } else if (sameTypeAs) {
+    target.set("productModal", "sameType");
+    target.set("sameTypeAs", sameTypeAs);
+  }
+  if (typeof sp.productKind === "string") target.set("productKind", sp.productKind);
+  if (typeof sp.source === "string") target.set("source", sp.source);
 
-  return (
-    <NewProductForm
-      storeId={context.storeId}
-      publicMediaBaseUrl={publicMedia.publicBaseUrl}
-      categories={options.categories}
-      brands={options.brands}
-      suppliers={options.suppliers}
-      comboProducts={options.comboProducts}
-      priceBooks={priceBooks}
-      initialValues={seedProduct ? productToFormInitialValues(seedProduct, seedMode, priceBookPrices, publicMedia) : undefined}
-      variantGroup={seedProduct?.variantGroup}
-      initialManagedImages={undefined}
-      aiPreview={aiPreview}
-      creationKind={seedProduct?.productKind ?? creationKind}
-    />
-  );
+  redirect(`${Routes.Inventory}?${target.toString()}`);
 }

@@ -8,15 +8,18 @@ export function ProductDetailDialog({
   title,
   subtitle,
   children,
+  closeHref,
 }: {
   title: string;
   subtitle: string;
   children: ReactNode;
+  closeHref?: string;
 }) {
   const router = useRouter();
   const close = useCallback(() => {
-    router.back();
-  }, [router]);
+    if (closeHref) router.replace(closeHref);
+    else router.back();
+  }, [closeHref, router]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

@@ -176,13 +176,13 @@ function buildAiReviewAction(preview: AiActionPreview): AiActionPreview["reviewA
     return { type: "open", href: "/inventory?tab=pricing&source=ai-preview", label: "Mở bảng giá", target: "pricing" };
   }
   if (preview.intent === "create_product") {
-    return { type: "open", href: "/products/new?source=ai-preview", label: "Mở form sản phẩm", target: "product_form" };
+    return { type: "open", href: `${Routes.ProductNew}&source=ai-preview`, label: "Mở form sản phẩm", target: "product_form" };
   }
   if (preview.intent === "update_product" || preview.intent === "update_product_min_stock" || preview.intent === "toggle_product_active") {
     return {
       type: "open",
       href: productId
-        ? `/products/${productId}/edit?source=ai-preview`
+        ? `${Routes.productEdit(productId)}&source=ai-preview`
         : hrefWithParams("/inventory", { tab: "products", q: productQuery, source: "ai-preview" }),
       label: "Mở form sản phẩm",
       target: "product_form",
