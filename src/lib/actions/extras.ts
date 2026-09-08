@@ -24,7 +24,10 @@ import { evaluateServiceProjectClose } from "@/lib/services/project-close";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { trackServiceChange } from "@/lib/services/activity";
 import { deleteProjectCore } from "@/lib/projects/delete-project";
-import { deriveReopenedServiceProjectState } from "@/lib/projects/status";
+import {
+  deriveReopenedServiceProjectState,
+  shouldValidateServiceProjectClose,
+} from "@/lib/projects/status";
 
 // ============ Công trình ============
 
@@ -351,7 +354,11 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
     }
     const effectiveServiceType = v.serviceType ?? current.serviceType;
     if (
-      v.status === "done"
+      shouldValidateServiceProjectClose({
+        currentStatus: current.status,
+        nextStatus: v.status,
+        isServiceProject: Boolean(effectiveServiceType),
+      })
       && effectiveServiceType
       && !await canCloseServiceProject(gate.storeId, v.id, effectiveServiceType)
     ) {

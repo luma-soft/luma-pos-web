@@ -3,6 +3,16 @@ export type ReopenedServiceProjectState = {
   serviceStage: "active" | "completed" | "warranty";
 };
 
+export function shouldValidateServiceProjectClose(input: {
+  currentStatus: string;
+  nextStatus: string;
+  isServiceProject: boolean;
+}): boolean {
+  return input.isServiceProject
+    && input.currentStatus !== "done"
+    && input.nextStatus === "done";
+}
+
 export function deriveReopenedServiceProjectState(input: {
   jobStatuses: readonly string[];
   warrantyClaimStatuses: readonly string[];

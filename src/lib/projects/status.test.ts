@@ -1,7 +1,36 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { deriveReopenedServiceProjectState } from "./status";
+import {
+  deriveReopenedServiceProjectState,
+  shouldValidateServiceProjectClose,
+} from "./status";
+
+test("editing an already-completed service project does not re-run close validation", () => {
+  assert.equal(shouldValidateServiceProjectClose({
+    currentStatus: "done",
+    nextStatus: "done",
+    isServiceProject: true,
+  }), false);
+});
+
+test("only an active-to-done service transition requires close validation", () => {
+  assert.equal(shouldValidateServiceProjectClose({
+    currentStatus: "active",
+    nextStatus: "done",
+    isServiceProject: true,
+  }), true);
+  assert.equal(shouldValidateServiceProjectClose({
+    currentStatus: "done",
+    nextStatus: "active",
+    isServiceProject: true,
+  }), false);
+  assert.equal(shouldValidateServiceProjectClose({
+    currentStatus: "active",
+    nextStatus: "done",
+    isServiceProject: false,
+  }), false);
+});
 
 test("reopening recalculates progress from non-cancelled jobs", () => {
   assert.deepEqual(deriveReopenedServiceProjectState({
