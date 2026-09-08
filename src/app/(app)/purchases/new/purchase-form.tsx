@@ -748,7 +748,7 @@ export function PurchaseForm({
                 {t("purchases.saveDraft")}
               </Button>}
               <Button type="button" onClick={() => void submit("receive")} disabled={!canSubmit || busy} loading={pendingAction === "receive"} className="h-12 min-w-0 flex-1 rounded-card font-semibold">
-                {mode === "edit" && purchaseStatus !== "draft" ? t("purchases.saveChanges") : t("purchases.receiveNow")} · {formatCurrency(total)}
+                {mode === "edit" && purchaseStatus !== "draft" ? t("purchases.saveChanges") : t("purchases.complete")}
               </Button>
             </div>
           </div>

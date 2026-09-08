@@ -1600,6 +1600,7 @@
     },
     "saveAndCreate": "Lưu & tạo thêm hàng",
     "saveAndCreateSameType": "Lưu & tạo tương tự",
+    "saveAndCreateVariant": "Lưu & tạo biến thể",
     "directSale": "Bán trực tiếp",
     "tabs": {
       "info": "Thông tin",
@@ -1898,6 +1899,8 @@
       "keepUnit": "Đơn vị gốc của SKU đã lưu phải được giữ nguyên trong màn sửa nhóm.",
       "stockPerSku": "Nhập tồn đầu riêng cho từng SKU. Hãy cập nhật ứng dụng để tạo nhiều biến thể.",
       "useGroupEditor": "Dùng Sửa nhóm biến thể để thay đổi thuộc tính. Mô tả riêng không áp dụng hàng loạt.",
+      "lockedSkuHint": "Thuộc tính này xác định SKU đang sửa. Hãy thay đổi tại",
+      "lockedStandaloneHint": "Để thêm màu, phiên bản hoặc dung tích, chọn “Lưu & tạo biến thể” bên dưới. Hệ thống sẽ lưu SKU hiện tại rồi mở luồng tạo biến thể.",
       "selectSku": "Chọn một SKU trước khi thực hiện thao tác kho.",
       "barcodeExists": "Mã vạch đã được sử dụng. Mỗi SKU cần một mã vạch riêng.",
       "unitBarcodePerSku": "Nhập mã vạch đơn vị riêng trên từng SKU sau khi tạo nhóm.",
@@ -2978,7 +2981,7 @@
     "noSuppliers": "Chưa có NCC — tạo ở mục Nhà cung cấp",
     "payFull": "Thanh toán đủ cho NCC",
     "amountPaid": "Đã trả NCC",
-    "receiveNow": "Lưu & nhận hàng ngay",
+    "complete": "Hoàn thành",
     "receiveHint": "Nhận hàng ngay: cộng tồn kho, tính giá vốn bình quân gồm chiết khấu, VAT và phí nhập; phần chưa trả ghi vào nợ NCC.",
     "errors": {
       "emptyItems": "Phiếu nhập cần ít nhất 1 sản phẩm.",

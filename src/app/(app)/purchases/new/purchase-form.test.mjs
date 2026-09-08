@@ -140,8 +140,16 @@ describe("purchase draft actions", () => {
     const html = renderForm({ initialValues: values });
     expect(button(html, "purchases.saveDraft")).toBeDefined();
     expect(button(html, "purchases.saveDraft")).not.toContain('disabled=""');
-    expect(button(html, "purchases.receiveNow")).not.toContain('disabled=""');
+    expect(button(html, "purchases.complete")).not.toContain('disabled=""');
     expect(html).toContain("purchases.draftHint");
+  });
+  test("receive action keeps a concise label without repeating the total", () => {
+    const html = renderForm({ initialValues: initialValues(0) });
+    const receiveButton = button(html, "purchases.complete");
+
+    expect(receiveButton).toBeDefined();
+    expect(receiveButton).not.toContain("·");
+    expect(receiveButton).not.toContain("198.000");
   });
   test("empty or invalid quantities disable both mutations", () => {
     for (const quantity of [0, -1, NaN]) {
@@ -149,7 +157,7 @@ describe("purchase draft actions", () => {
       values.items[0].quantity = quantity;
       const html = renderForm({ initialValues: values });
       expect(button(html, "purchases.saveDraft")).toContain('disabled=""');
-      expect(button(html, "purchases.receiveNow")).toContain('disabled=""');
+      expect(button(html, "purchases.complete")).toContain('disabled=""');
     }
     const html = renderForm({ initialProducts: [] });
     expect(button(html, "purchases.saveDraft")).toContain('disabled=""');
@@ -158,7 +166,7 @@ describe("purchase draft actions", () => {
     for (const key of ["supplierId", "warehouseId"]) {
       const html = renderForm({ initialValues: { ...initialValues(0), [key]: "" } });
       expect(button(html, "purchases.saveDraft")).toContain('disabled=""');
-      expect(button(html, "purchases.receiveNow")).toContain('disabled=""');
+      expect(button(html, "purchases.complete")).toContain('disabled=""');
     }
   });
   test("editing a draft can keep the draft or receive it", async () => {
@@ -167,7 +175,7 @@ describe("purchase draft actions", () => {
     expect(page.props.purchaseStatus).toBe("draft");
     const html = renderToStaticMarkup(page);
     expect(button(html, "purchases.saveDraft")).toBeDefined();
-    expect(button(html, "purchases.receiveNow")).toBeDefined();
+    expect(button(html, "purchases.complete")).toBeDefined();
     expect(button(html, "purchases.saveChanges")).toBeUndefined();
   });
   test("received receipt cannot downgrade from edit form", async () => {

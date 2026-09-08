@@ -484,6 +484,7 @@ export function NewProductForm({
             onCancel={close}
             onIntent={setSubmitIntent}
             isEdit={isEdit}
+            createVariantAfterSave={isEdit && productKind === "product"}
           />
         )}
       </header>
@@ -563,6 +564,7 @@ export function NewProductForm({
             onCancel={close}
             onIntent={setSubmitIntent}
             isEdit={isEdit}
+            createVariantAfterSave={isEdit && productKind === "product"}
             align="footer"
           />
         </footer>
@@ -581,6 +583,7 @@ function FormActions({
   onIntent,
   showDirectSale = true,
   isEdit,
+  createVariantAfterSave = false,
   align = "header",
 }: {
   loading: boolean;
@@ -588,6 +591,7 @@ function FormActions({
   onCancel: () => void;
   onIntent: (intent: "save" | "sameType") => void;
   isEdit: boolean;
+  createVariantAfterSave?: boolean;
   showDirectSale?: boolean;
   align?: "header" | "footer";
 }) {
@@ -623,7 +627,7 @@ function FormActions({
           variant="secondary"
           disabled={loading}
           onClick={() => onIntent("sameType")}
-          tx={isEdit ? "products.saveAndCreateSameType" : "products.saveAndCreate"}
+          tx={createVariantAfterSave ? "products.saveAndCreateVariant" : isEdit ? "products.saveAndCreateSameType" : "products.saveAndCreate"}
           className={align === "footer" ? "order-3 col-span-2 w-full sm:order-none sm:w-auto" : undefined}
         />
         <Button
@@ -911,6 +915,7 @@ function VariantsTab({
   isVariantChild: boolean;
   siblingCount: number;
 }) {
+  const t = useTranslations();
   return (
     <div className="space-y-4">
       <Section
@@ -933,7 +938,18 @@ function VariantsTab({
         collapsible={false}
       >
         <AttributesField locked={isEdit && !groupEditing} />
-        {isEdit && !groupEditing && <p className="mt-3 text-sm text-slate-500">Giá trị này xác định SKU đang sửa. {groupId && <a className="font-medium text-primary-600 underline" href={Routes.productGroupEdit(groupId)}>Sửa nhóm biến thể</a>}</p>}
+        {isEdit && !groupEditing && (
+          <div className="mt-3 rounded-lg border border-primary-100 bg-primary-50/60 px-3 py-2.5 text-sm text-slate-600 dark:border-primary-900/50 dark:bg-primary-950/20 dark:text-slate-300">
+            {groupId ? (
+              <>
+                {t("products.variants.lockedSkuHint")}{" "}
+                <a className="font-medium text-primary-600 underline dark:text-primary-300" href={Routes.productGroupEdit(groupId)}>
+                  {t("products.variants.editGroup")}
+                </a>
+              </>
+            ) : t("products.variants.lockedStandaloneHint")}
+          </div>
+        )}
       </Section>
       {isEdit && isVariantChild && !groupEditing && (
         <SiblingApplySection siblingCount={siblingCount} />

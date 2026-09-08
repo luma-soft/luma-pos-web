@@ -1600,6 +1600,7 @@
     },
     "saveAndCreate": "Save & add another item",
     "saveAndCreateSameType": "Save & create similar",
+    "saveAndCreateVariant": "Save & create variants",
     "directSale": "Direct sale",
     "tabs": {
       "info": "Info",
@@ -1898,6 +1899,8 @@
       "keepUnit": "Keep the existing SKU base unit in the group editor.",
       "stockPerSku": "Enter opening stock per SKU. Update the app to create multiple variants.",
       "useGroupEditor": "Use the variant group editor to change attributes. Individual descriptions cannot be copied in bulk.",
+      "lockedSkuHint": "These attributes identify the SKU being edited. Change them in",
+      "lockedStandaloneHint": "To add a color, version, or capacity, choose “Save & create variants” below. The current SKU will be saved before the variant workflow opens.",
       "selectSku": "Select a SKU before performing an inventory action.",
       "barcodeExists": "The barcode is already in use. Each SKU needs its own barcode.",
       "unitBarcodePerSku": "Set unit barcodes individually on each SKU after creating the group.",
@@ -2978,7 +2981,7 @@
     "noSuppliers": "No suppliers — create one in Suppliers",
     "payFull": "Pay supplier in full",
     "amountPaid": "Paid to supplier",
-    "receiveNow": "Save & receive now",
+    "complete": "Complete",
     "receiveHint": "Receive now: stock is added, average cost includes discounts, VAT and freight; unpaid balance is recorded as supplier debt.",
     "errors": {
       "emptyItems": "Add at least 1 product.",
