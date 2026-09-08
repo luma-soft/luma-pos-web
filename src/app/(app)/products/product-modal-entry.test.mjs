@@ -6,6 +6,7 @@ const editPage = readFileSync(new URL("./[id]/edit/page.tsx", import.meta.url), 
 const newPage = readFileSync(new URL("./new/page.tsx", import.meta.url), "utf8");
 const routes = readFileSync(new URL("../../../lib/routes.ts", import.meta.url), "utf8");
 const aiActions = readFileSync(new URL("../../../lib/ai/actions.ts", import.meta.url), "utf8");
+const productForm = readFileSync(new URL("./new/product-form.tsx", import.meta.url), "utf8");
 
 test("hard-loaded product detail keeps the detail inside a dialog", () => {
   expect(detailPage).toContain("<ProductDetailDialog");
@@ -24,4 +25,17 @@ test("internal product form links target modal URLs without a legacy page hop", 
   expect(routes).not.toContain('productEdit: (id: string) => `/products/${id}/edit`');
   expect(aiActions).not.toContain('href: "/products/new?source=ai-preview"');
   expect(aiActions).not.toContain('`/products/${productId}/edit?source=ai-preview`');
+});
+
+test("product save refreshes only when the editor stays open", () => {
+  const saveValues = productForm.slice(
+    productForm.indexOf("async function saveValues"),
+    productForm.indexOf("function resetForNextProduct"),
+  );
+  const refreshCount = saveValues.match(/router\.refresh\(\)/g)?.length ?? 0;
+  const stayOpenRefreshCount = saveValues.match(
+    /resetForNextProduct\(\);\s*router\.refresh\(\)/g,
+  )?.length ?? 0;
+
+  expect(refreshCount).toBe(stayOpenRefreshCount);
 });

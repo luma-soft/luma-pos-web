@@ -309,7 +309,6 @@ export function NewProductForm({
         return;
       }
       navigateAfterModal(submitIntent === "sameType" ? sameTypeHref(result.data.id) : isModal ? doneHref : Routes.product(result.data.id));
-      router.refresh();
       return;
     }
     if (isEdit && productId) {
@@ -368,7 +367,6 @@ export function NewProductForm({
               : Routes.product(productId);
         if (isModal) navigateAfterModal(href);
         else router.push(href);
-        router.refresh();
         return;
       }
       form.setError("root", { message: res.error });
@@ -384,7 +382,6 @@ export function NewProductForm({
       navigateAfterModal(
         doneHref,
       );
-      router.refresh();
       return;
     }
     form.setError("root", { message: res.error });
