@@ -479,7 +479,11 @@ export function ProductsTable({
               return <tr key={`${product.id}:${child.id}`} onClick={() => openProduct(child)} className={cn("cursor-pointer border-t border-border-soft bg-surface hover:bg-surface-2 [&>td:first-child]:border-l [&>td:first-child]:border-primary-600 [&>td:last-child]:border-r [&>td:last-child]:border-primary-600", selectedIds.has(child.id) && "bg-primary-50 dark:bg-primary-950/40")}>
                 {visibleColumns.map((column) => <td key={column.key} className={cn("px-3 py-3 align-middle", column.align === "right" && "text-right tabular-nums", column.align === "center" && "text-center", typeof column.cellClassName === "function" ? column.cellClassName(child) : column.cellClassName)}>
                   {column.key === "sku" ? <Link href={Routes.productDetail(child.id)} scroll={false} onClick={stopRowToggle} className="flex min-h-14 items-center gap-2.5 text-sm font-medium hover:text-primary-600"><ProductThumbnail product={child} /><span className="min-w-0 break-words">{child.sku}</span></Link>
-                    : column.key === "product" ? <Link href={Routes.productDetail(child.id)} scroll={false} onClick={stopRowToggle} className="block whitespace-normal font-medium hover:text-primary-600"><span className="block break-words">{child.name}</span>{productVariantLabel(child) !== child.name && <span className="mt-1 block text-xs font-normal text-slate-500">{t("products.variants.version")}: {productVariantLabel(child)}</span>}</Link>
+                    : column.key === "product" ? <Link href={Routes.productDetail(child.id)} scroll={false} onClick={stopRowToggle} className="block whitespace-normal font-medium hover:text-primary-600">
+                      <span className="block break-words">{child.name}</span>
+                      {productVariantLabel(child) !== child.name && <span className="mt-1 block text-xs font-normal text-slate-500">{t("products.variants.version")}: {productVariantLabel(child)}</span>}
+                      <span className="mt-1 block"><ProductKindBadge kind={child.productKind} /></span>
+                    </Link>
                     : column.render(child)}
                 </td>)}
               </tr>;
