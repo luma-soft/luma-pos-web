@@ -42,7 +42,14 @@ export function PurchasesTable({ rows, printTemplates, detailPurchase = null }: 
   const columns: DataTableColumn<PurchaseRow>[] = [
     { key: "code", label: t("purchases.cols.code"), required: true, render: (purchase) => <span className="font-semibold text-primary-600">{purchase.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, render: (purchase) => <span className="text-slate-500">{formatDate(purchase.createdAt)}</span> },
-    { key: "supplier", label: t("purchases.cols.supplier"), defaultVisible: true, render: (purchase) => <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} /> },
+    {
+      key: "supplier",
+      label: t("purchases.cols.supplier"),
+      defaultVisible: true,
+      width: "30%",
+      cellClassName: "overflow-visible whitespace-normal text-clip break-words",
+      render: (purchase) => <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} />,
+    },
     { key: "total", label: t("orders.cols.total"), defaultVisible: true, align: "right", cellClassName: "font-semibold", render: (purchase) => formatCurrency(Number(purchase.total)) },
     { key: "owed", label: t("purchases.cols.owed"), defaultVisible: true, align: "right", cellClassName: (purchase) => purchaseOwed(purchase) > 0 ? "font-semibold text-warn" : "text-slate-400", render: (purchase) => purchaseOwed(purchase) > 0 ? formatCurrency(purchaseOwed(purchase)) : "—" },
     { key: "status", label: t("orders.cols.status"), defaultVisible: true, render: (purchase) => <StatusBadge status={purchase.status} /> },

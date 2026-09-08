@@ -54,3 +54,12 @@ test("opening and closing update the URL while preserving list filters", () => {
     else globalThis.window = previousWindow;
   }
 });
+
+test("the desktop supplier column has room for and wraps long supplier names", () => {
+  render();
+  const supplierColumn = table.columns.find((column) => column.key === "supplier");
+
+  expect(supplierColumn.width).toBe("30%");
+  expect(supplierColumn.cellClassName).toContain("whitespace-normal");
+  expect(supplierColumn.cellClassName).toContain("break-words");
+});
