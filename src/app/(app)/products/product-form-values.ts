@@ -7,6 +7,16 @@ import { buildVariantCombinations, normalizeVariantAttributes, variantCombinatio
 export type ProductSeedMode = "edit" | "copy" | "groupCopy" | "sameType" | "groupEdit" | "groupAdd";
 const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
 
+export function latestVariantMemberId(product: ProductDetail): string | undefined {
+  return product.variantGroup?.members
+    .filter((member) => !member.isVariantParent)
+    .slice()
+    .sort((left, right) => {
+      const byTime = new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+      return byTime || right.id.localeCompare(left.id);
+    })[0]?.id;
+}
+
 /** Group forms must seed shared fields from the real root, never a child override. */
 export async function resolveProductFormSeed(
   product: ProductDetail,
@@ -27,6 +37,7 @@ export function productToFormInitialValues(
   publicMedia?: PublicMediaConfig,
 ): Partial<CreateProductInput> {
   const isCopy = mode === "copy" || mode === "groupCopy";
+  const clearsIdentity = isCopy || mode === "groupAdd" || mode === "sameType";
   const specs = (product.specs as Record<string, string[]> | null) ?? {};
   const orderNote = specs[PRODUCT_ORDER_NOTE_SPEC_KEY]?.[0] ?? "";
   const attributeSpecs = Object.entries(specs).filter(
@@ -56,7 +67,7 @@ export function productToFormInitialValues(
       id: mode === "edit" ? u.id : undefined,
       unitName: u.unitName,
       multiplier: Number(u.multiplier),
-      barcode: isCopy ? "" : (u.barcode ?? ""),
+      barcode: clearsIdentity ? "" : (u.barcode ?? ""),
       priceOverride: u.priceOverride != null ? Number(u.priceOverride) : null,
     })),
     comboItems: product.comboItems.map((item) => ({
@@ -116,19 +127,25 @@ export function productToFormInitialValues(
         imageUrls: isCopy ? [] : member.imageUrls ?? [],
       };
     });
+    const addingOne = Boolean(group) && (mode === "groupAdd" || mode === "sameType");
     return {
       ...shared,
       variantContractVersion: 2,
       variantOperation: isCopy ? "create" : mode === "groupAdd" || mode === "sameType" ? "add" : "edit",
       ...(!isCopy ? { variantGroupId: group?.id ?? product.id, variantRevision: group?.revision ?? 0 } : {}),
       attributes,
-      variantChildren: children,
+      variantChildren: addingOne ? [] : children,
       excludedCombinationKeys: group?.excludedCombinationKeys ?? combinations.filter((combo) => !children.some((child) => child.combinationKey === combo.combinationKey)).map((combo) => combo.combinationKey),
-      sku: isCopy ? "" : product.sku,
-      barcode: isCopy ? "" : product.barcode ?? "",
-      name: group?.name ?? product.name,
+      sku: clearsIdentity ? "" : product.sku,
+      barcode: clearsIdentity ? "" : product.barcode ?? "",
+      name: addingOne ? product.name : group?.name ?? product.name,
       imageUrls: isCopy ? [] : product.imageUrls ?? [],
       imageMediaIds: isCopy ? [] : imageMedia.map((image) => image.mediaId),
+      ...(addingOne ? {
+        variantTemplateProductId: product.id,
+        variantAddValues: Object.fromEntries(attributes.map((attribute) => ["attributeId" in attribute ? attribute.attributeId : "", ""])),
+        variantExistingCombinationKeys: children.flatMap((child) => child.combinationKey ? [child.combinationKey] : []),
+      } : {}),
       location: product.location ?? "",
       description: product.description ?? "",
       invoiceNote: orderNote,

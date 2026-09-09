@@ -92,6 +92,9 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
   `);
   const identityByProduct = new Map(identities.rows.map((row) => [row.product_id, row.combination_key]));
   const existingById = new Map(existing.map((row) => [row.id, row]));
+  if (v.variantOperation === "add" && v.variantTemplateProductId && !existingById.has(v.variantTemplateProductId)) {
+    fail("products.variants.invalidGroup");
+  }
   const submittedIds = new Set(children.flatMap((row) => row.productId ? [row.productId] : []));
   if (children.some((child) => child.productId && !existingById.has(child.productId))) fail("products.variants.invalidGroup");
   if (v.variantOperation !== "add" && existing.some((row) => !submittedIds.has(row.id))) fail("products.variants.keepExisting");
@@ -161,11 +164,11 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
         updatedAt: sql`now()` }).where(and(eq(products.storeId, storeId), eq(products.id, id)));
     } else {
       await tx.insert(products).values({ ...common, ...commercial, id,
-        name: `${v.name.trim()} - ${child.variantName}`, baseUnit: child.baseUnit || v.baseUnit,
+        name: child.name?.trim() || `${v.name.trim()} - ${child.variantName}`, baseUnit: child.baseUnit || v.baseUnit,
         parentProductId: kind === "native" ? groupId : null,
         relatedProductId: kind === "related" && id !== groupId ? groupId : null,
         // Native children inherit common description dynamically; separate overrides can be edited later.
-        description: kind === "native" ? null : common.description,
+        description: v.variantOperation === "add" ? common.description : kind === "native" ? null : common.description,
         imageUrls: child.imageUrls.length ? child.imageUrls : v.imageUrls,
       });
       createdIds.push(id);

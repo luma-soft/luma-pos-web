@@ -117,6 +117,7 @@ export async function replaceProductMediaInTransaction(
     productId: string;
     imageMediaIds: readonly string[];
     imageUrls: readonly string[];
+    allowedSourceProductIds?: readonly string[];
     publicMedia: PublicMediaConfig;
     now?: Date;
   },
@@ -130,6 +131,7 @@ export async function replaceProductMediaInTransaction(
   const storeId = canonicalizeUuidCoordinate(input.storeId);
   const productId = canonicalizeUuidCoordinate(input.productId);
   const ids = parsedIds.data;
+  const allowedSourceProductIds = (input.allowedSourceProductIds ?? []).map(canonicalizeUuidCoordinate);
   const changedAt = input.now ?? new Date();
 
   const [coordinates] = await transaction.select({
@@ -181,7 +183,7 @@ export async function replaceProductMediaInTransaction(
 
   const eligible = productMediaEligibilitySql(mediaObjects, {
     storeId,
-    targetIds: [storeId, productId],
+    targetIds: [storeId, productId, ...allowedSourceProductIds],
     publicMedia: input.publicMedia,
   });
   const records = ids.length === 0
@@ -223,6 +225,7 @@ export async function replaceProductMediaInTransaction(
       || (
         !uuidCoordinatesEqual(record.targetId, storeId)
         && !uuidCoordinatesEqual(record.targetId, productId)
+        && !allowedSourceProductIds.some((id) => uuidCoordinatesEqual(record.targetId, id))
       )
       || !orderedCoordinates[index]
       || !uuidCoordinatesEqual(orderedCoordinates[index]!.storeId, storeId)

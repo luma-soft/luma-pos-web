@@ -32,7 +32,16 @@ export async function saveProductVariantGroup(input: CreateProductInput): Promis
             const imageUrls = record.imageUrls ?? [];
             const imageMediaIds = JSON.stringify(imageUrls) === JSON.stringify(v.imageUrls) && v.imageMediaIds.length
               ? v.imageMediaIds : await resolveLegacyProductImageIdsInTransaction(tx, { storeId: gate.storeId, productId: record.id, imageUrls, publicMedia });
-            await replaceProductMediaInTransaction(tx, { storeId: gate.storeId, productId: record.id, imageMediaIds, imageUrls, publicMedia });
+            await replaceProductMediaInTransaction(tx, {
+              storeId: gate.storeId,
+              productId: record.id,
+              imageMediaIds,
+              imageUrls,
+              publicMedia,
+              allowedSourceProductIds: v.variantOperation === "add" && v.variantTemplateProductId
+                ? [v.variantTemplateProductId]
+                : [],
+            });
           }
         }
         await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId,

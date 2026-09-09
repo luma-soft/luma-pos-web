@@ -2,17 +2,17 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ProductDetail } from "@/lib/data/products";
 import { createProductSchema } from "./new/schema";
-import { productToFormInitialValues, resolveProductFormSeed } from "./product-form-values";
+import { latestVariantMemberId, productToFormInitialValues, resolveProductFormSeed } from "./product-form-values";
 
 const base = {
   id: "parent", name: "RAP2200", sku: "RAP2200", productKind: "product", barcode: null,
   categoryId: "network", brandId: null, suppliers: [], units: [], comboItems: [],
   baseUnit: "cái", costPrice: "990000", retailPrice: "1190000", wholesalePrice: null,
   contractorPrice: null, agentPrice: null, imageUrls: [], imageMedia: [], location: null,
-  description: "Thông số kỹ thuật: hai băng tần", specs: null, isActive: true, totalStock: "0",
+  description: "Thông số kỹ thuật: hai băng tần", specs: null, isActive: true, totalStock: "0", createdAt: new Date("2026-01-01T00:00:00Z"),
 };
-const e = { ...base, id: "e", sku: "RG-RAP2200(E)", name: "RAP2200 E", variantName: "E", costPrice: "1280000", retailPrice: "1490000", specs: { "Phiên bản": ["E"] } };
-const f = { ...base, id: "f", sku: "RG-RAP2200(F)", name: "RAP2200 F", variantName: "F", totalStock: "2", specs: { "Phiên bản": ["F"] } };
+const e = { ...base, id: "e", sku: "RG-RAP2200(E)", name: "RAP2200 E", variantName: "E", costPrice: "1280000", retailPrice: "1490000", specs: { "Phiên bản": ["E"] }, createdAt: new Date("2026-01-02T00:00:00Z") };
+const f = { ...base, id: "f", sku: "RG-RAP2200(F)", name: "RAP2200 F", variantName: "F", totalStock: "2", specs: { "Phiên bản": ["F"] }, createdAt: new Date("2026-01-03T00:00:00Z") };
 const grouped = {
   ...base, isVariantParent: true,
   variantGroup: { id: "parent", name: "RAP2200", kind: "native", revision: 4,
@@ -61,10 +61,12 @@ test("group footer copies an imported sellable root and all siblings without cha
 });
 
 test("same-type action targets the existing group instead of making another parent", () => {
+  assert.equal(latestVariantMemberId(grouped), "f");
   const draft = productToFormInitialValues(grouped, "sameType");
   assert.equal(draft.variantOperation, "add");
   assert.equal(draft.variantGroupId, "parent");
-  assert.deepEqual(draft.variantChildren?.map((child) => child.productId), ["e", "f"]);
+  assert.deepEqual(draft.variantChildren, []);
+  assert.deepEqual(draft.variantExistingCombinationKeys?.length, 2);
 });
 
 test("a simple product without identifying attributes needs an explicit combination assignment", () => {

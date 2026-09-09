@@ -47,6 +47,7 @@ import { UnitPriceConfirmation } from "./unit-price-confirmation";
 import { buildUnitPriceReview, normalizeUnitPriceDraft, type UnitPricingSnapshot, type UnitPriceBook } from "@/lib/products/unit-price-edit";
 import { AttributesField } from "./attributes-field";
 import { VariantChildrenField } from "./variant-children-field";
+import { prepareVariantAddition } from "./variant-add";
 import { normalizeVariantAttributes } from "@/lib/products/variant-model";
 import { saveProductVariantGroup } from "@/lib/actions/product-variants";
 import {
@@ -279,8 +280,10 @@ export function NewProductForm({
     try {
       try {
         values = normalizeUnitPriceDraft(values);
+        values = prepareVariantAddition(values);
       } catch (error) {
         form.setError("root", { message: error instanceof Error ? error.message : "errors.invalidData" });
+        if (values.variantOperation === "add") setTab("variants");
         return;
       }
       // Group/variant edits retain their explicit SKU workflow; never propagate
@@ -416,6 +419,8 @@ export function NewProductForm({
 
   const productKind = form.watch("productKind") ?? "product";
   const groupEditing = Boolean(form.watch("variantGroupId"));
+  const groupAdding = groupEditing && form.watch("variantOperation") === "add";
+  const groupManaging = groupEditing && !groupAdding;
   const variantEnabled = productKind === "product" && (!isEdit || groupEditing);
   const hasVariants = variantEnabled && (form.watch("attributes") ?? []).some((attribute) => attribute.createsVariants !== false);
   const rawError = form.formState.errors.root?.message ?? form.formState.errors.variantChildren?.message ?? form.formState.errors.attributes?.message;
@@ -459,7 +464,7 @@ export function NewProductForm({
             id={isModal ? "product-editor-title" : undefined}
             as="h1"
             size="lg"
-            text={groupEditing ? (form.watch("variantOperation") === "add" ? "Thêm biến thể" : "Sửa nhóm biến thể") : t(
+            text={groupEditing ? (groupAdding ? "Thêm hàng hóa cùng loại" : "Sửa nhóm biến thể") : t(
               isEdit
                 ? `products.kind.editTitles.${productKind}`
                 : `products.kind.createTitles.${productKind}`,
@@ -479,7 +484,7 @@ export function NewProductForm({
         ) : (
           <FormActions
             loading={form.formState.isSubmitting}
-            showDirectSale={!groupEditing && !hasVariants}
+            showDirectSale={!groupManaging && (!hasVariants || groupAdding)}
             registerDirectSale={form.register("directSale")}
             onCancel={close}
             onIntent={setSubmitIntent}
@@ -522,8 +527,8 @@ export function NewProductForm({
         )}
       >
         {groupEditing && <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-800">
-          <p className="font-semibold">{form.watch("variantOperation") === "add" ? "Thêm biến thể vào nhóm" : "Sửa nhóm biến thể"}: {variantGroup?.name ?? form.watch("name")}</p>
-          <p className="mt-1">Giữ SKU đã có; hàng mới được thêm vào cùng nhóm. Nội dung riêng của từng SKU được giữ nguyên.</p>
+          <p className="font-semibold">{groupAdding ? "Thêm hàng hóa cùng loại" : "Sửa nhóm biến thể"}: {variantGroup?.name ?? form.watch("name")}</p>
+          <p className="mt-1">{groupAdding ? "Thông tin đang được sao chép từ biến thể mới nhất. Bạn có thể sửa cho hàng mới; cấu trúc thuộc tính của nhóm được giữ nguyên." : "Nội dung riêng của từng SKU được giữ nguyên khi chỉnh cấu trúc nhóm."}</p>
         </div>}
         {tab === "info" && (
           <InfoTab
@@ -550,7 +555,7 @@ export function NewProductForm({
             groupId={variantGroup?.id}
           />
         )}
-        <VariantChildrenField key={`variant-children-${formGeneration}`} visible={tab === "variants"} enabled={variantEnabled} />
+        <VariantChildrenField key={`variant-children-${formGeneration}`} visible={tab === "variants"} enabled={variantEnabled && !groupAdding} />
         {tab === "description" && <DescriptionTab />}
         {hasVariants && !groupEditing && tab === "info" && <p className="text-sm text-slate-500">Giá chung dùng cho SKU mới. Nhập giá và tồn từng biến thể tại tab Đơn vị & thuộc tính.</p>}
       </div>
@@ -559,7 +564,7 @@ export function NewProductForm({
         <footer className="shrink-0 border-t border-border bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:pb-3">
           <FormActions
             loading={form.formState.isSubmitting}
-            showDirectSale={!groupEditing && !hasVariants}
+            showDirectSale={!groupManaging && (!hasVariants || groupAdding)}
             registerDirectSale={form.register("directSale")}
             onCancel={close}
             onIntent={setSubmitIntent}
@@ -655,22 +660,15 @@ function InfoTab({
   const { watch } = useFormCtx();
   const productKind = watch("productKind") ?? "product";
   const groupAdding = groupEditing && watch("variantOperation") === "add";
-  if (groupAdding) return <Section title="Thông tin nhóm" collapsible={false}>
-    <p className="mb-4 text-sm text-slate-500">Đang thêm SKU vào nhóm này. Thông tin chung được giữ nguyên; nhập thuộc tính, giá và tồn đầu của SKU mới ở tab Đơn vị &amp; thuộc tính.</p>
-    <dl className="grid gap-4 sm:grid-cols-2">
-      <div className="sm:col-span-2"><dt className="text-sm text-slate-500">Tên nhóm</dt><dd className="mt-1 font-medium">{watch("name")}</dd></div>
-      <div><dt className="text-sm text-slate-500">Nhóm hàng</dt><dd className="mt-1">{categories.find((category) => category.id === watch("categoryId"))?.name ?? "—"}</dd></div>
-      <div><dt className="text-sm text-slate-500">Thương hiệu</dt><dd className="mt-1">{brands.find((brand) => brand.id === watch("brandId"))?.name ?? "—"}</dd></div>
-    </dl>
-  </Section>;
+  const groupManaging = groupEditing && !groupAdding;
   return (
     <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">
       <div className="min-w-0 space-y-5">
-        <BasicInfoSection categories={categories} brands={brands} groupEditing={groupEditing} />
+        <BasicInfoSection categories={categories} brands={brands} groupEditing={groupManaging} />
         {productKind === "combo" && (
           <ComboItemsField products={comboProducts ?? []} />
         )}
-        {!groupEditing && <Section
+        {!groupManaging && <Section
           titleTx="products.sections.pricing"
           className="rounded-none border-x-0 border-b-0 shadow-none"
         >
@@ -684,7 +682,7 @@ function InfoTab({
             >
               <StockFields />
             </Section>
-            {!groupEditing && <Section
+            {!groupManaging && <Section
               titleTx="products.sections.physical"
               descriptionTx="products.sections.physicalDesc"
               defaultOpen={false}
@@ -888,14 +886,15 @@ function DescriptionTab() {
   const { register, watch } = useFormCtx();
   const groupEditing = Boolean(watch("variantGroupId"));
   const groupAdding = groupEditing && watch("variantOperation") === "add";
+  const groupManaging = groupEditing && !groupAdding;
   return (
     <div className="space-y-4">
       <Section title="Mô tả và thông số kỹ thuật" description="Thông số như băng tần, nguồn cấp, MIMO và hướng dẫn cài đặt được ghi ở đây; không tạo thêm SKU." collapsible={false}>
-        {groupAdding
-          ? <div className="space-y-3"><p className="text-sm text-slate-500">Mô tả chung được giữ nguyên khi thêm SKU. Dùng Sửa nhóm biến thể để cập nhật nội dung này.</p><p className="whitespace-pre-wrap text-sm">{watch("description") || "Chưa có mô tả."}</p></div>
+        {groupManaging
+          ? <div className="space-y-3"><p className="text-sm text-slate-500">Mô tả chung được giữ nguyên khi sửa cấu trúc nhóm.</p><p className="whitespace-pre-wrap text-sm">{watch("description") || "Chưa có mô tả."}</p></div>
           : <Textarea {...register("description")} aria-label="Mô tả và thông số kỹ thuật" rows={8} />}
       </Section>
-      {!groupEditing && <Section titleTx="products.description.invoiceNote" collapsible={false}>
+      {!groupManaging && <Section titleTx="products.description.invoiceNote" collapsible={false}>
         <Textarea {...register("invoiceNote")} aria-label="Mẫu ghi chú hóa đơn, đặt hàng" rows={4} />
       </Section>}
     </div>
@@ -916,6 +915,8 @@ function VariantsTab({
   siblingCount: number;
 }) {
   const t = useTranslations();
+  const { watch } = useFormCtx();
+  const groupAdding = groupEditing && watch("variantOperation") === "add";
   return (
     <div className="space-y-4">
       <Section
@@ -934,10 +935,10 @@ function VariantsTab({
       </Section>
       <Section
         title="Thuộc tính tạo biến thể"
-        description="Chọn đặc điểm phân biệt hàng bán như phiên bản, màu, dung tích. Mỗi tổ hợp tương ứng một SKU."
+        description={groupAdding ? "Cấu trúc thuộc tính của nhóm đã được khóa. Chỉ nhập giá trị thuộc tính của hàng hóa mới." : "Chọn đặc điểm phân biệt hàng bán như phiên bản, màu, dung tích. Mỗi tổ hợp tương ứng một SKU."}
         collapsible={false}
       >
-        <AttributesField locked={isEdit && !groupEditing} />
+        {groupAdding ? <VariantAddFields /> : <AttributesField locked={isEdit && !groupEditing} />}
         {isEdit && !groupEditing && (
           <div className="mt-3 rounded-lg border border-primary-100 bg-primary-50/60 px-3 py-2.5 text-sm text-slate-600 dark:border-primary-900/50 dark:bg-primary-950/20 dark:text-slate-300">
             {groupId ? (
@@ -953,6 +954,37 @@ function VariantsTab({
       </Section>
       {isEdit && isVariantChild && !groupEditing && (
         <SiblingApplySection siblingCount={siblingCount} />
+      )}
+    </div>
+  );
+}
+
+function VariantAddFields() {
+  const { register, watch } = useFormCtx();
+  const attributes = watch("attributes") ?? [];
+
+  return (
+    <div className="space-y-3">
+      {attributes.map((attribute) => (
+        <div
+          key={attribute.attributeId}
+          className="grid grid-cols-1 items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)]"
+        >
+          <div>
+            <p className="text-sm font-semibold">{attribute.name}</p>
+            <p className="text-xs text-slate-500">Thuộc tính cố định</p>
+          </div>
+          <Field label={`Mã ${attribute.name}`} required>
+            <Input
+              {...register(`variantAddValues.${attribute.attributeId}`)}
+              placeholder={`Nhập mã ${attribute.name.toLocaleLowerCase("vi")}`}
+              autoComplete="off"
+            />
+          </Field>
+        </div>
+      ))}
+      {attributes.length === 0 && (
+        <p className="text-sm text-red-600">Nhóm hàng chưa có thuộc tính để tạo hàng hóa cùng loại.</p>
       )}
     </div>
   );
@@ -1572,7 +1604,8 @@ function StockFields() {
   const currentStock = watch("currentStock");
   const editingStock = currentStock !== undefined;
   const groupEditing = Boolean(watch("variantGroupId"));
-  const hasVariants = groupEditing || (!editingStock && (watch("attributes") ?? []).some((attribute) => attribute.createsVariants !== false));
+  const groupAdding = groupEditing && watch("variantOperation") === "add";
+  const hasVariants = (groupEditing && !groupAdding) || (!groupAdding && !editingStock && (watch("attributes") ?? []).some((attribute) => attribute.createsVariants !== false));
   if (hasVariants) return <p className="text-sm text-slate-500">Tồn được quản lý trên từng SKU trong tab Đơn vị & thuộc tính. Nhóm không có tồn riêng.</p>;
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

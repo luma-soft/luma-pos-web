@@ -11,7 +11,7 @@ import { parsePageSize } from "@/lib/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { ProductsTable } from "./products-table";
 import { NewProductForm } from "../../products/new/product-form";
-import { productToFormInitialValues, resolveProductFormSeed } from "../../products/product-form-values";
+import { latestVariantMemberId, productToFormInitialValues, resolveProductFormSeed } from "../../products/product-form-values";
 import { ShopeeListingModal } from "./shopee-listing-modal";
 import { CAMERA_QUOTE_DETAIL_MATERIAL_SKUS, CAMERA_QUOTE_MATERIAL_SKUS } from "@/lib/data/camera-quote-constants";
 import { CameraMaterialSearch } from "./camera-material-search";
@@ -173,17 +173,20 @@ export async function ProductEditorModal({
   const seedProduct = requestedProduct ? await resolveProductFormSeed(requestedProduct, seedMode, (productId) => getProduct(context.storeId, productId)) : null;
   if (seedId && !seedProduct) notFound();
 
-  const priceOverridesByBook = seedProduct ? await getPriceOverridesForProducts(context.storeId, [seedProduct.id]) : {};
-  const priceBookPrices = seedProduct
-    ? Object.fromEntries(Object.entries(priceOverridesByBook).map(([bookId, prices]) => [bookId, prices[seedProduct.id]]))
+  const templateId = seedMode === "groupAdd" && seedProduct ? latestVariantMemberId(seedProduct) : undefined;
+  const templateProduct = templateId ? await getProduct(context.storeId, templateId) : seedProduct;
+  if (seedMode === "groupAdd" && !templateProduct) notFound();
+  const priceOverridesByBook = templateProduct ? await getPriceOverridesForProducts(context.storeId, [templateProduct.id]) : {};
+  const priceBookPrices = templateProduct
+    ? Object.fromEntries(Object.entries(priceOverridesByBook).map(([bookId, prices]) => [bookId, prices[templateProduct.id]]))
     : {};
   const closeHref = closeHrefOverride ?? productModalHref(searchParams, {});
   const mode = modal === "edit" || modal === "groupEdit" ? "edit" : "create";
   const requestedKind = ["product", "service", "combo"].includes(searchParams.productKind ?? "")
     ? searchParams.productKind as "product" | "service" | "combo"
     : "product";
-  const initialValues = seedProduct
-    ? productToFormInitialValues(seedProduct, seedMode, priceBookPrices, publicMedia)
+  const initialValues = templateProduct
+    ? productToFormInitialValues(templateProduct, seedMode, priceBookPrices, publicMedia)
     : undefined;
 
   return (
@@ -203,7 +206,7 @@ export async function ProductEditorModal({
           siblingCount={seedProduct?.siblings.length ?? 0}
           initialValues={initialValues}
           variantGroup={seedProduct?.variantGroup}
-          initialManagedImages={mode === "edit" ? seedProduct?.imageMedia : undefined}
+          initialManagedImages={mode === "edit" || seedMode === "groupAdd" ? templateProduct?.imageMedia : undefined}
           categories={options.categories}
           brands={options.brands}
           suppliers={options.suppliers}
