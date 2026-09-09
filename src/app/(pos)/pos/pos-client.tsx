@@ -807,11 +807,14 @@ export function PosClient({
   async function requestDeleteDraft(inv: PosDraft, index: number) {
     const label = draftDisplayLabel(inv, index);
     const itemCount = inv.cart.reduce((sum, line) => sum + line.quantity, 0);
+    if (itemCount <= 0) {
+      if (invoices.length > 1) closeInvoice(inv.id);
+      else clearInvoice(inv.id);
+      return;
+    }
     const approved = await confirm({
       title: t("pos.draftActions.deleteTitle"),
-      description: itemCount > 0
-        ? t("pos.draftActions.deleteDescriptionWithItems", { name: label, count: formatNumber(itemCount) })
-        : t("pos.draftActions.deleteDescriptionEmpty", { name: label }),
+      description: t("pos.draftActions.deleteDescriptionWithItems", { name: label, count: formatNumber(itemCount) }),
       cancelLabel: t("pos.draftActions.keep"),
       confirmLabel: t("pos.draftActions.delete"),
       variant: "destructive",
@@ -2655,7 +2658,7 @@ export function PosClient({
       <RowPreviewModal
         open={renameDraftId != null}
         onClose={() => setRenameDraftId(null)}
-        title={t("pos.draftActions.rename")}
+        title={t("pos.draftActions.renameTitle")}
         subtitle={t("pos.draftActions.renameDescription")}
         size="md"
         footer={(
