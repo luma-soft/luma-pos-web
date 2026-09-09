@@ -150,6 +150,7 @@ export interface NewProductFormProps {
   layout?: "page" | "modal";
   closeHref?: string;
   closeNavigation?: "push" | "replace";
+  cancelNavigation?: "back" | "push" | "replace";
   aiPreview?: boolean;
   creationKind?: "product" | "service" | "combo";
 }
@@ -172,6 +173,7 @@ export function NewProductForm({
   layout = "page",
   closeHref,
   closeNavigation = "push",
+  cancelNavigation,
   aiPreview = false,
   creationKind = "product",
 }: NewProductFormProps) {
@@ -432,7 +434,11 @@ export function NewProductForm({
     return `${path || Routes.Inventory}?${sp.toString()}`;
   }
 
-  const close = () => navigateAfterModal(doneHref);
+  const close = () => {
+    if (cancelNavigation === "back") router.back();
+    else if (cancelNavigation === "replace") router.replace(doneHref);
+    else navigateAfterModal(doneHref);
+  };
 
   const productKind = form.watch("productKind") ?? "product";
   const groupEditing = Boolean(form.watch("variantGroupId"));

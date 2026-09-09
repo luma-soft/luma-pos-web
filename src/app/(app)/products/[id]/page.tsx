@@ -15,26 +15,27 @@ interface Props {
 export default async function ProductDetailPage({ params, searchParams }: Props) {
   const { id } = await params;
   const query = await searchParams;
+  if (query.edit === "1") {
+    return (
+      <ProductEditorModal
+        searchParams={{ productModal: "edit", productId: id }}
+        closeHrefOverride={productEditorCloseHref(id)}
+        closeNavigation="replace"
+        cancelNavigation="replace"
+      />
+    );
+  }
   const context = await requireStoreContext();
   const product = await getProductListItem(context.storeId, id);
   if (!product) notFound();
 
   return (
-    <>
-      <ProductDetailDialog
-        title={product.name}
-        subtitle={product.sku}
-        closeHref={`${Routes.Inventory}?tab=products`}
-      >
-        <ProductDetailView product={product} />
-      </ProductDetailDialog>
-      {query.edit === "1" && (
-        <ProductEditorModal
-          searchParams={{ productModal: "edit", productId: id }}
-          closeHrefOverride={productEditorCloseHref("page", id)}
-          closeNavigation="replace"
-        />
-      )}
-    </>
+    <ProductDetailDialog
+      title={product.name}
+      subtitle={product.sku}
+      closeHref={`${Routes.Inventory}?tab=products`}
+    >
+      <ProductDetailView product={product} />
+    </ProductDetailDialog>
   );
 }

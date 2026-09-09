@@ -28,6 +28,7 @@ import { ProductCatalogSwitcher } from "./product-catalog-switcher";
 import { ListSearchFilterBar } from "@/components/list-search-filter";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { getPublicMediaConfig } from "@/lib/media/config";
+import { ProductModalFrame } from "@/components/product-modal-frame";
 import {
   DEFAULT_PRODUCT_LIST_SORT,
   parseProductListSort,
@@ -146,10 +147,12 @@ export async function ProductEditorModal({
   searchParams,
   closeHrefOverride,
   closeNavigation,
+  cancelNavigation,
 }: {
   searchParams: SP;
   closeHrefOverride?: string;
   closeNavigation?: "push" | "replace";
+  cancelNavigation?: "back" | "push" | "replace";
 }) {
   const context = await requireStoreContext();
   const publicMedia = getPublicMediaConfig();
@@ -181,6 +184,7 @@ export async function ProductEditorModal({
     ? Object.fromEntries(Object.entries(priceOverridesByBook).map(([bookId, prices]) => [bookId, prices[templateProduct.id]]))
     : {};
   const closeHref = closeHrefOverride ?? productModalHref(searchParams, {});
+  const effectiveCancelNavigation = cancelNavigation ?? closeNavigation ?? "replace";
   const mode = modal === "edit" || modal === "groupEdit" ? "edit" : "create";
   const requestedKind = ["product", "service", "combo"].includes(searchParams.productKind ?? "")
     ? searchParams.productKind as "product" | "service" | "combo"
@@ -190,13 +194,11 @@ export async function ProductEditorModal({
     : undefined;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-0 sm:p-5">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="product-editor-title"
-        className="h-dvh w-full max-w-7xl overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl"
-      >
+    <ProductModalFrame
+      labelledBy="product-editor-title"
+      closeHref={closeHref}
+      closeNavigation={effectiveCancelNavigation}
+    >
         <NewProductForm
           key={`${modal}-${templateProduct?.id ?? "blank"}`}
           storeId={context.storeId}
@@ -217,10 +219,10 @@ export async function ProductEditorModal({
           layout="modal"
           closeHref={closeHref}
           closeNavigation={closeNavigation}
+          cancelNavigation={effectiveCancelNavigation}
           creationKind={seedProduct?.productKind ?? requestedKind}
         />
-      </div>
-    </div>
+    </ProductModalFrame>
   );
 }
 

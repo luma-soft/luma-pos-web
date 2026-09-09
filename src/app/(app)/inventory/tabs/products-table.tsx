@@ -1881,7 +1881,6 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
                     productId: product.id,
                   })
             }
-            replace={pathname.startsWith("/products/")}
             tone="primary"
           />
           {!product.isVariantParent && <ActionLink

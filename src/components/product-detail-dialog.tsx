@@ -1,8 +1,7 @@
-"use client";
-
-import { type ReactNode, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { type ReactNode } from "react";
 import { X } from "lucide-react";
+import { ProductModalFrame } from "@/components/product-modal-frame";
+import { ProductModalCloseButton } from "@/components/product-modal-close-button";
 
 export function ProductDetailDialog({
   title,
@@ -15,50 +14,20 @@ export function ProductDetailDialog({
   children: ReactNode;
   closeHref?: string;
 }) {
-  const router = useRouter();
-  const close = useCallback(() => {
-    if (closeHref) router.replace(closeHref);
-    else router.back();
-  }, [closeHref, router]);
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") close();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [close]);
-
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-5"
-      onMouseDown={close}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="product-detail-title"
-        className="flex h-dvh w-full max-w-7xl flex-col overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-6">
-          <div className="min-w-0">
-            <h2 id="product-detail-title" className="truncate text-lg font-bold text-slate-900 dark:text-slate-100">
-              {title}
-            </h2>
-            <p className="truncate text-sm text-slate-400">{subtitle}</p>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Đóng chi tiết sản phẩm"
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-surface-2 hover:text-slate-700 dark:hover:text-slate-200 lg:h-9 lg:w-9"
-          >
-            <X className="h-5 w-5" />
-          </button>
+    <ProductModalFrame labelledBy="product-detail-title" closeHref={closeHref} closeOnBackdrop>
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-6">
+        <div className="min-w-0">
+          <h2 id="product-detail-title" className="truncate text-lg font-bold text-slate-900 dark:text-slate-100">
+            {title}
+          </h2>
+          <p className="truncate text-sm text-slate-400">{subtitle}</p>
         </div>
-        <div className="min-h-0 flex-1">{children}</div>
+        <ProductModalCloseButton closeHref={closeHref} aria-label="Đóng chi tiết sản phẩm">
+          <X className="h-5 w-5" />
+        </ProductModalCloseButton>
       </div>
-    </div>
+      <div className="min-h-0 flex-1">{children}</div>
+    </ProductModalFrame>
   );
 }
