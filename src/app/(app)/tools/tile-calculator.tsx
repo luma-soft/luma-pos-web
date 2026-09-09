@@ -4,12 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Check,
-  ChevronDown,
   CircleAlert,
   Copy,
   DoorOpen,
   Layers3,
-  Minus,
   Palette,
   Plus,
   ReceiptText,
@@ -20,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
 import { MoneyInput } from "@/components/ui/money-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
+import { Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/lib/utils";
@@ -679,17 +679,19 @@ function CalculatorSection({ icon, title, description, tinted, defaultOpen, chil
   children: React.ReactNode;
 }) {
   return (
-    <details open={defaultOpen ? true : undefined} className={cn("group rounded-xl border border-border-soft bg-surface", tinted && "bg-primary-50/50 dark:bg-primary-950/15")}>
-      <summary className="flex cursor-pointer list-none items-start gap-2.5 px-4 py-3.5 [&::-webkit-details-marker]:hidden">
-        <span className="mt-0.5 text-primary-600 [&_svg]:size-4">{icon}</span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
-          <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">{description}</p>
-        </div>
-        <ChevronDown aria-hidden className="size-4 text-slate-400 transition group-open:rotate-180" />
-      </summary>
-      <div className="border-t border-border-soft px-4 py-4">{children}</div>
-    </details>
+    <Section
+      defaultOpen={defaultOpen ?? false}
+      title={(
+        <span className="flex items-center gap-2.5 text-sm">
+          <span className="text-primary-600 [&_svg]:size-4">{icon}</span>
+          {title}
+        </span>
+      )}
+      description={description}
+      className={cn("overflow-hidden rounded-xl shadow-none", tinted && "bg-primary-50/50 dark:bg-primary-950/15")}
+    >
+      {children}
+    </Section>
   );
 }
 
@@ -704,11 +706,19 @@ function QuantityStepper({ value, label, compact = false, onChange }: {
   return (
     <div className={cn("space-y-1.5", compact && "min-w-0")}>
       {compact && <span className="block text-xs font-medium text-slate-600 dark:text-slate-300">{label}</span>}
-      <div className="grid grid-cols-[2.75rem_minmax(3rem,1fr)_2.75rem] overflow-hidden rounded-lg border border-border bg-surface">
-        <button type="button" disabled={normalized <= 1} onClick={() => onChange(normalized - 1)} aria-label={`${t("decreaseQuantity")} ${label}`} className="grid place-items-center border-r border-border text-slate-600 disabled:opacity-35"><Minus className="size-4" /></button>
-        <input aria-label={label} inputMode="numeric" min={1} max={999} value={normalized} onChange={(event) => onChange(Math.min(999, Math.max(1, Number.parseInt(event.target.value, 10) || 1)))} className="h-10 min-w-0 bg-transparent text-center font-mono font-bold outline-none" />
-        <button type="button" disabled={normalized >= 999} onClick={() => onChange(normalized + 1)} aria-label={`${t("increaseQuantity")} ${label}`} className="grid place-items-center border-l border-border text-slate-600 disabled:opacity-35"><Plus className="size-4" /></button>
-      </div>
+      <QuantityInput
+        value={normalized}
+        min={1}
+        max={999}
+        decimals={0}
+        size="sm"
+        touchTargets
+        className={compact ? "w-[132px]" : "w-[148px]"}
+        decrementLabel={`${t("decreaseQuantity")} ${label}`}
+        inputLabel={label}
+        incrementLabel={`${t("increaseQuantity")} ${label}`}
+        onChange={(next) => onChange(Math.floor(next))}
+      />
     </div>
   );
 }

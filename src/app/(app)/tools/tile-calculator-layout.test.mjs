@@ -22,3 +22,12 @@ test("pricing follows openings and keeps controls readable", () => {
   expect(calculator).toContain('className="xl:col-span-2"');
   expect(calculator).toContain('<legend className="sr-only">{title}</legend>');
 });
+
+test("calculator controls compose the shared design-system components", () => {
+  expect(calculator).toContain('import { QuantityInput } from "@/components/ui/quantity-input"');
+  expect(calculator).toContain('import { Section } from "@/components/ui/section"');
+  expect(calculator).toContain("<QuantityInput");
+  expect(calculator).toContain("<Section");
+  expect(calculator).not.toContain("<details");
+  expect(calculator).not.toContain('<input aria-label={label} inputMode="numeric"');
+});
