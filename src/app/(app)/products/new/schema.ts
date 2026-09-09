@@ -139,10 +139,14 @@ export const createProductSchema = z.object({
         children: value.variantChildren,
         excludedCombinationKeys: value.excludedCombinationKeys,
         allowPartial: value.variantOperation === "add",
-        // Preliminary client-shape validation only; the writer derives the
-        // authoritative budget from the locked group's persisted members.
+        // Preliminary shape validation accepts claimed existing identities so
+        // large groups can reach the writer. The writer still derives the
+        // authoritative budget from locked, persisted membership.
         maxCombinations: value.variantGroupId
-          ? variantCombinationBudget(new Set(value.variantChildren.flatMap((child) => child.productId ? [child.productId] : [])).size, value.excludedCombinationKeys.length)
+          ? variantCombinationBudget(Math.max(
+              new Set(value.variantChildren.flatMap((child) => child.productId ? [child.productId] : [])).size,
+              value.variantOperation === "add" ? new Set(value.variantExistingCombinationKeys).size : 0,
+            ), value.excludedCombinationKeys.length)
           : undefined,
       });
     } catch (error) {

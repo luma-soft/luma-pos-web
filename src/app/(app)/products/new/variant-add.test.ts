@@ -57,3 +57,23 @@ test("attribute label does not repeat the word mã", () => {
   assert.equal(variantAddFieldLabel("Mã hàng"), "Mã hàng");
   assert.equal(variantAddFieldLabel("Phiên bản"), "Mã Phiên bản");
 });
+
+test("group add form accepts more than 200 combinations when they are existing SKUs", () => {
+  const attributeId = "00000000-0000-4000-8000-000000000005";
+  const values = Array.from({ length: 236 }, (_, index) => String(index + 1));
+  const valueIds = values.map((_, index) => `existing-value-${index + 1}`);
+  const result = createProductSchema.safeParse({
+    ...base,
+    attributes: [{
+      attributeId,
+      name: "Mã",
+      values,
+      valueIds,
+      createsVariants: true,
+    }],
+    variantChildren: [],
+    variantExistingCombinationKeys: valueIds.map((valueId) => JSON.stringify([[attributeId, valueId]])),
+    variantAddValues: { [attributeId]: "237" },
+  });
+  assert.equal(result.success, true, result.success ? undefined : result.error.issues[0]?.message);
+});
