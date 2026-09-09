@@ -1,0 +1,20 @@
+# Local dependencies and build output
+node_modules/
+.next/
+out/
+build/
+coverage/
+
+# Local tooling and generated artifacts
+.git/
+.vercel/
+.codex/
+tmp/
+kiotviet_data/
+*.tsbuildinfo
+
+# Local secrets and logs
+.env*
+!.env.example
+*.log
+.DS_Store
