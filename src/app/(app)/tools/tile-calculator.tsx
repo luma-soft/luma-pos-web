@@ -418,39 +418,6 @@ function RoomCard({
           </div>
         </CalculatorSection>
 
-        <CalculatorSection icon={<ReceiptText />} title={t("pricing")} description={t("pricingHint")}>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <PriceGroup title={t("floor")}>
-              <NumberField id={`${room.id}-floor-price`} label={t("pricePerSquareMeter")} value={room.floorPrice} suffix="₫" money step={1000} onChange={(floorPrice) => onPatch({ floorPrice })} />
-              <NumberField id={`${room.id}-floor-waste`} label={t("waste")} value={room.floorWaste} suffix="%" onChange={(floorWaste) => onPatch({ floorWaste })} />
-            </PriceGroup>
-            <PriceGroup title={t("wall")} muted={!wallVisible}>
-              <NumberField id={`${room.id}-wall-price`} label={t("pricePerSquareMeter")} value={room.wallPrice} suffix="₫" money step={1000} disabled={!wallVisible} onChange={(wallPrice) => onPatch({ wallPrice })} />
-              <NumberField id={`${room.id}-wall-waste`} label={t("waste")} value={room.wallWaste} suffix="%" disabled={!wallVisible} onChange={(wallWaste) => onPatch({ wallWaste })} />
-            </PriceGroup>
-            <PriceGroup title={t("skirting")} muted={!room.skirtEnabled}>
-              <div className="grid grid-cols-2 gap-2">
-                <NumberField id={`${room.id}-skirt-height`} label={t("skirtHeight")} value={room.skirtHeight} suffix="cm" disabled={!room.skirtEnabled} onChange={(skirtHeight) => onPatch({ skirtHeight })} />
-                <SelectField
-                  id={`${room.id}-skirt-price-mode`}
-                  label={t("priceMode")}
-                  value={room.skirtPriceMode}
-                  disabled={!room.skirtEnabled}
-                  options={[
-                    { value: "m", label: t("perLinearMeter") },
-                    { value: "m2", label: t("perSquareMeter") },
-                  ]}
-                  onChange={(skirtPriceMode) => onPatch({ skirtPriceMode: skirtPriceMode as TileRoom["skirtPriceMode"] })}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <NumberField id={`${room.id}-skirt-price`} label={t("price")} value={room.skirtPrice} suffix="₫" money step={1000} disabled={!room.skirtEnabled} onChange={(skirtPrice) => onPatch({ skirtPrice })} />
-                <NumberField id={`${room.id}-skirt-waste`} label={t("waste")} value={room.skirtWaste} suffix="%" disabled={!room.skirtEnabled} onChange={(skirtWaste) => onPatch({ skirtWaste })} />
-              </div>
-            </PriceGroup>
-          </div>
-        </CalculatorSection>
-
         {room.wallMultiType && (
           <CalculatorSection icon={<Palette />} title={t("wallTypes")} description={t("wallTypesHint")} tinted>
             <div className="space-y-2">
@@ -502,6 +469,41 @@ function RoomCard({
           <Button type="button" variant="ghost" size="sm" onClick={onAddOpening} className="mt-2">
             <Plus /> {t("addOpening")}
           </Button>
+        </CalculatorSection>
+
+        <CalculatorSection icon={<ReceiptText />} title={t("pricing")} description={t("pricingHint")}>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <PriceGroup title={t("floor")}>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <NumberField id={`${room.id}-floor-price`} label={t("pricePerSquareMeter")} value={room.floorPrice} suffix="₫" money step={1000} onChange={(floorPrice) => onPatch({ floorPrice })} />
+                <NumberField id={`${room.id}-floor-waste`} label={t("waste")} value={room.floorWaste} suffix="%" onChange={(floorWaste) => onPatch({ floorWaste })} />
+              </div>
+            </PriceGroup>
+            <PriceGroup title={t("wall")} muted={!wallVisible}>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <NumberField id={`${room.id}-wall-price`} label={t("pricePerSquareMeter")} value={room.wallPrice} suffix="₫" money step={1000} disabled={!wallVisible} onChange={(wallPrice) => onPatch({ wallPrice })} />
+                <NumberField id={`${room.id}-wall-waste`} label={t("waste")} value={room.wallWaste} suffix="%" disabled={!wallVisible} onChange={(wallWaste) => onPatch({ wallWaste })} />
+              </div>
+            </PriceGroup>
+            <PriceGroup title={t("skirting")} muted={!room.skirtEnabled} className="xl:col-span-2">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <NumberField id={`${room.id}-skirt-height`} label={t("skirtHeight")} value={room.skirtHeight} suffix="cm" disabled={!room.skirtEnabled} onChange={(skirtHeight) => onPatch({ skirtHeight })} />
+                <SelectField
+                  id={`${room.id}-skirt-price-mode`}
+                  label={t("priceMode")}
+                  value={room.skirtPriceMode}
+                  disabled={!room.skirtEnabled}
+                  options={[
+                    { value: "m", label: t("perLinearMeter") },
+                    { value: "m2", label: t("perSquareMeter") },
+                  ]}
+                  onChange={(skirtPriceMode) => onPatch({ skirtPriceMode: skirtPriceMode as TileRoom["skirtPriceMode"] })}
+                />
+                <NumberField id={`${room.id}-skirt-price`} label={t("price")} value={room.skirtPrice} suffix="₫" money step={1000} disabled={!room.skirtEnabled} onChange={(skirtPrice) => onPatch({ skirtPrice })} />
+                <NumberField id={`${room.id}-skirt-waste`} label={t("waste")} value={room.skirtWaste} suffix="%" disabled={!room.skirtEnabled} onChange={(skirtWaste) => onPatch({ skirtWaste })} />
+              </div>
+            </PriceGroup>
+          </div>
         </CalculatorSection>
 
         <RoomResult calculation={calculation} number={number} currency={currency} />
@@ -618,11 +620,12 @@ function QuantityStepper({ value, label, compact = false, onChange }: {
   );
 }
 
-function PriceGroup({ title, muted, children }: { title: string; muted?: boolean; children: React.ReactNode }) {
+function PriceGroup({ title, muted, className, children }: { title: string; muted?: boolean; className?: string; children: React.ReactNode }) {
   return (
-    <fieldset disabled={muted} className={cn("space-y-2 rounded-xl bg-surface-2 p-3 transition-opacity", muted && "opacity-45")}>
-      <legend className="px-1 text-xs font-semibold text-slate-600 dark:text-slate-300">{title}</legend>
-      {children}
+    <fieldset disabled={muted} className={cn("rounded-xl bg-surface-2 p-4 transition-opacity", muted && "opacity-45", className)}>
+      <legend className="sr-only">{title}</legend>
+      <p aria-hidden className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</p>
+      <div className="min-w-0">{children}</div>
     </fieldset>
   );
 }

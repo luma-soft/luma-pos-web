@@ -11,3 +11,14 @@ test("the room navigator keeps cards readable and reveals the active room", () =
   expect(calculator).toContain("snap-x snap-mandatory");
   expect(calculator).toContain("w-[15rem] shrink-0 snap-start");
 });
+
+test("pricing follows openings and keeps controls readable", () => {
+  const openings = calculator.indexOf('title={t("openings")}');
+  const pricing = calculator.indexOf('title={t("pricing")}');
+
+  expect(openings).toBeGreaterThan(-1);
+  expect(pricing).toBeGreaterThan(openings);
+  expect(calculator).toContain("xl:grid-cols-2");
+  expect(calculator).toContain('className="xl:col-span-2"');
+  expect(calculator).toContain('<legend className="sr-only">{title}</legend>');
+});
