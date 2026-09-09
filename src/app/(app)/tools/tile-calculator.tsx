@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Check,
@@ -228,21 +228,28 @@ function RoomNavigator({ rooms, activeRoomId, calculations, number, onSelect, on
   onAdd: () => void;
 }) {
   const t = useTranslations("tileCalculator");
+  const activeRoomRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    activeRoomRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeRoomId]);
+
   return (
     <nav aria-label={t("rooms")} className="rounded-card border border-border bg-surface p-3 shadow-e1 xl:col-span-2 2xl:col-span-1 2xl:sticky 2xl:top-[4.625rem]">
       <div className="mb-3 flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-slate-500">{t("roomGroups", { count: rooms.length })}</p>
         <Button type="button" variant="ghost" size="sm" onClick={onAdd}><Plus /> {t("addRoomShort")}</Button>
       </div>
-      <div className="flex gap-2 overflow-x-auto 2xl:flex-col">
+      <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain pb-1 2xl:flex-col 2xl:overflow-visible 2xl:pb-0">
         {rooms.map((room, index) => (
           <button
             key={room.id}
+            ref={room.id === activeRoomId ? activeRoomRef : undefined}
             type="button"
             onClick={() => onSelect(room.id)}
             aria-current={room.id === activeRoomId ? "page" : undefined}
             className={cn(
-              "flex min-w-[12rem] items-center gap-3 rounded-xl border px-3 py-3 text-left transition 2xl:min-w-0",
+              "flex min-h-[4.5rem] w-[15rem] shrink-0 snap-start items-center gap-3 rounded-xl border px-3 py-3 text-left transition 2xl:w-full",
               room.id === activeRoomId
                 ? "border-primary-300 bg-primary-50 text-primary-900 dark:border-primary-800 dark:bg-primary-950/30 dark:text-primary-100"
                 : "border-transparent bg-surface-2 hover:border-border hover:bg-surface",
@@ -251,9 +258,13 @@ function RoomNavigator({ rooms, activeRoomId, calculations, number, onSelect, on
             <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface font-mono text-xs font-bold text-primary-700 shadow-e1 dark:text-primary-300">
               {String(index + 1).padStart(2, "0")}
             </span>
-            <span className="min-w-0">
+            <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold">{room.name}</span>
-              <span className="mt-0.5 block text-xs text-slate-500">{t("identicalRooms", { count: room.quantity })} · {number.format(calculations[index].floor.area)} m²</span>
+              <span className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-slate-500 2xl:block">
+                <span className="block truncate">{t("identicalRooms", { count: room.quantity })}</span>
+                <span aria-hidden className="shrink-0 2xl:hidden">·</span>
+                <span className="shrink-0 2xl:mt-0.5 2xl:block">{number.format(calculations[index].floor.area)} m²</span>
+              </span>
             </span>
           </button>
         ))}
