@@ -120,7 +120,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
           disabled={locked || decreasedValue === value}
           onClick={() => onChange(decreasedValue)}
           aria-label={decrementLabel}
-          className="grid h-full place-items-center text-slate-500 transition-colors hover:bg-surface-2 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+          className="grid h-full place-items-center border-r border-border text-slate-500 transition-colors hover:bg-surface-2 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Minus className="h-3.5 w-3.5" />
         </button>
@@ -138,7 +138,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
           readOnly={readOnly}
           aria-label={inputLabel}
           className={cn(
-            "h-full rounded-none border-y-0 px-1 text-center focus:ring-0",
+            "h-full rounded-none border-0 px-1 text-center focus:border-transparent focus:ring-0",
             inputClassName,
           )}
         />
@@ -147,7 +147,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
           disabled={locked || increasedValue === value}
           onClick={() => onChange(increasedValue)}
           aria-label={incrementLabel}
-          className="grid h-full place-items-center text-slate-500 transition-colors hover:bg-surface-2 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-40"
+          className="grid h-full place-items-center border-l border-border text-slate-500 transition-colors hover:bg-surface-2 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Plus className="h-3.5 w-3.5" />
         </button>

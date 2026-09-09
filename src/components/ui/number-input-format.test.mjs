@@ -38,6 +38,27 @@ test("fractional quantities render and submit without localized-string loss", ()
   expect(stepQuantity(0.5, 1)).toBe(1);
 });
 
+test("quantity input uses one integrated focus border", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      NextIntlClientProvider,
+      { locale: "vi", messages: {}, timeZone: "Asia/Ho_Chi_Minh" },
+      React.createElement(QuantityInput, {
+        value: 1,
+        decimals: 0,
+        onChange() {},
+      }),
+    ),
+  );
+
+  expect(html).toContain("focus-within:border-primary-600");
+  expect(html).toContain("border-r border-border");
+  expect(html).toContain("border-l border-border");
+  expect(html).toContain("border-0");
+  expect(html).toContain("focus:border-transparent");
+  expect(html).not.toContain("rounded-none border-y-0");
+});
+
 test("imported quantities preserve fractions and reject non-finite/invalid numbers", () => {
   for (const value of [0.5, "0.5", 1.5, "1.5"]) expect(positiveQuantityOrDefault(value)).toBe(Number(value));
   for (const value of [0, -1, null, undefined, Infinity, "not a number"]) expect(positiveQuantityOrDefault(value)).toBe(1);
