@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw } from "lucide-react";
+import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import { Combobox } from "@/components/combobox";
@@ -19,6 +19,10 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { LumaActionMenu } from "@/components/ui/action-menu";
+import { RowPreviewModal } from "@/components/data-table";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { PrintDoc, type PrintLine } from "@/components/print/print-doc";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
@@ -201,6 +205,7 @@ export type PriceBook = string;
 interface PosDraft {
   id: string;
   kind: PosDraftKind;
+  displayName?: string;
   cameraQuote?: boolean;
   cameraInitialId?: string;
   cameraPackages?: CameraQuotePackage[];
@@ -549,6 +554,8 @@ export function PosClient({
     return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
   }, [browsing, search]);
   const [editKey, setEditKey] = useState<string | null>(null); // dòng đang mở popup sửa giá
+  const [renameDraftId, setRenameDraftId] = useState<string | null>(null);
+  const [renameDraftValue, setRenameDraftValue] = useState("");
 
   // nhiều hóa đơn cùng lúc (tab). id đầu cố định để khớp SSR.
   const [invoices, setInvoices] = useState<PosDraft[]>(() => [
@@ -770,6 +777,48 @@ export function PosClient({
       if (id === activeId) setActiveId(final[Math.max(0, list.findIndex((i) => i.id === id) - 1)]?.id ?? final[0].id);
       return final;
     });
+  }
+
+  function draftDefaultLabel(inv: PosDraft, index: number) {
+    const kind = inv.kind ?? "invoice";
+    const ordinal = invoices.slice(0, index + 1).filter((item) => (item.kind ?? "invoice") === kind).length;
+    if (inv.heldAt) return t("pos.held.item", { n: ordinal });
+    if (inv.cameraQuote) return t("pos.draftTabs.cameraQuote", { n: ordinal });
+    return t(`pos.draftTabs.${kind}`, { n: ordinal });
+  }
+
+  function draftDisplayLabel(inv: PosDraft, index: number) {
+    return inv.displayName?.trim() || draftDefaultLabel(inv, index);
+  }
+
+  function openRenameDraft(inv: PosDraft, index: number) {
+    setRenameDraftId(inv.id);
+    setRenameDraftValue(inv.displayName?.trim() || draftDefaultLabel(inv, index));
+  }
+
+  function saveDraftName() {
+    const name = renameDraftValue.trim();
+    if (!renameDraftId || !name) return;
+    setInvoices((list) => list.map((inv) => inv.id === renameDraftId ? { ...inv, displayName: name.slice(0, 60) } : inv));
+    setRenameDraftId(null);
+    setRenameDraftValue("");
+  }
+
+  async function requestDeleteDraft(inv: PosDraft, index: number) {
+    const label = draftDisplayLabel(inv, index);
+    const itemCount = inv.cart.reduce((sum, line) => sum + line.quantity, 0);
+    const approved = await confirm({
+      title: t("pos.draftActions.deleteTitle"),
+      description: itemCount > 0
+        ? t("pos.draftActions.deleteDescriptionWithItems", { name: label, count: formatNumber(itemCount) })
+        : t("pos.draftActions.deleteDescriptionEmpty", { name: label }),
+      cancelLabel: t("pos.draftActions.keep"),
+      confirmLabel: t("pos.draftActions.delete"),
+      variant: "destructive",
+    });
+    if (!approved) return;
+    if (invoices.length > 1) closeInvoice(inv.id);
+    else clearInvoice(inv.id);
   }
 
   const customer = useMemo(
@@ -1646,7 +1695,6 @@ export function PosClient({
         const count = inv.cart.reduce((s, l) => s + l.quantity, 0);
         const isActive = inv.id === activeId;
         const kind = inv.kind ?? "invoice";
-        const ordinal = invoices.slice(0, idx + 1).filter((item) => (item.kind ?? "invoice") === kind).length;
         const TabIcon = isReturnKind(kind) ? RotateCcw : kind === "quote" ? FileText : kind === "booking" ? ClipboardList : ShoppingCart;
         return (
           <div
@@ -1660,32 +1708,26 @@ export function PosClient({
             )}
           >
             <TabIcon className={cn("w-4 h-4 shrink-0", isActive ? "text-primary-600" : "text-slate-400")} />
-            <span>{inv.heldAt
-              ? t("pos.held.item", { n: ordinal })
-              : inv.cameraQuote
-                ? t("pos.draftTabs.cameraQuote", { n: ordinal })
-                : t(`pos.draftTabs.${kind}`, { n: ordinal })}</span>
+            <span>{draftDisplayLabel(inv, idx)}</span>
             {count > 0 && (
               <span className={cn(
                 "min-w-[20px] text-center rounded-full px-1.5 text-xs font-bold",
                 isActive ? "bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300" : "bg-slate-200 dark:bg-slate-700"
               )}>{count}</span>
             )}
-            {(invoices.length > 1 || inv.id === activeId) && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (invoices.length > 1) closeInvoice(inv.id);
-                  else clearInvoice(inv.id);
-                }}
-                className="-my-2 -mr-1 grid h-11 w-11 place-items-center rounded text-slate-400 hover:bg-slate-200/70 hover:text-er dark:hover:bg-slate-700"
-                title={t(invoices.length > 1 ? "pos.invoice.close" : "pos.invoice.clear")}
-                aria-label={t(invoices.length > 1 ? "pos.invoice.close" : "pos.invoice.clear")}
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
+            <div onClick={(event) => event.stopPropagation()}>
+              <LumaActionMenu
+                label={t("pos.draftActions.menu")}
+                ariaLabel={t("pos.draftActions.menuFor", { name: draftDisplayLabel(inv, idx) })}
+                icon={MoreHorizontal}
+                iconOnly
+                className="-my-2 -mr-1 grid h-11 w-11 place-items-center rounded text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 dark:hover:bg-slate-700"
+                items={[
+                  { key: "rename", label: t("pos.draftActions.rename"), icon: Pencil, onSelect: () => openRenameDraft(inv, idx) },
+                  { key: "delete", label: t("pos.draftActions.delete"), icon: Trash2, onSelect: () => void requestDeleteDraft(inv, idx) },
+                ]}
+              />
+            </div>
           </div>
         );
       })}
@@ -2609,6 +2651,37 @@ export function PosClient({
         </>,
         document.body
       )}
+
+      <RowPreviewModal
+        open={renameDraftId != null}
+        onClose={() => setRenameDraftId(null)}
+        title={t("pos.draftActions.rename")}
+        subtitle={t("pos.draftActions.renameDescription")}
+        size="md"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setRenameDraftId(null)}>{t("common.cancel")}</Button>
+            <Button type="button" disabled={!renameDraftValue.trim()} onClick={saveDraftName}>{t("pos.draftActions.saveName")}</Button>
+          </div>
+        )}
+      >
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+          {t("pos.draftActions.nameLabel")}
+          <Input
+            autoFocus
+            className="mt-1"
+            value={renameDraftValue}
+            maxLength={60}
+            onChange={(event) => setRenameDraftValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                saveDraftName();
+              }
+            }}
+          />
+        </label>
+      </RowPreviewModal>
 
       {/* Phiếu tạm để in (ẩn trên màn hình, chỉ hiện khi in) */}
       {printSize && printJob && createPortal(

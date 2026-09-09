@@ -1477,6 +1477,19 @@
       "return_quick": "Trả nhanh {n}",
       "return_invoice": "Trả HĐ {n}"
     },
+    "draftActions": {
+      "menu": "Thao tác hóa đơn",
+      "menuFor": "Thao tác {name}",
+      "rename": "Đổi tên hóa đơn",
+      "delete": "Xóa đơn tạm",
+      "renameDescription": "Tên này giúp nhận biết đơn đang soạn; số hóa đơn không thay đổi.",
+      "nameLabel": "Tên hóa đơn",
+      "saveName": "Lưu tên",
+      "deleteTitle": "Xóa đơn tạm?",
+      "deleteDescriptionEmpty": "Bạn có chắc muốn xóa “{name}”? Thao tác này không thể hoàn tác.",
+      "deleteDescriptionWithItems": "Bạn có chắc muốn xóa “{name}” cùng {count} sản phẩm trong đơn? Thao tác này không thể hoàn tác.",
+      "keep": "Giữ lại"
+    },
     "modes": {
       "sale": "Bán mới",
       "edit": "Sửa hóa đơn",

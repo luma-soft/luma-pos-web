@@ -1477,6 +1477,19 @@
       "return_quick": "Quick return {n}",
       "return_invoice": "Invoice return {n}"
     },
+    "draftActions": {
+      "menu": "Invoice actions",
+      "menuFor": "Actions for {name}",
+      "rename": "Rename invoice",
+      "delete": "Delete draft",
+      "renameDescription": "Use a name to recognize this draft; the invoice number will not change.",
+      "nameLabel": "Invoice name",
+      "saveName": "Save name",
+      "deleteTitle": "Delete draft?",
+      "deleteDescriptionEmpty": "Are you sure you want to delete “{name}”? This action cannot be undone.",
+      "deleteDescriptionWithItems": "Are you sure you want to delete “{name}” with {count} items? This action cannot be undone.",
+      "keep": "Keep draft"
+    },
     "modes": {
       "sale": "New sale",
       "edit": "Edit invoice",
