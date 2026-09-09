@@ -29,9 +29,14 @@ import {
   FLOOR_TILE_SIZES,
   SKIRT_TILE_SIZES,
   WALL_TILE_SIZES,
+  calculateMaterialGroups,
   calculateRoom,
   calculateTotals,
+  materialSourceRoomId,
+  resolveRoomMaterials,
   tileSizeLabel,
+  type MaterialGroup,
+  type MaterialKind,
   type Opening,
   type RoomCalculation,
   type TileRoom,
@@ -49,8 +54,13 @@ export function TileCalculator() {
   const [rooms, setRooms] = useState<TileRoom[]>(() => createInitialRooms(t));
   const [activeRoomId, setActiveRoomId] = useState("room-living");
   const [copyState, setCopyState] = useState<CopyState>("idle");
-  const calculations = useMemo(() => rooms.map(calculateRoom), [rooms]);
-  const totals = useMemo(() => calculateTotals(calculations), [calculations]);
+  const effectiveRooms = useMemo(() => resolveRoomMaterials(rooms), [rooms]);
+  const calculations = useMemo(() => effectiveRooms.map(calculateRoom), [effectiveRooms]);
+  const materialGroups = useMemo(
+    () => calculateMaterialGroups(rooms, effectiveRooms, calculations),
+    [rooms, effectiveRooms, calculations],
+  );
+  const totals = useMemo(() => calculateTotals(calculations, materialGroups), [calculations, materialGroups]);
   const number = useMemo(() => new Intl.NumberFormat(locale, {
     maximumFractionDigits: 2,
   }), [locale]);
@@ -77,9 +87,33 @@ export function TileCalculator() {
   function removeRoom(roomId: string) {
     setRooms((current) => {
       if (current.length <= 1) return current;
-      const next = current.filter((room) => room.id !== roomId);
+      const effective = resolveRoomMaterials(current);
+      const next = current
+        .filter((room) => room.id !== roomId)
+        .map((room) => {
+          let patched = room;
+          for (const kind of ["floor", "wall", "skirt"] as const) {
+            if (materialSourceRoomId(current, room.id, kind) !== roomId) continue;
+            const effectiveRoom = effective.find((candidate) => candidate.id === room.id) ?? room;
+            patched = { ...patched, ...materialPatch(effectiveRoom, kind), [materialSourceField(kind)]: "" };
+          }
+          return patched;
+        });
       if (activeRoomId === roomId) setActiveRoomId(next[0].id);
       return next;
+    });
+  }
+
+  function patchMaterialSource(roomId: string, kind: MaterialKind, sourceId: string) {
+    setRooms((current) => {
+      const effective = resolveRoomMaterials(current);
+      return current.map((room) => {
+        if (room.id !== roomId) return room;
+        const ownMaterial = sourceId === ""
+          ? materialPatch(effective.find((candidate) => candidate.id === roomId) ?? room, kind)
+          : {};
+        return { ...room, ...ownMaterial, [materialSourceField(kind)]: sourceId };
+      });
     });
   }
 
@@ -142,7 +176,7 @@ export function TileCalculator() {
   }
 
   async function copySummary() {
-    const text = buildSummaryText(rooms, calculations, t, number, currency);
+    const text = buildSummaryText(rooms, calculations, materialGroups, t, number, currency);
     try {
       await writeClipboard(text);
       setCopyState("copied");
@@ -154,6 +188,7 @@ export function TileCalculator() {
 
   const activeIndex = Math.max(0, rooms.findIndex((room) => room.id === activeRoomId));
   const activeRoom = rooms[activeIndex];
+  const activeEffectiveRoom = effectiveRooms[activeIndex];
 
   return (
     <div className="min-h-full bg-canvas [&_button]:min-h-11 [&_button]:min-w-11 lg:[&_button]:min-h-0 lg:[&_button]:min-w-0">
@@ -189,12 +224,15 @@ export function TileCalculator() {
               <RoomCard
                 key={activeRoom.id}
                 room={activeRoom}
+                effectiveRoom={activeEffectiveRoom}
+                rooms={rooms}
                 calculation={calculations[activeIndex]}
                 index={activeIndex}
                 number={number}
                 currency={currency}
                 canRemove={rooms.length > 1}
                 onPatch={(patch) => patchRoom(activeRoom.id, patch)}
+                onPatchMaterialSource={(kind, sourceId) => patchMaterialSource(activeRoom.id, kind, sourceId)}
                 onRemove={() => removeRoom(activeRoom.id)}
                 onAddOpening={() => addOpening(activeRoom.id)}
                 onPatchOpening={(openingId, patch) => patchOpening(activeRoom.id, openingId, patch)}
@@ -210,6 +248,7 @@ export function TileCalculator() {
             rooms={rooms}
             calculations={calculations}
             totals={totals}
+            materialGroups={materialGroups}
             number={number}
             currency={currency}
           />
@@ -275,12 +314,15 @@ function RoomNavigator({ rooms, activeRoomId, calculations, number, onSelect, on
 
 function RoomCard({
   room,
+  effectiveRoom,
+  rooms,
   calculation,
   index,
   number,
   currency,
   canRemove,
   onPatch,
+  onPatchMaterialSource,
   onRemove,
   onAddOpening,
   onPatchOpening,
@@ -290,12 +332,15 @@ function RoomCard({
   onRemoveWallType,
 }: {
   room: TileRoom;
+  effectiveRoom: TileRoom;
+  rooms: TileRoom[];
   calculation: RoomCalculation;
   index: number;
   number: Intl.NumberFormat;
   currency: Intl.NumberFormat;
   canRemove: boolean;
   onPatch: (patch: Partial<TileRoom>) => void;
+  onPatchMaterialSource: (kind: MaterialKind, sourceId: string) => void;
   onRemove: () => void;
   onAddOpening: () => void;
   onPatchOpening: (openingId: string, patch: Partial<Opening>) => void;
@@ -306,6 +351,9 @@ function RoomCard({
 }) {
   const t = useTranslations("tileCalculator");
   const wallVisible = room.height > 0 || room.wallMultiType;
+  const floorLinked = room.floorMaterialSourceId !== "";
+  const wallLinked = room.wallMaterialSourceId !== "";
+  const skirtLinked = room.skirtMaterialSourceId !== "";
 
   return (
     <article className="overflow-hidden rounded-card border border-border bg-surface shadow-e1">
@@ -363,42 +411,55 @@ function RoomCard({
 
         <CalculatorSection icon={<Layers3 />} title={t("materials")} description={t("materialsHint")}>
           <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-            <TileSelect
-              id={`${room.id}-floor-tile`}
-              label={t("floorTile")}
-              sizes={FLOOR_TILE_SIZES}
-              value={room.floorTileSize}
-              onChange={(floorTileSize) => onPatch({ floorTileSize })}
-            />
+            <div className="space-y-3 rounded-xl bg-surface-2 p-3">
+              <MaterialSourceField room={room} rooms={rooms} kind="floor" onChange={(sourceId) => onPatchMaterialSource("floor", sourceId)} />
+              <TileSelect
+                id={`${room.id}-floor-tile`}
+                label={t("floorTile")}
+                sizes={FLOOR_TILE_SIZES}
+                value={effectiveRoom.floorTileSize}
+                disabled={floorLinked}
+                onChange={(floorTileSize) => onPatch({ floorTileSize })}
+              />
+            </div>
             {wallVisible && (
-              <div className="grid grid-cols-[minmax(0,1fr)_8.5rem] gap-2">
-                <TileSelect
-                  id={`${room.id}-wall-tile`}
-                  label={t("wallTile")}
-                  sizes={WALL_TILE_SIZES}
-                  value={room.wallTileSize}
-                  onChange={(wallTileSize) => onPatch({ wallTileSize })}
-                />
-                <SelectField
-                  id={`${room.id}-orientation`}
-                  label={t("orientation")}
-                  value={room.wallOrientation}
-                  options={[
-                    { value: "horizontal", label: t("horizontal") },
-                    { value: "vertical", label: t("vertical") },
-                  ]}
-                  onChange={(wallOrientation) => onPatch({ wallOrientation: wallOrientation as TileRoom["wallOrientation"] })}
-                />
+              <div className="space-y-3 rounded-xl bg-surface-2 p-3">
+                <MaterialSourceField room={room} rooms={rooms} kind="wall" onChange={(sourceId) => onPatchMaterialSource("wall", sourceId)} />
+                <div className="grid grid-cols-[minmax(0,1fr)_8.5rem] gap-2">
+                  <TileSelect
+                    id={`${room.id}-wall-tile`}
+                    label={t("wallTile")}
+                    sizes={WALL_TILE_SIZES}
+                    value={effectiveRoom.wallTileSize}
+                    disabled={wallLinked}
+                    onChange={(wallTileSize) => onPatch({ wallTileSize })}
+                  />
+                  <SelectField
+                    id={`${room.id}-orientation`}
+                    label={t("orientation")}
+                    value={effectiveRoom.wallOrientation}
+                    disabled={wallLinked}
+                    options={[
+                      { value: "horizontal", label: t("horizontal") },
+                      { value: "vertical", label: t("vertical") },
+                    ]}
+                    onChange={(wallOrientation) => onPatch({ wallOrientation: wallOrientation as TileRoom["wallOrientation"] })}
+                  />
+                </div>
               </div>
             )}
             {room.skirtEnabled && (
-              <TileSelect
-                id={`${room.id}-skirt-tile`}
-                label={t("skirtSourceTile")}
-                sizes={SKIRT_TILE_SIZES}
-                value={room.skirtSourceTile}
-                onChange={(skirtSourceTile) => onPatch({ skirtSourceTile })}
-              />
+              <div className="space-y-3 rounded-xl bg-surface-2 p-3">
+                <MaterialSourceField room={room} rooms={rooms} kind="skirt" onChange={(sourceId) => onPatchMaterialSource("skirt", sourceId)} />
+                <TileSelect
+                  id={`${room.id}-skirt-tile`}
+                  label={t("skirtSourceTile")}
+                  sizes={SKIRT_TILE_SIZES}
+                  value={effectiveRoom.skirtSourceTile}
+                  disabled={skirtLinked}
+                  onChange={(skirtSourceTile) => onPatch({ skirtSourceTile })}
+                />
+              </div>
             )}
           </div>
 
@@ -475,32 +536,32 @@ function RoomCard({
           <div className="grid gap-4 xl:grid-cols-2">
             <PriceGroup title={t("floor")}>
               <div className="grid gap-3 sm:grid-cols-2">
-                <NumberField id={`${room.id}-floor-price`} label={t("pricePerSquareMeter")} value={room.floorPrice} suffix="₫" money step={1000} onChange={(floorPrice) => onPatch({ floorPrice })} />
-                <NumberField id={`${room.id}-floor-waste`} label={t("waste")} value={room.floorWaste} suffix="%" onChange={(floorWaste) => onPatch({ floorWaste })} />
+                <NumberField id={`${room.id}-floor-price`} label={t("pricePerSquareMeter")} value={effectiveRoom.floorPrice} suffix="₫" money step={1000} disabled={floorLinked} onChange={(floorPrice) => onPatch({ floorPrice })} />
+                <NumberField id={`${room.id}-floor-waste`} label={t("waste")} value={effectiveRoom.floorWaste} suffix="%" disabled={floorLinked} onChange={(floorWaste) => onPatch({ floorWaste })} />
               </div>
             </PriceGroup>
             <PriceGroup title={t("wall")} muted={!wallVisible}>
               <div className="grid gap-3 sm:grid-cols-2">
-                <NumberField id={`${room.id}-wall-price`} label={t("pricePerSquareMeter")} value={room.wallPrice} suffix="₫" money step={1000} disabled={!wallVisible} onChange={(wallPrice) => onPatch({ wallPrice })} />
-                <NumberField id={`${room.id}-wall-waste`} label={t("waste")} value={room.wallWaste} suffix="%" disabled={!wallVisible} onChange={(wallWaste) => onPatch({ wallWaste })} />
+                <NumberField id={`${room.id}-wall-price`} label={t("pricePerSquareMeter")} value={effectiveRoom.wallPrice} suffix="₫" money step={1000} disabled={!wallVisible || wallLinked} onChange={(wallPrice) => onPatch({ wallPrice })} />
+                <NumberField id={`${room.id}-wall-waste`} label={t("waste")} value={effectiveRoom.wallWaste} suffix="%" disabled={!wallVisible || wallLinked} onChange={(wallWaste) => onPatch({ wallWaste })} />
               </div>
             </PriceGroup>
             <PriceGroup title={t("skirting")} muted={!room.skirtEnabled} className="xl:col-span-2">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <NumberField id={`${room.id}-skirt-height`} label={t("skirtHeight")} value={room.skirtHeight} suffix="cm" disabled={!room.skirtEnabled} onChange={(skirtHeight) => onPatch({ skirtHeight })} />
+                <NumberField id={`${room.id}-skirt-height`} label={t("skirtHeight")} value={effectiveRoom.skirtHeight} suffix="cm" disabled={!room.skirtEnabled || skirtLinked} onChange={(skirtHeight) => onPatch({ skirtHeight })} />
                 <SelectField
                   id={`${room.id}-skirt-price-mode`}
                   label={t("priceMode")}
-                  value={room.skirtPriceMode}
-                  disabled={!room.skirtEnabled}
+                  value={effectiveRoom.skirtPriceMode}
+                  disabled={!room.skirtEnabled || skirtLinked}
                   options={[
                     { value: "m", label: t("perLinearMeter") },
                     { value: "m2", label: t("perSquareMeter") },
                   ]}
                   onChange={(skirtPriceMode) => onPatch({ skirtPriceMode: skirtPriceMode as TileRoom["skirtPriceMode"] })}
                 />
-                <NumberField id={`${room.id}-skirt-price`} label={t("price")} value={room.skirtPrice} suffix="₫" money step={1000} disabled={!room.skirtEnabled} onChange={(skirtPrice) => onPatch({ skirtPrice })} />
-                <NumberField id={`${room.id}-skirt-waste`} label={t("waste")} value={room.skirtWaste} suffix="%" disabled={!room.skirtEnabled} onChange={(skirtWaste) => onPatch({ skirtWaste })} />
+                <NumberField id={`${room.id}-skirt-price`} label={t("price")} value={effectiveRoom.skirtPrice} suffix="₫" money step={1000} disabled={!room.skirtEnabled || skirtLinked} onChange={(skirtPrice) => onPatch({ skirtPrice })} />
+                <NumberField id={`${room.id}-skirt-waste`} label={t("waste")} value={effectiveRoom.skirtWaste} suffix="%" disabled={!room.skirtEnabled || skirtLinked} onChange={(skirtWaste) => onPatch({ skirtWaste })} />
               </div>
             </PriceGroup>
           </div>
@@ -512,10 +573,11 @@ function RoomCard({
   );
 }
 
-function ProjectSummary({ rooms, calculations, totals, number, currency }: {
+function ProjectSummary({ rooms, calculations, totals, materialGroups, number, currency }: {
   rooms: TileRoom[];
   calculations: RoomCalculation[];
   totals: ReturnType<typeof calculateTotals>;
+  materialGroups: MaterialGroup[];
   number: Intl.NumberFormat;
   currency: Intl.NumberFormat;
 }) {
@@ -533,6 +595,37 @@ function ProjectSummary({ rooms, calculations, totals, number, currency }: {
         <SummaryLine label={t("wallRequired")} value={`${number.format(totals.wallArea)} m²`} detail={t("tileCount", { count: totals.wallTiles })} />
         <SummaryLine label={t("skirtRequired")} value={`${number.format(totals.skirtLength)} m`} detail={t("sourceTileCount", { count: totals.skirtSourceTiles })} />
       </dl>
+
+      <div className="border-t border-border-soft px-5 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t("materialsSummary")}</h2>
+          <span className="rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-700 dark:bg-primary-950/40 dark:text-primary-300">
+            {t("materialGroupCount", { count: materialGroups.length })}
+          </span>
+        </div>
+        <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pr-1">
+          {materialGroups.map((group) => {
+            const names = group.roomIds
+              .map((roomId) => rooms.find((room) => room.id === roomId)?.name)
+              .filter(Boolean)
+              .join(", ");
+            const kindLabel = group.kind === "floor" ? t("floor") : group.kind === "wall" ? t("wall") : t("skirting");
+            const amount = group.kind === "skirt"
+              ? `${number.format(group.requiredLength)} m · ${t("sourceTileCount", { count: group.tileCount })}`
+              : `${number.format(group.requiredArea)} m² · ${t("tileCount", { count: group.tileCount })}`;
+            return (
+              <div key={group.id} className="rounded-xl bg-surface-2 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">{kindLabel} · {tileSizeLabel(group.tileSize)}</p>
+                  <span className="shrink-0 font-mono text-xs font-semibold text-slate-700 dark:text-slate-200">{currency.format(group.cost)}</span>
+                </div>
+                <p className="mt-1 truncate text-[11px] text-slate-500" title={names}>{names}</p>
+                <p className="mt-1 font-mono text-xs font-semibold text-primary-700 dark:text-primary-300">{amount}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="border-t border-border-soft px-5 py-4">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t("byRoom")}</h2>
@@ -674,11 +767,39 @@ function TextField({ label, value, onChange }: { label: string; value: string; o
   );
 }
 
-function TileSelect({ id, label, sizes, value, onChange }: {
+function MaterialSourceField({ room, rooms, kind, onChange }: {
+  room: TileRoom;
+  rooms: TileRoom[];
+  kind: MaterialKind;
+  onChange: (sourceId: string) => void;
+}) {
+  const t = useTranslations("tileCalculator");
+  const value = kind === "floor"
+    ? room.floorMaterialSourceId
+    : kind === "wall" ? room.wallMaterialSourceId : room.skirtMaterialSourceId;
+  const options = [
+    { value: "", label: t("ownMaterial") },
+    ...rooms
+      .filter((candidate) => candidate.id !== room.id && materialSourceRoomId(rooms, candidate.id, kind) !== room.id)
+      .map((candidate) => ({ value: candidate.id, label: t("useRoomMaterial", { room: candidate.name }) })),
+  ];
+  return (
+    <SelectField
+      id={`${room.id}-${kind}-material-source`}
+      label={t("materialSource")}
+      value={value}
+      options={options}
+      onChange={onChange}
+    />
+  );
+}
+
+function TileSelect({ id, label, sizes, value, disabled, onChange }: {
   id: string;
   label: string;
   sizes: readonly string[];
   value: string;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
@@ -687,6 +808,7 @@ function TileSelect({ id, label, sizes, value, onChange }: {
       label={label}
       value={value}
       options={sizes.map((size) => ({ value: size, label: tileSizeLabel(size) }))}
+      disabled={disabled}
       onChange={onChange}
     />
   );
@@ -781,6 +903,9 @@ function createRoom(id: string, name: string): TileRoom {
     wallMultiType: false,
     openings: [],
     wallTypes: [],
+    floorMaterialSourceId: "",
+    wallMaterialSourceId: "",
+    skirtMaterialSourceId: "",
   };
 }
 
@@ -821,6 +946,7 @@ function defaultWallTypes(t: Translator, prefix: string): WallType[] {
 function buildSummaryText(
   rooms: TileRoom[],
   calculations: RoomCalculation[],
+  materialGroups: MaterialGroup[],
   t: Translator,
   number: Intl.NumberFormat,
   currency: Intl.NumberFormat,
@@ -838,7 +964,46 @@ function buildSummaryText(
     }
     lines.push(`  ${t("estimatedCost")}: ${currency.format(calculation.totalCost)}`);
   });
+  lines.push("", t("materialsSummary"));
+  materialGroups.forEach((group) => {
+    const names = group.roomIds
+      .map((roomId) => rooms.find((room) => room.id === roomId)?.name)
+      .filter(Boolean)
+      .join(", ");
+    const kind = group.kind === "floor" ? t("floor") : group.kind === "wall" ? t("wall") : t("skirting");
+    const amount = group.kind === "skirt"
+      ? `${number.format(group.requiredLength)} m · ${t("sourceTileCount", { count: group.tileCount })}`
+      : `${number.format(group.requiredArea)} m² · ${t("tileCount", { count: group.tileCount })}`;
+    lines.push(`  ${kind} · ${tileSizeLabel(group.tileSize)} · ${names}: ${amount} · ${currency.format(group.cost)}`);
+  });
   return lines.join("\n");
+}
+
+function materialSourceField(kind: MaterialKind) {
+  if (kind === "floor") return "floorMaterialSourceId";
+  if (kind === "wall") return "wallMaterialSourceId";
+  return "skirtMaterialSourceId";
+}
+
+function materialPatch(room: TileRoom, kind: MaterialKind): Partial<TileRoom> {
+  if (kind === "floor") {
+    return { floorTileSize: room.floorTileSize, floorPrice: room.floorPrice, floorWaste: room.floorWaste };
+  }
+  if (kind === "wall") {
+    return {
+      wallTileSize: room.wallTileSize,
+      wallOrientation: room.wallOrientation,
+      wallPrice: room.wallPrice,
+      wallWaste: room.wallWaste,
+    };
+  }
+  return {
+    skirtSourceTile: room.skirtSourceTile,
+    skirtPrice: room.skirtPrice,
+    skirtWaste: room.skirtWaste,
+    skirtPriceMode: room.skirtPriceMode,
+    skirtHeight: room.skirtHeight,
+  };
 }
 
 async function writeClipboard(text: string) {

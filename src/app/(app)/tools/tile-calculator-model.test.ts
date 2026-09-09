@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { calculateRoom, type TileRoom } from "./tile-calculator-model";
+import {
+  FLOOR_TILE_SIZES,
+  WALL_TILE_SIZES,
+  calculateMaterialGroups,
+  calculateRoom,
+  resolveRoomMaterials,
+  type TileRoom,
+} from "./tile-calculator-model";
 
 function room(overrides: Partial<TileRoom> = {}): TileRoom {
   return {
@@ -26,6 +33,9 @@ function room(overrides: Partial<TileRoom> = {}): TileRoom {
     wallMultiType: false,
     openings: [],
     wallTypes: [],
+    floorMaterialSourceId: "",
+    wallMaterialSourceId: "",
+    skirtMaterialSourceId: "",
     ...overrides,
   };
 }
@@ -54,5 +64,43 @@ describe("calculateRoom quantities", () => {
     assert.equal(calculateRoom(room({ quantity: 0 })).floor.area, 20);
     assert.equal(calculateRoom(room({ quantity: 2.9 })).floor.area, 40);
     assert.equal(calculateRoom(room({ quantity: 2000 })).floor.area, 19980);
+  });
+});
+
+describe("shared material groups", () => {
+  test("inherits floor material without inheriting room dimensions", () => {
+    const rooms = [
+      room({ id: "room-1", length: 1, width: 1, floorTileSize: "0.4x0.6", floorPrice: 120000 }),
+      room({ id: "room-2", length: 2, width: 3, floorTileSize: "0.8x0.8", floorMaterialSourceId: "room-1" }),
+    ];
+
+    const effective = resolveRoomMaterials(rooms);
+    assert.equal(effective[1].length, 2);
+    assert.equal(effective[1].width, 3);
+    assert.equal(effective[1].floorTileSize, "0.4x0.6");
+    assert.equal(effective[1].floorPrice, 120000);
+  });
+
+  test("aggregates linked rooms before rounding and keeps independent rooms separate", () => {
+    const rooms = [
+      room({ id: "room-1", length: 1, width: 1, floorTileSize: "0.4x0.6" }),
+      room({ id: "room-2", length: 1, width: 1, floorMaterialSourceId: "room-1" }),
+      room({ id: "room-3", length: 1, width: 1 }),
+      room({ id: "room-4", length: 1, width: 1 }),
+      room({ id: "room-5", length: 1, width: 1 }),
+    ];
+    const effective = resolveRoomMaterials(rooms);
+    const calculations = effective.map(calculateRoom);
+    const floorGroups = calculateMaterialGroups(rooms, effective, calculations)
+      .filter((group) => group.kind === "floor");
+
+    assert.equal(floorGroups.length, 4);
+    assert.deepEqual(floorGroups[0].roomIds, ["room-1", "room-2"]);
+    assert.equal(floorGroups[0].tileCount, 9);
+  });
+
+  test("offers the 40 x 60 size for floor and wall tiles", () => {
+    assert.ok(FLOOR_TILE_SIZES.includes("0.4x0.6"));
+    assert.ok(WALL_TILE_SIZES.includes("0.4x0.6"));
   });
 });

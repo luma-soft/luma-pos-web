@@ -4,6 +4,7 @@ export const DEFAULT_SKIRT_HEIGHT = 12;
 export const FLOOR_TILE_SIZES = [
   "0.3x0.3",
   "0.4x0.4",
+  "0.4x0.6",
   "0.42x0.6",
   "0.5x0.5",
   "0.6x0.6",
@@ -17,6 +18,7 @@ export const WALL_TILE_SIZES = [
   "0.25x0.4",
   "0.3x0.45",
   "0.3x0.6",
+  "0.4x0.6",
   "0.4x0.8",
   "0.6x0.6",
   "0.6x1.2",
@@ -26,6 +28,7 @@ export const SKIRT_TILE_SIZES = FLOOR_TILE_SIZES;
 
 export type WallOrientation = "horizontal" | "vertical";
 export type SkirtPriceMode = "m" | "m2";
+export type MaterialKind = "floor" | "wall" | "skirt";
 
 export interface Opening {
   id: string;
@@ -64,6 +67,9 @@ export interface TileRoom {
   wallMultiType: boolean;
   openings: Opening[];
   wallTypes: WallType[];
+  floorMaterialSourceId: string;
+  wallMaterialSourceId: string;
+  skirtMaterialSourceId: string;
 }
 
 export interface WallTypeResult extends WallType {
@@ -110,6 +116,127 @@ export interface CalculatorTotals {
   skirtLength: number;
   skirtSourceTiles: number;
   totalCost: number;
+}
+
+export interface MaterialGroup {
+  id: string;
+  kind: MaterialKind;
+  sourceRoomId: string;
+  roomIds: string[];
+  tileSize: string;
+  requiredArea: number;
+  requiredLength: number;
+  tileCount: number;
+  cost: number;
+}
+
+const materialFields = {
+  floor: ["floorTileSize", "floorPrice", "floorWaste"],
+  wall: ["wallTileSize", "wallOrientation", "wallPrice", "wallWaste"],
+  skirt: ["skirtSourceTile", "skirtPrice", "skirtWaste", "skirtPriceMode", "skirtHeight"],
+} as const satisfies Record<MaterialKind, readonly (keyof TileRoom)[]>;
+
+export function materialSourceRoomId(rooms: TileRoom[], roomId: string, kind: MaterialKind) {
+  const byId = new Map(rooms.map((room) => [room.id, room]));
+  const original = byId.get(roomId);
+  if (!original) return roomId;
+  const seen = new Set([roomId]);
+  let current = original;
+  while (true) {
+    const sourceId = sourceIdFor(current, kind);
+    if (!sourceId || seen.has(sourceId)) return current === original ? roomId : current.id;
+    const source = byId.get(sourceId);
+    if (!source) return current.id;
+    seen.add(sourceId);
+    current = source;
+  }
+}
+
+export function resolveRoomMaterials(rooms: TileRoom[]) {
+  const byId = new Map(rooms.map((room) => [room.id, room]));
+  return rooms.map((room) => {
+    const resolved = { ...room };
+    for (const kind of ["floor", "wall", "skirt"] as const) {
+      const source = byId.get(materialSourceRoomId(rooms, room.id, kind));
+      if (!source) continue;
+      for (const field of materialFields[kind]) {
+        Object.assign(resolved, { [field]: source[field] });
+      }
+    }
+    return resolved;
+  });
+}
+
+export function calculateMaterialGroups(
+  rooms: TileRoom[],
+  effectiveRooms: TileRoom[],
+  calculations: RoomCalculation[],
+): MaterialGroup[] {
+  const groups = new Map<string, MaterialGroup & { hasMultiType?: boolean }>();
+  const add = (kind: MaterialKind, index: number) => {
+    const room = rooms[index];
+    const effective = effectiveRooms[index];
+    const calculation = calculations[index];
+    if (kind === "wall" && !calculation.wall.enabled) return;
+    if (kind === "skirt" && !calculation.skirt.enabled) return;
+    const sourceRoomId = materialSourceRoomId(rooms, room.id, kind);
+    const id = `${kind}:${sourceRoomId}`;
+    const tileSize = kind === "floor"
+      ? effective.floorTileSize
+      : kind === "wall" ? effective.wallTileSize : effective.skirtSourceTile;
+    const current = groups.get(id) ?? {
+      id,
+      kind,
+      sourceRoomId,
+      roomIds: [],
+      tileSize,
+      requiredArea: 0,
+      requiredLength: 0,
+      tileCount: 0,
+      cost: 0,
+    };
+    current.roomIds.push(room.id);
+    if (kind === "floor") {
+      current.requiredArea += calculation.floor.requiredArea;
+      current.cost += calculation.floor.cost;
+    } else if (kind === "wall") {
+      current.requiredArea += calculation.wall.requiredArea;
+      current.tileCount += calculation.wall.tileCount;
+      current.cost += calculation.wall.cost;
+      current.hasMultiType ||= room.wallMultiType;
+    } else {
+      current.requiredLength += calculation.skirt.requiredLength;
+    }
+    groups.set(id, current);
+  };
+
+  rooms.forEach((_, index) => {
+    add("floor", index);
+    add("wall", index);
+    add("skirt", index);
+  });
+
+  return [...groups.values()].map((group) => {
+    const source = effectiveRooms[rooms.findIndex((room) => room.id === group.sourceRoomId)] ?? effectiveRooms[0];
+    const tile = parseTileSize(group.tileSize);
+    if (group.kind === "floor") {
+      group.tileCount = tile.area > 0 ? Math.ceil(group.requiredArea / tile.area) : 0;
+    } else if (group.kind === "wall" && !group.hasMultiType) {
+      group.tileCount = tile.area > 0 ? Math.ceil(group.requiredArea / tile.area) : 0;
+    } else if (group.kind === "skirt" && source) {
+      const tileLong = Math.max(tile.a, tile.b);
+      const tileShort = Math.min(tile.a, tile.b);
+      const height = positive(source.skirtHeight) / 100;
+      const strips = height > 0 ? Math.floor(tileShort / height) : 0;
+      group.tileCount = strips > 0 && tileLong > 0
+        ? Math.ceil(group.requiredLength / (strips * tileLong))
+        : 0;
+      group.cost = source.skirtPriceMode === "m2"
+        ? group.tileCount * tile.area * positive(source.skirtPrice)
+        : group.requiredLength * positive(source.skirtPrice);
+    }
+    return group;
+  });
 }
 
 export function parseTileSize(value: string) {
@@ -230,8 +357,8 @@ export function calculateRoom(room: TileRoom): RoomCalculation {
   };
 }
 
-export function calculateTotals(calculations: RoomCalculation[]): CalculatorTotals {
-  return calculations.reduce<CalculatorTotals>((totals, calculation) => ({
+export function calculateTotals(calculations: RoomCalculation[], groups?: MaterialGroup[]): CalculatorTotals {
+  const totals = calculations.reduce<CalculatorTotals>((totals, calculation) => ({
     floorArea: totals.floorArea + calculation.floor.requiredArea,
     floorTiles: totals.floorTiles + calculation.floor.tileCount,
     wallArea: totals.wallArea + calculation.wall.requiredArea,
@@ -248,6 +375,20 @@ export function calculateTotals(calculations: RoomCalculation[]): CalculatorTota
     skirtSourceTiles: 0,
     totalCost: 0,
   });
+  if (!groups) return totals;
+  return {
+    ...totals,
+    floorTiles: groups.filter((group) => group.kind === "floor").reduce((sum, group) => sum + group.tileCount, 0),
+    wallTiles: groups.filter((group) => group.kind === "wall").reduce((sum, group) => sum + group.tileCount, 0),
+    skirtSourceTiles: groups.filter((group) => group.kind === "skirt").reduce((sum, group) => sum + group.tileCount, 0),
+    totalCost: groups.reduce((sum, group) => sum + group.cost, 0),
+  };
+}
+
+function sourceIdFor(room: TileRoom, kind: MaterialKind) {
+  if (kind === "floor") return room.floorMaterialSourceId;
+  if (kind === "wall") return room.wallMaterialSourceId;
+  return room.skirtMaterialSourceId;
 }
 
 function positive(value: number) {
