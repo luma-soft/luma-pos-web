@@ -13,7 +13,6 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
-import { normalizeSearch } from "@/lib/normalize";
 import { createPortal } from "react-dom";
 import { Combobox } from "@/components/combobox";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -75,6 +74,10 @@ import {
   PosSummaryAdjustRow,
 } from "@/components/pos/pos-summary-controls";
 import { PosProductThumbnail } from "@/components/pos/pos-product-thumbnail";
+import {
+  resolveAiCartDraftItems,
+  type PosAiUnresolvedItem,
+} from "@/lib/pos/ai-cart-resolution";
 
 type CartLine = {
   key: string;
@@ -93,25 +96,6 @@ type CartLine = {
   /** Giá cần khôi phục khi thu ngân tắt trạng thái miễn phí. */
   freeRestore?: { unitPrice: number; lineDiscount: number; lineDiscountMode?: LineDiscountMode; lineDiscountValue?: number; priceBook?: PriceBook };
   note?: string;
-};
-
-type PosAiCartDraftItem = {
-  productId?: string;
-  productName?: string;
-  sku?: string;
-  text?: string;
-  unitName?: string;
-  quantity?: number;
-  confidence?: number;
-  reason?: string;
-};
-
-type PosAiUnresolvedItem = {
-  key: string;
-  label: string;
-  sku?: string;
-  quantity: number;
-  reason: string;
 };
 
 type PosAiCartDraftPayload = {
@@ -383,46 +367,6 @@ function isReturnKind(kind: PosDraftKind) {
 
 function scopedStorageKey(key: string, scopeId: string) {
   return `${key}:${scopeId}`;
-}
-
-function pendingAiCartItem(raw: unknown, index: number): PosAiUnresolvedItem | null {
-  if (!raw || typeof raw !== "object") return null;
-  const item = raw as PosAiCartDraftItem;
-  const label = (item.productName ?? item.text ?? item.sku ?? `Dòng ${index + 1}`).trim();
-  if (!label) return null;
-  return {
-    key: `ai-unresolved-${index}-${item.sku ?? label}`,
-    label,
-    sku: item.sku?.trim() || undefined,
-    quantity: positiveQuantityOrDefault(item.quantity),
-    reason: item.reason === "inactive_or_not_found" ? "Sản phẩm không active hoặc không có trong danh mục" : "Không tìm thấy sản phẩm active trong danh mục",
-  };
-}
-
-function matchAiCartDraftItems(rawItems: unknown[], products: PosProduct[]) {
-  const matched: Array<{ product: PosProduct; quantity: number }> = [];
-  const unresolved: PosAiUnresolvedItem[] = [];
-  rawItems.forEach((raw, index) => {
-    if (!raw || typeof raw !== "object") return;
-    const item = raw as PosAiCartDraftItem;
-    const name = normalizeSearch(item.productName ?? "");
-    const sku = normalizeSearch(item.sku ?? "");
-    const product = products.find((candidate) =>
-      (!candidate.isVariantParent) &&
-      (
-        (!!item.productId && candidate.id === item.productId) ||
-        (!!sku && normalizeSearch(candidate.sku ?? "") === sku) ||
-        (!!name && normalizeSearch(candidate.name) === name)
-      )
-    );
-    if (!product) {
-      const pending = pendingAiCartItem(raw, index);
-      if (pending) unresolved.push(pending);
-      return;
-    }
-    matched.push({ product, quantity: positiveQuantityOrDefault(item.quantity) });
-  });
-  return { matched, unresolved };
 }
 
 function aiProductDraftItemsFromQuery(params: URLSearchParams) {
@@ -1224,8 +1168,12 @@ export function PosClient({
     });
   }, [priceBook, setCart, t, data.priceBooks]);
 
-  const applyRawAiCartItems = useCallback((rawItems: unknown[], payload?: Record<string, unknown>) => {
-    const { matched, unresolved } = matchAiCartDraftItems(rawItems, searchableProducts);
+  const applyRawAiCartItems = useCallback(async (rawItems: unknown[], payload?: Record<string, unknown>) => {
+    const { matched, unresolved } = await resolveAiCartDraftItems(
+      rawItems,
+      searchableProducts,
+      async (query) => flattenProducts(await searchPosProducts(query)),
+    );
     setAiUnresolvedItems(unresolved);
     if (matched.length === 0) return false;
     for (const line of matched) addQuantityToCart(line.product, line.quantity);
@@ -1260,7 +1208,7 @@ export function PosClient({
       ...(Array.isArray(payload.items) ? payload.items : []),
       ...(Array.isArray(payload.unresolvedItems) ? payload.unresolvedItems : []),
     ];
-    applyRawAiCartItems(rawItems);
+    void applyRawAiCartItems(rawItems);
   }
 
   useEffect(() => {
@@ -1271,7 +1219,7 @@ export function PosClient({
         ...(Array.isArray(detail?.items) ? detail.items : []),
         ...(Array.isArray(payload.unresolvedItems) ? payload.unresolvedItems : []),
       ];
-      applyRawAiCartItems(rawItems);
+      void applyRawAiCartItems(rawItems);
     };
     window.addEventListener("luma:pos-ai-cart-draft", onAiCartDraft);
     return () => window.removeEventListener("luma:pos-ai-cart-draft", onAiCartDraft);
@@ -1282,24 +1230,26 @@ export function PosClient({
     if (params.get("aiDraft") !== "1") return;
     let cancelled = false;
     queueMicrotask(() => {
-      if (cancelled) return;
-      let stored: PosAiCartDraftPayload | null = null;
-      try {
-        stored = JSON.parse(localStorage.getItem(scopedStorageKey(AI_POS_DRAFT_KEY, storageScope)) ?? "null") as PosAiCartDraftPayload | null;
-      } catch {
-        stored = null;
-      }
-      const storedItems = Array.isArray(stored?.items) ? stored.items : [];
-      const payload = stored?.payload && typeof stored.payload === "object" ? stored.payload : {};
-      const payloadUnresolvedItems = Array.isArray(payload.unresolvedItems) ? payload.unresolvedItems : [];
-      const rawItems = storedItems.length > 0 ? [...storedItems, ...payloadUnresolvedItems] : aiProductDraftItemsFromQuery(params);
-      if (rawItems.length > 0) hydratedScopeRef.current = storageScope;
-      const consumed = applyRawAiCartItems(rawItems, payload);
-      if (consumed) localStorage.removeItem(scopedStorageKey(AI_POS_DRAFT_KEY, storageScope));
-      params.delete("aiDraft");
-      params.delete("aiProducts");
-      const query = params.toString();
-      window.history.replaceState(null, "", query ? `/pos?${query}` : "/pos");
+      void (async () => {
+        if (cancelled) return;
+        let stored: PosAiCartDraftPayload | null = null;
+        try {
+          stored = JSON.parse(localStorage.getItem(scopedStorageKey(AI_POS_DRAFT_KEY, storageScope)) ?? "null") as PosAiCartDraftPayload | null;
+        } catch {
+          stored = null;
+        }
+        const storedItems = Array.isArray(stored?.items) ? stored.items : [];
+        const payload = stored?.payload && typeof stored.payload === "object" ? stored.payload : {};
+        const payloadUnresolvedItems = Array.isArray(payload.unresolvedItems) ? payload.unresolvedItems : [];
+        const rawItems = storedItems.length > 0 ? [...storedItems, ...payloadUnresolvedItems] : aiProductDraftItemsFromQuery(params);
+        if (rawItems.length > 0) hydratedScopeRef.current = storageScope;
+        const consumed = await applyRawAiCartItems(rawItems, payload);
+        if (consumed) localStorage.removeItem(scopedStorageKey(AI_POS_DRAFT_KEY, storageScope));
+        params.delete("aiDraft");
+        params.delete("aiProducts");
+        const query = params.toString();
+        window.history.replaceState(null, "", query ? `/pos?${query}` : "/pos");
+      })();
     });
     return () => { cancelled = true; };
   }, [applyRawAiCartItems, searchableProducts, storageScope]);

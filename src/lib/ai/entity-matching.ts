@@ -145,6 +145,27 @@ export function matchAiInboundProduct(
     }
   }
 
+  const requestedName = normalized(row.text);
+  const exactNameMatches = requestedName
+    ? candidates.filter((product) => normalized(product.name) === requestedName)
+    : [];
+  if (exactNameMatches.length === 1) {
+    return {
+      product: exactNameMatches[0],
+      confidence: Math.max(row.confidence, 0.96),
+      ambiguous: [],
+      matchedBy: "name",
+    };
+  }
+  if (exactNameMatches.length > 1) {
+    return {
+      product: null,
+      confidence: Math.min(row.confidence, 0.55),
+      ambiguous: exactNameMatches.slice(0, 5),
+      matchedBy: null,
+    };
+  }
+
   const scored = candidates
     .map((product) => ({ product, score: aiProductNameSimilarity(row.text, product.name) }))
     .filter((item) => item.score > 0)

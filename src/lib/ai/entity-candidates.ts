@@ -6,7 +6,7 @@ import {
   aiSupplierSkuTokens,
   type AiProductCandidate,
 } from "@/lib/ai/entity-matching";
-import { accentInsensitiveLike } from "@/lib/search";
+import { accentInsensitiveLike, productSearchCondition } from "@/lib/search";
 
 export {
   aiEntitySearchTerms,
@@ -57,6 +57,33 @@ function withProductDetails(
   }));
 }
 
+async function hydrateProductCandidates(
+  storeId: string,
+  rows: Array<Omit<AiProductCandidate, "supplierSkus" | "units">>,
+) {
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const ids = [...byId.keys()];
+  const [aliases, units] = ids.length
+    ? await Promise.all([
+        db
+          .select({ productId: productSuppliers.productId, supplierSku: productSuppliers.supplierSku })
+          .from(productSuppliers)
+          .where(and(
+            eq(productSuppliers.storeId, storeId),
+            inArray(productSuppliers.productId, ids),
+          )),
+        db
+          .select({ productId: productUnits.productId, unitName: productUnits.unitName, multiplier: productUnits.multiplier })
+          .from(productUnits)
+          .where(and(
+            eq(productUnits.storeId, storeId),
+            inArray(productUnits.productId, ids),
+          )),
+      ])
+    : [[], []];
+  return withProductDetails([...byId.values()], aliases, units);
+}
+
 export async function getAiProductCandidates(storeId: string, values: readonly string[]) {
   const terms = aiEntitySearchTerms(values);
   const termGroups = Array.from(
@@ -100,26 +127,24 @@ export async function getAiProductCandidates(storeId: string, values: readonly s
       : Promise.resolve([]),
   ]);
 
-  const byId = new Map<string, Omit<AiProductCandidate, "supplierSkus" | "units">>();
-  for (const row of [...directGroups.flat(), ...supplierRows]) byId.set(row.id, row);
-  const ids = [...byId.keys()];
-  const [aliases, units] = ids.length
-    ? await Promise.all([
-        db
-          .select({ productId: productSuppliers.productId, supplierSku: productSuppliers.supplierSku })
-          .from(productSuppliers)
-          .where(and(
-            eq(productSuppliers.storeId, storeId),
-            inArray(productSuppliers.productId, ids),
-          )),
-        db
-          .select({ productId: productUnits.productId, unitName: productUnits.unitName, multiplier: productUnits.multiplier })
-          .from(productUnits)
-          .where(and(
-            eq(productUnits.storeId, storeId),
-            inArray(productUnits.productId, ids),
-          )),
-      ])
-    : [[], []];
-  return withProductDetails([...byId.values()], aliases, units);
+  return hydrateProductCandidates(storeId, [...directGroups.flat(), ...supplierRows]);
+}
+
+/** Focused candidate lookup for structured OCR rows; all tokens in one row must match. */
+export async function getAiProductCandidatesForRows(
+  storeId: string,
+  values: readonly string[],
+) {
+  const queries = [...new Set(values.map((value) => value.trim()).filter(Boolean))].slice(0, 30);
+  if (queries.length === 0) return [];
+  const groups = await Promise.all(queries.map((query) => db
+    .select(productSelection)
+    .from(products)
+    .where(and(
+      eq(products.storeId, storeId),
+      eq(products.isActive, true),
+      productSearchCondition([products.name, products.sku, products.barcode], query),
+    ))
+    .limit(20)));
+  return hydrateProductCandidates(storeId, groups.flat());
 }

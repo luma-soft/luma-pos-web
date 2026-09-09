@@ -7,6 +7,7 @@ import type { ParsedAiAttachment } from "@/lib/ai/attachments";
 import {
   aiEntitySearchTerms,
   getAiProductCandidates,
+  getAiProductCandidatesForRows,
   matchAiInboundProduct,
   resolveAiProductUnit,
   type AiProductCandidate,
@@ -15,6 +16,11 @@ import { planAiAssistantIntent, type AiPlannerIntent, type AiPlannerResult } fro
 import { recordAiTokenUsage } from "@/lib/ai/usage";
 import { Routes } from "@/lib/routes";
 import { accentInsensitiveLike } from "@/lib/search";
+import {
+  buildPosImageProductLines,
+  mergeAlternativeProductLines,
+  posImageProductLookupValues,
+} from "@/lib/ai/pos-image-cart";
 
 export type AiAssistantState =
   | "idle"
@@ -1223,9 +1229,7 @@ export function parseProductLines(prompt: string, productOptions: PriceProductOp
   const profiles = buildProductProfiles(productOptions);
   const segmented = parseSegmentedProductLines(prompt, profiles);
   const exact = parseExactProductLines(prompt, productOptions);
-  const lines: ParsedProductLine[] = [];
-  for (const line of [...segmented, ...exact]) pushParsedLine(lines, line);
-  return lines.slice(0, 30);
+  return mergeAlternativeProductLines(segmented, exact).slice(0, 30);
 }
 
 function attachmentExtractedText(prompt: string) {
@@ -2293,10 +2297,26 @@ function posMatchQualityText(confidence: number) {
   return "Khớp tương đối, kiểm tra kỹ";
 }
 
-export async function posCartPreview(storeId: string, prompt: string, source: "voice" | "image"): Promise<AiActionPreview> {
-  const context = await getSalesContext(storeId, prompt);
-  const lines = parseProductLines(prompt, context.products);
-  const unresolvedItems = parseUnresolvedProductSegments(prompt, context.products);
+export async function posCartPreview(
+  storeId: string,
+  prompt: string,
+  source: "voice" | "image",
+  parsedAttachments: ParsedAiAttachment[] = [],
+): Promise<AiActionPreview> {
+  const attachmentCandidates = source === "image"
+    ? parsedAttachments.flatMap((attachment) => attachment.candidates)
+    : [];
+  const products = attachmentCandidates.length > 0
+    ? await getAiProductCandidatesForRows(
+        storeId,
+        posImageProductLookupValues(attachmentCandidates),
+      )
+    : (await getSalesContext(storeId, prompt)).products;
+  const structured = attachmentCandidates.length > 0
+    ? buildPosImageProductLines(attachmentCandidates, products)
+    : null;
+  const lines = structured?.lines ?? parseProductLines(prompt, products);
+  const unresolvedItems = structured?.unresolvedItems ?? parseUnresolvedProductSegments(prompt, products);
   const unresolvedText = source === "image" ? attachmentExtractedText(prompt) : "";
   const missingFields = lines.length ? [] : ["items"];
   const sourceText = source === "voice" ? "Danh sách nhập tay/giọng nói" : "Ảnh/OCR";
@@ -2550,9 +2570,9 @@ export async function buildAiAssistantResponse(input: {
         : previewTool === "buildCashbookPreview"
           ? cashbookPreview(prompt, forcedCashbookMode)
         : previewTool === "buildPosCartPreview:voice"
-          ? await posCartPreview(input.storeId, prompt, "voice")
+          ? await posCartPreview(input.storeId, prompt, "voice", input.parsedAttachments ?? [])
         : previewTool === "buildPosCartPreview:image"
-          ? await posCartPreview(input.storeId, prompt, "image")
+          ? await posCartPreview(input.storeId, prompt, "image", input.parsedAttachments ?? [])
         : previewTool === "buildOrderPreview"
           ? await orderActionPreview(input.storeId, prompt, forcedOrderMode)
         : previewTool === "buildReportSummaryPreview"

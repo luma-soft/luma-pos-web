@@ -183,7 +183,15 @@ export async function runAiTool(input: AiToolRunInput): Promise<AiToolResult> {
     case "buildOrderPreview":
       return { kind: "preview", preview: await orderActionPreview(input.storeId, prompt) };
     case "buildPosCartPreview":
-      return { kind: "preview", preview: await posCartPreview(input.storeId, prompt, input.source ?? "voice") };
+      return {
+        kind: "preview",
+        preview: await posCartPreview(
+          input.storeId,
+          prompt,
+          input.source ?? "voice",
+          input.parsedAttachments ?? [],
+        ),
+      };
     default: {
       const exhaustive: never = input.name;
       throw new Error(`Unsupported AI tool: ${exhaustive}`);
