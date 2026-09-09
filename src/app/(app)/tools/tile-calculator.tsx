@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Check,
+  ChevronDown,
   CircleAlert,
   Copy,
   DoorOpen,
   Layers3,
+  Minus,
   Palette,
   Plus,
   ReceiptText,
@@ -45,6 +47,7 @@ export function TileCalculator() {
   const toolsT = useTranslations("toolsCenter");
   const locale = useLocale();
   const [rooms, setRooms] = useState<TileRoom[]>(() => createInitialRooms(t));
+  const [activeRoomId, setActiveRoomId] = useState("room-living");
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const calculations = useMemo(() => rooms.map(calculateRoom), [rooms]);
   const totals = useMemo(() => calculateTotals(calculations), [calculations]);
@@ -63,14 +66,21 @@ export function TileCalculator() {
 
   function addRoom() {
     const roomNumber = rooms.length + 1;
+    const nextRoom = createRoom(makeId("room"), t("roomDefaultName", { number: roomNumber }));
     setRooms((current) => [
       ...current,
-      createRoom(makeId("room"), t("roomDefaultName", { number: roomNumber })),
+      nextRoom,
     ]);
+    setActiveRoomId(nextRoom.id);
   }
 
   function removeRoom(roomId: string) {
-    setRooms((current) => current.length > 1 ? current.filter((room) => room.id !== roomId) : current);
+    setRooms((current) => {
+      if (current.length <= 1) return current;
+      const next = current.filter((room) => room.id !== roomId);
+      if (activeRoomId === roomId) setActiveRoomId(next[0].id);
+      return next;
+    });
   }
 
   function addOpening(roomId: string) {
@@ -83,6 +93,7 @@ export function TileCalculator() {
           name: t("openingDefaultName", { number: room.openings.length + 1 }),
           width: 0.9,
           height: 2.1,
+          quantity: 1,
         },
       ],
     } : room));
@@ -141,6 +152,9 @@ export function TileCalculator() {
     }
   }
 
+  const activeIndex = Math.max(0, rooms.findIndex((room) => room.id === activeRoomId));
+  const activeRoom = rooms[activeIndex];
+
   return (
     <div className="min-h-full bg-canvas [&_button]:min-h-11 [&_button]:min-w-11 lg:[&_button]:min-h-0 lg:[&_button]:min-w-0">
       <ToolPageHeader
@@ -160,36 +174,36 @@ export function TileCalculator() {
           <p role="alert" className="mb-4 text-sm font-medium text-er">{t("copyFailed")}</p>
         )}
 
-        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[13rem_minmax(28rem,1fr)_20rem]">
+          <RoomNavigator
+            rooms={rooms}
+            activeRoomId={activeRoom.id}
+            calculations={calculations}
+            number={number}
+            onSelect={setActiveRoomId}
+            onAdd={addRoom}
+          />
+
           <section aria-label={t("rooms")} className="min-w-0 space-y-4">
-            {rooms.map((room, index) => (
+            {activeRoom && (
               <RoomCard
-                key={room.id}
-                room={room}
-                calculation={calculations[index]}
-                index={index}
+                key={activeRoom.id}
+                room={activeRoom}
+                calculation={calculations[activeIndex]}
+                index={activeIndex}
                 number={number}
                 currency={currency}
                 canRemove={rooms.length > 1}
-                onPatch={(patch) => patchRoom(room.id, patch)}
-                onRemove={() => removeRoom(room.id)}
-                onAddOpening={() => addOpening(room.id)}
-                onPatchOpening={(openingId, patch) => patchOpening(room.id, openingId, patch)}
-                onRemoveOpening={(openingId) => removeOpening(room.id, openingId)}
-                onAddWallType={() => addWallType(room.id)}
-                onPatchWallType={(typeId, patch) => patchWallType(room.id, typeId, patch)}
-                onRemoveWallType={(typeId) => removeWallType(room.id, typeId)}
+                onPatch={(patch) => patchRoom(activeRoom.id, patch)}
+                onRemove={() => removeRoom(activeRoom.id)}
+                onAddOpening={() => addOpening(activeRoom.id)}
+                onPatchOpening={(openingId, patch) => patchOpening(activeRoom.id, openingId, patch)}
+                onRemoveOpening={(openingId) => removeOpening(activeRoom.id, openingId)}
+                onAddWallType={() => addWallType(activeRoom.id)}
+                onPatchWallType={(typeId, patch) => patchWallType(activeRoom.id, typeId, patch)}
+                onRemoveWallType={(typeId) => removeWallType(activeRoom.id, typeId)}
               />
-            ))}
-
-            <button
-              type="button"
-              onClick={addRoom}
-              className="group flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-primary-300 bg-primary-50/40 px-4 py-4 text-sm font-semibold text-primary-700 transition hover:border-primary-500 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-primary-800 dark:bg-primary-950/20 dark:text-primary-300 dark:hover:bg-primary-950/35 min-h-11"
-            >
-              <Plus className="size-4 transition-transform group-hover:rotate-90" />
-              {t("addRoom")}
-            </button>
+            )}
           </section>
 
           <ProjectSummary
@@ -202,6 +216,49 @@ export function TileCalculator() {
         </div>
       </main>
     </div>
+  );
+}
+
+function RoomNavigator({ rooms, activeRoomId, calculations, number, onSelect, onAdd }: {
+  rooms: TileRoom[];
+  activeRoomId: string;
+  calculations: RoomCalculation[];
+  number: Intl.NumberFormat;
+  onSelect: (roomId: string) => void;
+  onAdd: () => void;
+}) {
+  const t = useTranslations("tileCalculator");
+  return (
+    <nav aria-label={t("rooms")} className="rounded-card border border-border bg-surface p-3 shadow-e1 xl:col-span-2 2xl:col-span-1 2xl:sticky 2xl:top-[4.625rem]">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-slate-500">{t("roomGroups", { count: rooms.length })}</p>
+        <Button type="button" variant="ghost" size="sm" onClick={onAdd}><Plus /> {t("addRoomShort")}</Button>
+      </div>
+      <div className="flex gap-2 overflow-x-auto 2xl:flex-col">
+        {rooms.map((room, index) => (
+          <button
+            key={room.id}
+            type="button"
+            onClick={() => onSelect(room.id)}
+            aria-current={room.id === activeRoomId ? "page" : undefined}
+            className={cn(
+              "flex min-w-[12rem] items-center gap-3 rounded-xl border px-3 py-3 text-left transition 2xl:min-w-0",
+              room.id === activeRoomId
+                ? "border-primary-300 bg-primary-50 text-primary-900 dark:border-primary-800 dark:bg-primary-950/30 dark:text-primary-100"
+                : "border-transparent bg-surface-2 hover:border-border hover:bg-surface",
+            )}
+          >
+            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface font-mono text-xs font-bold text-primary-700 shadow-e1 dark:text-primary-300">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold">{room.name}</span>
+              <span className="mt-0.5 block text-xs text-slate-500">{t("identicalRooms", { count: room.quantity })} · {number.format(calculations[index].floor.area)} m²</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </nav>
   );
 }
 
@@ -269,11 +326,27 @@ function RoomCard({
       </header>
 
       <div className="space-y-6 p-4 sm:p-5">
-        <CalculatorSection icon={<Ruler />} title={t("dimensions")} description={t("dimensionsHint")}>
+        <section className="rounded-xl border border-primary-200 bg-primary-50/45 p-4 dark:border-primary-900 dark:bg-primary-950/20">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t("roomQuantity")}</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("roomQuantityHint")}</p>
+            </div>
+            <QuantityStepper value={room.quantity} label={t("roomQuantity")} onChange={(quantity) => onPatch({ quantity })} />
+          </div>
+        </section>
+
+        <CalculatorSection icon={<Ruler />} title={t("dimensions")} description={t("dimensionsHint")} defaultOpen>
           <div className="grid gap-3 sm:grid-cols-3">
             <NumberField id={`${room.id}-length`} label={t("length")} value={room.length} suffix="m" onChange={(length) => onPatch({ length })} />
             <NumberField id={`${room.id}-width`} label={t("width")} value={room.width} suffix="m" onChange={(width) => onPatch({ width })} />
             <NumberField id={`${room.id}-height`} label={t("height")} hint={t("optional")} value={room.height} suffix="m" onChange={(height) => onPatch({ height })} />
+          </div>
+          <div className="mt-4 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 dark:border-primary-900 dark:bg-primary-950/25">
+            <p className="text-xs font-semibold text-primary-700 dark:text-primary-300">{t("floorAreaFormula")}</p>
+            <p className="mt-1 font-mono text-xl font-bold text-slate-950 dark:text-white">
+              {number.format(room.length)} × {number.format(room.width)} × {room.quantity} = {number.format(calculation.floor.area)} m²
+            </p>
           </div>
         </CalculatorSection>
 
@@ -398,13 +471,17 @@ function RoomCard({
           {room.openings.length > 0 ? (
             <div className="space-y-2">
               {room.openings.map((opening) => (
-                <div key={opening.id} className="grid gap-2 rounded-xl bg-surface-2 p-3 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_44px] sm:items-end lg:grid-cols-[minmax(0,1fr)_7rem_7rem_2rem]">
+                <div key={opening.id} className="grid gap-2 rounded-xl bg-surface-2 p-3 sm:grid-cols-[minmax(0,1fr)_6.5rem_6.5rem_8.5rem_44px] sm:items-end lg:grid-cols-[minmax(0,1fr)_6.5rem_6.5rem_8.5rem_2rem]">
                   <TextField label={t("openingName")} value={opening.name} onChange={(name) => onPatchOpening(opening.id, { name })} />
                   <NumberField id={`${room.id}-${opening.id}-width`} label={t("width")} value={opening.width} suffix="m" onChange={(width) => onPatchOpening(opening.id, { width })} />
                   <NumberField id={`${room.id}-${opening.id}-height`} label={t("height")} value={opening.height} suffix="m" onChange={(height) => onPatchOpening(opening.id, { height })} />
+                  <QuantityStepper compact value={opening.quantity} label={t("quantity")} onChange={(quantity) => onPatchOpening(opening.id, { quantity })} />
                   <Button type="button" variant="ghost" size="iconSm" onClick={() => onRemoveOpening(opening.id)} aria-label={t("removeOpening", { name: opening.name })} className="text-slate-400 hover:text-er">
                     <Trash2 />
                   </Button>
+                  <p className="text-xs text-slate-500 sm:col-span-5 lg:col-span-5">
+                    {number.format(opening.width)} × {number.format(opening.height)} × {opening.quantity} = {number.format(opening.width * opening.height * opening.quantity)} m² / {t("roomUnit")}
+                  </p>
                 </div>
               ))}
             </div>
@@ -487,24 +564,46 @@ function RoomResult({ calculation, number, currency }: { calculation: RoomCalcul
   );
 }
 
-function CalculatorSection({ icon, title, description, tinted, children }: {
+function CalculatorSection({ icon, title, description, tinted, defaultOpen, children }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   tinted?: boolean;
+  defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <section className={cn(tinted && "rounded-xl bg-primary-50/50 p-4 dark:bg-primary-950/15")}>
-      <div className="mb-3 flex items-start gap-2.5">
+    <details open={defaultOpen ? true : undefined} className={cn("group rounded-xl border border-border-soft bg-surface", tinted && "bg-primary-50/50 dark:bg-primary-950/15")}>
+      <summary className="flex cursor-pointer list-none items-start gap-2.5 px-4 py-3.5 [&::-webkit-details-marker]:hidden">
         <span className="mt-0.5 text-primary-600 [&_svg]:size-4">{icon}</span>
-        <div>
+        <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
           <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">{description}</p>
         </div>
+        <ChevronDown aria-hidden className="size-4 text-slate-400 transition group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-border-soft px-4 py-4">{children}</div>
+    </details>
+  );
+}
+
+function QuantityStepper({ value, label, compact = false, onChange }: {
+  value: number;
+  label: string;
+  compact?: boolean;
+  onChange: (value: number) => void;
+}) {
+  const t = useTranslations("tileCalculator");
+  const normalized = Math.min(999, Math.max(1, Math.floor(value || 1)));
+  return (
+    <div className={cn("space-y-1.5", compact && "min-w-0")}>
+      {compact && <span className="block text-xs font-medium text-slate-600 dark:text-slate-300">{label}</span>}
+      <div className="grid grid-cols-[2.75rem_minmax(3rem,1fr)_2.75rem] overflow-hidden rounded-lg border border-border bg-surface">
+        <button type="button" disabled={normalized <= 1} onClick={() => onChange(normalized - 1)} aria-label={`${t("decreaseQuantity")} ${label}`} className="grid place-items-center border-r border-border text-slate-600 disabled:opacity-35"><Minus className="size-4" /></button>
+        <input aria-label={label} inputMode="numeric" min={1} max={999} value={normalized} onChange={(event) => onChange(Math.min(999, Math.max(1, Number.parseInt(event.target.value, 10) || 1)))} className="h-10 min-w-0 bg-transparent text-center font-mono font-bold outline-none" />
+        <button type="button" disabled={normalized >= 999} onClick={() => onChange(normalized + 1)} aria-label={`${t("increaseQuantity")} ${label}`} className="grid place-items-center border-l border-border text-slate-600 disabled:opacity-35"><Plus className="size-4" /></button>
       </div>
-      {children}
-    </section>
+    </div>
   );
 }
 
@@ -648,6 +747,7 @@ function createRoom(id: string, name: string): TileRoom {
   return {
     id,
     name,
+    quantity: 1,
     length: 0,
     width: 0,
     height: 0,
@@ -675,7 +775,7 @@ function createInitialRooms(t: Translator): TileRoom[] {
     ...createRoom("room-living", t("livingRoom")),
     length: 5,
     width: 4,
-    openings: [{ id: "opening-main", name: t("mainDoor"), width: 0.9, height: 2.1 }],
+    openings: [{ id: "opening-main", name: t("mainDoor"), width: 0.9, height: 2.1, quantity: 1 }],
     wallTypes: defaultWallTypes(t, "living"),
   };
   const bathroom = {
@@ -686,7 +786,7 @@ function createInitialRooms(t: Translator): TileRoom[] {
     floorTileSize: "0.3x0.3",
     skirtEnabled: false,
     wallMultiType: true,
-    openings: [{ id: "opening-bathroom", name: t("door"), width: 0.7, height: 2 }],
+    openings: [{ id: "opening-bathroom", name: t("door"), width: 0.7, height: 2, quantity: 1 }],
     wallTypes: [
       { id: "bathroom-dark", name: t("darkTile"), rows: 2 },
       { id: "bathroom-accent", name: t("accentTile"), rows: 1 },
@@ -714,7 +814,7 @@ function buildSummaryText(
   const lines = [t("copyTitle"), "═".repeat(42)];
   rooms.forEach((room, index) => {
     const calculation = calculations[index];
-    lines.push("", room.name);
+    lines.push("", `${room.name} × ${room.quantity} ${t("roomUnit")}`);
     lines.push(`  ${t("floor")}: ${number.format(calculation.floor.requiredArea)} m² · ${t("tileCount", { count: calculation.floor.tileCount })}`);
     if (calculation.wall.enabled) {
       lines.push(`  ${t("wall")}: ${number.format(calculation.wall.requiredArea)} m² · ${t("tileCount", { count: calculation.wall.tileCount })}`);

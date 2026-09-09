@@ -32,6 +32,7 @@ export interface Opening {
   name: string;
   width: number;
   height: number;
+  quantity: number;
 }
 
 export interface WallType {
@@ -43,6 +44,7 @@ export interface WallType {
 export interface TileRoom {
   id: string;
   name: string;
+  quantity: number;
   length: number;
   width: number;
   height: number;
@@ -124,18 +126,19 @@ export function tileSizeLabel(value: string) {
 }
 
 export function calculateRoom(room: TileRoom): RoomCalculation {
+  const quantity = wholeQuantity(room.quantity);
   const length = positive(room.length);
   const width = positive(room.width);
   const height = positive(room.height);
   const perimeter = 2 * (length + width);
-  const floorArea = length * width;
+  const floorArea = length * width * quantity;
 
   const openingArea = room.openings.reduce(
-    (sum, opening) => sum + positive(opening.width) * positive(opening.height),
+    (sum, opening) => sum + positive(opening.width) * positive(opening.height) * wholeQuantity(opening.quantity),
     0,
   );
   const openingWidth = room.openings.reduce(
-    (sum, opening) => sum + positive(opening.width),
+    (sum, opening) => sum + positive(opening.width) * wholeQuantity(opening.quantity),
     0,
   );
 
@@ -149,7 +152,7 @@ export function calculateRoom(room: TileRoom): RoomCalculation {
   const tilesPerRow = horizontalSpan > 0 ? Math.ceil(perimeter / horizontalSpan) : 0;
   const typeResults = room.wallTypes.map((type) => {
     const rows = positive(type.rows);
-    const tileCount = tilesPerRow * rows;
+    const tileCount = tilesPerRow * rows * quantity;
     return {
       ...type,
       rows,
@@ -165,10 +168,10 @@ export function calculateRoom(room: TileRoom): RoomCalculation {
   const wallHeight = room.wallMultiType
     ? (height > 0 ? height : totalWallRows * verticalSpan)
     : height;
-  const wallArea = wallEnabled ? Math.max(0, perimeter * wallHeight - openingArea) : 0;
+  const wallArea = wallEnabled ? Math.max(0, perimeter * wallHeight - openingArea) * quantity : 0;
 
   const skirtEnabled = room.skirtEnabled;
-  const skirtLength = skirtEnabled ? Math.max(0, perimeter - openingWidth) : 0;
+  const skirtLength = skirtEnabled ? Math.max(0, perimeter - openingWidth) * quantity : 0;
 
   const floorTile = parseTileSize(room.floorTileSize);
   const floorRequiredArea = floorArea * (1 + positive(room.floorWaste) / 100);
@@ -249,4 +252,8 @@ export function calculateTotals(calculations: RoomCalculation[]): CalculatorTota
 
 function positive(value: number) {
   return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function wholeQuantity(value: number) {
+  return Number.isFinite(value) ? Math.min(999, Math.max(1, Math.floor(value))) : 1;
 }

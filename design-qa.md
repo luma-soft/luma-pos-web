@@ -1,3 +1,39 @@
+# Tile Calculator Redesign Design QA — 2026-09-09
+
+## Reference and capture
+
+- Source visual truth: `/Users/cvthien/.codex/generated_images/01a08599-8d03-7193-b011-6fc4ed345ea7/exec-bc36e52c-9b9f-4323-9cae-6ee4f90ba1dd.png`, `exec-f6143caf-a750-4253-bceb-d6eceed6253c.png`, and `exec-0f7a773c-22bf-488f-8ddb-bba6b5f64688.png`.
+- Shared comparison artifact: `/Users/cvthien/project/LumaPOS/luma-pos-mobile/artifacts/tile-calculator-design-qa-comparison.png`.
+- Browser verification: `/tools`, dark theme, approximately 1265 × 720 CSS pixels in the Codex in-app browser.
+- Mobile verification: iPhone 17 Pro Simulator, 402 × 874 logical pixels at 3× density.
+
+## Comparison history
+
+1. The first desktop pass forced three columns too early and compressed the form. The room navigator now spans the top at laptop widths and moves left only at wider desktop widths.
+2. The first mobile pass exposed every material field at once. Those secondary steps now live in a collapsed accordion while quantity, dimensions, formula, and the sticky result remain immediately visible.
+3. The full-screen mobile result sheet initially conflicted with the shared sheet frame. A widget test caught the layout error; the sheet now scrolls correctly and keeps its copy action above the safe area.
+4. The final reference and runtime captures were opened together. No P0, P1, or P2 visual differences remained.
+
+## Required fidelity surfaces
+
+- Header and navigation are unchanged on both platforms.
+- The room navigator, single active editor, quantity stepper, formula preview, grouped secondary inputs, and persistent summary follow the selected visual direction.
+- Existing Luma type, spacing, border, color, icon, picker, modal-sheet, and button components are reused rather than introducing a parallel design system.
+- Room and opening quantities aggregate measurements before waste and tile rounding; `5 × 4 × 3` with 5% waste and 60 cm tiles produces `63 m² · 175 viên`.
+- Responsive behavior was checked at the available desktop viewport and on the iPhone 17 Pro Simulator. Text remains readable and primary touch targets are at least 44 logical pixels on mobile.
+
+## Interaction and runtime evidence
+
+- Desktop: active-room switching, add/delete room, quantity editing, accordion expansion, live summary, and unchanged custom Luma pickers are wired. The browser console reported no errors or warnings.
+- Mobile: quantity was increased from 1 to 3 in the simulator; the formula and sticky total updated to `175 viên · 63 m²`. The result sheet, secondary accordion, and opened material picker were captured.
+- Automated checks: web model tests, TypeScript, and targeted ESLint passed; mobile domain/widget regression tests and targeted Flutter analyze passed.
+
+## Final result
+
+Passed. Remaining differences are P3 presentation details only: the implementation stays inside the current Luma component system and deliberately omits decorative texture imagery that is not required for the calculator workflow.
+
+---
+
 # Camera Specification Image Copy Design QA
 
 ## Reference and capture
