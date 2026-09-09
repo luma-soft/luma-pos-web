@@ -1,6 +1,11 @@
 import type { CreateProductOutput } from "./schema";
 import { buildVariantCombinations, normalizeVariantAttributes, variantNameKey, VariantValidationError } from "@/lib/products/variant-model";
 
+export function variantAddFieldLabel(attributeName: string): string {
+  const name = attributeName.trim();
+  return /^mã(?:\s|$)/iu.test(name) ? name : `Mã ${name}`;
+}
+
 /** Turn the compact "add same type" form into one authoritative new SKU row. */
 export function prepareVariantAddition(values: CreateProductOutput): CreateProductOutput {
   if (values.variantOperation !== "add" || !values.variantGroupId) return values;

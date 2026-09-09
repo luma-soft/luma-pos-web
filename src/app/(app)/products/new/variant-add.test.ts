@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createProductSchema } from "./schema";
-import { prepareVariantAddition } from "./variant-add";
+import { prepareVariantAddition, variantAddFieldLabel } from "./variant-add";
 
 const base = createProductSchema.parse({
   name: "Gạch Lâm Hưng - 10124",
@@ -50,4 +50,10 @@ test("compact group addition rejects a value already present in the locked attri
     () => prepareVariantAddition({ ...base, variantAddValues: { "00000000-0000-4000-8000-000000000005": " 10122 " } }),
     /products\.variants\.invalidValues/,
   );
+});
+
+test("attribute label does not repeat the word mã", () => {
+  assert.equal(variantAddFieldLabel("MÃ"), "MÃ");
+  assert.equal(variantAddFieldLabel("Mã hàng"), "Mã hàng");
+  assert.equal(variantAddFieldLabel("Phiên bản"), "Mã Phiên bản");
 });

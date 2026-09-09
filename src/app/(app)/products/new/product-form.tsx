@@ -47,7 +47,7 @@ import { UnitPriceConfirmation } from "./unit-price-confirmation";
 import { buildUnitPriceReview, normalizeUnitPriceDraft, type UnitPricingSnapshot, type UnitPriceBook } from "@/lib/products/unit-price-edit";
 import { AttributesField } from "./attributes-field";
 import { VariantChildrenField } from "./variant-children-field";
-import { prepareVariantAddition } from "./variant-add";
+import { prepareVariantAddition, variantAddFieldLabel } from "./variant-add";
 import { normalizeVariantAttributes } from "@/lib/products/variant-model";
 import { saveProductVariantGroup } from "@/lib/actions/product-variants";
 import {
@@ -965,7 +965,9 @@ function VariantAddFields() {
 
   return (
     <div className="space-y-3">
-      {attributes.map((attribute) => (
+      {attributes.map((attribute) => {
+        const fieldLabel = variantAddFieldLabel(attribute.name);
+        return (
         <div
           key={attribute.attributeId}
           className="grid grid-cols-1 items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)]"
@@ -974,15 +976,16 @@ function VariantAddFields() {
             <p className="text-sm font-semibold">{attribute.name}</p>
             <p className="text-xs text-slate-500">Thuộc tính cố định</p>
           </div>
-          <Field label={`Mã ${attribute.name}`} required>
+          <Field label={fieldLabel} required>
             <Input
               {...register(`variantAddValues.${attribute.attributeId}`)}
-              placeholder={`Nhập mã ${attribute.name.toLocaleLowerCase("vi")}`}
+              placeholder={`Nhập ${fieldLabel.toLocaleLowerCase("vi")}`}
               autoComplete="off"
             />
           </Field>
         </div>
-      ))}
+        );
+      })}
       {attributes.length === 0 && (
         <p className="text-sm text-red-600">Nhóm hàng chưa có thuộc tính để tạo hàng hóa cùng loại.</p>
       )}
