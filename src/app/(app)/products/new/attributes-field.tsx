@@ -16,7 +16,7 @@ import { variantCombinationKey } from "@/lib/products/variant-model";
 
 const CREATE_ATTRIBUTE = "__create_attribute__";
 
-export function AttributesField({ locked = false }: { locked?: boolean }) {
+export function AttributesField({ locked = false, allowValueEdits = false }: { locked?: boolean; allowValueEdits?: boolean }) {
   const t = useTranslations();
   const { control, getValues, setValue } = useFormContext<CreateProductInput>();
   const [catalog, setCatalog] = useState<ProductAttribute[]>([]);
@@ -134,7 +134,7 @@ export function AttributesField({ locked = false }: { locked?: boolean }) {
                   f.onChange(values);
                 }}
                 protectedIds={protectedIds}
-                disabled={locked}
+                disabled={locked && !(allowValueEdits && (currentAttributes[idx]?.valueIds?.length ?? 0) > 0)}
                 label={`${currentAttributes[idx]?.name || t("products.attributes.nameLabel")} — Giá trị`}
               />
             )}

@@ -576,23 +576,30 @@ export function ProductUnitSelector({
     >
       <Select
         value={value}
-        options={[
-          { value: baseUnit, label: baseUnit },
-          ...units.map((unit) => ({
-            value: unit.unitName,
-            label: unit.unitName,
-          })),
-        ]}
+        options={buildProductUnitOptions(baseUnit, units)}
         onValueChange={onChange}
         aria-label={`Đơn vị tính ${productName}`}
         size="sm"
-        wrapLabel
         menuMinWidth={160}
         rootClassName="max-w-full"
         className="max-w-full text-slate-600 dark:text-slate-300"
       />
     </div>
   );
+}
+
+export function buildProductUnitOptions(
+  baseUnit: string,
+  units: readonly ProductListUnit[],
+) {
+  const seen = new Set<string>();
+  return [baseUnit, ...units.map((unit) => unit.unitName)]
+    .filter((unitName) => {
+      if (seen.has(unitName)) return false;
+      seen.add(unitName);
+      return true;
+    })
+    .map((unitName) => ({ value: unitName, label: unitName }));
 }
 
 export function ProductMobileRow({

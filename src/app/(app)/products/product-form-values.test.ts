@@ -85,8 +85,9 @@ test("ambiguous imported selections are not silently assigned to the same combin
 });
 
 test("editing a single SKU retains selected attributes without generating children", () => {
-  const draft = productToFormInitialValues(f as unknown as ProductDetail, "edit");
-  assert.deepEqual(draft.attributes, [{ name: "Phiên bản", values: ["F"], createsVariants: false }]);
+  const product = { ...f, combinationKey: '[["version","f-option"]]', optionValueIds: ["f-option"], variantGroup: grouped.variantGroup } as unknown as ProductDetail;
+  const draft = productToFormInitialValues(product, "edit");
+  assert.deepEqual(draft.attributes, [{ attributeId: "version", name: "Phiên bản", values: ["F"], valueIds: ["f-option"], createsVariants: false }]);
   assert.equal(draft.variantChildren, undefined);
   assert.equal(draft.currentStock, 2);
 });

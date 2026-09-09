@@ -198,6 +198,7 @@ export async function ProductEditorModal({
         className="h-dvh w-full max-w-7xl overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl"
       >
         <NewProductForm
+          key={`${modal}-${templateProduct?.id ?? "blank"}`}
           storeId={context.storeId}
           publicMediaBaseUrl={publicMedia.publicBaseUrl}
           mode={mode}
@@ -206,6 +207,7 @@ export async function ProductEditorModal({
           siblingCount={seedProduct?.siblings.length ?? 0}
           initialValues={initialValues}
           variantGroup={seedProduct?.variantGroup}
+          variantTemplateName={seedMode === "groupAdd" ? templateProduct?.name : undefined}
           initialManagedImages={mode === "edit" || seedMode === "groupAdd" ? templateProduct?.imageMedia : undefined}
           categories={options.categories}
           brands={options.brands}

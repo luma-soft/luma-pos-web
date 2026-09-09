@@ -19,6 +19,8 @@ import {
   profiles,
   priceBooks,
   productPrices,
+  productVariantGroups,
+  productVariantMembers,
 } from "@/db/schema";
 import {
   createProductSchema,
@@ -49,7 +51,8 @@ import { imageMediaIdsSchema } from "@/lib/products/product-media-schema";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { activityValuesEqual, productActivityChanges, readProductActivitySnapshot } from "@/lib/products/product-activity";
 import { saveProductVariantGroup } from "./product-variants";
-import { variantNameKey } from "@/lib/products/variant-model";
+import { buildVariantCombinations, variantCombinationBudget, variantNameKey, VariantValidationError } from "@/lib/products/variant-model";
+import { applyVariantValueEdits } from "@/lib/products/variant-identity-edit";
 
 /** Tạo nhóm hàng mới từ form (combobox "+ thêm"). Trả id. */
 export async function createCategory(
@@ -416,6 +419,15 @@ const updateProductSchema = z.object({
   })).optional(),
   isActive: z.boolean(),
   specs: z.record(z.string(), z.array(z.string())).nullable(),
+  variantIdentity: z.object({
+    groupId: z.uuid(),
+    revision: z.number().int().min(0),
+    values: z.array(z.object({
+      attributeId: z.string().min(1),
+      optionValueId: z.string().min(1),
+      value: z.string().trim().min(1),
+    })),
+  }).optional(),
   applyToSiblings: siblingApplySchema.optional(),
   units: z.array(productUnitSchema),
 }).superRefine((value, ctx) => {
@@ -776,20 +788,68 @@ export async function updateProduct(
         .limit(1).for("update");
 
       if (!current) throw new Error("PRODUCT_NOT_FOUND");
+      const beforeActivity = await readProductActivitySnapshot(tx, gate.storeId, v.id);
       const hasGroup = current.parentProductId || current.relatedProductId || current.isVariantParent
         || (await tx.execute(sql`select 1 from product_variant_groups where store_id=${gate.storeId}::uuid and id=${v.id}::uuid limit 1`)).rows.length
         || (await tx.execute(sql`select 1 from products where store_id=${gate.storeId}::uuid and related_product_id=${v.id}::uuid limit 1`)).rows.length;
       if (hasGroup) {
-        const catalog = await tx.execute<{ name_key: string; attribute_id: string }>(sql`
-          select name_key,attribute_id from product_attribute_aliases where store_id=${gate.storeId}::uuid
-        `);
-        const canonical = (specs: unknown) => Object.entries((specs ?? {}) as Record<string, unknown>)
-          .filter(([name]) => !name.startsWith("__"))
-          .map(([name, values]) => [catalog.rows.find((a) => a.name_key === variantNameKey(name))?.attribute_id ?? variantNameKey(name), values])
-          .sort(([a], [b]) => String(a).localeCompare(String(b)));
-        if (JSON.stringify(canonical(current.specs)) !== JSON.stringify(canonical(v.specs))) throw new Error("PRODUCT_VARIANT_IDENTITY");
+        if (v.variantIdentity) {
+          const [group] = await tx.select({
+            id: productVariantGroups.id,
+            attributes: productVariantGroups.attributes,
+            excludedCombinationKeys: productVariantGroups.excludedCombinationKeys,
+            revision: productVariantGroups.revision,
+          }).from(productVariantGroups).where(and(
+            eq(productVariantGroups.storeId, gate.storeId),
+            eq(productVariantGroups.id, v.variantIdentity.groupId),
+          )).limit(1).for("update");
+          if (!group) throw new Error("PRODUCT_VARIANT_IDENTITY");
+          if (group.revision !== v.variantIdentity.revision) throw new VariantValidationError("products.variants.groupChanged");
+          const identities = await tx.select({
+            productId: productVariantMembers.productId,
+            combinationKey: productVariantMembers.combinationKey,
+          }).from(productVariantMembers).where(and(
+            eq(productVariantMembers.storeId, gate.storeId),
+            eq(productVariantMembers.groupId, group.id),
+          ));
+          if (!identities.some((identity) => identity.productId === v.id)) throw new Error("PRODUCT_VARIANT_IDENTITY");
+
+          const nextAttributes = applyVariantValueEdits(group.attributes, v.variantIdentity.values);
+          if (JSON.stringify(nextAttributes) !== JSON.stringify(group.attributes)) {
+            const combinations = new Map(buildVariantCombinations(nextAttributes, {
+              maxCombinations: variantCombinationBudget(identities.length, group.excludedCombinationKeys.length),
+            }).map((combination) => [combination.combinationKey, combination]));
+            const memberIds = identities.map((identity) => identity.productId);
+            const memberRows = await tx.select({ id: products.id, specs: products.specs }).from(products)
+              .where(and(eq(products.storeId, gate.storeId), inArray(products.id, memberIds)));
+            const oldAxisNames = new Set(group.attributes.map((attribute) => variantNameKey(attribute.name)));
+            await tx.update(productVariantGroups).set({ attributes: nextAttributes }).where(and(
+              eq(productVariantGroups.storeId, gate.storeId), eq(productVariantGroups.id, group.id),
+            ));
+            for (const identity of identities) {
+              const combination = identity.combinationKey ? combinations.get(identity.combinationKey) : undefined;
+              const member = memberRows.find((row) => row.id === identity.productId);
+              if (!combination || !member) throw new Error("PRODUCT_VARIANT_IDENTITY");
+              const retainedSpecs = Object.fromEntries(Object.entries((member.specs ?? {}) as Record<string, string[]>)
+                .filter(([name]) => name.startsWith("__") || !oldAxisNames.has(variantNameKey(name))));
+              await tx.update(products).set({
+                specs: { ...retainedSpecs, ...combination.specs },
+                variantName: combination.variantName,
+                updatedAt: sql`now()`,
+              }).where(and(eq(products.storeId, gate.storeId), eq(products.id, identity.productId)));
+            }
+          }
+        } else {
+          const catalog = await tx.execute<{ name_key: string; attribute_id: string }>(sql`
+            select name_key,attribute_id from product_attribute_aliases where store_id=${gate.storeId}::uuid
+          `);
+          const canonical = (specs: unknown) => Object.entries((specs ?? {}) as Record<string, unknown>)
+            .filter(([name]) => !name.startsWith("__"))
+            .map(([name, values]) => [catalog.rows.find((a) => a.name_key === variantNameKey(name))?.attribute_id ?? variantNameKey(name), values])
+            .sort(([a], [b]) => String(a).localeCompare(String(b)));
+          if (JSON.stringify(canonical(current.specs)) !== JSON.stringify(canonical(v.specs))) throw new Error("PRODUCT_VARIANT_IDENTITY");
+        }
       }
-      const beforeActivity = await readProductActivitySnapshot(tx, gate.storeId, v.id);
       const changedRelatedProducts: { type: string; id: string; name: string; code?: string }[] = [];
       if (
         v.productKind !== undefined &&
@@ -1028,6 +1088,7 @@ export async function updateProduct(
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
   } catch (e) {
+    if (e instanceof VariantValidationError) return { ok: false, error: e.code };
     const known: Record<string, string> = {
       PRODUCT_NOT_FOUND: "errors.invalidData",
       PRODUCT_KIND_IMMUTABLE: "products.errors.kindImmutable",

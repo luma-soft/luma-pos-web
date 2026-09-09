@@ -145,6 +145,7 @@ export interface NewProductFormProps {
   siblingCount?: number;
   initialValues?: Partial<CreateProductInput>;
   variantGroup?: ProductDetail["variantGroup"];
+  variantTemplateName?: string;
   initialManagedImages?: UploadedProductImage[];
   layout?: "page" | "modal";
   closeHref?: string;
@@ -166,6 +167,7 @@ export function NewProductForm({
   siblingCount = 0,
   initialValues,
   variantGroup,
+  variantTemplateName,
   initialManagedImages = [],
   layout = "page",
   closeHref,
@@ -307,8 +309,7 @@ export function NewProductForm({
       const result = await saveProductVariantGroup(values);
       if (!result.ok) { form.setError("root", { message: result.error }); return; }
       if (!isEdit && submitIntent === "sameType") {
-        resetForNextProduct();
-        router.refresh();
+        navigateAfterModal(sameTypeHref(result.data.createdProductId ?? result.data.id));
         return;
       }
       navigateAfterModal(submitIntent === "sameType" ? sameTypeHref(result.data.id) : isModal ? doneHref : Routes.product(result.data.id));
@@ -333,6 +334,21 @@ export function NewProductForm({
                 .map((a) => [a.name, a.values]),
             )
           : null;
+      const variantIdentityValues = variantGroup?.attributes.flatMap((groupAttribute) => {
+        const attribute = values.attributes.find((candidate) => candidate.attributeId === groupAttribute.attributeId);
+        return attribute?.values.length === 1 && attribute.valueIds?.length === 1
+          ? [{ attributeId: groupAttribute.attributeId, optionValueId: attribute.valueIds[0], value: attribute.values[0] }]
+          : [];
+      }) ?? [];
+      const identityChanged = variantIdentityValues.some((identity) => {
+        const initialAttribute = initialValues?.attributes?.find((attribute) => attribute.attributeId === identity.attributeId);
+        return initialAttribute?.values?.[0]?.trim().replace(/\s+/g, " ") !== identity.value.trim().replace(/\s+/g, " ");
+      });
+      const variantIdentity = productId && variantGroup?.members.some((member) => member.id === productId)
+        && identityChanged
+        && variantIdentityValues.length === variantGroup.attributes.length
+        ? { groupId: variantGroup.id, revision: variantGroup.revision, values: variantIdentityValues }
+        : undefined;
       const res = stockOnly
         ? await updateProductStock({ id: productId, stockAdjustment })
         : await updateProduct({
@@ -357,6 +373,7 @@ export function NewProductForm({
           comboItems: values.comboItems,
           isActive: values.directSale,
           specs: specsWithOrderNote(specs, values.invoiceNote),
+          variantIdentity,
           applyToSiblings: values.applyToSiblings,
           units: values.units,
           stockAdjustment,
@@ -527,7 +544,7 @@ export function NewProductForm({
         )}
       >
         {groupEditing && <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-800">
-          <p className="font-semibold">{groupAdding ? "Thêm hàng hóa cùng loại" : "Sửa nhóm biến thể"}: {variantGroup?.name ?? form.watch("name")}</p>
+          <p className="font-semibold">{groupAdding ? "Thêm hàng hóa cùng loại" : "Sửa nhóm biến thể"}: {groupAdding ? variantTemplateName ?? form.watch("name") : variantGroup?.name ?? form.watch("name")}</p>
           <p className="mt-1">{groupAdding ? "Thông tin đang được sao chép từ biến thể mới nhất. Bạn có thể sửa cho hàng mới; cấu trúc thuộc tính của nhóm được giữ nguyên." : "Nội dung riêng của từng SKU được giữ nguyên khi chỉnh cấu trúc nhóm."}</p>
         </div>}
         {tab === "info" && (
@@ -938,7 +955,10 @@ function VariantsTab({
         description={groupAdding ? "Cấu trúc thuộc tính của nhóm đã được khóa. Chỉ nhập giá trị thuộc tính của hàng hóa mới." : "Chọn đặc điểm phân biệt hàng bán như phiên bản, màu, dung tích. Mỗi tổ hợp tương ứng một SKU."}
         collapsible={false}
       >
-        {groupAdding ? <VariantAddFields /> : <AttributesField locked={isEdit && !groupEditing} />}
+        {groupAdding ? <VariantAddFields /> : <AttributesField
+          locked={isEdit && !groupEditing}
+          allowValueEdits={isEdit && !groupEditing && Boolean(groupId)}
+        />}
         {isEdit && !groupEditing && (
           <div className="mt-3 rounded-lg border border-primary-100 bg-primary-50/60 px-3 py-2.5 text-sm text-slate-600 dark:border-primary-900/50 dark:bg-primary-950/20 dark:text-slate-300">
             {groupId ? (

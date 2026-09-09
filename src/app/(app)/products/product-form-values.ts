@@ -154,8 +154,35 @@ export function productToFormInitialValues(
     };
   }
 
+  let editableAttributes = shared.attributes;
+  if (mode === "edit" && group && product.combinationKey) {
+    try {
+      const selections = new Map(JSON.parse(product.combinationKey) as [string, string][]);
+      const groupNames = new Set(group.attributes.map((attribute) => attribute.name.trim().toLocaleLowerCase()));
+      const identityAttributes = group.attributes.map((attribute) => {
+        const optionValueId = selections.get(attribute.attributeId) ?? "";
+        const valueIndex = attribute.valueIds.indexOf(optionValueId);
+        if (valueIndex < 0) throw new Error("Invalid variant identity");
+        return {
+          attributeId: attribute.attributeId,
+          name: attribute.name,
+          values: [attribute.values[valueIndex]],
+          valueIds: [optionValueId],
+          createsVariants: false,
+        };
+      });
+      editableAttributes = [
+        ...identityAttributes,
+        ...(shared.attributes ?? []).filter((attribute) => !groupNames.has(attribute.name.trim().toLocaleLowerCase())),
+      ];
+    } catch {
+      // Legacy/incomplete identities stay visible but locked by the form.
+    }
+  }
+
   return {
     ...shared,
+    attributes: editableAttributes,
     sku: isCopy ? "" : product.sku,
     barcode: isCopy ? "" : (product.barcode ?? ""),
     name: product.name,

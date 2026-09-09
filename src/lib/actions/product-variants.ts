@@ -12,7 +12,7 @@ import { recordActivity } from "@/lib/audit/activity-log";
 import { getPublicMediaConfig } from "@/lib/media/config";
 import { replaceProductMediaInTransaction, resolveLegacyProductImageIdsInTransaction, ProductMediaValidationError } from "@/lib/products/product-media";
 
-export async function saveProductVariantGroup(input: CreateProductInput): Promise<ActionResult<{ id: string }>> {
+export async function saveProductVariantGroup(input: CreateProductInput): Promise<ActionResult<{ id: string; createdProductId?: string }>> {
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
   const parsed = createProductSchema.safeParse(input);
@@ -52,7 +52,15 @@ export async function saveProductVariantGroup(input: CreateProductInput): Promis
       return saved;
     });
     revalidateAppData("/(app)", "layout");
-    return { ok: true, data: { id: result.id } };
+    return {
+      ok: true,
+      data: {
+        id: result.id,
+        // `add` creates one sellable SKU. Returning it lets "save and create
+        // another" reopen from the exact product that was just persisted.
+        createdProductId: result.createdIds.at(-1),
+      },
+    };
   } catch (error) {
     if (error instanceof VariantValidationError) return { ok: false, error: error.code };
     if (error instanceof ProductMediaValidationError) return { ok: false, error: error.error };

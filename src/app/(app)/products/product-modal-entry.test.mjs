@@ -7,6 +7,7 @@ const newPage = readFileSync(new URL("./new/page.tsx", import.meta.url), "utf8")
 const routes = readFileSync(new URL("../../../lib/routes.ts", import.meta.url), "utf8");
 const aiActions = readFileSync(new URL("../../../lib/ai/actions.ts", import.meta.url), "utf8");
 const productForm = readFileSync(new URL("./new/product-form.tsx", import.meta.url), "utf8");
+const productsModal = readFileSync(new URL("../inventory/tabs/products.tsx", import.meta.url), "utf8");
 
 test("hard-loaded product detail keeps the detail inside a dialog", () => {
   expect(detailPage).toContain("<ProductDetailDialog");
@@ -38,4 +39,16 @@ test("product save refreshes only when the editor stays open", () => {
   )?.length ?? 0;
 
   expect(refreshCount).toBe(stayOpenRefreshCount);
+});
+
+test("save and create another continues from the product that was just created", () => {
+  expect(productForm).toContain("sameTypeHref(result.data.createdProductId ?? result.data.id)");
+  expect(productForm).toContain("groupAdding ? variantTemplateName ?? form.watch(\"name\")");
+  expect(productsModal).toContain('key={`${modal}-${templateProduct?.id ?? "blank"}`}');
+  expect(productsModal).toContain('variantTemplateName={seedMode === "groupAdd" ? templateProduct?.name : undefined}');
+  const variantSave = productForm.slice(
+    productForm.indexOf("if (values.variantGroupId || values.variantChildren.length > 0)"),
+    productForm.indexOf("if (isEdit && productId)"),
+  );
+  expect(variantSave).not.toMatch(/resetForNextProduct\(\);\s*router\.refresh\(\)/);
 });

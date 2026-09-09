@@ -10,3 +10,8 @@ test("an existing product points users to the safe variant workflow", () => {
   expect(productForm).toContain('t("products.variants.lockedStandaloneHint")');
   expect(productForm).toContain("Routes.productGroupEdit(groupId)");
 });
+
+test("an existing grouped SKU can edit its value but keeps group structure locked", () => {
+  expect(productForm).toContain("allowValueEdits={isEdit && !groupEditing && Boolean(groupId)}");
+  expect(vi.products.variants.lockedSkuHint).toContain("không lưu nếu trùng");
+});
