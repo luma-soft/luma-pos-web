@@ -19,8 +19,20 @@ export interface PrintTotalRow {
   label: string;
   value: number;
   kind?: "subtotal" | "discount" | "tax" | "shipping" | "other";
+  ratePercent?: number;
   bold?: boolean;
   negative?: boolean;
+}
+
+function printTotalLabel(row: PrintTotalRow, totals: PrintTotalRow[]) {
+  if (row.kind !== "tax") return row.label;
+  const subtotal = totals.find((item) => item.kind === "subtotal")?.value ?? 0;
+  const discount = totals.find((item) => item.kind === "discount")?.value ?? 0;
+  const taxableAmount = Math.max(0, subtotal - discount);
+  const inferredRate = taxableAmount > 0 ? (row.value / taxableAmount) * 100 : 0;
+  const rate = Number.isFinite(row.ratePercent) ? Number(row.ratePercent) : inferredRate;
+  const roundedRate = Math.round(rate * 100) / 100;
+  return roundedRate > 0 ? `${row.label} (${formatNumber(roundedRate)}%)` : row.label;
 }
 
 export interface PrintDocProps {
@@ -158,7 +170,7 @@ export function PrintDoc(p: PrintDocProps) {
           <tbody>
             {visibleTotals.map((r) => (
               <tr key={r.label}>
-                <td className="py-0.5 text-slate-600">{r.label}</td>
+                <td className="py-0.5 text-slate-600">{printTotalLabel(r, p.totals)}</td>
                 <td className="text-right">{r.negative ? "− " : ""}{formatNumber(r.value)}</td>
               </tr>
             ))}
@@ -288,7 +300,7 @@ function K80Doc(p: PrintDocProps) {
       <section className="mt-2 border-y-2 border-black py-1.5">
         {visibleTotals.map((r) => (
           <div key={r.label} className="flex justify-between gap-3 py-0.5">
-            <span className="text-slate-700">{r.label}</span>
+            <span className="text-slate-700">{printTotalLabel(r, p.totals)}</span>
             <span>{r.negative ? "−" : ""}{formatNumber(r.value)}</span>
           </div>
         ))}

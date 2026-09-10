@@ -127,7 +127,7 @@ type PosPrintJob = {
   partyPhone?: string | null;
   projectName?: string | null;
   items: PrintLine[];
-  totals: { subtotal: number; discount: number; tax: number; shipping: number };
+  totals: { subtotal: number; discount: number; tax: number; taxRate?: number; shipping: number };
   grandTotal: number;
   paid: number;
   remaining: number;
@@ -1152,6 +1152,7 @@ export function PosClient({
         subtotal,
         discount: discountVnd,
         tax: taxAmount,
+        taxRate,
         shipping: shippingFee,
       },
       grandTotal: total,
@@ -2703,7 +2704,7 @@ export function PosClient({
             totals={[
               { label: t("pos.subtotal"), value: printJob.totals.subtotal, kind: "subtotal" },
               ...(printJob.totals.discount > 0 ? [{ label: t("pos.discount"), value: printJob.totals.discount, negative: true, kind: "discount" as const }] : []),
-              ...(printJob.totals.tax > 0 ? [{ label: t("pos.tax"), value: printJob.totals.tax, kind: "tax" as const }] : []),
+              ...(printJob.totals.tax > 0 ? [{ label: t("pos.tax"), value: printJob.totals.tax, ratePercent: printJob.totals.taxRate, kind: "tax" as const }] : []),
               ...(printJob.totals.shipping > 0 ? [{ label: t("pos.shipping"), value: printJob.totals.shipping, kind: "shipping" as const }] : []),
             ]}
             grandTotalLabel={t(printJob.template.docType === "return" ? "returns.totalRefund" : "print.grandTotal")}
