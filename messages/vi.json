@@ -3428,16 +3428,23 @@
     "toggles": {
       "showSeller": "Tên người lập/bán",
       "showProject": "Công trình",
+      "showPartyPhone": "Số điện thoại khách hàng / NCC",
+      "showDeliveryAddress": "Địa chỉ giao hàng",
       "showDebt": "Đã trả / còn nợ",
       "showBatchDebtSummary": "Trang tổng hợp công nợ khi in hàng loạt",
-      "showDiscount": "Chiết khấu / giảm giá tổng",
+      "showDiscount": "Giảm giá toàn hóa đơn",
       "showTax": "Thuế / VAT",
-      "showLineDiscount": "Giảm giá trong bảng sản phẩm",
+      "showLineDiscount": "Giảm giá từng sản phẩm",
       "showPaymentQr": "QR và thông tin chuyển khoản",
       "alwaysShowPaymentQr": "Luôn hiện QR kể cả khi đã thanh toán",
       "showInWords": "Số tiền bằng chữ",
       "showSignatures": "Khu vực chữ ký",
       "showSku": "Mã SKU cạnh tên SP"
+    },
+    "optionGroups": {
+      "content": "Thông tin chứng từ",
+      "pricing": "Giá và thanh toán",
+      "batch": "Khi in hàng loạt"
     },
     "signatureLabelsSection": "Nhãn khu vực chữ ký",
     "signatureLabelsHint": "Để trống để dùng nhãn mặc định phù hợp với từng loại chứng từ.",

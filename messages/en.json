@@ -3428,16 +3428,23 @@
     "toggles": {
       "showSeller": "Seller name",
       "showProject": "Project",
+      "showPartyPhone": "Customer / supplier phone",
+      "showDeliveryAddress": "Delivery address",
       "showDebt": "Paid / remaining",
       "showBatchDebtSummary": "Debt summary page for batch printing",
-      "showDiscount": "Document discount",
+      "showDiscount": "Whole-document discount",
       "showTax": "Tax / VAT",
-      "showLineDiscount": "Line discount in product table",
+      "showLineDiscount": "Per-product discount",
       "showPaymentQr": "Payment QR and bank info",
       "alwaysShowPaymentQr": "Always show QR after full payment",
       "showInWords": "Amount in words",
       "showSignatures": "Signature area",
       "showSku": "SKU next to product"
+    },
+    "optionGroups": {
+      "content": "Document information",
+      "pricing": "Pricing and payment",
+      "batch": "Batch printing"
     },
     "signatureLabelsSection": "Signature labels",
     "signatureLabelsHint": "Leave blank to use the default label for each document type.",

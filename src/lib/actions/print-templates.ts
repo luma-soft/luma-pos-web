@@ -28,6 +28,8 @@ const saveSchema = z.object({
   options: z.object({
     showSeller: z.boolean(),
     showProject: z.boolean(),
+    showPartyPhone: z.boolean().default(true),
+    showDeliveryAddress: z.boolean().default(true),
     showDebt: z.boolean(),
     showBatchDebtSummary: z.boolean().default(true),
     showDiscount: z.boolean(),

@@ -9,6 +9,8 @@ export const PAPER_SIZES = ["a4", "a5", "k80"] as const satisfies readonly Paper
 export interface PrintTemplateOptions {
   showSeller: boolean;
   showProject: boolean;
+  showPartyPhone: boolean;
+  showDeliveryAddress: boolean;
   showDebt: boolean;
   showBatchDebtSummary: boolean;
   showDiscount: boolean;
@@ -51,6 +53,8 @@ export type PrintTemplateStoreInfo = Pick<PrintTemplate, "storeName" | "storeAdd
 export const DEFAULT_OPTIONS: PrintTemplateOptions = {
   showSeller: true,
   showProject: true,
+  showPartyPhone: true,
+  showDeliveryAddress: true,
   showDebt: true,
   showBatchDebtSummary: true,
   showDiscount: true,

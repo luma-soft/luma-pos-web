@@ -124,9 +124,9 @@ export function PrintDoc(p: PrintDocProps) {
       <div className="my-3 flex justify-between text-[12.5px]">
         <div>
           <b>{p.partyLabel}:</b> {p.partyName}
-          {p.partyPhone && <> — {p.partyPhone}</>}
+          {t.options.showPartyPhone !== false && p.partyPhone && <> — {p.partyPhone}</>}
           {t.options.showProject && p.projectName && <><br /><b>Công trình:</b> {p.projectName}</>}
-          {p.deliveryAddress && <><br /><b>{p.deliverToLabel ?? "Giao đến"}:</b> {p.deliveryAddress}</>}
+          {t.options.showDeliveryAddress !== false && p.deliveryAddress && <><br /><b>{p.deliverToLabel ?? "Giao đến"}:</b> {p.deliveryAddress}</>}
         </div>
         {t.options.showSeller && p.sellerName && (
           <div className="text-right"><b>{p.sellerLabel ?? "Người lập"}:</b> {p.sellerName}</div>
@@ -254,9 +254,9 @@ function K80Doc(p: PrintDocProps) {
       <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
         <div><span className="text-slate-600">Ngày:</span> {formatDate(p.date)}</div>
         {t.options.showSeller && p.sellerName && <div className="truncate text-right"><span className="text-slate-600">NV:</span> {p.sellerName}</div>}
-        <div className="col-span-2 truncate"><span className="text-slate-600">{p.partyLabel}:</span> <span className="font-bold">{p.partyName}</span>{p.partyPhone ? ` · ${p.partyPhone}` : ""}</div>
+        <div className="col-span-2 truncate"><span className="text-slate-600">{p.partyLabel}:</span> <span className="font-bold">{p.partyName}</span>{t.options.showPartyPhone !== false && p.partyPhone ? ` · ${p.partyPhone}` : ""}</div>
         {t.options.showProject && p.projectName && <div className="col-span-2 truncate"><span className="text-slate-600">Công trình:</span> {p.projectName}</div>}
-        {p.deliveryAddress && <div className="col-span-2"><span className="text-slate-600">{p.deliverToLabel ?? "Giao đến"}:</span> {p.deliveryAddress}</div>}
+        {t.options.showDeliveryAddress !== false && p.deliveryAddress && <div className="col-span-2"><span className="text-slate-600">{p.deliverToLabel ?? "Giao đến"}:</span> {p.deliveryAddress}</div>}
       </div>
 
       <table className="print-line-items mt-3 w-full table-fixed border-collapse text-[9px] leading-tight">

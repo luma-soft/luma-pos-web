@@ -15,6 +15,8 @@ function render(size, configure = () => {}) {
     date: "2026-09-10",
     partyLabel: "Khách hàng",
     partyName: "Khách A",
+    partyPhone: "0909 000 000",
+    deliveryAddress: "12 Nguyễn Trãi",
     items: [
       { id: "line-1", name: "Gạch 30×60", unitName: "m²", quantity: 2, unitPrice: 100000, total: 200000 },
       { id: "line-2", name: "Keo dán gạch", unitName: "bao", quantity: 1, unitPrice: 150000, total: 150000 },
@@ -56,4 +58,22 @@ test("saved signature labels override document defaults", () => {
 
 test("batch debt summary is enabled for existing and new templates by default", () => {
   expect(defaultTemplate("order").options.showBatchDebtSummary).toBe(true);
+});
+
+for (const size of ["a4", "k80"]) {
+  test(`${size} can hide party phone and delivery address independently`, () => {
+    const html = render(size, (template) => {
+      template.options.showPartyPhone = false;
+      template.options.showDeliveryAddress = false;
+    });
+
+    expect(html).not.toContain("0909 000 000");
+    expect(html).not.toContain("12 Nguyễn Trãi");
+  });
+}
+
+test("party phone and delivery address stay visible for existing templates", () => {
+  const html = render("a4");
+  expect(html).toContain("0909 000 000");
+  expect(html).toContain("12 Nguyễn Trãi");
 });
