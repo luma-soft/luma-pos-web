@@ -60,6 +60,7 @@ import {
 import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
 import { buildExpectedPosPricing, countPosPricingConflicts, requestPosOrder } from "@/lib/pos/checkout-pricing";
 import { resolvePosCartUnit } from "@/lib/pos/cart-unit";
+import { upsertPosCartLine } from "@/lib/pos/cart-line-order";
 import {
   createLinePriceEditorState,
   resolveLinePriceEditor,
@@ -1181,19 +1182,20 @@ export function PosClient({
       return;
     }
     setCart((c) => {
-      const existing = c.find((l) => l.product.id === p.id && l.priceBook === undefined);
-      if (existing) {
-        return c.map((l) => (l.key === existing.key ? { ...l, quantity: l.quantity + 1 } : l));
-      }
       const unit = resolvePosCartUnit(p.baseUnit, p.units);
-      return [...c, {
-        key: `${p.id}-${Date.now()}`,
-        product: p,
-        unitName: unit.unitName,
-        unitMultiplier: unit.unitMultiplier,
-        unitPrice: unitPriceFor(p, unit.alternateUnit, priceBook, data.priceBooks),
-        quantity: 1,
-      }];
+      return upsertPosCartLine<CartLine>(
+        c,
+        (line) => line.product.id === p.id && line.priceBook === undefined,
+        () => ({
+          key: `${p.id}-${Date.now()}`,
+          product: p,
+          unitName: unit.unitName,
+          unitMultiplier: unit.unitMultiplier,
+          unitPrice: unitPriceFor(p, unit.alternateUnit, priceBook, data.priceBooks),
+          quantity: 1,
+        }),
+        (line) => ({ ...line, quantity: line.quantity + 1 }),
+      );
     });
   }
 
@@ -1204,19 +1206,20 @@ export function PosClient({
       return;
     }
     setCart((c) => {
-      const existing = c.find((l) => l.product.id === p.id);
-      if (existing) {
-        return c.map((l) => (l.key === existing.key ? { ...l, quantity: l.quantity + safeQuantity } : l));
-      }
       const unit = resolvePosCartUnit(p.baseUnit, p.units);
-      return [...c, {
-        key: `${p.id}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-        product: p,
-        unitName: unit.unitName,
-        unitMultiplier: unit.unitMultiplier,
-        unitPrice: unitPriceFor(p, unit.alternateUnit, priceBook, data.priceBooks),
-        quantity: safeQuantity,
-      }];
+      return upsertPosCartLine<CartLine>(
+        c,
+        (line) => line.product.id === p.id,
+        () => ({
+          key: `${p.id}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+          product: p,
+          unitName: unit.unitName,
+          unitMultiplier: unit.unitMultiplier,
+          unitPrice: unitPriceFor(p, unit.alternateUnit, priceBook, data.priceBooks),
+          quantity: safeQuantity,
+        }),
+        (line) => ({ ...line, quantity: line.quantity + safeQuantity }),
+      );
     });
   }, [priceBook, setCart, t, data.priceBooks]);
 
