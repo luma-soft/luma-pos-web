@@ -1,6 +1,7 @@
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
+import { FloatingMenuPortal } from "@/components/ui/floating-menu-portal";
 import { Fragment, isValidElement, type ReactNode, type SyntheticEvent, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Columns3, X } from "lucide-react";
@@ -686,11 +687,12 @@ function ColumnVisibilityMenu<T>({
       >
         <Columns3 className="h-4 w-4" />
       </button>
-      {open && (
-        <>
-          <button type="button" className="fixed inset-0 z-30 cursor-default" aria-label="Đóng chọn cột" onClick={() => onOpenChange(false)} />
-          <div
-            ref={menuRef}
+      <FloatingMenuPortal
+            open={open}
+            anchorRef={triggerRef}
+            surfaceRef={menuRef}
+            onDismiss={() => onOpenChange(false)}
+            side="bottom"
             id={menuId}
             role="dialog"
             aria-label="Thông tin hiển thị"
@@ -704,7 +706,7 @@ function ColumnVisibilityMenu<T>({
                 : (current + (event.key === "ArrowDown" ? 1 : -1) + controls.length) % controls.length;
               controls[next]?.focus();
             }}
-            className="absolute right-0 top-full z-40 mt-2 w-[300px] max-w-[calc(100vw-2rem)] rounded-card border border-border-soft bg-surface p-3 text-left shadow-e2"
+            className="w-[300px] max-w-[calc(100vw-2rem)] rounded-card border border-border-soft bg-surface p-3 text-left shadow-e2"
           >
             <div className="mb-2 flex items-center justify-between gap-3">
               <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Thông tin hiển thị</div>
@@ -739,9 +741,7 @@ function ColumnVisibilityMenu<T>({
                 Đặt lại mặc định
               </button>
             </div>
-          </div>
-        </>
-      )}
+      </FloatingMenuPortal>
     </div>
   );
 }

@@ -17,6 +17,7 @@ import {
   Loader2,
   Search,
 } from "lucide-react";
+import { FloatingMenuPortal } from "@/components/ui/floating-menu-portal";
 import { isOrderDateRangeValid } from "@/lib/orders/filter-date-range";
 import { cn } from "@/lib/utils";
 
@@ -116,7 +117,6 @@ export function LumaWebPicker({
   onChange?: (value: string) => void;
 }) {
   const listboxId = `luma-picker-${useId().replaceAll(":", "")}`;
-  const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [open, setOpen] = useState(false);
@@ -131,17 +131,6 @@ export function LumaWebPicker({
   const visibleOptions = search.trim()
     ? options.filter((option) => option.label.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
     : options;
-
-  useEffect(() => {
-    if (!open) return;
-    const onOutsideClick = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onOutsideClick);
-    return () => document.removeEventListener("mousedown", onOutsideClick);
-  }, [open]);
 
   function focusOption(index: number) {
     if (visibleOptions.length === 0) return;
@@ -167,7 +156,7 @@ export function LumaWebPicker({
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative">
       <input type="hidden" name={name} value={selectedValue} />
       {label && (
         <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -207,12 +196,17 @@ export function LumaWebPicker({
         />
       </button>
 
-      {open && (
-        <div
+      <FloatingMenuPortal
+          open={open}
+          anchorRef={triggerRef}
+          onDismiss={() => setOpen(false)}
+          side="bottom"
+          matchAnchorWidth
+          maxMenuHeight={288}
           id={listboxId}
           role="listbox"
           aria-label={ariaLabel}
-          className="absolute inset-x-0 top-full z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-2xl"
+          className="rounded-xl border border-border bg-surface p-1.5 shadow-2xl"
         >
           {searchable && (
             <div className="sticky top-0 z-10 bg-surface p-1.5">
@@ -275,8 +269,7 @@ export function LumaWebPicker({
           {visibleOptions.length === 0 && (
             <p className="px-3 py-4 text-center text-sm text-slate-500">Không tìm thấy kết quả</p>
           )}
-        </div>
-      )}
+      </FloatingMenuPortal>
     </div>
   );
 }
@@ -296,7 +289,7 @@ export function LumaDateRangePicker({
   onChange: (from: string, to: string) => void;
   error: string;
 }) {
-  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [draftFrom, setDraftFrom] = useState(from);
@@ -304,23 +297,17 @@ export function LumaDateRangePicker({
 
   useEffect(() => {
     if (!open) return;
-    const onOutsideClick = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onOutsideClick);
     window.requestAnimationFrame(() => firstInputRef.current?.focus());
-    return () => document.removeEventListener("mousedown", onOutsideClick);
   }, [open]);
 
   const draftValid = isOrderDateRangeValid(draftFrom, draftTo);
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative">
       <input type="hidden" name={fromName} value={from} />
       <input type="hidden" name={toName} value={to} />
       <button
+        ref={triggerRef}
         type="button"
         className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-surface px-3 text-left text-sm outline-none transition hover:border-primary-300 focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-100"
         aria-label="Chọn khoảng thời gian"
@@ -342,11 +329,15 @@ export function LumaDateRangePicker({
       </button>
       {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
 
-      {open && (
-        <div
+      <FloatingMenuPortal
+          open={open}
+          anchorRef={triggerRef}
+          onDismiss={() => setOpen(false)}
+          side="bottom"
+          matchAnchorWidth
           role="dialog"
           aria-label="Chọn khoảng thời gian"
-          className="absolute inset-x-0 top-full z-40 mt-2 rounded-xl border border-border bg-surface p-4 shadow-2xl"
+          className="rounded-xl border border-border bg-surface p-4 shadow-2xl"
         >
           <p className="text-sm font-extrabold">Khoảng thời gian</p>
           <p className="mt-1 text-xs text-slate-500">
@@ -426,8 +417,7 @@ export function LumaDateRangePicker({
               Áp dụng
             </button>
           </div>
-        </div>
-      )}
+      </FloatingMenuPortal>
     </div>
   );
 }
@@ -460,7 +450,7 @@ export function LumaEntityPicker({
   onChange: (next: { value: string; label: string }) => void;
 }) {
   const id = useId().replaceAll(":", "");
-  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const listboxId = `entity-picker-${kind}-${id}`;
   const searchRef = useRef<HTMLInputElement>(null);
   const requestToken = useRef(0);
@@ -473,18 +463,11 @@ export function LumaEntityPicker({
 
   useEffect(() => {
     if (!open) return;
-    const onOutsideClick = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
     const restoreFocus = window.setTimeout(() => {
       searchRef.current?.focus();
     }, 0);
-    document.addEventListener("mousedown", onOutsideClick);
     return () => {
       clearTimeout(restoreFocus);
-      document.removeEventListener("mousedown", onOutsideClick);
     };
   }, [open]);
 
@@ -541,7 +524,7 @@ export function LumaEntityPicker({
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative">
       <input type="hidden" name={name} value={value} />
       <input type="hidden" name={labelName} value={labelValue} />
       {queryName && <input type="hidden" name={queryName} value={labelValue} />}
@@ -552,6 +535,7 @@ export function LumaEntityPicker({
         </span>
       ) : null}
       <button
+        ref={triggerRef}
         type="button"
         role="combobox"
         aria-expanded={open}
@@ -576,8 +560,15 @@ export function LumaEntityPicker({
         <ChevronRight className="size-4 shrink-0 text-slate-400" />
       </button>
 
-      {open && (
-        <div className="absolute inset-x-0 top-full z-40 mt-2 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
+      <FloatingMenuPortal
+        open={open}
+        anchorRef={triggerRef}
+        onDismiss={() => setOpen(false)}
+        side="bottom"
+        matchAnchorWidth
+        maxMenuHeight={360}
+        className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
+      >
           <div className="relative border-b border-border p-3">
             <Search className="absolute left-6 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -609,7 +600,7 @@ export function LumaEntityPicker({
               className="min-h-10 w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 min-h-11 lg:min-h-0 min-h-11 lg:min-h-0"
             />
           </div>
-          <div id={listboxId} role="listbox" className="max-h-72 overflow-y-auto py-1">
+          <div id={listboxId} role="listbox" className="min-h-0 overflow-y-auto py-1">
             {value && (
               <button
                 type="button"
@@ -662,8 +653,7 @@ export function LumaEntityPicker({
               ))
             )}
           </div>
-        </div>
-      )}
+      </FloatingMenuPortal>
     </div>
   );
 }

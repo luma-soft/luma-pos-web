@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { ChevronDown, Printer } from "lucide-react";
+import { FloatingMenuPortal } from "@/components/ui/floating-menu-portal";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +17,8 @@ export function PrintTemplateMenu({
   label: string;
   className?: string;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const customTemplates = templates.filter((template) => !template.name.toLocaleLowerCase("vi").includes("mặc định"));
   const menuTemplates = customTemplates.length > 0
@@ -26,14 +28,6 @@ export function PrintTemplateMenu({
         name: `Mẫu ${size.toUpperCase()}`,
         paperDefault: size,
       }));
-
-  useEffect(() => {
-    const close = (event: MouseEvent) => {
-      if (!ref.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, []);
 
   const print = (template: Pick<PrintTemplate, "id" | "paperDefault">) => {
     const url = new URL(baseHref, window.location.origin);
@@ -62,21 +56,27 @@ export function PrintTemplateMenu({
   };
 
   return (
-    <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen((value) => !value)} className={cn("inline-flex items-center gap-1.5 min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-0 lg:min-w-0", className)} aria-expanded={open}>
+    <div className="relative">
+      <button ref={triggerRef} type="button" onClick={() => setOpen((value) => !value)} className={cn("inline-flex items-center gap-1.5 min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-0 lg:min-w-0", className)} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined}>
         <Printer className="h-4 w-4" />
         {label}
         <ChevronDown className="h-3.5 w-3.5" />
       </button>
-      {open && (
-        <div className="absolute bottom-full right-0 z-[80] mb-2 min-w-52 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-e2">
+      <FloatingMenuPortal
+        open={open}
+        anchorRef={triggerRef}
+        onDismiss={() => setOpen(false)}
+        side="top"
+        id={menuId}
+        role="menu"
+        className="min-w-52 rounded-lg border border-border bg-surface py-1 shadow-e2"
+      >
           {menuTemplates.map((template) => (
-            <button key={`${template.id}-${template.paperDefault}`} type="button" onClick={() => print(template)} className="flex min-h-11 w-full items-center px-3 py-2 text-left text-sm font-medium hover:bg-surface-2">
+            <button key={`${template.id}-${template.paperDefault}`} type="button" role="menuitem" onClick={() => print(template)} className="flex min-h-11 w-full items-center px-3 py-2 text-left text-sm font-medium hover:bg-surface-2">
               {template.name}
             </button>
           ))}
-        </div>
-      )}
+      </FloatingMenuPortal>
     </div>
   );
 }
