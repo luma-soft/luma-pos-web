@@ -6,7 +6,7 @@ import {
   aiSupplierSkuTokens,
   type AiProductCandidate,
 } from "@/lib/ai/entity-matching";
-import { accentInsensitiveLike, productSearchCondition } from "@/lib/search";
+import { accentInsensitiveLike, catalogProductSearchCondition } from "@/lib/search";
 
 export {
   aiEntitySearchTerms,
@@ -143,7 +143,7 @@ export async function getAiProductCandidatesForRows(
     .where(and(
       eq(products.storeId, storeId),
       eq(products.isActive, true),
-      productSearchCondition([products.name, products.sku, products.barcode], query),
+      catalogProductSearchCondition(products, query),
     ))
     .limit(20)));
   return hydrateProductCandidates(storeId, groups.flat());

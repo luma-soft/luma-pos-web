@@ -107,9 +107,11 @@ export function searchProductCatalog(
       product.name,
       product.sku,
       product.barcode ?? "",
+      product.variantName ?? "",
       product.model ?? "",
       product.brandName ?? "",
       product.categoryName ?? "",
+      JSON.stringify(product.specs ?? {}),
       ...product.units.flatMap((unit) => [unit.unitName, unit.barcode ?? ""]),
     ].join(" "));
     if (!matchesSearchTokens(searchable, normalizedQuery)) continue;

@@ -70,7 +70,7 @@ beforeAll(async () => {
   ]);
   await database.insert(schema.products).values([
     { id: parentId, storeId, sku: "RAP2200", name: "RAP2200", isVariantParent: true },
-    { id: productId, storeId, sku: "RAP2200-E", name: "RAP2200 E", parentProductId: parentId, costPrice: "1280000", lastPurchasePrice: "1400000", retailPrice: "1490000" },
+    { id: productId, storeId, sku: "RAP2200-E", name: "RAP2200 E", parentProductId: parentId, variantName: "34601", specs: { "Phiên bản": ["34601"] }, costPrice: "1280000", lastPurchasePrice: "1400000", retailPrice: "1490000" },
     { id: siblingId, storeId, sku: "RAP2200-F", name: "RAP2200 F", parentProductId: parentId, costPrice: "990000", lastPurchasePrice: "1100000", retailPrice: "1190000" },
     { id: zeroCostId, storeId, sku: "ZERO-COST", name: "Zero cost", costPrice: "0", lastPurchasePrice: "0", retailPrice: "100000" },
     { storeId: otherStoreId, sku: "RAP2200-OTHER", name: "RAP2200 other store", costPrice: "900000", retailPrice: "1200000" },
@@ -123,6 +123,16 @@ for (const role of ["cashier", "warehouse", undefined]) {
 test("a real zero cost is retained instead of falling back to retail", async () => {
   const [product] = await searchPosProductRows(storeId, "ZERO-COST", { role: "owner" });
   expect(Number(product.prices[costBookId] ?? product.retailPrice)).toBe(0);
+});
+
+test("web and mobile POS find a variant by its variant value", async () => {
+  accessRole = "owner";
+  const webRows = await searchPosProducts("34601");
+  const response = await GET(new Request("http://localhost/api/mobile/pos/search?q=34601"));
+  const mobileRows = (await response.json()).data;
+  for (const rows of [webRows, mobileRows]) {
+    expect(rows.map((row) => row.id)).toContain(productId);
+  }
 });
 
 for (const role of ["owner", "cashier"]) {

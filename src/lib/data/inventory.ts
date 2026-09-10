@@ -4,7 +4,7 @@ import {
   categories, internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, stockLevels, stockMovements, suppliers, warehouses,
 } from "@/db/schema";
 import { unstable_cache } from "next/cache";
-import { accentInsensitiveLike, productSearchCondition } from "@/lib/search";
+import { accentInsensitiveLike, catalogProductSearchCondition } from "@/lib/search";
 import { coercePageSize } from "@/lib/pagination";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 import { stockManagedCategoryCondition } from "@/lib/data/product-stock";
@@ -87,7 +87,7 @@ export async function getInventory(storeId: string, filters: { q?: string; low?:
     : products.totalStock;
   if (filters.q?.trim()) {
     const q = filters.q.trim();
-    const c = productSearchCondition([products.name, products.sku, products.barcode], q);
+    const c = catalogProductSearchCondition(products, q);
     if (c) conditions.push(c);
   }
   if (filters.categoryId) conditions.push(eq(products.categoryId, filters.categoryId));
@@ -406,7 +406,7 @@ export async function searchPurchaseProductRows(storeId: string, q: string) {
     .where(and(
       eq(products.storeId, storeId),
       eq(products.isActive, true),
-      productSearchCondition([products.name, products.sku, products.barcode], term),
+      catalogProductSearchCondition(products, term),
     ))
     .orderBy(asc(products.name))
     .limit(30);

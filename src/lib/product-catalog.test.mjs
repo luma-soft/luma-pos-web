@@ -40,6 +40,15 @@ describe("product catalog keyword search", () => {
     expect(searchProductCatalog(rows, "ống UNIT-001").map((item) => item.id)).toEqual(["unit"]);
   });
 
+  test("finds variants by their variant label and specification values", () => {
+    const rows = [product("variant", "Gạch Lâm Hưng sân vườn", {
+      variantName: "34601",
+      specs: { "Phiên bản": ["34601"], "Kích thước": ["40x60"] },
+    })];
+    expect(searchProductCatalog(rows, "34601").map((item) => item.id)).toEqual(["variant"]);
+    expect(searchProductCatalog(rows, "40x60").map((item) => item.id)).toEqual(["variant"]);
+  });
+
   test("respects exclusions, stock-managed filtering and limit", () => {
     expect(searchProductCatalog(catalog, "cút", { excludeIds: new Set(["27"]) }).map((item) => item.id)).toEqual(["99"]);
     expect(searchProductCatalog(catalog, "cút", { limit: 1 }).map((item) => item.id)).toEqual(["27"]);

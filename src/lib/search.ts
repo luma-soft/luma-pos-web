@@ -42,3 +42,27 @@ export function productSearchCondition(columns: readonly (AnyColumn | SQL)[], qu
     sql`${column} like ${`%${token}%`}`,
   ))!))!;
 }
+
+type ProductSearchFields = {
+  name: AnyColumn | SQL;
+  sku: AnyColumn | SQL;
+  barcode: AnyColumn | SQL;
+  variantName: AnyColumn | SQL;
+  specs: AnyColumn | SQL;
+};
+
+/** Canonical product lookup fields used by POS and every product picker/list. */
+export function catalogProductSearchCondition(
+  fields: ProductSearchFields,
+  query: string,
+  extraColumns: readonly (AnyColumn | SQL)[] = [],
+): SQL {
+  return productSearchCondition([
+    fields.name,
+    fields.sku,
+    fields.barcode,
+    fields.variantName,
+    sql`${fields.specs}::text`,
+    ...extraColumns,
+  ], query);
+}

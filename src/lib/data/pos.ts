@@ -6,7 +6,7 @@ import { getActivePromotions } from "@/lib/data/active-promotions";
 import { getPriceBooks } from "@/lib/data/price-books";
 import type { Role } from "@/lib/actions/common";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
-import { productSearchCondition } from "@/lib/search";
+import { catalogProductSearchCondition } from "@/lib/search";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 import { applySystemPriceBooks } from "@/lib/pos/system-price-projection";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
@@ -317,7 +317,7 @@ export async function searchPosProductRows(
     .orderBy(desc(warehouses.isDefault))
     .limit(1);
 
-  const match: SQL | undefined = productSearchCondition([products.name, products.sku, products.barcode], q);
+  const match: SQL | undefined = catalogProductSearchCondition(products, q);
 
   const [childRows, rootRows] = await Promise.all([
     db

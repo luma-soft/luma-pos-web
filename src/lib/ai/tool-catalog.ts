@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, or } from "drizzle-orm";
 import { db } from "@/db";
 import { customers, products, suppliers, warehouses } from "@/db/schema";
-import { accentInsensitiveLike, productSearchCondition } from "@/lib/search";
+import { accentInsensitiveLike, catalogProductSearchCondition } from "@/lib/search";
 import type { ParsedAiAttachment } from "@/lib/ai/attachments";
 import type { RestockRow } from "@/lib/data/ai-restock";
 import {
@@ -85,7 +85,7 @@ function clampLimit(value: unknown, fallback = 8) {
 }
 
 async function searchProducts(storeId: string, query: string, limit: number): Promise<AiToolResult> {
-  const match = productSearchCondition([products.name, products.sku, products.barcode], query);
+  const match = catalogProductSearchCondition(products, query);
   const rows = await db
     .select({
       id: products.id,

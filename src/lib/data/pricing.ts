@@ -21,7 +21,7 @@ import {
   suppliers,
 } from "@/db/schema";
 import { coercePageSize } from "@/lib/pagination";
-import { productSearchCondition } from "@/lib/search";
+import { catalogProductSearchCondition } from "@/lib/search";
 import {
   pricingProjectionPolicy,
   pricingSortSpec,
@@ -134,7 +134,7 @@ export function pricingFilterCondition(storeId: string, query: PricingQuery = {}
   const q = query.q?.trim();
   if (q) {
     conditions.push(
-      productSearchCondition([products.name, products.sku, products.barcode], q)!,
+      catalogProductSearchCondition(products, q),
     );
   }
   if (query.categoryIds?.length) {

@@ -23,7 +23,7 @@ import {
   suppliers,
   warehouses,
 } from "@/db/schema";
-import { productSearchCondition } from "@/lib/search";
+import { catalogProductSearchCondition } from "@/lib/search";
 import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
 import { coercePageSize, DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import {
@@ -112,10 +112,13 @@ function productFilterPredicate(alias: "member" | "products", storeId: string, f
   else if (status === "inactive") conditions.push(sql`${field("is_active")} = false`);
   else if (hasCompliance && (status === "draft" || status === "archived")) conditions.push(sql`${field("lifecycle_status")} = ${status}`);
   const q = filters.q?.trim();
-  if (q) conditions.push(productSearchCondition([
-    field("name"), field("sku"), field("barcode"), sql`${field("specs")}::text`,
-    ...groupSearchFields,
-  ], q));
+  if (q) conditions.push(catalogProductSearchCondition({
+    name: field("name"),
+    sku: field("sku"),
+    barcode: field("barcode"),
+    variantName: field("variant_name"),
+    specs: field("specs"),
+  }, q, groupSearchFields));
   for (const [column, single, multiple] of [
     ["category_id", filters.categoryId, filters.categoryIds],
     ["brand_id", filters.brandId, filters.brandIds],
