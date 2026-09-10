@@ -10,6 +10,7 @@ export interface PrintTemplateOptions {
   showSeller: boolean;
   showProject: boolean;
   showDebt: boolean;
+  showBatchDebtSummary: boolean;
   showDiscount: boolean;
   showTax: boolean;
   showLineDiscount: boolean;
@@ -17,6 +18,9 @@ export interface PrintTemplateOptions {
   showInWords: boolean;
   showSignatures: boolean;
   showSku: boolean;
+  signatureLeftLabel: string;
+  signatureMiddleLabel: string;
+  signatureRightLabel: string;
 }
 
 export interface PrintTemplate {
@@ -41,6 +45,7 @@ export const DEFAULT_OPTIONS: PrintTemplateOptions = {
   showSeller: true,
   showProject: true,
   showDebt: true,
+  showBatchDebtSummary: true,
   showDiscount: true,
   showTax: true,
   showLineDiscount: true,
@@ -48,6 +53,9 @@ export const DEFAULT_OPTIONS: PrintTemplateOptions = {
   showInWords: true,
   showSignatures: true,
   showSku: false,
+  signatureLeftLabel: "",
+  signatureMiddleLabel: "",
+  signatureRightLabel: "",
 };
 
 export const DEFAULT_FOOTER: Record<PrintDocType, string> = {

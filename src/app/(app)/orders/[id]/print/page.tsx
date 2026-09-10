@@ -98,6 +98,7 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
           signHint={t("print.signHint")}
           note={order.note}
           cols={{
+            index: t("print.index"),
             product: t("orders.cols.product"),
             unit: t("orders.cols.unit"),
             qty: t("orders.cols.qty"),

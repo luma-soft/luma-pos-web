@@ -109,6 +109,7 @@ export default async function PrintBatchPage({ searchParams }: Props) {
           signHint={t("print.signHint")}
           note={order.note}
           cols={{
+            index: t("print.index"),
             product: t("orders.cols.product"),
             unit: t("orders.cols.unit"),
             qty: t("orders.cols.qty"),
@@ -121,7 +122,7 @@ export default async function PrintBatchPage({ searchParams }: Props) {
     };
   });
 
-  const debtSummaries = template.options.showDebt
+  const debtSummaries = template.options.showBatchDebtSummary
     ? buildBatchDebtSummaries(orders.map((order) => ({
         id: order.id,
         code: order.code,

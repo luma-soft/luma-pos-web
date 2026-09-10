@@ -24,7 +24,7 @@ export default async function PrintInventoryDocument({ params, searchParams }: {
         afterTotals={[]}
         note={[`Trạng thái: ${doc.status === "draft" ? "Nháp — chưa xuất kho" : doc.status === "pending" ? "Chờ duyệt — chưa xuất kho" : "Đã xuất kho"}`, `Kho: ${doc.warehouseName}`, `Lý do: ${internalUseReasonLabel(doc.reason, "vi")}`, doc.note].filter(Boolean).join(" · ")}
         inWordsLabel="Bằng chữ" signatures={["Người lập phiếu", "Người giao", "Người nhận"]}
-        cols={{ product: "Hàng hóa", unit: "ĐVT", qty: "Số lượng", unitPrice: "Đơn giá", lineTotal: "Thành tiền" }}
+        cols={{ index: "STT", product: "Hàng hóa", unit: "ĐVT", qty: "Số lượng", unitPrice: "Đơn giá", lineTotal: "Thành tiền" }}
       />
     </div>
   </>;

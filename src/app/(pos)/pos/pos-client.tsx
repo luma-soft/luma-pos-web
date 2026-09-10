@@ -2718,6 +2718,7 @@ export function PosClient({
             signatures={[t("print.buyerSign"), t("print.delivererSign"), t("print.sellerSign")]}
             signHint={t("print.signHint")}
             cols={{
+              index: t("print.index"),
               product: t("orders.cols.product"),
               unit: t("orders.cols.unit"),
               qty: t(printJob.template.docType === "return" ? "returns.cols.returnNow" : "orders.cols.qty"),

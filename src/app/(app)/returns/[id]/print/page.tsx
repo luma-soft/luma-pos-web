@@ -65,6 +65,7 @@ export default async function PrintReturnPage({ params, searchParams }: Props) {
             ret.note,
           ].filter(Boolean).join(" · ")}
           cols={{
+            index: t("print.index"),
             product: t("orders.cols.product"),
             unit: t("orders.cols.unit"),
             qty: t("returns.cols.returnNow"),

@@ -3346,6 +3346,7 @@
     "invoiceTitle": "SALES INVOICE",
     "number": "No.",
     "date": "Date",
+    "index": "No.",
     "deliverTo": "Deliver to",
     "grandTotal": "GRAND TOTAL",
     "paid": "Paid",
@@ -3428,6 +3429,7 @@
       "showSeller": "Seller name",
       "showProject": "Project",
       "showDebt": "Paid / remaining",
+      "showBatchDebtSummary": "Debt summary page for batch printing",
       "showDiscount": "Document discount",
       "showTax": "Tax / VAT",
       "showLineDiscount": "Line discount in product table",
@@ -3435,6 +3437,18 @@
       "showInWords": "Amount in words",
       "showSignatures": "Signature area",
       "showSku": "SKU next to product"
+    },
+    "signatureLabelsSection": "Signature labels",
+    "signatureLabelsHint": "Leave blank to use the default label for each document type.",
+    "signatureLabels": {
+      "signatureLeftLabel": "Left",
+      "signatureMiddleLabel": "Center",
+      "signatureRightLabel": "Right"
+    },
+    "signaturePlaceholders": {
+      "signatureLeftLabel": "Customer / Goods receiver",
+      "signatureMiddleLabel": "Deliverer",
+      "signatureRightLabel": "Seller"
     },
     "footerNote": "Footer note (return policy, thanks…)",
     "previewNote": "Sample note for layout checking.",

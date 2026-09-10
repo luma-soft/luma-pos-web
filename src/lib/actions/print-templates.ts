@@ -28,6 +28,7 @@ const saveSchema = z.object({
     showSeller: z.boolean(),
     showProject: z.boolean(),
     showDebt: z.boolean(),
+    showBatchDebtSummary: z.boolean().default(true),
     showDiscount: z.boolean(),
     showTax: z.boolean(),
     showLineDiscount: z.boolean(),
@@ -35,6 +36,9 @@ const saveSchema = z.object({
     showInWords: z.boolean(),
     showSignatures: z.boolean(),
     showSku: z.boolean(),
+    signatureLeftLabel: z.string().trim().max(80).default(""),
+    signatureMiddleLabel: z.string().trim().max(80).default(""),
+    signatureRightLabel: z.string().trim().max(80).default(""),
   }),
 });
 

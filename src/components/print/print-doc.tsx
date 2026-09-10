@@ -58,7 +58,7 @@ export interface PrintDocProps {
   signHint?: string;
   note?: string | null;
   /** nhãn cột */
-  cols: { product: string; unit: string; qty: string; unitPrice: string; discount?: string; lineTotal: string };
+  cols: { index?: string; product: string; unit: string; qty: string; unitPrice: string; discount?: string; lineTotal: string };
 }
 
 export function PrintDoc(p: PrintDocProps) {
@@ -66,7 +66,12 @@ export function PrintDoc(p: PrintDocProps) {
   if (p.size === "k80") return <K80Doc {...p} />;
 
   const isA4 = p.size === "a4";
-  const signatures = p.signatures && (isA4 ? p.signatures : [p.signatures[0], p.signatures[2]]);
+  const configuredSignatures = p.signatures && [
+    t.options.signatureLeftLabel?.trim() || p.signatures[0],
+    t.options.signatureMiddleLabel?.trim() || p.signatures[1],
+    t.options.signatureRightLabel?.trim() || p.signatures[2],
+  ];
+  const signatures = configuredSignatures && (isA4 ? configuredSignatures : [configuredSignatures[0], configuredSignatures[2]]);
   const showLineDiscount = t.options.showLineDiscount && p.items.some((item) => Number(item.discount ?? 0) > 0);
   const visibleTotals = p.totals.filter((row) => {
     if (row.kind === "discount") return t.options.showDiscount;
@@ -117,6 +122,7 @@ export function PrintDoc(p: PrintDocProps) {
       <table className="print-line-items w-full border-collapse text-[13.5px]">
         <thead>
           <tr className="bg-slate-100">
+            <th className="w-9 border border-slate-400 px-1 py-1.5 text-center">{p.cols.index ?? "STT"}</th>
             <th className="border border-slate-400 px-2 py-1.5 text-left">{p.cols.product}</th>
             <th className="border border-slate-400 px-2 py-1.5">{p.cols.unit}</th>
             <th className="border border-slate-400 px-2 py-1.5">{p.cols.qty}</th>
@@ -126,8 +132,9 @@ export function PrintDoc(p: PrintDocProps) {
           </tr>
         </thead>
         <tbody>
-          {p.items.map((i) => (
+          {p.items.map((i, index) => (
           <tr key={i.id} className="break-inside-avoid">
+              <td className="border border-slate-400 px-1 py-1.5 text-center tabular-nums">{index + 1}</td>
               <td className="border border-slate-400 px-2 py-1.5">
                 {i.name}
                 {t.options.showSku && i.sku && <span className="text-slate-500 text-[10px]"> ({i.sku})</span>}

@@ -26,7 +26,8 @@ import {
   type PrintTemplateStoreInfo,
 } from "@/lib/print/template-shared";
 
-const TOGGLES = ["showSeller", "showProject", "showDebt", "showDiscount", "showTax", "showLineDiscount", "showPaymentQr", "showInWords", "showSignatures", "showSku"] as const;
+const TOGGLES = ["showSeller", "showProject", "showDebt", "showBatchDebtSummary", "showDiscount", "showTax", "showLineDiscount", "showPaymentQr", "showInWords", "showSignatures", "showSku"] as const;
+const SIGNATURE_LABELS = ["signatureLeftLabel", "signatureMiddleLabel", "signatureRightLabel"] as const;
 
 export function PrintSettingsForm({ templates, storeDefaults }: { templates: PrintTemplate[]; storeDefaults: PrintTemplateStoreInfo }) {
   const t = useTranslations();
@@ -52,6 +53,10 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
   }
 
   function patchOption(key: (typeof TOGGLES)[number], value: boolean) {
+    patch({ options: { ...DEFAULT_OPTIONS, ...selected.options, [key]: value } });
+  }
+
+  function patchSignatureLabel(key: (typeof SIGNATURE_LABELS)[number], value: string) {
     patch({ options: { ...DEFAULT_OPTIONS, ...selected.options, [key]: value } });
   }
 
@@ -216,7 +221,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
 
             <Panel title={t("printSettings.optionsSection")}>
               <div className="grid gap-2 sm:grid-cols-2">
-                {TOGGLES.map((key) => (
+                {TOGGLES.filter((key) => key !== "showBatchDebtSummary" || docType === "order").map((key) => (
                   <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0 min-w-11 lg:min-w-0">
                     <Checkbox checked={Boolean(selected.options[key])} onChange={(event) => patchOption(key, event.target.checked)} />
                     {t(`printSettings.toggles.${key}`)}
@@ -224,6 +229,25 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                 ))}
               </div>
             </Panel>
+
+            {selected.options.showSignatures && (
+              <Panel title={t("printSettings.signatureLabelsSection")}>
+                <p className="mb-3 text-xs text-slate-500">{t("printSettings.signatureLabelsHint")}</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {SIGNATURE_LABELS.map((key) => (
+                    <Field key={key} label={t(`printSettings.signatureLabels.${key}`)}>
+                      <input
+                        value={selected.options[key]}
+                        placeholder={t(`printSettings.signaturePlaceholders.${key}`)}
+                        onChange={(event) => patchSignatureLabel(key, event.target.value)}
+                        className={inputCls}
+                        maxLength={80}
+                      />
+                    </Field>
+                  ))}
+                </div>
+              </Panel>
+            )}
 
             <Panel>
               <Field label={t("printSettings.footerNote")}><textarea rows={3} value={selected.footerNote} onChange={(event) => patch({ footerNote: event.target.value })} className={inputCls} /></Field>
@@ -292,7 +316,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   signatures={[t("print.buyerSign"), t("print.delivererSign"), t("print.sellerSign")]}
                   signHint={t("print.signHint")}
                   note={t("printSettings.previewNote")}
-                  cols={{ product: t("orders.cols.product"), unit: t("orders.cols.unit"), qty: t("orders.cols.qty"), unitPrice: t("orders.cols.unitPrice"), discount: t("orders.cols.discount"), lineTotal: t("orders.cols.lineTotal") }}
+                  cols={{ index: t("print.index"), product: t("orders.cols.product"), unit: t("orders.cols.unit"), qty: t("orders.cols.qty"), unitPrice: t("orders.cols.unitPrice"), discount: t("orders.cols.discount"), lineTotal: t("orders.cols.lineTotal") }}
                 />
               </div>
             </div>
