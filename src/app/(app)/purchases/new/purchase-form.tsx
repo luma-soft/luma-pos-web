@@ -239,6 +239,7 @@ export function PurchaseForm({
   const [aiPendingLines, setAiPendingLines] = useState<AiPendingLine[]>([]);
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
   const aiPreviewHydratedRef = useRef(false);
+  const selectedSupplier = options.suppliers.find((supplier) => supplier.id === supplierId);
 
   useEffect(() => {
     if (mode !== "create" || !aiPreview) return;
@@ -708,6 +709,14 @@ export function PurchaseForm({
             <Combobox value={supplierId} onChange={setSupplierId} allowClear={false}
               placeholder={t(options.suppliers.length ? "products.fields.supplierPlaceholder" : "purchases.noSuppliers")}
               options={options.suppliers.map((s) => ({ value: s.id, label: s.name }))} />
+            {selectedSupplier && (
+              <div className="mt-1.5 flex items-center justify-between gap-3 text-xs">
+                <span className="text-slate-500">{t("purchases.currentSupplierDebt")}</span>
+                <span className={cn("tabular-nums font-semibold", Number(selectedSupplier.currentDebt) > 0 ? "text-warn" : "text-slate-400")}>
+                  {formatCurrency(Number(selectedSupplier.currentDebt))}
+                </span>
+              </div>
+            )}
           </div>
           {/* Receiving warehouse is temporarily hidden; retain the saved/default ID. */}
           <div>

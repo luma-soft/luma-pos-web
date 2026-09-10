@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 const translate = (key) => key;
 const productId = "00000000-0000-4000-8000-000000000001";
 const purchaseId = "00000000-0000-4000-8000-000000000002";
-const options = { suppliers: [{ id: "supplier", name: "Nhà cung cấp" }], warehouses: [{ id: "warehouse", name: "Kho" }] };
+const options = { suppliers: [{ id: "supplier", name: "Nhà cung cấp", currentDebt: "125000" }], warehouses: [{ id: "warehouse", name: "Kho" }] };
 const products = [{ id: productId, name: "Ống nhựa", sku: "SP001", baseUnit: "m", costPrice: "100000", units: [] }];
 const purchase = {
   id: purchaseId, code: "PN001", status: "received", supplierId: "supplier", warehouseId: "warehouse",
@@ -15,7 +15,7 @@ const purchase = {
   items: [{ id: "item", productId, productName: "Ống nhựa", sku: "SP001", baseUnit: "m", quantity: "2", unitCost: "100000", discount: "10000", total: "190000" }],
 };
 
-mock.module("next/navigation", () => ({ useRouter: () => ({ push() {}, refresh() {} }), usePathname: () => "/purchases/new", useSearchParams: () => new URLSearchParams(), notFound: () => { throw new Error("Not found"); } }));
+mock.module("next/navigation", () => ({ useRouter: () => ({ push() {}, refresh() {} }), usePathname: () => "/purchases/new", useSearchParams: () => new URLSearchParams(), notFound: () => { throw new Error("Not found"); }, redirect: () => { throw new Error("Redirect"); } }));
 mock.module("next-intl", () => ({ useTranslations: () => translate, useLocale: () => "vi" }));
 mock.module("next-intl/server", () => ({ getTranslations: async () => translate }));
 mock.module("@/lib/auth/store-context", () => ({ requireStoreContext: async () => ({ storeId: "store-1", role: "owner" }) }));
@@ -46,6 +46,13 @@ function initialValues(shippingFee) {
 }
 
 describe("purchase freight", () => {
+  test("shows the selected supplier's existing payable separately from this receipt debt", () => {
+    const html = renderToStaticMarkup(createElement(PurchaseForm, { options, initialProducts: products, initialValues: initialValues(20000), mode: "edit", purchaseId }));
+    expect(html).toContain("purchases.currentSupplierDebt");
+    expect(html).toContain("125.000");
+    expect(html).toContain("168.000");
+  });
+
   test("form includes freight after discount and VAT in total and debt", () => {
     const html = renderToStaticMarkup(createElement(PurchaseForm, { options, initialProducts: products, initialValues: initialValues(20000), mode: "edit", purchaseId }));
     expect(html).toContain('for="purchase-shipping-fee"');

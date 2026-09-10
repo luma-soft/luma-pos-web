@@ -3018,6 +3018,7 @@
     "noSuppliers": "Chưa có NCC — tạo ở mục Nhà cung cấp",
     "payFull": "Thanh toán đủ cho NCC",
     "amountPaid": "Đã trả NCC",
+    "currentSupplierDebt": "Nợ phải trả hiện tại",
     "complete": "Hoàn thành",
     "receiveHint": "Nhận hàng ngay: cộng tồn kho, tính giá vốn bình quân gồm chiết khấu, VAT và phí nhập; phần chưa trả ghi vào nợ NCC.",
     "errors": {

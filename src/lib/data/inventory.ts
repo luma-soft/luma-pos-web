@@ -353,7 +353,7 @@ export async function getPurchase(storeId: string, id: string) {
 /** Options cho form tạo phiếu nhập. */
 export async function getPurchaseFormOptions(storeId: string) {
   const [supplierRows, warehouseRows] = await Promise.all([
-    db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers).where(eq(suppliers.storeId, storeId)).orderBy(asc(suppliers.name)),
+    db.select({ id: suppliers.id, name: suppliers.name, currentDebt: suppliers.currentDebt }).from(suppliers).where(eq(suppliers.storeId, storeId)).orderBy(asc(suppliers.name)),
     db.select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault }).from(warehouses).where(eq(warehouses.storeId, storeId)).orderBy(desc(warehouses.isDefault)),
   ]);
   return { suppliers: supplierRows, warehouses: warehouseRows };

@@ -3018,6 +3018,7 @@
     "noSuppliers": "No suppliers — create one in Suppliers",
     "payFull": "Pay supplier in full",
     "amountPaid": "Paid to supplier",
+    "currentSupplierDebt": "Current supplier payable",
     "complete": "Complete",
     "receiveHint": "Receive now: stock is added, average cost includes discounts, VAT and freight; unpaid balance is recorded as supplier debt.",
     "errors": {
