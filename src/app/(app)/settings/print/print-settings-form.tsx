@@ -1,6 +1,7 @@
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select } from "@/components/ui/select";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -156,41 +157,31 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="rounded-card border border-border bg-surface">
-          <div className="flex items-center justify-between border-b border-border-soft p-3">
-            <div className="text-sm font-bold">{t("printSettings.templateList")}</div>
-            <button type="button" onClick={addTemplate} aria-label={t("common.add")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white min-w-11">
-              <Plus className="h-3.5 w-3.5" />
-              {t("common.add")}
-            </button>
-          </div>
-          <div className="max-h-[620px] overflow-y-auto p-2">
-            {visible.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => { setSelectedId(item.id); setMsg(null); }}
-                aria-pressed={selected.id === item.id}
-                className={cn(
-                  "mb-1 min-h-11 w-full rounded-lg border px-3 py-2.5 text-left text-sm transition",
-                  selected.id === item.id ? "border-primary-500 bg-primary-50 text-primary-800 dark:bg-primary-950/40 dark:text-primary-200" : "border-transparent hover:bg-surface-2",
-                )}
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate font-semibold">{item.name}</span>
-                  {item.isDefault && <Star className="h-3.5 w-3.5 shrink-0 fill-current text-primary-600" />}
-                </span>
-                <span className="mt-1 block text-xs text-slate-500">{item.paperDefault.toUpperCase()} · {item.isActive ? t("printSettings.active") : t("printSettings.inactive")}</span>
-              </button>
-            ))}
-          </div>
-        </aside>
-
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="order-1 space-y-4">
             <Panel>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid items-end gap-3 lg:grid-cols-[minmax(220px,1.1fr)_minmax(220px,1fr)_auto]">
+                <div>
+                  <span className="mb-1 block text-xs font-semibold text-slate-500">{t("printSettings.templateList")}</span>
+                  <div className="flex gap-2">
+                    <Select
+                      aria-label={t("printSettings.templateList")}
+                      value={selected.id}
+                      onValueChange={(value) => { setSelectedId(value); setMsg(null); }}
+                      options={visible.map((item) => ({
+                        value: item.id,
+                        label: item.name,
+                        description: `${item.isDefault ? "★ · " : ""}${item.paperDefault.toUpperCase()} · ${item.isActive ? t("printSettings.active") : t("printSettings.inactive")}`,
+                      }))}
+                      rootClassName="min-w-0 flex-1"
+                      wrapLabel
+                    />
+                    <button type="button" onClick={addTemplate} aria-label={t("common.add")} className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white min-w-11">
+                      <Plus className="h-3.5 w-3.5" />
+                      {t("common.add")}
+                    </button>
+                  </div>
+                </div>
                 <Field label={t("printSettings.templateName")}><input value={selected.name} onChange={(event) => patch({ name: event.target.value })} className={inputCls} /></Field>
                 <Field label={t("printSettings.paperDefault")}>
                   <div className="flex gap-1.5">
@@ -352,8 +343,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
               </div>
             </div>
           </div>
-        </section>
-      </div>
+      </section>
     </div>
   );
 }
