@@ -22,7 +22,7 @@ import { recordActivity } from "@/lib/audit/activity-log";
 import { activityValuesEqual } from "@/lib/products/product-activity";
 import { calculatePurchaseCosts } from "@/lib/purchases/cost-calculations";
 import { ensureInventoryCostBaselines, assertPurchaseCostPeriod, revalueInventoryProducts } from "@/lib/inventory/cost-valuation";
-import { updateReceiptCompanyPrices } from "@/lib/pricing/receipt-company-prices";
+import { changedReceiptCompanyPriceItems, updateReceiptCompanyPrices } from "@/lib/pricing/receipt-company-prices";
 
 type PurchaseCalcInput = Pick<CreatePurchaseOutput, "items" | "discount" | "vatRate" | "shippingFee" | "amountPaid">;
 
@@ -124,7 +124,6 @@ export async function createPurchase(
   const parsed = createPurchaseSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
-  if (v.items.some((item) => item.updateCompanyPrice) && gate.role !== "owner" && gate.role !== "manager") return { ok: false, error: "errors.forbidden" };
   const totals = calcPurchaseTotals(v);
 
   try {
@@ -316,7 +315,6 @@ export async function updatePurchase(
   const parsed = updatePurchaseSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
-  if (v.items.some((item) => item.updateCompanyPrice) && gate.role !== "owner" && gate.role !== "manager") return { ok: false, error: "errors.forbidden" };
   const proposedTotals = calcPurchaseTotals(v);
 
   try {
@@ -340,6 +338,13 @@ export async function updatePurchase(
       if (found.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
       if (found.some((product) => product.isVariantParent)) throw new Error("PRODUCT_VARIANT_PARENT");
       const oldItems = await tx.select().from(purchaseOrderItems).where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
+      // Receiving a draft establishes every company price. Editing an already
+      // received document only updates SKUs whose gross unit cost changed, so a
+      // note-only edit to an old receipt cannot overwrite a newer list price.
+      const companyPriceItems = changedReceiptCompanyPriceItems(
+        v.items,
+        po.status === "draft" ? undefined : oldItems,
+      );
       const comparableItems = (items: { productId: string; quantity: string | number; unitCost: string | number; discount: string | number; batchNumber?: string | null; expiryDate?: string | null }[]) => items.map((item) => ({
         productId: item.productId, quantity: Number(item.quantity), unitCost: Number(item.unitCost), discount: Number(item.discount), batchNumber: item.batchNumber ?? null, expiryDate: item.expiryDate ?? null,
       })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
@@ -583,7 +588,7 @@ export async function updatePurchase(
           `,
         });
       if (stockChanged) await revalueInventoryProducts(tx, gate.storeId, affectedIds);
-      await updateReceiptCompanyPrices(tx, gate, po.id, v.items);
+      await updateReceiptCompanyPrices(tx, gate, po.id, companyPriceItems);
 
       const notification = po.status === "draft"
         ? await createNotificationEventInTx(tx, {

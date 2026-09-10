@@ -86,6 +86,7 @@ import {
 } from "@/lib/pos/ai-cart-resolution";
 import { buildPrintPaymentQr, type PrintPaymentQr } from "@/lib/print/payment-qr";
 import { waitForPrintImages } from "@/lib/print/wait-for-images";
+import { isSellPriceBelowPurchase, purchasePriceForSoldUnit } from "@/lib/pos/below-purchase-warning";
 
 type CartLine = {
   key: string;
@@ -1749,6 +1750,8 @@ export function PosClient({
         {cart.map((l, idx) => {
           const m2 = l.product.m2PerUnit ? Number(l.product.m2PerUnit) * l.unitMultiplier * l.quantity : 0;
           const eff = effPrice(l);
+          const purchaseUnitPrice = purchasePriceForSoldUnit(l.product, data.priceBooks, l.unitMultiplier);
+          const belowPurchasePrice = isSellPriceBelowPurchase(eff.price, purchaseUnitPrice);
           const stockManaged = isProductStockManaged(l.product.categoryName);
           const ordered = orderedBaseQuantityByProduct.get(l.product.id) ?? 0;
           const stockInsufficient = exceedsAvailableStock(stockManaged, Number(l.product.stock), ordered + Number(l.product.booked), isReturnDraft);
@@ -1832,7 +1835,7 @@ export function PosClient({
                       type="button"
                       disabled={isCameraQuoteDraft}
                       onClick={() => setEditKey(editKey === l.key ? null : l.key)}
-                      className="flex min-h-11 w-full min-w-0 items-center text-left text-sm tabular-nums text-slate-500 hover:text-primary-600 [overflow-wrap:anywhere]"
+                      className={cn("flex min-h-11 w-full min-w-0 items-center text-left text-sm tabular-nums hover:text-primary-600 [overflow-wrap:anywhere]", belowPurchasePrice ? "font-semibold text-er" : "text-slate-500")}
                     >
                       {formatCurrency(eff.price)}{posUnitSuffix(l.unitName)}
                     </button>
@@ -1937,7 +1940,7 @@ export function PosClient({
                     disabled={isCameraQuoteDraft}
                     onClick={() => setEditKey(editKey === l.key ? null : l.key)}
                     title={t("pos.priceEditor.editHint")}
-                    className="w-full text-right text-base leading-6 tabular-nums text-slate-500 hover:text-primary-600"
+                    className={cn("w-full text-right text-base leading-6 tabular-nums hover:text-primary-600", belowPurchasePrice ? "font-semibold text-er" : "text-slate-500")}
                   >
                     {formatCurrency(eff.price)}
                   </button>
@@ -2905,6 +2908,8 @@ function LinePriceEditor({
     onChangeRef.current = onChange;
   }, [onChange]);
   const resolved = resolveLinePriceEditor(editor);
+  const purchaseUnitPrice = purchasePriceForSoldUnit(line.product, priceBooks, line.unitMultiplier);
+  const belowPurchasePrice = isSellPriceBelowPurchase(resolved.sellPrice, purchaseUnitPrice);
   const discountInput = Math.max(0, Number(editor.discount) || 0);
 
   function selectedPriceBook() {
@@ -3032,9 +3037,18 @@ function LinePriceEditor({
           <MoneyInput
             value={editor.price} autoFocus
             onChange={setPrice}
-            className="no-spinner min-h-11 w-40 rounded-md border border-border bg-surface px-2 py-1.5 text-right"
+            aria-invalid={belowPurchasePrice}
+            className={cn(
+              "no-spinner min-h-11 w-40 rounded-md border bg-surface px-2 py-1.5 text-right",
+              belowPurchasePrice ? "border-er bg-red-50 text-er focus:border-er dark:bg-red-950/20" : "border-border",
+            )}
           />
         </div>
+        {belowPurchasePrice && purchaseUnitPrice != null && (
+          <p role="alert" className="rounded-md bg-red-50 px-2.5 py-2 text-xs font-semibold text-er dark:bg-red-950/30">
+            Giá bán sau chiết khấu thấp hơn Giá nhập cuối ({formatCurrency(purchaseUnitPrice)} / {line.unitName}).
+          </p>
+        )}
         <div className="flex items-center justify-between gap-2">
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.discount")}</span>
           <fieldset disabled={editor.free} className="m-0 min-w-0 border-0 p-0 disabled:opacity-50">
@@ -3053,7 +3067,7 @@ function LinePriceEditor({
         />
         <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.sellPrice")}</span>
-          <span className="font-bold text-primary-600 tabular-nums">{formatCurrency(resolved.sellPrice)}</span>
+          <span className={cn("font-bold tabular-nums", belowPurchasePrice ? "text-er" : "text-primary-600")}>{formatCurrency(resolved.sellPrice)}</span>
         </div>
       </div>
     </>

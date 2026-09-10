@@ -17,13 +17,15 @@ Tên, loại và việc xóa bảng hệ thống vẫn bị khóa. Khóa siêu d
 
 Giá nhập cuối được truy vấn từ chứng từ hiện hành nên sửa/hủy phiếu tự phản ánh mà không cần ghi một bộ nhớ đệm giá khác. `products.lastPurchasePrice` vẫn giữ nghĩa cũ là **gross nhập**, phục vụ lịch sử/tính vốn; API dùng trường riêng `lastPurchaseNetPrice` cho bảng Giá nhập cuối.
 
-Chủ cửa hàng/quản lý có thể chọn **Cập nhật giá công ty** trên từng dòng nhập. Mặc định tắt, kể cả khi sao chép/sửa phiếu. Khi chọn, ghi đơn giá trước chiết khấu, trước VAT theo đơn vị gốc vào bảng công ty trong cùng giao dịch lưu phiếu; ghi lịch sử thay đổi kèm phiếu nguồn. Nhập hàng bình thường không thay đổi bảng công ty. Các dòng cùng SKU yêu cầu cập nhật hai giá khác nhau bị từ chối.
+Khi nhận phiếu, hệ thống tự ghi đơn giá trước chiết khấu, trước VAT theo đơn vị gốc vào **Giá chưa chiết khấu** trong cùng giao dịch và ghi lịch sử kèm phiếu nguồn. Việc này không thay đổi **Giá chung** hay giá snapshot của đơn bán đã lưu. Khi sửa phiếu đã nhận, chỉ SKU có đơn giá nhập thực sự thay đổi mới cập nhật; sửa ghi chú hoặc thông tin khác trên phiếu cũ không được ghi đè giá công ty mới hơn. Các dòng cùng SKU có hai đơn giá khác nhau bị từ chối.
 
 ## Bán hàng
 
 Giá chung vẫn là lựa chọn bán mặc định, bất kể thứ tự hiển thị. Có thể chọn bảng khác từng dòng trong đơn hỗn hợp. Bảng công ty quy đổi trực tiếp theo đơn vị gốc, không dùng giá bán riêng của đơn vị thay thế. Giá được hiểu trước VAT; thuế theo thiết lập hóa đơn hiện có.
 
 Chọn Giá chưa chiết khấu rồi nhập chiết khấu `%` hoặc tiền cho khách. Web có thao tác áp dụng chiết khấu cho các dòng đang dùng giá công ty; các dòng khác không thay đổi. Bảng công ty không tự cộng thêm khuyến mại. Giảm toàn hóa đơn vẫn là thao tác riêng và theo quy tắc quyền hiện có.
+
+Khi người có quyền xem giá nhập sửa giá dòng tại POS, web/mobile so sánh giá bán thực thu sau chiết khấu với **Giá nhập cuối** đã quy đổi theo đơn vị đang bán. Nếu thấp hơn, trường giá và giá dòng hiển thị cảnh báo đỏ; đây là cảnh báo, không chặn lưu đơn.
 
 Chiết khấu làm tròn trên mỗi đơn vị trước khi nhân số lượng, thống nhất preview web/mobile và server. Ví dụ 9.999 × 3 giảm 20%: giảm mỗi đơn vị 2.000; tổng 23.997. Các công thức hàng loạt chỉ áp dụng SKU có giá nền, không tự lấp giá thiếu.
 

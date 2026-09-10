@@ -157,7 +157,8 @@ export const purchaseItemSchema = z.object({
   productId: z.uuid(),
   quantity: z.number().positive(), // theo đơn vị gốc
   unitCost: z.number().min(0),
-  updateCompanyPrice: z.boolean().default(false),
+  // Accepted for compatibility with older clients; received prices now sync automatically.
+  updateCompanyPrice: z.boolean().optional(),
   discount: z.number().min(0).default(0), // giảm giá dòng (VND)
   batchNumber: z.string().trim().min(1).max(80).optional(),
   expiryDate: z.iso.date().optional(),

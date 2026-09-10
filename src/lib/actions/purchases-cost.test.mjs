@@ -10,6 +10,7 @@ import * as schema from "../../db/schema";
 const pg = new PGlite();
 const database = drizzle(pg, { schema });
 const storeId = randomUUID(), userId = randomUUID(), supplierId = randomUUID(), warehouseId = randomUUID();
+const companyPriceBookId = randomUUID();
 const basisAt = "2020-01-01T00:00:00.000500Z";
 // Keep action schemas, common money/quantity helpers, stock, costs, shifts and
 // transactional activity logging real. Only request/external boundaries differ.
@@ -35,7 +36,8 @@ const { createPurchase, updatePurchase, cancelPurchase, savePurchaseDraft } = aw
 const tables = [schema.products, schema.productSuppliers, schema.purchaseOrders,
   schema.purchaseOrderItems, schema.stockLevels, schema.stockLots, schema.stockLotMovements,
   schema.stockMovements, schema.inventoryCostBaselines, schema.inventoryCostAdjustments,
-  schema.warehouses, schema.returns, schema.profiles, schema.shifts, schema.suppliers, schema.auditLogs];
+  schema.warehouses, schema.returns, schema.profiles, schema.shifts, schema.suppliers, schema.auditLogs,
+  schema.priceBooks, schema.productPrices];
 const dialect = new PgDialect();
 const quote = value => `'${value.replaceAll("'", "''")}'`;
 beforeAll(async () => {
@@ -58,6 +60,7 @@ beforeAll(async () => {
     await pg.exec(`create table "${config.name}" (${definitions.join(",")})`);
   }
   await pg.exec("create unique index fixture_product_supplier on product_suppliers(product_id,supplier_id)");
+  await pg.exec("create unique index fixture_product_price on product_prices(price_book_id,product_id)");
   await pg.exec(await readFile(new URL("../../../supabase/denormalize-stock.sql", import.meta.url), "utf8"));
 });
 beforeEach(async () => {
@@ -66,6 +69,7 @@ beforeEach(async () => {
   await database.insert(schema.profiles).values({ id: userId, storeId, fullName: "Cost test owner", role: "owner" });
   await database.insert(schema.warehouses).values({ id: warehouseId, storeId, name: "Main" });
   await database.insert(schema.suppliers).values({ id: supplierId, storeId, code: "NCC-COST", name: "Cost test supplier", currentDebt: "0" });
+  await database.insert(schema.priceBooks).values({ id: companyPriceBookId, storeId, name: "Giá chưa chiết khấu", systemType: "list" });
 });
 afterAll(async () => { await pg.close(); });
 
@@ -146,10 +150,14 @@ test("new receipt create and edit recalculate average and gross through real act
   // (2,000 − 200 line − 180 invoice) × 1.10 + 18 freight = 1,800.
   // Opening value 1,000 + landed receipt 1,800 over 20 units = 140.
   expect(await values(productId)).toEqual({ quantity: 20, cost: 140, gross: 200, retail: 999 });
+  expect((await pg.query("select price from product_prices where product_id=$1", [productId])).rows)
+    .toEqual([{ price: "200.00" }]);
   expect((await pg.query("select subtotal,tax,shipping_fee,total from purchase_orders where id=$1", [id])).rows[0])
     .toEqual({ subtotal: "1800.00", tax: "162.00", shipping_fee: "18.00", total: "1800.00" });
   expect((await updatePurchase({ id, ...payload(productId, 20, 150) })).ok).toBe(true);
   expect(await values(productId)).toEqual({ quantity: 30, cost: 133.33, gross: 150, retail: 999 });
+  expect((await pg.query("select price from product_prices where product_id=$1", [productId])).rows)
+    .toEqual([{ price: "150.00" }]);
   expect((await pg.query("select quantity,unit_cost,discount,total from purchase_order_items where purchase_order_id=$1", [id])).rows)
     .toEqual([{ quantity: "20.0000", unit_cost: "150.00", discount: "0.00", total: "3000.00" }]);
   expect((await pg.query("select count(*)::int as n from stock_movements")).rows[0].n).toBe(3);

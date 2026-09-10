@@ -9,7 +9,7 @@ const storeId = randomUUID(), userId = randomUUID(), receiptId = randomUUID();
 const listId = randomUUID(), productId = randomUUID(), secondId = randomUUID();
 const activity = [];
 mock.module("@/lib/audit/activity-log", () => ({ recordActivity: async (_tx, event) => { activity.push(event); } }));
-const { updateReceiptCompanyPrices } = await import("./receipt-company-prices");
+const { changedReceiptCompanyPriceItems, updateReceiptCompanyPrices } = await import("./receipt-company-prices");
 
 beforeAll(async () => {
   await pg.exec(`
@@ -30,45 +30,56 @@ const apply = (items, role = "manager") => database.transaction((tx) =>
   updateReceiptCompanyPrices(tx, { storeId, userId, role }, receiptId, items));
 const prices = async () => (await pg.query("select product_id, price from product_prices order by product_id")).rows;
 
-test("normal receipts leave company prices untouched unless each line opts in", async () => {
-  await pg.query("insert into product_prices (store_id,price_book_id,product_id,price) values ($1,$2,$3,90000)", [storeId, listId, productId]);
-  await apply([{ productId, unitCost: 100000 }, { productId: secondId, unitCost: 200000, updateCompanyPrice: false }], "warehouse");
-  expect(await prices()).toEqual([{ product_id: productId, price: "90000.00" }]);
-  expect(activity).toHaveLength(0);
+test("received receipt edits update only new or gross-price-changed SKUs", () => {
+  const items = [{ productId, unitCost: 100000 }, { productId: secondId, unitCost: 210000 }];
+  expect(changedReceiptCompanyPriceItems(items, [
+    { productId, unitCost: "100000.00" },
+    { productId: secondId, unitCost: "200000.00" },
+  ])).toEqual([{ productId: secondId, unitCost: 210000 }]);
+  expect(changedReceiptCompanyPriceItems(items)).toEqual(items);
 });
 
-test.each(["owner", "manager"])("%s opt-in stores gross company price before receipt discounts", async (role) => {
-  await apply([{ productId, unitCost: 100000, discount: 35000, total: 65000, updateCompanyPrice: true },
-    { productId: secondId, unitCost: 200000 }], role);
+test("received lines automatically update company prices without changing them by receipt discount", async () => {
+  await pg.query("insert into product_prices (store_id,price_book_id,product_id,price) values ($1,$2,$3,90000)", [storeId, listId, productId]);
+  await apply([{ productId, unitCost: 100000, discount: 35000, total: 65000 }, { productId: secondId, unitCost: 200000 }], "warehouse");
+  expect(await prices()).toEqual([
+    { product_id: productId, price: "100000.00" },
+    { product_id: secondId, price: "200000.00" },
+  ]);
+  expect(activity).toHaveLength(2);
+});
+
+test.each(["owner", "manager", "warehouse"])("%s receipt stores gross company price before receipt discounts", async (role) => {
+  await apply([{ productId, unitCost: 100000, discount: 35000, total: 65000 }], role);
   expect(await prices()).toEqual([{ product_id: productId, price: "100000.00" }]);
   expect(activity).toHaveLength(1);
   expect(activity[0]).toMatchObject({
     storeId, actorId: userId, entityId: productId, action: "product.price_book.updated",
     before: { price: null }, after: { price: 100000 },
-    metadata: { receiptId, priceBookId: listId, source: "receipt_opt_in", beforeSupplierDiscount: true },
+    metadata: { receiptId, priceBookId: listId, source: "receipt_automatic", beforeSupplierDiscount: true },
   });
 });
 
-test("manager opt-in updates an existing company price using the already converted base-unit cost", async () => {
+test("receipt updates an existing company price using the already converted base-unit cost", async () => {
   await pg.query("insert into product_prices (store_id,price_book_id,product_id,price) values ($1,$2,$3,90000)", [storeId, listId, productId]);
   // Caller converted a 1,000,000 VND box of 10 into 100,000 VND per base unit.
-  await apply([{ productId, unitCost: 100000, updateCompanyPrice: true }]);
+  await apply([{ productId, unitCost: 100000 }]);
   expect(await prices()).toEqual([{ product_id: productId, price: "100000.00" }]);
   expect(activity[0]).toMatchObject({ before: { price: 90000 }, after: { price: 100000 } });
 });
 
-test("warehouse staff cannot opt in to company price changes", async () => {
-  await expect(apply([{ productId, unitCost: 100000, updateCompanyPrice: true }], "warehouse"))
-    .rejects.toThrow("COMPANY_PRICE_FORBIDDEN");
-  expect(await prices()).toEqual([]);
+test("unchanged company prices do not create duplicate writes or audit events", async () => {
+  await pg.query("insert into product_prices (store_id,price_book_id,product_id,price) values ($1,$2,$3,100000)", [storeId, listId, productId]);
+  await apply([{ productId, unitCost: 100000 }]);
+  expect(await prices()).toEqual([{ product_id: productId, price: "100000.00" }]);
   expect(activity).toHaveLength(0);
 });
 
 test("conflicting gross prices for a repeated SKU reject without partial writes", async () => {
   await expect(apply([
-    { productId: secondId, unitCost: 200000, updateCompanyPrice: true },
-    { productId, unitCost: 100000, updateCompanyPrice: true },
-    { productId, unitCost: 110000, updateCompanyPrice: true },
+    { productId: secondId, unitCost: 200000 },
+    { productId, unitCost: 100000 },
+    { productId, unitCost: 110000 },
   ])).rejects.toThrow("COMPANY_PRICE_CONFLICT");
   expect(await prices()).toEqual([]);
   expect(activity).toHaveLength(0);
@@ -76,8 +87,8 @@ test("conflicting gross prices for a repeated SKU reject without partial writes"
 
 test("repeated matching SKU prices write and audit once", async () => {
   await apply([
-    { productId, unitCost: 100000, updateCompanyPrice: true },
-    { productId, unitCost: 100000, updateCompanyPrice: true },
+    { productId, unitCost: 100000 },
+    { productId, unitCost: 100000 },
   ]);
   expect(await prices()).toEqual([{ product_id: productId, price: "100000.00" }]);
   expect(activity).toHaveLength(1);
