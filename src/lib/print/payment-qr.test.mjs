@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { buildPrintPaymentQr } from "./payment-qr";
+import { buildPrintPaymentQr, formatPrintPaymentReference } from "./payment-qr";
 
 const account = {
   bankCode: "VCB",
@@ -36,4 +36,9 @@ test("prefills the outstanding amount when the invoice still has a balance", () 
 test("does not build a QR when the option is disabled or no bank account exists", () => {
   expect(buildPrintPaymentQr({ enabled: false, account, reference: "HD003", labels })).toBeNull();
   expect(buildPrintPaymentQr({ enabled: true, account: null, reference: "HD003", labels })).toBeNull();
+});
+
+test("formats configurable transfer content with the invoice code placeholder", () => {
+  expect(formatPrintPaymentReference("HAI DANG {invoiceCode}", "DH-001")).toBe("HAI DANG DH-001");
+  expect(formatPrintPaymentReference("", "DH-001")).toBe("DH-001");
 });

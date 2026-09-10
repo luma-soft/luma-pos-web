@@ -1,5 +1,6 @@
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { moneyToWords, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
+import { isPrintRichTextEmpty, sanitizePrintRichText } from "@/lib/print/rich-text";
 
 export interface PrintLine {
   id: string;
@@ -78,6 +79,8 @@ export function PrintDoc(p: PrintDocProps) {
     if (row.kind === "tax") return t.options.showTax;
     return true;
   });
+  const qrTitle = t.options.paymentQrTitle?.trim() || (t.docType !== "order" ? p.paymentQr?.title : "");
+  const footerHtml = sanitizePrintRichText(t.footerNote);
   return (
     <div
       className={
@@ -184,11 +187,11 @@ export function PrintDoc(p: PrintDocProps) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className={isA4 ? "h-24 w-24 object-contain" : "h-20 w-20 object-contain"} />
           <div className="min-w-0 flex-1">
-            {t.docType !== "order" && <div className="font-bold">{p.paymentQr.title}</div>}
-            <div>{p.paymentQr.bankLabel}: <b>{p.paymentQr.bankName}</b></div>
-            <div>{p.paymentQr.accountLabel}: <b className="font-mono">{p.paymentQr.accountNumber}</b></div>
-            <div>{p.paymentQr.nameLabel}: <b>{p.paymentQr.accountName}</b></div>
-            <div>{p.paymentQr.referenceLabel}: <b className="font-mono">{p.paymentQr.reference}</b></div>
+            {qrTitle && <div className="font-bold">{qrTitle}</div>}
+            {t.options.showPaymentQrBank !== false && <div>{p.paymentQr.bankLabel}: <b>{p.paymentQr.bankName}</b></div>}
+            {t.options.showPaymentQrAccountNumber !== false && <div>{p.paymentQr.accountLabel}: <b className="font-mono">{p.paymentQr.accountNumber}</b></div>}
+            {t.options.showPaymentQrAccountName !== false && <div>{p.paymentQr.nameLabel}: <b>{p.paymentQr.accountName}</b></div>}
+            {t.options.showPaymentQrReference !== false && <div>{p.paymentQr.referenceLabel}: <b className="font-mono">{p.paymentQr.reference}</b></div>}
           </div>
         </div>
       )}
@@ -203,10 +206,11 @@ export function PrintDoc(p: PrintDocProps) {
         </div>
       )}
 
-      {t.footerNote && (
-        <div className={`mt-6 border-t border-dashed border-slate-400 pt-2 text-center text-[10.5px] text-slate-500 break-inside-avoid ${isA4 ? "" : "mt-5"}`}>
-          {t.footerNote}
-        </div>
+      {!isPrintRichTextEmpty(footerHtml) && (
+        <div
+          className={`print-rich-text mt-6 whitespace-pre-wrap border-t border-dashed border-slate-400 pt-2 text-[10.5px] text-slate-500 break-inside-avoid [&_h3]:text-[1.15em] [&_h3]:font-bold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-0.5 [&_ul]:list-disc [&_ul]:pl-5 ${isA4 ? "" : "mt-5"}`}
+          dangerouslySetInnerHTML={{ __html: footerHtml }}
+        />
       )}
     </div>
   );
@@ -219,6 +223,8 @@ function K80Doc(p: PrintDocProps) {
     if (row.kind === "tax") return t.options.showTax;
     return true;
   });
+  const qrTitle = t.options.paymentQrTitle?.trim() || (t.docType !== "order" ? p.paymentQr?.title : "");
+  const footerHtml = sanitizePrintRichText(t.footerNote);
   return (
     <div className="print-document w-[302px] bg-white px-3 py-4 font-mono text-[11px] leading-[1.45] text-black shadow-lg print:shadow-none">
       <header className="text-center">
@@ -305,18 +311,21 @@ function K80Doc(p: PrintDocProps) {
       {t.options.showPaymentQr && p.paymentQr && (
         <>
           <div className="mt-3 border-t-2 border-dashed border-black pt-2 text-center">
-            {t.docType !== "order" && <div className="font-bold uppercase">{p.paymentQr.title}</div>}
+            {qrTitle && <div className="font-bold uppercase">{qrTitle}</div>}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className="mx-auto my-1 h-32 w-32 object-contain" />
-            <div className="text-[10px]">{p.paymentQr.bankLabel}: <b>{p.paymentQr.bankName}</b></div>
-            <div className="text-[10px]">{p.paymentQr.accountLabel}: <b>{p.paymentQr.accountNumber}</b></div>
-            <div className="text-[10px]">{p.paymentQr.nameLabel}: <b>{p.paymentQr.accountName}</b></div>
-            <div className="text-[9px] text-slate-700">{p.paymentQr.referenceLabel}: {p.paymentQr.reference}</div>
+            {t.options.showPaymentQrBank !== false && <div className="text-[10px]">{p.paymentQr.bankLabel}: <b>{p.paymentQr.bankName}</b></div>}
+            {t.options.showPaymentQrAccountNumber !== false && <div className="text-[10px]">{p.paymentQr.accountLabel}: <b>{p.paymentQr.accountNumber}</b></div>}
+            {t.options.showPaymentQrAccountName !== false && <div className="text-[10px]">{p.paymentQr.nameLabel}: <b>{p.paymentQr.accountName}</b></div>}
+            {t.options.showPaymentQrReference !== false && <div className="text-[9px] text-slate-700">{p.paymentQr.referenceLabel}: {p.paymentQr.reference}</div>}
           </div>
         </>
       )}
-      {t.footerNote && (
-        <div className="mt-3 border-t border-dashed border-slate-400 pt-2 text-center text-[9.5px] leading-snug">{t.footerNote}</div>
+      {!isPrintRichTextEmpty(footerHtml) && (
+        <div
+          className="print-rich-text mt-3 whitespace-pre-wrap border-t border-dashed border-slate-400 pt-2 text-[9.5px] leading-snug [&_h3]:text-[1.1em] [&_h3]:font-bold [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:my-0.5 [&_ul]:list-disc [&_ul]:pl-4"
+          dangerouslySetInnerHTML={{ __html: footerHtml }}
+        />
       )}
       <div className="mt-3 text-center text-[10px] font-bold uppercase tracking-wide">Cảm ơn quý khách!</div>
     </div>

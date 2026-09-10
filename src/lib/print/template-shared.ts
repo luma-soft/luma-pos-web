@@ -22,6 +22,12 @@ export interface PrintTemplateOptions {
   signatureLeftLabel: string;
   signatureMiddleLabel: string;
   signatureRightLabel: string;
+  paymentQrTitle: string;
+  paymentQrContentTemplate: string;
+  showPaymentQrBank: boolean;
+  showPaymentQrAccountNumber: boolean;
+  showPaymentQrAccountName: boolean;
+  showPaymentQrReference: boolean;
 }
 
 export interface PrintTemplate {
@@ -58,6 +64,12 @@ export const DEFAULT_OPTIONS: PrintTemplateOptions = {
   signatureLeftLabel: "",
   signatureMiddleLabel: "",
   signatureRightLabel: "",
+  paymentQrTitle: "",
+  paymentQrContentTemplate: "{invoiceCode}",
+  showPaymentQrBank: true,
+  showPaymentQrAccountNumber: true,
+  showPaymentQrAccountName: true,
+  showPaymentQrReference: true,
 };
 
 export const DEFAULT_FOOTER: Record<PrintDocType, string> = {

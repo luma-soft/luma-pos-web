@@ -61,3 +61,22 @@ test("K80 keeps the payment QR at a scannable 32mm-class size", () => {
   expect(html).not.toContain(">Quét để thanh toán</div>");
   expect(html).toContain("Vietcombank");
 });
+
+test("K80 respects configurable QR title and visible account fields", () => {
+  const template = defaultTemplate("order");
+  template.options.paymentQrTitle = "Chuyển khoản";
+  template.options.showPaymentQrBank = false;
+  template.options.showPaymentQrAccountName = false;
+  const html = renderK80({ template, paymentQr: {
+    title: "Quét VietQR để thanh toán",
+    qrImageUrl: "https://qr.sepay.vn/img?bank=VCB&acc=0123456789&des=HD001",
+    bankLabel: "Ngân hàng", accountLabel: "Tài khoản", nameLabel: "Tên", referenceLabel: "Nội dung",
+    bankName: "Vietcombank", accountNumber: "0123456789", accountName: "HAI DANG", reference: "HD001",
+  } });
+
+  expect(html).toContain("Chuyển khoản");
+  expect(html).not.toContain("Ngân hàng:");
+  expect(html).not.toContain("HAI DANG");
+  expect(html).toContain("Tài khoản:");
+  expect(html).toContain("Nội dung:");
+});

@@ -5,7 +5,7 @@ import { getOrder } from "@/lib/data/orders";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { getDefaultSepayBankAccount } from "@/lib/data/payment-bank-accounts";
 import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
-import { buildPrintPaymentQr } from "@/lib/print/payment-qr";
+import { buildPrintPaymentQr, formatPrintPaymentReference } from "@/lib/print/payment-qr";
 import { buildBatchDebtSummaries } from "@/lib/print/batch-debt-summary";
 import { PrintDoc } from "@/components/print/print-doc";
 import { BatchDebtSummary } from "@/components/print/batch-debt-summary";
@@ -57,7 +57,7 @@ export default async function PrintBatchPage({ searchParams }: Props) {
       alwaysShow: template.options.alwaysShowPaymentQr,
       account: defaultBankAccount,
       amount: remaining > 0 ? remaining : undefined,
-      reference: order.code,
+      reference: formatPrintPaymentReference(template.options.paymentQrContentTemplate, order.code),
       labels: {
         title: t("pos.sepay.title"),
         bank: t("pos.sepay.bank"),

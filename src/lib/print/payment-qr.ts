@@ -26,6 +26,11 @@ interface PrintPaymentQrLabels {
   reference: string;
 }
 
+export function formatPrintPaymentReference(template: string | null | undefined, invoiceCode: string): string {
+  const value = template?.trim() || "{invoiceCode}";
+  return value.replaceAll("{invoiceCode}", invoiceCode).replace(/\s+/g, " ").trim().slice(0, 100);
+}
+
 export function buildVietQrImageUrl(input: {
   bankCode: string;
   accountNumber: string;

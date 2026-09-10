@@ -3451,6 +3451,32 @@
       "signatureMiddleLabel": "Người giao",
       "signatureRightLabel": "Người bán"
     },
+    "qrSection": "Thông tin khu vực QR",
+    "qrTitle": "Tiêu đề phía trên QR",
+    "qrTitlePlaceholder": "Để trống nếu không cần tiêu đề",
+    "qrContentTemplate": "Nội dung chuyển khoản",
+    "qrContentHint": "Dùng {invoiceCode} để tự chèn mã hóa đơn, ví dụ: HAI DANG {invoiceCode}.",
+    "qrVisibility": {
+      "showPaymentQrBank": "Hiện tên ngân hàng",
+      "showPaymentQrAccountNumber": "Hiện số tài khoản",
+      "showPaymentQrAccountName": "Hiện tên chủ tài khoản",
+      "showPaymentQrReference": "Hiện nội dung chuyển khoản"
+    },
+    "richText": {
+      "toolbar": "Công cụ định dạng ghi chú",
+      "editor": "Nội dung ghi chú chân trang",
+      "placeholder": "Nhập nội dung chân trang...",
+      "paragraph": "Đoạn văn thường",
+      "heading": "Tiêu đề",
+      "bold": "In đậm",
+      "italic": "In nghiêng",
+      "underline": "Gạch chân",
+      "bulletList": "Danh sách dấu chấm",
+      "numberedList": "Danh sách đánh số",
+      "alignLeft": "Căn trái",
+      "alignCenter": "Căn giữa",
+      "alignRight": "Căn phải"
+    },
     "footerNote": "Ghi chú chân trang (chính sách đổi trả, cảm ơn…)",
     "previewNote": "Ghi chú mẫu để kiểm tra bố cục.",
     "saveFor": "Lưu mẫu: {type}",

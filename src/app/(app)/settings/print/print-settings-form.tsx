@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Copy, EyeOff, Loader2, Plus, Save, Star } from "lucide-react";
 import { PrintDoc } from "@/components/print/print-doc";
+import { PrintRichTextEditor } from "@/components/print/print-rich-text-editor";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import {
   deactivatePrintTemplate,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/actions/print-templates";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { buildVietQrImageUrl, formatPrintPaymentReference } from "@/lib/print/payment-qr";
 import {
   DEFAULT_OPTIONS,
   PAPER_SIZES,
@@ -28,6 +30,9 @@ import {
 
 const TOGGLES = ["showSeller", "showProject", "showDebt", "showBatchDebtSummary", "showDiscount", "showTax", "showLineDiscount", "showPaymentQr", "alwaysShowPaymentQr", "showInWords", "showSignatures", "showSku"] as const;
 const SIGNATURE_LABELS = ["signatureLeftLabel", "signatureMiddleLabel", "signatureRightLabel"] as const;
+const QR_VISIBILITY_OPTIONS = ["showPaymentQrBank", "showPaymentQrAccountNumber", "showPaymentQrAccountName", "showPaymentQrReference"] as const;
+type BooleanOptionKey = (typeof TOGGLES)[number] | (typeof QR_VISIBILITY_OPTIONS)[number];
+type TextOptionKey = (typeof SIGNATURE_LABELS)[number] | "paymentQrTitle" | "paymentQrContentTemplate";
 
 export function PrintSettingsForm({ templates, storeDefaults }: { templates: PrintTemplate[]; storeDefaults: PrintTemplateStoreInfo }) {
   const t = useTranslations();
@@ -52,11 +57,11 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
     setDrafts((current) => current.map((item) => item.id === selected.id ? { ...item, ...value } : item));
   }
 
-  function patchOption(key: (typeof TOGGLES)[number], value: boolean) {
+  function patchOption(key: BooleanOptionKey, value: boolean) {
     patch({ options: { ...DEFAULT_OPTIONS, ...selected.options, [key]: value } });
   }
 
-  function patchSignatureLabel(key: (typeof SIGNATURE_LABELS)[number], value: string) {
+  function patchTextOption(key: TextOptionKey, value: string) {
     patch({ options: { ...DEFAULT_OPTIONS, ...selected.options, [key]: value } });
   }
 
@@ -121,6 +126,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
   }
 
   const inputCls = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm lg:min-h-10";
+  const previewQrReference = formatPrintPaymentReference(selected.options.paymentQrContentTemplate, "XX-000");
 
   return (
     <div className="px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:p-6">
@@ -210,6 +216,28 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
               </label>
             </Panel>
 
+            {selected.options.showPaymentQr && (
+              <Panel title={t("printSettings.qrSection")}>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label={t("printSettings.qrTitle")}>
+                    <input value={selected.options.paymentQrTitle} onChange={(event) => patchTextOption("paymentQrTitle", event.target.value)} placeholder={t("printSettings.qrTitlePlaceholder")} maxLength={100} className={inputCls} />
+                  </Field>
+                  <Field label={t("printSettings.qrContentTemplate")}>
+                    <input value={selected.options.paymentQrContentTemplate} onChange={(event) => patchTextOption("paymentQrContentTemplate", event.target.value)} placeholder="{invoiceCode}" maxLength={100} className={inputCls} />
+                  </Field>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">{t("printSettings.qrContentHint", { invoiceCode: "{invoiceCode}" })}</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {QR_VISIBILITY_OPTIONS.map((key) => (
+                    <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0">
+                      <Checkbox checked={selected.options[key]} onChange={(event) => patchOption(key, event.target.checked)} />
+                      {t(`printSettings.qrVisibility.${key}`)}
+                    </label>
+                  ))}
+                </div>
+              </Panel>
+            )}
+
             <Panel title={t("printSettings.storeSection")}>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={t("printSettings.storeName")}><input value={selected.storeName} onChange={(event) => patch({ storeName: event.target.value })} className={inputCls} /></Field>
@@ -242,7 +270,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                       <input
                         value={selected.options[key]}
                         placeholder={t(`printSettings.signaturePlaceholders.${key}`)}
-                        onChange={(event) => patchSignatureLabel(key, event.target.value)}
+                        onChange={(event) => patchTextOption(key, event.target.value)}
                         className={inputCls}
                         maxLength={80}
                       />
@@ -252,8 +280,8 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
               </Panel>
             )}
 
-            <Panel>
-              <Field label={t("printSettings.footerNote")}><textarea rows={3} value={selected.footerNote} onChange={(event) => patch({ footerNote: event.target.value })} className={inputCls} /></Field>
+            <Panel title={t("printSettings.footerNote")}>
+              <PrintRichTextEditor key={selected.id} value={selected.footerNote} onChange={(footerNote) => patch({ footerNote })} />
             </Panel>
 
             <div className="sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center gap-2 border-t border-border bg-surface/95 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
@@ -305,7 +333,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   afterTotals={[{ label: t("print.paid"), value: 500000 }, { label: t("print.remaining"), value: 472000, bold: true }]}
                   paymentQr={{
                     title: t("pos.sepay.title"),
-                    qrImageUrl: "https://qr.sepay.vn/img?bank=VCB&acc=0123456789&amount=420000&des=XX-000",
+                    qrImageUrl: buildVietQrImageUrl({ bankCode: "VCB", accountNumber: "0123456789", amount: 420000, reference: previewQrReference }),
                     bankLabel: t("pos.sepay.bank"),
                     accountLabel: t("pos.sepay.account"),
                     nameLabel: t("pos.sepay.name"),
@@ -313,7 +341,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                     bankName: "Vietcombank",
                     accountNumber: "0123456789",
                     accountName: "LumaPOS",
-                    reference: "XX-000",
+                    reference: previewQrReference,
                   }}
                   inWordsLabel={t("print.inWords")}
                   signatures={[t("print.buyerSign"), t("print.delivererSign"), t("print.sellerSign")]}

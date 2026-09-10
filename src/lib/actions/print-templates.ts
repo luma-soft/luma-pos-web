@@ -10,6 +10,7 @@ import { recordActivity } from "@/lib/audit/activity-log";
 import { printTemplates } from "@/db/schema";
 import { type ActionResult, requireManager } from "./common";
 import { isPersistedTemplateId } from "@/lib/print/template-shared";
+import { sanitizePrintRichText } from "@/lib/print/rich-text";
 
 const saveSchema = z.object({
   id: z.string().optional(),
@@ -23,7 +24,7 @@ const saveSchema = z.object({
   storeAddress: z.string().max(300).default(""),
   storePhone: z.string().max(50).default(""),
   storeTaxCode: z.string().max(30).default(""),
-  footerNote: z.string().max(500).default(""),
+  footerNote: z.string().max(10_000).default("").transform(sanitizePrintRichText),
   options: z.object({
     showSeller: z.boolean(),
     showProject: z.boolean(),
@@ -40,6 +41,12 @@ const saveSchema = z.object({
     signatureLeftLabel: z.string().trim().max(80).default(""),
     signatureMiddleLabel: z.string().trim().max(80).default(""),
     signatureRightLabel: z.string().trim().max(80).default(""),
+    paymentQrTitle: z.string().trim().max(100).default(""),
+    paymentQrContentTemplate: z.string().trim().max(100).default("{invoiceCode}"),
+    showPaymentQrBank: z.boolean().default(true),
+    showPaymentQrAccountNumber: z.boolean().default(true),
+    showPaymentQrAccountName: z.boolean().default(true),
+    showPaymentQrReference: z.boolean().default(true),
   }),
 });
 
