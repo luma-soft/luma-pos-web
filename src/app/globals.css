@@ -330,8 +330,38 @@ input[type="number"] {
     page-break-inside: avoid;
   }
 
+  html:has(body.pos-printing),
+  body.pos-printing {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
   body.pos-printing > *:not(.pos-print-root) { display: none !important; }
-  body.pos-printing .pos-print-root { display: flex !important; justify-content: center; }
+  body.pos-printing .pos-print-root {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  body.pos-printing .print-document {
+    min-height: 0 !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  body.pos-printing .print-document--a4,
+  body.pos-printing .print-document--a5 { width: 100% !important; }
+  body.pos-printing .print-line-items thead { display: table-header-group; }
+  body.pos-printing .print-line-items tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
   body.electrical-labels-printing {
     width: 210mm !important;
     margin: 0 !important;

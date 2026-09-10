@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+export { buildVietQrImageUrl as buildSepayVietQrImageUrl } from "@/lib/print/payment-qr";
 
 export type SepayWebhookInput = {
   providerEventId: string;
@@ -79,21 +80,6 @@ export function normalizeSepayWebhookPayload(raw: unknown): SepayWebhookInput | 
     content,
     rawPayload: payload,
   };
-}
-
-export function buildSepayVietQrImageUrl(input: {
-  bankCode: string;
-  accountNumber: string;
-  amount: number;
-  reference: string;
-}) {
-  const params = new URLSearchParams({
-    acc: input.accountNumber,
-    bank: input.bankCode,
-    amount: String(Math.round(input.amount)),
-    des: input.reference,
-  });
-  return `https://qr.sepay.vn/img?${params.toString()}`;
 }
 
 function safeHexEqual(leftHex: string, rightHex: string) {

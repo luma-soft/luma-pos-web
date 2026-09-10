@@ -5,7 +5,7 @@ import { getOrder } from "@/lib/data/orders";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { getDefaultSepayBankAccount } from "@/lib/data/payment-bank-accounts";
 import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
-import { buildSepayVietQrImageUrl } from "@/lib/payments/sepay";
+import { buildPrintPaymentQr } from "@/lib/print/payment-qr";
 import { PrintDoc } from "@/components/print/print-doc";
 import { AutoPrint } from "@/components/print/auto-print";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -24,7 +24,7 @@ export default async function PrintBatchPage({ searchParams }: Props) {
 
   const [template, defaultBankAccount] = await Promise.all([
     getPrintTemplate(context.storeId, "order", params.templateId),
-    getDefaultSepayBankAccount(),
+    getDefaultSepayBankAccount(context.storeId),
   ]);
   const size: PaperSize = (["a4", "a5", "k80"] as const).includes(params.size as PaperSize)
     ? (params.size as PaperSize)
@@ -54,25 +54,19 @@ export default async function PrintBatchPage({ searchParams }: Props) {
           const total = Number(order.total);
           const paid = Number(order.amountPaid);
           const remaining = Math.max(0, total - paid);
-          const paymentQr = template.options.showPaymentQr && remaining > 0 && defaultBankAccount
-            ? {
-                title: t("pos.sepay.title"),
-                qrImageUrl: buildSepayVietQrImageUrl({
-                  bankCode: defaultBankAccount.bankCode,
-                  accountNumber: defaultBankAccount.accountNumber,
-                  amount: remaining,
-                  reference: order.code,
-                }),
-                bankLabel: t("pos.sepay.bank"),
-                accountLabel: t("pos.sepay.account"),
-                nameLabel: t("pos.sepay.name"),
-                referenceLabel: t("pos.sepay.reference"),
-                bankName: defaultBankAccount.gateway ?? defaultBankAccount.bankCode,
-                accountNumber: defaultBankAccount.accountNumber,
-                accountName: defaultBankAccount.accountName,
-                reference: order.code,
-              }
-            : null;
+          const paymentQr = buildPrintPaymentQr({
+            enabled: template.options.showPaymentQr,
+            account: defaultBankAccount,
+            amount: remaining > 0 ? remaining : undefined,
+            reference: order.code,
+            labels: {
+              title: t("pos.sepay.title"),
+              bank: t("pos.sepay.bank"),
+              account: t("pos.sepay.account"),
+              name: t("pos.sepay.name"),
+              reference: t("pos.sepay.reference"),
+            },
+          });
           return (
             <div key={order.id} className="break-after-page">
               <PrintDoc

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { waitForPrintImages } from "@/lib/print/wait-for-images";
 
 export function AutoPrint({ closeHref }: { closeHref: string }) {
   const router = useRouter();
@@ -9,10 +10,12 @@ export function AutoPrint({ closeHref }: { closeHref: string }) {
 
   useEffect(() => {
     if (searchParams.get("embedded") === "1") {
-      const id = window.setTimeout(() => {
+      let cancelled = false;
+      void waitForPrintImages(document.querySelectorAll<HTMLImageElement>(".print-document-root img")).then(() => {
+        if (cancelled) return;
         window.parent.postMessage({ type: "luma-print-ready" }, window.location.origin);
-      }, 0);
-      return () => window.clearTimeout(id);
+      });
+      return () => { cancelled = true; };
     }
     const close = () => {
       if (searchParams.get("autoclose") === "1") {
@@ -23,9 +26,12 @@ export function AutoPrint({ closeHref }: { closeHref: string }) {
       router.replace(closeHref, { scroll: false });
     };
     window.addEventListener("afterprint", close, { once: true });
-    const id = window.setTimeout(() => window.print(), 0);
+    let cancelled = false;
+    void waitForPrintImages(document.querySelectorAll<HTMLImageElement>(".print-document-root img")).then(() => {
+      if (!cancelled) window.print();
+    });
     return () => {
-      window.clearTimeout(id);
+      cancelled = true;
       window.removeEventListener("afterprint", close);
     };
   }, [closeHref, router, searchParams]);

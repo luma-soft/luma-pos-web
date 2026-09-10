@@ -84,6 +84,8 @@ import {
   resolveAiCartDraftItems,
   type PosAiUnresolvedItem,
 } from "@/lib/pos/ai-cart-resolution";
+import { buildPrintPaymentQr, type PrintPaymentQr } from "@/lib/print/payment-qr";
+import { waitForPrintImages } from "@/lib/print/wait-for-images";
 
 type CartLine = {
   key: string;
@@ -114,18 +116,6 @@ type PosAiCartDraftPayload = {
 
 type PayMethod = "cash" | "bank_transfer" | "credit";
 type PosDraftKind = "invoice" | "quote" | "booking" | "return_quick" | "return_invoice";
-type PosPrintPaymentQr = {
-  title: string;
-  qrImageUrl: string;
-  bankLabel: string;
-  accountLabel: string;
-  nameLabel: string;
-  referenceLabel: string;
-  bankName: string;
-  accountNumber: string;
-  accountName: string;
-  reference: string;
-};
 type PosPrintJob = {
   template: PrintTemplate;
   title: string;
@@ -140,7 +130,7 @@ type PosPrintJob = {
   paid: number;
   remaining: number;
   payMethod: PayMethod;
-  paymentQr?: PosPrintPaymentQr | null;
+  paymentQr?: PrintPaymentQr | null;
 };
 type SepayCheckout = {
   paymentId: string;
@@ -430,16 +420,6 @@ function makeTempSlipCode(): string {
   return `TT${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
-function buildVietQrImageUrl(input: { bankCode: string; accountNumber: string; amount: number; reference: string }) {
-  const params = new URLSearchParams({
-    acc: input.accountNumber,
-    bank: input.bankCode,
-    amount: String(Math.round(input.amount)),
-    des: input.reference,
-  });
-  return `https://qr.sepay.vn/img?${params.toString()}`;
-}
-
 function currentTimestamp(): number {
   return Date.now();
 }
@@ -541,8 +521,11 @@ export function PosClient({
     document.body.classList.add("pos-printing");
     const restore = () => { document.body.classList.remove("pos-printing"); setPrintSize(null); setPrintJob(null); };
     window.addEventListener("afterprint", restore, { once: true });
-    const id = setTimeout(() => window.print(), 60);
-    return () => { clearTimeout(id); window.removeEventListener("afterprint", restore); document.body.classList.remove("pos-printing"); };
+    let cancelled = false;
+    void waitForPrintImages(document.querySelectorAll<HTMLImageElement>(".pos-print-root img")).then(() => {
+      if (!cancelled) window.print();
+    });
+    return () => { cancelled = true; window.removeEventListener("afterprint", restore); document.body.classList.remove("pos-printing"); };
   }, [printSize]);
   // Đóng dropdown tìm kiếm khi click ra ngoài hoặc nhấn Esc.
   useEffect(() => {
@@ -1135,7 +1118,7 @@ export function PosClient({
     setPrintSize(size);
   }
 
-  function buildPrintJob(input: { template: PrintTemplate; title: string; code: string; paymentQr?: PosPrintPaymentQr | null }): PosPrintJob {
+  function buildPrintJob(input: { template: PrintTemplate; title: string; code: string; paymentQr?: PrintPaymentQr | null }): PosPrintJob {
     const printLines = isReturnDraft ? cart.filter((line) => line.quantity > 0) : cart;
     return {
       template: input.template,
@@ -1169,7 +1152,19 @@ export function PosClient({
       paid: isInvoiceDraft ? payableAmount : 0,
       remaining: isInvoiceDraft ? remaining : total,
       payMethod: isInvoiceDraft ? payMethod : "credit",
-      paymentQr: input.paymentQr ?? null,
+      paymentQr: input.paymentQr !== undefined ? input.paymentQr : buildPrintPaymentQr({
+        enabled: input.template.options.showPaymentQr,
+        account: data.defaultBankAccount,
+        amount: remaining > 0 ? remaining : undefined,
+        reference: input.code,
+        labels: {
+          title: t("pos.sepay.title"),
+          bank: t("pos.sepay.bank"),
+          account: t("pos.sepay.account"),
+          name: t("pos.sepay.name"),
+          reference: t("pos.sepay.reference"),
+        },
+      }),
     };
   }
 
@@ -1502,7 +1497,7 @@ export function PosClient({
             setError(paymentJson.error ? t(paymentJson.error) : t("pos.sepay.createFailed"));
             return;
           }
-          const paymentQr: PosPrintPaymentQr = {
+          const paymentQr: PrintPaymentQr = {
             title: t("pos.sepay.title"),
             qrImageUrl: paymentJson.data.qrImageUrl,
             bankLabel: t("pos.sepay.bank"),
@@ -1650,25 +1645,6 @@ export function PosClient({
       template: printTemplate,
       title: t("pos.tempSlipTitle"),
       code,
-      paymentQr: payMethod === "bank_transfer" && data.defaultBankAccount
-        ? {
-            title: t("pos.sepay.title"),
-            qrImageUrl: buildVietQrImageUrl({
-              bankCode: data.defaultBankAccount.bankCode,
-              accountNumber: data.defaultBankAccount.accountNumber,
-              amount: payableAmount,
-              reference: code,
-            }),
-            bankLabel: t("pos.sepay.bank"),
-            accountLabel: t("pos.sepay.account"),
-            nameLabel: t("pos.sepay.name"),
-            referenceLabel: t("pos.sepay.reference"),
-            bankName: data.defaultBankAccount.gateway ?? data.defaultBankAccount.bankCode,
-            accountNumber: data.defaultBankAccount.accountNumber,
-            accountName: data.defaultBankAccount.accountName,
-            reference: code,
-          }
-        : null,
     }), size);
   };
 
