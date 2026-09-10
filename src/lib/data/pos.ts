@@ -39,6 +39,16 @@ function recentSaleOrder() {
   return [sql`${lastCompletedSaleAt()} desc nulls last`, asc(products.name)] as const;
 }
 
+function sortByRecentSale<T extends { lastSoldAt: Date | string | null; name: string }>(
+  rows: T[],
+): T[] {
+  return rows.sort((a, b) => {
+    const aTime = a.lastSoldAt == null ? 0 : new Date(a.lastSoldAt).getTime();
+    const bTime = b.lastSoldAt == null ? 0 : new Date(b.lastSoldAt).getTime();
+    return bTime - aTime || a.name.localeCompare(b.name, "vi");
+  });
+}
+
 /** Select dùng chung cho lưới POS + tìm kiếm (cùng shape PosProduct). */
 function posProductSelect(
   storeId: string,
@@ -357,11 +367,11 @@ export async function searchPosProductRows(
 
   const rootsWithChildren = attachChildren(rootRows, pickerChildren);
   const seen = new Set<string>();
-  const rows = [...childRows.map((p) => ({ ...p, children: [] })), ...rootsWithChildren].filter((p) => {
+  const rows = sortByRecentSale([...childRows.map((p) => ({ ...p, children: [] })), ...rootsWithChildren].filter((p) => {
     if (seen.has(p.id)) return false;
     seen.add(p.id);
     return true;
-  });
+  }));
   // Kết quả tìm kiếm phải có cùng map bảng giá và quyền đọc giá vốn như lưới POS.
   const books = await getPriceBooks(storeId, { includeManagerOnly: canViewPurchasePrices(options?.role) });
   applySystemPriceBooks(rows as Parameters<typeof applySystemPriceBooks>[0], books);

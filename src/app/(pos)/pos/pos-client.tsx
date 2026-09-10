@@ -62,6 +62,7 @@ import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
 import { buildExpectedPosPricing, countPosPricingConflicts, requestPosOrder } from "@/lib/pos/checkout-pricing";
 import { resolvePosCartUnit } from "@/lib/pos/cart-unit";
 import { upsertPosCartLine } from "@/lib/pos/cart-line-order";
+import { expandPosSearchUnitResults } from "@/lib/pos/search-unit-results";
 import {
   createLinePriceEditorState,
   resolveLinePriceEditor,
@@ -1019,6 +1020,10 @@ export function PosClient({
       return bTime - aTime || a.name.localeCompare(b.name, "vi");
     });
   }, [search, serverResults, data.products]);
+  const searchUnitResults = useMemo(
+    () => expandPosSearchUnitResults(filtered),
+    [filtered],
+  );
 
   function usesCompanyPrice(l: CartLine) {
     return data.priceBooks.find((book) => book.id === (l.priceBook ?? priceBook))?.systemType === "list";
@@ -1169,7 +1174,7 @@ export function PosClient({
     };
   }
 
-  function addToCart(p: PosProduct) {
+  function addToCart(p: PosProduct, selectedUnitName = p.baseUnit) {
     if (p.isVariantParent) {
       setVariantParent(p);
       return;
@@ -1179,10 +1184,10 @@ export function PosClient({
       return;
     }
     setCart((c) => {
-      const unit = resolvePosCartUnit(p.baseUnit, p.units);
+      const unit = resolvePosCartUnit(p.baseUnit, p.units, selectedUnitName);
       return upsertPosCartLine<CartLine>(
         c,
-        (line) => line.product.id === p.id && line.priceBook === undefined,
+        (line) => line.product.id === p.id && line.unitName === unit.unitName && line.priceBook === undefined,
         () => ({
           key: `${p.id}-${Date.now()}`,
           product: p,
@@ -1306,12 +1311,12 @@ export function PosClient({
     return () => { cancelled = true; };
   }, [applyRawAiCartItems, searchableProducts, storageScope]);
 
-  function selectProduct(p: PosProduct) {
+  function selectProduct(p: PosProduct, unitName?: string | null) {
     if (p.isVariantParent && productChildren(p).length > 0) {
       setVariantParent(p);
       return;
     }
-    addToCart(p);
+    addToCart(p, unitName ?? p.baseUnit);
   }
 
   /** Di chuyển dòng `from` đến vị trí của dòng `to` (kéo thả sắp xếp). */
@@ -2145,25 +2150,34 @@ export function PosClient({
                   <div className="px-4 py-6 text-center text-sm text-slate-400">{search.trim() ? t("pos.noSearchResults") : t("pos.noProducts")}</div>
                 ) : (
                   <div className="py-1">
-                    {filtered.slice(0, 60).map((p) => {
+                    {searchUnitResults.slice(0, 60).map((result) => {
+                      const p = result.product;
+                      const resultUnit = result.unitName;
                       const stock = Number(p.stock);
                       const stockManaged = isProductStockManaged(p.categoryName);
-                      const line = cart.find((l) => l.product.id === p.id);
+                      const line = cart.find((l) =>
+                        l.product.id === p.id &&
+                        (resultUnit == null || l.unitName === resultUnit)
+                      );
                       const ordered = orderedBaseQuantityByProduct.get(p.id) ?? 0;
                       const stockInsufficient = exceedsAvailableStock(stockManaged, stock, ordered + Number(p.booked), isReturnDraft);
                       const children = productChildren(p);
                       const resultPriceLabel = line
                         ? `${formatCurrency(effPrice(line).price)}${posUnitSuffix(line.unitName)}`
-                        : `${priceLabelFor(p, priceBook)}${p.isVariantParent ? "" : posUnitSuffix(p.baseUnit)}`;
+                        : p.isVariantParent || resultUnit == null
+                          ? priceLabelFor(p, priceBook)
+                          : `${formatCurrency(unitPriceFor(p, result.alternateUnit, priceBook, data.priceBooks))}${posUnitSuffix(resultUnit)}`;
                       return (
                         <PosSearchResultLayout
-                          key={p.id}
+                          key={`${p.id}:${resultUnit ?? "variants"}`}
                           selected={Boolean(line)}
-                          onClick={line ? undefined : () => selectProduct(p)}
+                          onClick={line ? undefined : () => selectProduct(p, resultUnit)}
                           leading={<PosProductThumbnail product={p} />}
                           summary={(
                             <>
-                            <div className="text-sm font-medium whitespace-normal break-words">{p.name}</div>
+                            <div className="text-sm font-medium whitespace-normal break-words">
+                              {p.name}{resultUnit == null ? "" : ` · ${resultUnit}`}
+                            </div>
                             {p.isVariantParent ? (
                               <div className="text-xs text-slate-400">{children.length} SKU con</div>
                             ) : stockManaged ? (

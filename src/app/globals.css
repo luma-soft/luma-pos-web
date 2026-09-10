@@ -355,8 +355,12 @@ input[type="number"] {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
-  body.pos-printing .print-document--a4,
-  body.pos-printing .print-document--a5 { width: 100% !important; }
+  body.pos-printing .print-document--a4 { width: 210mm !important; }
+  body.pos-printing .print-document--a5 {
+    width: 148mm !important;
+    /* Tránh phần padding tràn dưới A5 vài px tạo thêm một trang trắng. */
+    padding-bottom: 36px !important;
+  }
   body.pos-printing .print-line-items thead { display: table-header-group; }
   body.pos-printing .print-line-items tr {
     break-inside: avoid;

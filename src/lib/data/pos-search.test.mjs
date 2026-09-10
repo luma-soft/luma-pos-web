@@ -125,6 +125,30 @@ test("a real zero cost is retained instead of falling back to retail", async () 
   expect(Number(product.prices[costBookId] ?? product.retailPrice)).toBe(0);
 });
 
+test("search orders child and root matches together by their latest completed sale", async () => {
+  const childId = randomUUID();
+  const rootId = randomUUID();
+  const sortParentId = randomUUID();
+  const oldOrderId = randomUUID();
+  const recentOrderId = randomUUID();
+  await database.insert(schema.products).values([
+    { id: sortParentId, storeId, sku: "UNRELATED-PARENT", name: "Unrelated parent", isVariantParent: true },
+    { id: childId, storeId, sku: "SORT-CHILD", name: "Sort child", parentProductId: sortParentId },
+    { id: rootId, storeId, sku: "SORT-ROOT", name: "Sort root" },
+  ]);
+  await database.insert(schema.orders).values([
+    { id: oldOrderId, storeId, code: "SORT-OLD", status: "completed", createdAt: new Date("2026-01-01T00:00:00Z") },
+    { id: recentOrderId, storeId, code: "SORT-RECENT", status: "completed", createdAt: new Date("2026-02-01T00:00:00Z") },
+  ]);
+  await database.insert(schema.orderItems).values([
+    { storeId, orderId: oldOrderId, productId: childId, productName: "Sort child", unitName: "cái", unitMultiplier: "1", quantity: "1", unitPrice: "1", total: "1" },
+    { storeId, orderId: recentOrderId, productId: rootId, productName: "Sort root", unitName: "cái", unitMultiplier: "1", quantity: "1", unitPrice: "1", total: "1" },
+  ]);
+
+  const rows = await searchPosProductRows(storeId, "SORT");
+  expect(rows.map((row) => row.id)).toEqual([rootId, childId]);
+});
+
 test("web and mobile POS find a variant by its variant value", async () => {
   accessRole = "owner";
   const webRows = await searchPosProducts("34601");
