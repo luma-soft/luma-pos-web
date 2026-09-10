@@ -44,6 +44,7 @@ import type { AiActionPreview } from "@/lib/ai/actions";
 import { createOrder } from "@/lib/actions/orders";
 import { createPosReturn, searchReturnableOrders, type ReturnableOrderOption } from "@/lib/actions/returns";
 import { searchPosProducts } from "@/lib/actions/pos-search";
+import { createPosCustomer } from "@/lib/actions/pos-customers";
 import { enqueueOrder, getOutbox, removeOutbox, markFailed } from "@/lib/offline/pos-store";
 import { applyPromo } from "@/lib/promo";
 import { Routes } from "@/lib/routes";
@@ -2608,6 +2609,7 @@ export function PosClient({
         open={customerCreateOpen}
         onOpenChange={setCustomerCreateOpen}
         onCreated={applyCreatedCustomer}
+        createAction={createPosCustomer}
       />
       {sepayCheckout && (
         <SepayCheckoutModal

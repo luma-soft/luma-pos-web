@@ -11,6 +11,7 @@ import { createCustomerSchema, type CreateCustomerInput, type CreateCustomerOutp
 import { cn } from "@/lib/utils";
 import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai-assistant/utils";
 import { useTenantClientScope } from "@/components/tenant-client-scope";
+import type { ActionResult } from "@/lib/actions/common";
 
 type AiWorkflowDraft = {
   intent?: string;
@@ -24,6 +25,10 @@ export type CustomerCreateResult = {
   type: CreateCustomerOutput["type"];
   debtLimit: number;
 };
+
+type CreateCustomerAction = (
+  input: CreateCustomerOutput,
+) => Promise<ActionResult<{ id: string }>>;
 
 function defaultCustomerValues(): CreateCustomerInput {
   return {
@@ -62,11 +67,13 @@ function readAiCustomerDraft(storageScope: string): CreateCustomerInput | null {
 
 export function CustomerCreateForm({
   aiPreview = false,
+  createAction = createCustomer,
   onCancel,
   onCreated,
   className,
 }: {
   aiPreview?: boolean;
+  createAction?: CreateCustomerAction;
   onCancel: () => void;
   onCreated: (customer: CustomerCreateResult) => void;
   className?: string;
@@ -88,7 +95,7 @@ export function CustomerCreateForm({
     const consentPurposes: Record<string, boolean> = values.consentStatus === "granted"
       ? { sales: true, loyalty: false, marketing: false, analytics: false }
       : {};
-    const res = await createCustomer({ ...values, consentPurposes });
+    const res = await createAction({ ...values, consentPurposes });
     if (res.ok) {
       onCreated({
         id: res.data.id,
@@ -177,11 +184,13 @@ export function CustomerCreateDialog({
   onOpenChange,
   onCreated,
   aiPreview = false,
+  createAction = createCustomer,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: (customer: CustomerCreateResult) => void;
   aiPreview?: boolean;
+  createAction?: CreateCustomerAction;
 }) {
   if (!open) return null;
 
@@ -199,7 +208,12 @@ export function CustomerCreateDialog({
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <CustomerCreateForm aiPreview={aiPreview} onCancel={() => onOpenChange(false)} onCreated={onCreated} />
+        <CustomerCreateForm
+          aiPreview={aiPreview}
+          createAction={createAction}
+          onCancel={() => onOpenChange(false)}
+          onCreated={onCreated}
+        />
       </div>
     </div>
   );
