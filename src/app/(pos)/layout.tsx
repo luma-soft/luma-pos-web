@@ -5,6 +5,7 @@ import { ProductCatalogProvider } from "@/components/product-catalog-provider";
 import { MobileTabBar } from "@/components/mobile-tabbar";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
+import { TenantClientScopeProvider } from "@/components/tenant-client-scope";
 
 /**
  * Layout riêng cho màn bán hàng — full màn hình, KHÔNG có sidebar quản trị
@@ -22,15 +23,18 @@ export default async function PosLayout({ children }: { children: React.ReactNod
     getLocale(),
     getMessages(),
   ]);
+  const clientScopeId = `${user.id}:${role}`;
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
-      <ProductCatalogProvider userId={user.id} scopeId={`${user.id}:${role}`}>
-        <div className="h-dvh overflow-hidden bg-canvas pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:pb-0">
-          {children}
-          <MobileTabBar />
-        </div>
-      </ProductCatalogProvider>
+      <TenantClientScopeProvider scopeId={clientScopeId}>
+        <ProductCatalogProvider userId={user.id} scopeId={clientScopeId}>
+          <div className="h-dvh overflow-hidden bg-canvas pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:pb-0">
+            {children}
+            <MobileTabBar />
+          </div>
+        </ProductCatalogProvider>
+      </TenantClientScopeProvider>
     </NextIntlClientProvider>
   );
 }
