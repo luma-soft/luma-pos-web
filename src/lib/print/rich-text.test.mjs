@@ -12,6 +12,13 @@ test("keeps supported rich-text formatting", () => {
   expect(html).not.toContain("color");
 });
 
+test("keeps only supported relative font sizes", () => {
+  expect(sanitizePrintRichText('<font size="2">Nhỏ</font><font size="4">Lớn</font>'))
+    .toBe('<span style="font-size:0.85em">Nhỏ</span><span style="font-size:1.2em">Lớn</span>');
+  expect(sanitizePrintRichText('<span style="font-size:99px" onclick="bad()">X</span>'))
+    .toBe("<span>X</span>");
+});
+
 test("removes scripts, event handlers, links, and unsafe embedded content", () => {
   const html = sanitizePrintRichText('<script>alert(1)</script><img src=x onerror="alert(2)"><a href="javascript:alert(3)">Bấm</a><p onclick="alert(4)">An toàn</p>');
 

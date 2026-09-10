@@ -68,6 +68,10 @@ export function PrintRichTextEditor({ value, onChange, className }: Props) {
         <ToolButton label={t("italic")} onPress={() => run("italic")}><Italic /></ToolButton>
         <ToolButton label={t("underline")} onPress={() => run("underline")}><Underline /></ToolButton>
         <span className="mx-0.5 w-px bg-border" aria-hidden="true" />
+        <TextToolButton label={t("fontSizeSmall")} text="A−" onPress={() => run("fontSize", "2")} />
+        <TextToolButton label={t("fontSizeNormal")} text="A" onPress={() => run("fontSize", "3")} />
+        <TextToolButton label={t("fontSizeLarge")} text="A+" onPress={() => run("fontSize", "4")} />
+        <span className="mx-0.5 w-px bg-border" aria-hidden="true" />
         <ToolButton label={t("bulletList")} onPress={() => run("insertUnorderedList")}><List /></ToolButton>
         <ToolButton label={t("numberedList")} onPress={() => run("insertOrderedList")}><ListOrdered /></ToolButton>
         <span className="mx-0.5 w-px bg-border" aria-hidden="true" />
@@ -89,6 +93,21 @@ export function PrintRichTextEditor({ value, onChange, className }: Props) {
         className="min-h-36 whitespace-pre-wrap px-3 py-2.5 text-sm outline-none empty:before:pointer-events-none empty:before:text-slate-400 empty:before:content-[attr(data-placeholder)] [&_h3]:my-1 [&_h3]:text-base [&_h3]:font-bold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5"
       />
     </div>
+  );
+}
+
+function TextToolButton({ label, text, onPress }: { label: string; text: string; onPress: () => void }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onPress}
+      className="inline-flex h-9 min-w-9 items-center justify-center rounded-md px-1 text-xs font-bold text-slate-600 hover:bg-surface hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-primary-500 dark:text-slate-300 dark:hover:text-white"
+    >
+      {text}
+    </button>
   );
 }
 

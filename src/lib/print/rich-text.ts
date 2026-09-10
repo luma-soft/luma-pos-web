@@ -1,5 +1,7 @@
-const ALLOWED_TAGS = new Set(["p", "div", "br", "strong", "b", "em", "i", "u", "h3", "ul", "ol", "li"]);
+const ALLOWED_TAGS = new Set(["p", "div", "br", "strong", "b", "em", "i", "u", "h3", "ul", "ol", "li", "span", "font"]);
 const ALIGNABLE_TAGS = new Set(["p", "div", "h3"]);
+const FONT_SIZE_BY_LEGACY_VALUE: Record<string, string> = { "2": "0.85em", "3": "1em", "4": "1.2em" };
+const ALLOWED_FONT_SIZES = new Set(Object.values(FONT_SIZE_BY_LEGACY_VALUE));
 
 function decodeEntities(value: string) {
   return value
@@ -40,8 +42,19 @@ export function sanitizePrintRichText(value: string): string {
     const closing = Boolean(match[1]);
     const tag = match[2].toLowerCase();
     if (!ALLOWED_TAGS.has(tag)) return "";
-    if (closing) return tag === "br" ? "" : `</${tag}>`;
+    if (closing) return tag === "br" ? "" : tag === "font" ? "</span>" : `</${tag}>`;
     if (tag === "br") return "<br>";
+
+    if (tag === "font") {
+      const legacySize = match[3].match(/\bsize\s*=\s*["']?([234])/i)?.[1] ?? "";
+      const fontSize = FONT_SIZE_BY_LEGACY_VALUE[legacySize];
+      return fontSize ? `<span style="font-size:${fontSize}">` : "<span>";
+    }
+
+    if (tag === "span") {
+      const fontSize = match[3].match(/font-size\s*:\s*(0\.85em|1em|1\.2em)/i)?.[1]?.toLowerCase() ?? "";
+      return `<span${ALLOWED_FONT_SIZES.has(fontSize) ? ` style="font-size:${fontSize}"` : ""}>`;
+    }
 
     let align = "";
     if (ALIGNABLE_TAGS.has(tag)) {

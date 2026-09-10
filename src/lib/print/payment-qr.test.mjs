@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { buildPrintPaymentQr, formatPrintPaymentReference } from "./payment-qr";
+import { buildPrintPaymentQr, formatPrintPaymentReference, resolvePrintPaymentQrAccount } from "./payment-qr";
 
 const account = {
   bankCode: "VCB",
@@ -41,4 +41,28 @@ test("does not build a QR when the option is disabled or no bank account exists"
 test("formats configurable transfer content with the invoice code placeholder", () => {
   expect(formatPrintPaymentReference("HAI DANG {invoiceCode}", "DH-001")).toBe("HAI DANG DH-001");
   expect(formatPrintPaymentReference("", "DH-001")).toBe("DH-001");
+});
+
+test("uses the payment default account unless the print template selects a custom account", () => {
+  expect(resolvePrintPaymentQrAccount({ paymentQrAccountSource: "default" }, account)).toEqual(account);
+  expect(resolvePrintPaymentQrAccount({
+    paymentQrAccountSource: "custom",
+    paymentQrCustomBankCode: "MB",
+    paymentQrCustomBankName: "MBBank",
+    paymentQrCustomAccountNumber: "0987654321",
+    paymentQrCustomAccountName: "HAI DANG",
+  }, account)).toEqual({
+    bankCode: "MB",
+    gateway: "MBBank",
+    accountNumber: "0987654321",
+    accountName: "HAI DANG",
+  });
+});
+
+test("does not silently fall back when a selected custom QR account is incomplete", () => {
+  expect(resolvePrintPaymentQrAccount({
+    paymentQrAccountSource: "custom",
+    paymentQrCustomBankCode: "VCB",
+    paymentQrCustomAccountNumber: "",
+  }, account)).toBeNull();
 });

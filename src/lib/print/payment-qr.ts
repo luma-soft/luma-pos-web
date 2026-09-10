@@ -11,11 +11,19 @@ export interface PrintPaymentQr {
   reference: string;
 }
 
-interface PrintPaymentQrAccount {
+export interface PrintPaymentQrAccount {
   bankCode: string;
   gateway?: string | null;
   accountNumber: string;
   accountName: string;
+}
+
+interface PrintPaymentQrAccountOptions {
+  paymentQrAccountSource?: "default" | "custom";
+  paymentQrCustomBankCode?: string;
+  paymentQrCustomBankName?: string;
+  paymentQrCustomAccountNumber?: string;
+  paymentQrCustomAccountName?: string;
 }
 
 interface PrintPaymentQrLabels {
@@ -29,6 +37,22 @@ interface PrintPaymentQrLabels {
 export function formatPrintPaymentReference(template: string | null | undefined, invoiceCode: string): string {
   const value = template?.trim() || "{invoiceCode}";
   return value.replaceAll("{invoiceCode}", invoiceCode).replace(/\s+/g, " ").trim().slice(0, 100);
+}
+
+export function resolvePrintPaymentQrAccount(
+  options: PrintPaymentQrAccountOptions,
+  defaultAccount: PrintPaymentQrAccount | null | undefined,
+): PrintPaymentQrAccount | null {
+  if (options.paymentQrAccountSource !== "custom") return defaultAccount ?? null;
+  const bankCode = options.paymentQrCustomBankCode?.trim();
+  const accountNumber = options.paymentQrCustomAccountNumber?.replace(/\s+/g, "");
+  if (!bankCode || !accountNumber) return null;
+  return {
+    bankCode,
+    gateway: options.paymentQrCustomBankName?.trim() || bankCode,
+    accountNumber,
+    accountName: options.paymentQrCustomAccountName?.trim() || "",
+  };
 }
 
 export function buildVietQrImageUrl(input: {

@@ -5,7 +5,7 @@ import { getOrder } from "@/lib/data/orders";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { getDefaultSepayBankAccount } from "@/lib/data/payment-bank-accounts";
 import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
-import { buildPrintPaymentQr, formatPrintPaymentReference } from "@/lib/print/payment-qr";
+import { buildPrintPaymentQr, formatPrintPaymentReference, resolvePrintPaymentQrAccount } from "@/lib/print/payment-qr";
 import { buildBatchDebtSummaries } from "@/lib/print/batch-debt-summary";
 import { PrintDoc } from "@/components/print/print-doc";
 import { BatchDebtSummary } from "@/components/print/batch-debt-summary";
@@ -55,7 +55,7 @@ export default async function PrintBatchPage({ searchParams }: Props) {
     const paymentQr = buildPrintPaymentQr({
       enabled: template.options.showPaymentQr,
       alwaysShow: template.options.alwaysShowPaymentQr,
-      account: defaultBankAccount,
+      account: resolvePrintPaymentQrAccount(template.options, defaultBankAccount),
       amount: remaining > 0 ? remaining : undefined,
       reference: formatPrintPaymentReference(template.options.paymentQrContentTemplate, order.code),
       labels: {

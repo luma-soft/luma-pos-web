@@ -3459,6 +3459,17 @@
       "signatureRightLabel": "Seller"
     },
     "qrSection": "QR section information",
+    "qrAccountSource": "Receiving account source",
+    "qrAccountSources": {
+      "default": "Default payment account",
+      "custom": "Custom account for this print template"
+    },
+    "qrBank": "Bank",
+    "qrBankPlaceholder": "Select a bank",
+    "qrAccountNumber": "Account number",
+    "qrAccountName": "Account holder",
+    "qrAccountHint": "A custom account only changes the QR on printed documents; it does not change payment reconciliation settings.",
+    "qrCustomRequired": "Select a bank and enter an account number to generate the QR.",
     "qrTitle": "Title above QR",
     "qrTitlePlaceholder": "Leave blank for no title",
     "qrContentTemplate": "Transfer content",
@@ -3478,6 +3489,9 @@
       "bold": "Bold",
       "italic": "Italic",
       "underline": "Underline",
+      "fontSizeSmall": "Small text",
+      "fontSizeNormal": "Normal text",
+      "fontSizeLarge": "Large text",
       "bulletList": "Bulleted list",
       "numberedList": "Numbered list",
       "alignLeft": "Align left",

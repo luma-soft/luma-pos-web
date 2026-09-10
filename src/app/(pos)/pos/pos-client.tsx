@@ -85,7 +85,7 @@ import {
   resolveAiCartDraftItems,
   type PosAiUnresolvedItem,
 } from "@/lib/pos/ai-cart-resolution";
-import { buildPrintPaymentQr, formatPrintPaymentReference, type PrintPaymentQr } from "@/lib/print/payment-qr";
+import { buildPrintPaymentQr, formatPrintPaymentReference, resolvePrintPaymentQrAccount, type PrintPaymentQr } from "@/lib/print/payment-qr";
 import { waitForPrintImages } from "@/lib/print/wait-for-images";
 import { isSellPriceBelowPurchase, purchasePriceForSoldUnit } from "@/lib/pos/below-purchase-warning";
 
@@ -1162,7 +1162,7 @@ export function PosClient({
       paymentQr: input.paymentQr !== undefined ? input.paymentQr : buildPrintPaymentQr({
         enabled: input.template.options.showPaymentQr,
         alwaysShow: input.template.options.alwaysShowPaymentQr,
-        account: data.defaultBankAccount,
+        account: resolvePrintPaymentQrAccount(input.template.options, data.defaultBankAccount),
         amount: remaining > 0 ? remaining : undefined,
         reference: formatPrintPaymentReference(input.template.options.paymentQrContentTemplate, input.code),
         labels: {

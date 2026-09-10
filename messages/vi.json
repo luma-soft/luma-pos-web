@@ -3459,6 +3459,17 @@
       "signatureRightLabel": "Người bán"
     },
     "qrSection": "Thông tin khu vực QR",
+    "qrAccountSource": "Nguồn tài khoản nhận tiền",
+    "qrAccountSources": {
+      "default": "Tài khoản thanh toán mặc định",
+      "custom": "Tài khoản tùy chỉnh cho mẫu in"
+    },
+    "qrBank": "Ngân hàng",
+    "qrBankPlaceholder": "Chọn ngân hàng",
+    "qrAccountNumber": "Số tài khoản",
+    "qrAccountName": "Tên chủ tài khoản",
+    "qrAccountHint": "Tài khoản tùy chỉnh chỉ dùng để tạo QR trên bản in, không thay đổi tài khoản thanh toán và đối soát.",
+    "qrCustomRequired": "Cần chọn ngân hàng và nhập số tài khoản để tạo QR.",
     "qrTitle": "Tiêu đề phía trên QR",
     "qrTitlePlaceholder": "Để trống nếu không cần tiêu đề",
     "qrContentTemplate": "Nội dung chuyển khoản",
@@ -3478,6 +3489,9 @@
       "bold": "In đậm",
       "italic": "In nghiêng",
       "underline": "Gạch chân",
+      "fontSizeSmall": "Cỡ chữ nhỏ",
+      "fontSizeNormal": "Cỡ chữ thường",
+      "fontSizeLarge": "Cỡ chữ lớn",
       "bulletList": "Danh sách dấu chấm",
       "numberedList": "Danh sách đánh số",
       "alignLeft": "Căn trái",

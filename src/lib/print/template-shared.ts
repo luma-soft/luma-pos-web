@@ -26,6 +26,11 @@ export interface PrintTemplateOptions {
   signatureRightLabel: string;
   paymentQrTitle: string;
   paymentQrContentTemplate: string;
+  paymentQrAccountSource: "default" | "custom";
+  paymentQrCustomBankCode: string;
+  paymentQrCustomBankName: string;
+  paymentQrCustomAccountNumber: string;
+  paymentQrCustomAccountName: string;
   showPaymentQrBank: boolean;
   showPaymentQrAccountNumber: boolean;
   showPaymentQrAccountName: boolean;
@@ -70,6 +75,11 @@ export const DEFAULT_OPTIONS: PrintTemplateOptions = {
   signatureRightLabel: "",
   paymentQrTitle: "",
   paymentQrContentTemplate: "{invoiceCode}",
+  paymentQrAccountSource: "default",
+  paymentQrCustomBankCode: "",
+  paymentQrCustomBankName: "",
+  paymentQrCustomAccountNumber: "",
+  paymentQrCustomAccountName: "",
   showPaymentQrBank: true,
   showPaymentQrAccountNumber: true,
   showPaymentQrAccountName: true,

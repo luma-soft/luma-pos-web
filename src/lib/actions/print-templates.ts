@@ -45,10 +45,19 @@ const saveSchema = z.object({
     signatureRightLabel: z.string().trim().max(80).default(""),
     paymentQrTitle: z.string().trim().max(100).default(""),
     paymentQrContentTemplate: z.string().trim().max(100).default("{invoiceCode}"),
+    paymentQrAccountSource: z.enum(["default", "custom"]).default("default"),
+    paymentQrCustomBankCode: z.string().trim().max(40).default(""),
+    paymentQrCustomBankName: z.string().trim().max(100).default(""),
+    paymentQrCustomAccountNumber: z.string().trim().max(50).default(""),
+    paymentQrCustomAccountName: z.string().trim().max(160).default(""),
     showPaymentQrBank: z.boolean().default(true),
     showPaymentQrAccountNumber: z.boolean().default(true),
     showPaymentQrAccountName: z.boolean().default(true),
     showPaymentQrReference: z.boolean().default(true),
+  }).superRefine((options, ctx) => {
+    if (!options.showPaymentQr || options.paymentQrAccountSource !== "custom") return;
+    if (!options.paymentQrCustomBankCode) ctx.addIssue({ code: "custom", path: ["paymentQrCustomBankCode"], message: "Bank is required" });
+    if (!options.paymentQrCustomAccountNumber) ctx.addIssue({ code: "custom", path: ["paymentQrCustomAccountNumber"], message: "Account number is required" });
   }),
 });
 
