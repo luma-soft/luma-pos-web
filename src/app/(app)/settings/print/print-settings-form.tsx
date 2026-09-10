@@ -26,7 +26,7 @@ import {
   type PrintTemplateStoreInfo,
 } from "@/lib/print/template-shared";
 
-const TOGGLES = ["showSeller", "showProject", "showDebt", "showBatchDebtSummary", "showDiscount", "showTax", "showLineDiscount", "showPaymentQr", "showInWords", "showSignatures", "showSku"] as const;
+const TOGGLES = ["showSeller", "showProject", "showDebt", "showBatchDebtSummary", "showDiscount", "showTax", "showLineDiscount", "showPaymentQr", "alwaysShowPaymentQr", "showInWords", "showSignatures", "showSku"] as const;
 const SIGNATURE_LABELS = ["signatureLeftLabel", "signatureMiddleLabel", "signatureRightLabel"] as const;
 
 export function PrintSettingsForm({ templates, storeDefaults }: { templates: PrintTemplate[]; storeDefaults: PrintTemplateStoreInfo }) {
@@ -221,12 +221,15 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
 
             <Panel title={t("printSettings.optionsSection")}>
               <div className="grid gap-2 sm:grid-cols-2">
-                {TOGGLES.filter((key) => key !== "showBatchDebtSummary" || docType === "order").map((key) => (
+                {TOGGLES
+                  .filter((key) => key !== "showBatchDebtSummary" || docType === "order")
+                  .filter((key) => key !== "alwaysShowPaymentQr" || selected.options.showPaymentQr)
+                  .map((key) => (
                   <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0 min-w-11 lg:min-w-0">
                     <Checkbox checked={Boolean(selected.options[key])} onChange={(event) => patchOption(key, event.target.checked)} />
                     {t(`printSettings.toggles.${key}`)}
                   </label>
-                ))}
+                  ))}
               </div>
             </Panel>
 

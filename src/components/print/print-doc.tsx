@@ -184,7 +184,7 @@ export function PrintDoc(p: PrintDocProps) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className={isA4 ? "h-24 w-24 object-contain" : "h-20 w-20 object-contain"} />
           <div className="min-w-0 flex-1">
-            <div className="font-bold">{p.paymentQr.title}</div>
+            {t.docType !== "order" && <div className="font-bold">{p.paymentQr.title}</div>}
             <div>{p.paymentQr.bankLabel}: <b>{p.paymentQr.bankName}</b></div>
             <div>{p.paymentQr.accountLabel}: <b className="font-mono">{p.paymentQr.accountNumber}</b></div>
             <div>{p.paymentQr.nameLabel}: <b>{p.paymentQr.accountName}</b></div>
@@ -305,7 +305,7 @@ function K80Doc(p: PrintDocProps) {
       {t.options.showPaymentQr && p.paymentQr && (
         <>
           <div className="mt-3 border-t-2 border-dashed border-black pt-2 text-center">
-            <div className="font-bold uppercase">{p.paymentQr.title}</div>
+            {t.docType !== "order" && <div className="font-bold uppercase">{p.paymentQr.title}</div>}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className="mx-auto my-1 h-32 w-32 object-contain" />
             <div className="text-[10px]">{p.paymentQr.bankLabel}: <b>{p.paymentQr.bankName}</b></div>

@@ -58,4 +58,6 @@ test("K80 keeps the payment QR at a scannable 32mm-class size", () => {
 
   expect(html).toContain("h-32 w-32 object-contain");
   expect(html).toContain("amount=2295000&amp;des=HD001");
+  expect(html).not.toContain(">Quét để thanh toán</div>");
+  expect(html).toContain("Vietcombank");
 });

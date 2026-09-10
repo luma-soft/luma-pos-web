@@ -54,6 +54,7 @@ export default async function PrintBatchPage({ searchParams }: Props) {
     const remaining = Math.max(0, total - paid);
     const paymentQr = buildPrintPaymentQr({
       enabled: template.options.showPaymentQr,
+      alwaysShow: template.options.alwaysShowPaymentQr,
       account: defaultBankAccount,
       amount: remaining > 0 ? remaining : undefined,
       reference: order.code,

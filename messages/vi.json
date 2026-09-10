@@ -3434,6 +3434,7 @@
       "showTax": "Thuế / VAT",
       "showLineDiscount": "Giảm giá trong bảng sản phẩm",
       "showPaymentQr": "QR và thông tin chuyển khoản",
+      "alwaysShowPaymentQr": "Luôn hiện QR kể cả khi đã thanh toán",
       "showInWords": "Số tiền bằng chữ",
       "showSignatures": "Khu vực chữ ký",
       "showSku": "Mã SKU cạnh tên SP"

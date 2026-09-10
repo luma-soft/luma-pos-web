@@ -15,8 +15,12 @@ const labels = {
   reference: "Noi dung",
 };
 
-test("builds a generic account QR for a fully paid invoice", () => {
-  const qr = buildPrintPaymentQr({ enabled: true, account, reference: "HD001", labels });
+test("hides the QR for a fully paid invoice by default", () => {
+  expect(buildPrintPaymentQr({ enabled: true, account, reference: "HD001", labels })).toBeNull();
+});
+
+test("builds a generic account QR when always-show is enabled", () => {
+  const qr = buildPrintPaymentQr({ enabled: true, alwaysShow: true, account, reference: "HD001", labels });
   const params = new URL(qr.qrImageUrl).searchParams;
 
   expect(qr).not.toBeNull();

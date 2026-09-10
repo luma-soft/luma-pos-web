@@ -33,6 +33,7 @@ const saveSchema = z.object({
     showTax: z.boolean(),
     showLineDiscount: z.boolean(),
     showPaymentQr: z.boolean(),
+    alwaysShowPaymentQr: z.boolean().default(false),
     showInWords: z.boolean(),
     showSignatures: z.boolean(),
     showSku: z.boolean(),

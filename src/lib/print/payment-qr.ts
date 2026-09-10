@@ -45,12 +45,13 @@ export function buildVietQrImageUrl(input: {
 
 export function buildPrintPaymentQr(input: {
   enabled: boolean;
+  alwaysShow?: boolean;
   account: PrintPaymentQrAccount | null | undefined;
   amount?: number;
   reference: string;
   labels: PrintPaymentQrLabels;
 }): PrintPaymentQr | null {
-  if (!input.enabled || !input.account) return null;
+  if (!input.enabled || !input.account || (!(input.amount != null && input.amount > 0) && !input.alwaysShow)) return null;
   return {
     title: input.labels.title,
     qrImageUrl: buildVietQrImageUrl({

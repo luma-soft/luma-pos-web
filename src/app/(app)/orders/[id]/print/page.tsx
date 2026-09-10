@@ -50,6 +50,7 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
   ];
   const paymentQr = buildPrintPaymentQr({
     enabled: !isQuote && !isBooking && template.options.showPaymentQr,
+    alwaysShow: template.options.alwaysShowPaymentQr,
     account: defaultBankAccount,
     amount: remaining > 0 ? remaining : undefined,
     reference: order.code,

@@ -3434,6 +3434,7 @@
       "showTax": "Tax / VAT",
       "showLineDiscount": "Line discount in product table",
       "showPaymentQr": "Payment QR and bank info",
+      "alwaysShowPaymentQr": "Always show QR after full payment",
       "showInWords": "Amount in words",
       "showSignatures": "Signature area",
       "showSku": "SKU next to product"

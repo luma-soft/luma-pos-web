@@ -1160,6 +1160,7 @@ export function PosClient({
       payMethod: isInvoiceDraft ? payMethod : "credit",
       paymentQr: input.paymentQr !== undefined ? input.paymentQr : buildPrintPaymentQr({
         enabled: input.template.options.showPaymentQr,
+        alwaysShow: input.template.options.alwaysShowPaymentQr,
         account: data.defaultBankAccount,
         amount: remaining > 0 ? remaining : undefined,
         reference: input.code,
