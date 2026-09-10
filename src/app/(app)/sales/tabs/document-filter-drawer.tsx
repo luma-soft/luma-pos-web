@@ -7,8 +7,10 @@ import {
   useEffect,
   useRef,
   useState,
+  type FormEvent,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import {
   Barcode,
   Building2,
@@ -295,6 +297,7 @@ export function DocumentFilterDrawer({
   kind: DocumentFilterKind;
   values: DocumentFilterValues;
 }) {
+  const router = useRouter();
   const labels = copy[kind];
   const panelRef = useRef<HTMLElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -458,6 +461,31 @@ export function DocumentFilterDrawer({
     });
   }
 
+  function clearFilters() {
+    setDraft(createDraftFromValues(kind, {
+      q: values.q,
+      customerId: "",
+      customerLabel: "",
+      productId: "",
+      productLabel: "",
+      timePreset: DEFAULT_TIME_FILTER_PRESET,
+      from: "",
+      to: "",
+      minTotal: "",
+      maxTotal: "",
+    }));
+  }
+
+  function applyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = new URLSearchParams();
+    for (const [key, value] of new FormData(event.currentTarget)) {
+      if (typeof value === "string" && value.trim()) query.set(key, value);
+    }
+    router.push(`${Routes.Sales}?${query.toString()}`);
+    setOpen(false);
+  }
+
   return (
     <>
       <ListSearchFilterBar
@@ -577,7 +605,7 @@ export function DocumentFilterDrawer({
               ref={formRef}
               action={Routes.Sales}
               className="flex min-h-0 flex-1 flex-col"
-              onSubmit={() => setOpen(false)}
+              onSubmit={applyFilters}
             >
               <input type="hidden" name="tab" value={kind} />
               {values.q && <input type="hidden" name="q" value={values.q} />}
@@ -821,7 +849,7 @@ export function DocumentFilterDrawer({
               <footer className="grid grid-cols-2 gap-3 border-t border-border bg-surface px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               <button
                 type="button"
-                onClick={closeDrawer}
+                onClick={clearFilters}
                 className="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary-600 font-bold text-primary-700 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0"
               >
                   Xóa lọc

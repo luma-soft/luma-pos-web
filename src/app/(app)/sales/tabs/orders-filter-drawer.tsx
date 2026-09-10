@@ -7,10 +7,12 @@ import {
   useEffect,
   useRef,
   useState,
+  type FormEvent,
   type ReactNode,
 } from "react";
 import { Barcode, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import { FilterTriggerButton, ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 import { Routes } from "@/lib/routes";
 import {
@@ -133,6 +135,7 @@ function amountRangeInvalid(draft: OrdersFilterDraft) {
 
 export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
   const t = useTranslations();
+  const router = useRouter();
   const openButtonRef = useRef<HTMLButtonElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -269,6 +272,36 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
     });
   }
 
+  function clearFilters() {
+    setDraft(createDraftFromValues({
+      ...values,
+      customerId: "",
+      customerLabel: "",
+      productId: "",
+      productLabel: "",
+      status: "all",
+      payment: "all",
+      paymentMethod: "all",
+      source: "all",
+      timePreset: DEFAULT_TIME_FILTER_PRESET,
+      from: "",
+      to: "",
+      minTotal: "",
+      maxTotal: "",
+      includeCancelled: false,
+    }));
+  }
+
+  function applyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = new URLSearchParams();
+    for (const [key, value] of new FormData(event.currentTarget)) {
+      if (typeof value === "string" && value.trim()) query.set(key, value);
+    }
+    router.push(`${Routes.Sales}?${query.toString()}`);
+    setOpen(false);
+  }
+
   return (
     <>
       <ListSearchFilterBar
@@ -363,7 +396,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
               ref={formRef}
               action={Routes.Sales}
               className="flex min-h-0 flex-1 flex-col"
-              onSubmit={() => setOpen(false)}
+              onSubmit={applyFilters}
             >
               <input type="hidden" name="tab" value="orders" />
               {values.q && <input type="hidden" name="q" value={values.q} />}
@@ -557,7 +590,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
               <div className="grid grid-cols-2 gap-3 border-t border-border bg-surface px-6 py-4">
                 <button
                   type="button"
-                  onClick={closeDrawer}
+                  onClick={clearFilters}
                   className="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary-600 font-bold text-primary-700 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0"
                 >
                   Xóa lọc
