@@ -1366,7 +1366,7 @@
     },
     "stockLabel": "Tồn",
     "noProducts": "Chưa có sản phẩm — thêm sản phẩm trước khi bán.",
-    "walkInCustomer": "Khách lẻ (không lưu)",
+    "walkInCustomer": "Khách lẻ",
     "projectPlaceholder": "Công trình (tùy chọn)…",
     "customerDebt": "Đang nợ: {debt}",
     "discount": "Giảm giá",
