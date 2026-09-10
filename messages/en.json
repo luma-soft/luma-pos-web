@@ -3367,7 +3367,22 @@
       "return": "RETURN SLIP"
     },
     "supplierSign": "Supplier",
-    "receiverSign": "Receiver"
+    "receiverSign": "Receiver",
+    "debtSummary": {
+      "title": "DEBT SUMMARY",
+      "customer": "Customer",
+      "printedAt": "Printed at",
+      "invoice": "Invoice",
+      "invoiceDate": "Date",
+      "invoiceTotal": "Invoice total",
+      "paid": "Paid",
+      "remaining": "Balance",
+      "openingDebt": "Debt before print batch",
+      "batchTotal": "Print batch total",
+      "batchPaid": "Paid in batch",
+      "batchRemaining": "Balance in batch",
+      "currentDebt": "CURRENT TOTAL DEBT"
+    }
   },
   "printSettings": {
     "title": "Print templates",

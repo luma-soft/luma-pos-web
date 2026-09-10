@@ -234,27 +234,43 @@ function K80Doc(p: PrintDocProps) {
         {p.deliveryAddress && <div className="col-span-2"><span className="text-slate-600">{p.deliverToLabel ?? "Giao đến"}:</span> {p.deliveryAddress}</div>}
       </div>
 
-      <div className="mt-3 border-y border-dashed border-black py-1 text-[10px] font-bold uppercase tracking-wide">
-        <span>{p.cols.product}</span>
-        <span className="float-right">{p.cols.lineTotal}</span>
-      </div>
-      <div className="divide-y divide-dashed divide-slate-400">
-        {p.items.map((i) => (
-          <div key={i.id} className="py-2">
-            <div className="pr-1 text-[11px] font-bold leading-snug">
-              {i.name}
-              {t.options.showSku && i.sku && <span className="ml-1 font-normal text-[9px] text-slate-600">[{i.sku}]</span>}
-            </div>
-            <div className="mt-0.5 flex items-end justify-between gap-3 text-[10px]">
-              <span className="text-slate-700">{formatNumber(i.quantity)} {i.unitName} × {formatNumber(t.options.showLineDiscount || i.quantity <= 0 ? i.unitPrice : i.total / i.quantity)}</span>
-              <span className="shrink-0 text-[11px] font-bold">{formatNumber(i.total)}</span>
-            </div>
-            {t.options.showLineDiscount && Number(i.discount ?? 0) > 0 && (
-              <div className="text-[9.5px] text-slate-700">{p.cols.discount ?? "Giảm giá"}: {i.lineDiscountMode === "pct" && `${formatNumber(i.lineDiscountValue ?? 0)}% · `}−{formatNumber(Number(i.discount))}</div>
-            )}
-          </div>
-        ))}
-      </div>
+      <table className="print-line-items mt-3 w-full table-fixed border-collapse text-[9px] leading-tight">
+        <colgroup>
+          <col className="w-[42%]" />
+          <col className="w-[12%]" />
+          <col className="w-[21%]" />
+          <col className="w-[25%]" />
+        </colgroup>
+        <thead>
+          <tr className="border-y-2 border-black">
+            <th className="py-1.5 pr-1 text-left">{p.cols.product}</th>
+            <th className="px-0.5 py-1.5 text-right">{p.cols.qty}</th>
+            <th className="px-0.5 py-1.5 text-right">{p.cols.unitPrice}</th>
+            <th className="py-1.5 pl-0.5 text-right">{p.cols.lineTotal}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {p.items.map((i) => (
+            <tr key={i.id} className="break-inside-avoid border-b border-dashed border-slate-400">
+              <td className="py-1.5 pr-1 align-top">
+                <div className="break-words font-bold leading-snug">{i.name}</div>
+                <div className="mt-0.5 text-[8px] text-slate-600">
+                  {i.unitName}
+                  {t.options.showSku && i.sku && <> · {i.sku}</>}
+                </div>
+                {t.options.showLineDiscount && Number(i.discount ?? 0) > 0 && (
+                  <div className="mt-0.5 text-[8px] text-slate-700">
+                    {p.cols.discount ?? "Giảm giá"}: {i.lineDiscountMode === "pct" && `${formatNumber(i.lineDiscountValue ?? 0)}% · `}−{formatNumber(Number(i.discount))}
+                  </div>
+                )}
+              </td>
+              <td className="px-0.5 py-1.5 text-right align-top tabular-nums">{formatNumber(i.quantity)}</td>
+              <td className="px-0.5 py-1.5 text-right align-top tabular-nums whitespace-nowrap">{formatNumber(t.options.showLineDiscount || i.quantity <= 0 ? i.unitPrice : i.total / i.quantity)}</td>
+              <td className="py-1.5 pl-0.5 text-right align-top font-bold tabular-nums whitespace-nowrap">{formatNumber(i.total)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       <section className="mt-2 border-y-2 border-black py-1.5">
         {visibleTotals.map((r) => (

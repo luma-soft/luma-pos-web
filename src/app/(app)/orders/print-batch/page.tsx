@@ -6,7 +6,9 @@ import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { getDefaultSepayBankAccount } from "@/lib/data/payment-bank-accounts";
 import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
 import { buildPrintPaymentQr } from "@/lib/print/payment-qr";
+import { buildBatchDebtSummaries } from "@/lib/print/batch-debt-summary";
 import { PrintDoc } from "@/components/print/print-doc";
+import { BatchDebtSummary } from "@/components/print/batch-debt-summary";
 import { AutoPrint } from "@/components/print/auto-print";
 import { requireStoreContext } from "@/lib/auth/store-context";
 
@@ -46,80 +48,122 @@ export default async function PrintBatchPage({ searchParams }: Props) {
     );
   }
 
+  const invoicePages = orders.map((order) => {
+    const total = Number(order.total);
+    const paid = Number(order.amountPaid);
+    const remaining = Math.max(0, total - paid);
+    const paymentQr = buildPrintPaymentQr({
+      enabled: template.options.showPaymentQr,
+      account: defaultBankAccount,
+      amount: remaining > 0 ? remaining : undefined,
+      reference: order.code,
+      labels: {
+        title: t("pos.sepay.title"),
+        bank: t("pos.sepay.bank"),
+        account: t("pos.sepay.account"),
+        name: t("pos.sepay.name"),
+        reference: t("pos.sepay.reference"),
+      },
+    });
+
+    return {
+      key: `invoice-${order.id}`,
+      content: (
+        <PrintDoc
+          template={template}
+          size={size}
+          title={t("print.titles.order")}
+          code={order.code}
+          date={order.createdAt}
+          partyLabel={t("orders.cols.customer")}
+          partyName={order.customerName ?? t("orders.walkIn")}
+          partyPhone={order.customerPhone}
+          projectName={order.projectName}
+          deliveryAddress={order.deliveryAddress}
+          deliverToLabel={t("print.deliverTo")}
+          sellerLabel={t("orders.detail.seller")}
+          sellerName={order.sellerName}
+          items={order.items.map((i) => ({
+            id: i.id,
+            name: i.productName,
+            unitName: i.unitName,
+            quantity: Number(i.quantity),
+            ...readOrderLinePricing(i),
+            total: Number(i.total),
+          }))}
+          totals={[
+            { label: t("pos.subtotal"), value: Number(order.subtotal), kind: "subtotal" },
+            ...(Number(order.discount) > 0 ? [{ label: t("pos.discount"), value: Number(order.discount), negative: true, kind: "discount" as const }] : []),
+            ...(Number(order.tax) > 0 ? [{ label: t("pos.tax"), value: Number(order.tax), kind: "tax" as const }] : []),
+            ...(Number(order.shippingFee) > 0 ? [{ label: t("pos.shipping"), value: Number(order.shippingFee), kind: "shipping" as const }] : []),
+          ]}
+          grandTotalLabel={t("print.grandTotal")}
+          grandTotal={total}
+          paymentQr={paymentQr}
+          afterTotals={[
+            ...(template.options.showDebt ? [{ label: t("print.paid"), value: paid }] : []),
+            ...(template.options.showDebt && remaining > 0 ? [{ label: t("print.remaining"), value: remaining, bold: true }] : []),
+          ]}
+          inWordsLabel={t("print.inWords")}
+          signatures={[t("print.buyerSign"), t("print.delivererSign"), t("print.sellerSign")]}
+          signHint={t("print.signHint")}
+          note={order.note}
+          cols={{
+            product: t("orders.cols.product"),
+            unit: t("orders.cols.unit"),
+            qty: t("orders.cols.qty"),
+            unitPrice: t("orders.cols.unitPrice"),
+            discount: t("orders.cols.discount"),
+            lineTotal: t("orders.cols.lineTotal"),
+          }}
+        />
+      ),
+    };
+  });
+
+  const debtSummaries = template.options.showDebt
+    ? buildBatchDebtSummaries(orders.map((order) => ({
+        id: order.id,
+        code: order.code,
+        status: order.status,
+        customerId: order.customerId,
+        customerName: order.customerName,
+        createdAt: order.createdAt,
+        total: Number(order.total),
+        paid: Number(order.amountPaid),
+        currentCustomerDebt: Number(order.customerDebt ?? 0),
+      })))
+    : [];
+  const debtLabels = {
+    title: t("print.debtSummary.title"),
+    customer: t("print.debtSummary.customer"),
+    printedAt: t("print.debtSummary.printedAt"),
+    invoice: t("print.debtSummary.invoice"),
+    invoiceDate: t("print.debtSummary.invoiceDate"),
+    invoiceTotal: t("print.debtSummary.invoiceTotal"),
+    paid: t("print.debtSummary.paid"),
+    remaining: t("print.debtSummary.remaining"),
+    openingDebt: t("print.debtSummary.openingDebt"),
+    batchTotal: t("print.debtSummary.batchTotal"),
+    batchPaid: t("print.debtSummary.batchPaid"),
+    batchRemaining: t("print.debtSummary.batchRemaining"),
+    currentDebt: t("print.debtSummary.currentDebt"),
+  };
+  const debtPages = debtSummaries.map((summary) => ({
+    key: `debt-${summary.customerId}`,
+    content: <BatchDebtSummary template={template} size={size} summary={summary} printedAt={new Date()} labels={debtLabels} />,
+  }));
+  const pages = [...invoicePages, ...debtPages];
+
   return (
     <>
       <AutoPrint closeHref={Routes.Orders} />
       <div className="print-document-root flex min-h-screen flex-col items-center gap-8 overflow-auto py-4 print:gap-0 print:py-0">
-        {orders.map((order) => {
-          const total = Number(order.total);
-          const paid = Number(order.amountPaid);
-          const remaining = Math.max(0, total - paid);
-          const paymentQr = buildPrintPaymentQr({
-            enabled: template.options.showPaymentQr,
-            account: defaultBankAccount,
-            amount: remaining > 0 ? remaining : undefined,
-            reference: order.code,
-            labels: {
-              title: t("pos.sepay.title"),
-              bank: t("pos.sepay.bank"),
-              account: t("pos.sepay.account"),
-              name: t("pos.sepay.name"),
-              reference: t("pos.sepay.reference"),
-            },
-          });
-          return (
-            <div key={order.id} className="break-after-page">
-              <PrintDoc
-                template={template}
-                size={size}
-                title={t("print.titles.order")}
-                code={order.code}
-                date={order.createdAt}
-                partyLabel={t("orders.cols.customer")}
-                partyName={order.customerName ?? t("orders.walkIn")}
-                partyPhone={order.customerPhone}
-                projectName={order.projectName}
-                deliveryAddress={order.deliveryAddress}
-                deliverToLabel={t("print.deliverTo")}
-                sellerLabel={t("orders.detail.seller")}
-                sellerName={order.sellerName}
-                items={order.items.map((i) => ({
-                  id: i.id,
-                  name: i.productName,
-                  unitName: i.unitName,
-                  quantity: Number(i.quantity),
-                  ...readOrderLinePricing(i),
-                  total: Number(i.total),
-                }))}
-                totals={[
-                  { label: t("pos.subtotal"), value: Number(order.subtotal), kind: "subtotal" },
-                  ...(Number(order.discount) > 0 ? [{ label: t("pos.discount"), value: Number(order.discount), negative: true, kind: "discount" as const }] : []),
-                  ...(Number(order.tax) > 0 ? [{ label: t("pos.tax"), value: Number(order.tax), kind: "tax" as const }] : []),
-                  ...(Number(order.shippingFee) > 0 ? [{ label: t("pos.shipping"), value: Number(order.shippingFee), kind: "shipping" as const }] : []),
-                ]}
-                grandTotalLabel={t("print.grandTotal")}
-                grandTotal={total}
-                paymentQr={paymentQr}
-                afterTotals={[
-                  ...(template.options.showDebt ? [{ label: t("print.paid"), value: paid }] : []),
-                  ...(template.options.showDebt && remaining > 0 ? [{ label: t("print.remaining"), value: remaining, bold: true }] : []),
-                ]}
-                inWordsLabel={t("print.inWords")}
-                signatures={[t("print.buyerSign"), t("print.delivererSign"), t("print.sellerSign")]}
-                signHint={t("print.signHint")}
-                note={order.note}
-                cols={{
-                  product: t("orders.cols.product"),
-                  unit: t("orders.cols.unit"),
-                  qty: t("orders.cols.qty"),
-                  unitPrice: t("orders.cols.unitPrice"),
-                  discount: t("orders.cols.discount"),
-                  lineTotal: t("orders.cols.lineTotal"),
-                }}
-              />
-            </div>
-          );
-        })}
+        {pages.map((page, index) => (
+          <div key={page.key} className={index < pages.length - 1 ? "break-after-page" : undefined}>
+            {page.content}
+          </div>
+        ))}
       </div>
     </>
   );

@@ -3367,7 +3367,22 @@
       "return": "PHIẾU TRẢ HÀNG"
     },
     "supplierSign": "Nhà cung cấp",
-    "receiverSign": "Người nhận"
+    "receiverSign": "Người nhận",
+    "debtSummary": {
+      "title": "TỔNG HỢP CÔNG NỢ",
+      "customer": "Khách hàng",
+      "printedAt": "Ngày in",
+      "invoice": "Hóa đơn",
+      "invoiceDate": "Ngày",
+      "invoiceTotal": "Tiền hàng",
+      "paid": "Đã trả",
+      "remaining": "Còn nợ",
+      "openingDebt": "Công nợ trước lô in",
+      "batchTotal": "Tổng tiền lô in",
+      "batchPaid": "Đã thanh toán trong lô",
+      "batchRemaining": "Còn nợ trong lô",
+      "currentDebt": "TỔNG CÔNG NỢ HIỆN TẠI"
+    }
   },
   "printSettings": {
     "title": "Mẫu in",
