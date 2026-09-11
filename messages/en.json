@@ -3450,6 +3450,8 @@
       "showDiscount": "Whole-document discount",
       "showTax": "Tax / VAT",
       "showLineDiscount": "Per-product discount",
+      "showLineDiscountPercent": "Discount % column",
+      "showLineDiscountAmount": "Discount amount column",
       "showPaymentQr": "Payment QR and bank info",
       "alwaysShowPaymentQr": "Always show QR after full payment",
       "showInWords": "Amount in words",

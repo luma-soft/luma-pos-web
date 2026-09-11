@@ -31,7 +31,7 @@ import {
 
 const OPTION_GROUPS = [
   { key: "content", options: ["showSeller", "showProject", "showPartyPhone", "showDeliveryAddress", "showInWords", "showSignatures", "showSku"] },
-  { key: "pricing", options: ["showDebt", "showDiscount", "showLineDiscount", "showTax", "showPaymentQr", "alwaysShowPaymentQr"] },
+  { key: "pricing", options: ["showDebt", "showDiscount", "showLineDiscount", "showLineDiscountPercent", "showLineDiscountAmount", "showTax", "showPaymentQr", "alwaysShowPaymentQr"] },
   { key: "batch", options: ["showBatchDebtSummary"] },
 ] as const;
 const SIGNATURE_LABELS = ["signatureLeftLabel", "signatureMiddleLabel", "signatureRightLabel"] as const;
@@ -337,7 +337,8 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                 {OPTION_GROUPS.map((group) => {
                   const options = group.options
                     .filter((key) => key !== "showBatchDebtSummary" || docType === "order")
-                    .filter((key) => key !== "alwaysShowPaymentQr" || selected.options.showPaymentQr);
+                    .filter((key) => key !== "alwaysShowPaymentQr" || selected.options.showPaymentQr)
+                    .filter((key) => !["showLineDiscountPercent", "showLineDiscountAmount"].includes(key) || selected.options.showLineDiscount);
                   if (options.length === 0) return null;
                   return (
                     <section key={group.key} aria-labelledby={`print-option-group-${group.key}`}>
@@ -452,7 +453,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   deliveryAddress="12 Nguyen Trai"
                   sellerLabel={t("orders.detail.seller")}
                   sellerName="LumaPOS"
-                  items={[{ id: "1", name: "Xi mang PCB40", sku: "HT40", unitName: "bao", quantity: 10, unitPrice: 95000, discount: 30000, total: 920000 }]}
+                  items={[{ id: "1", name: "Xi mang PCB40", sku: "HT40", unitName: "bao", quantity: 10, unitPrice: 95000, discount: 30000, lineDiscountMode: "pct", lineDiscountValue: 3, total: 920000 }]}
                   totals={[
                     { label: t("pos.subtotal"), value: 920000, kind: "subtotal" },
                     { label: t("pos.discount"), value: 20000, negative: true, kind: "discount" },

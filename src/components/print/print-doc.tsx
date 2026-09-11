@@ -24,6 +24,15 @@ export interface PrintTotalRow {
   negative?: boolean;
 }
 
+function lineDiscountPercent(item: PrintLine) {
+  if (item.lineDiscountMode === "pct" && Number.isFinite(item.lineDiscountValue)) {
+    return `${formatNumber(Number(item.lineDiscountValue))}%`;
+  }
+  const gross = item.unitPrice * item.quantity;
+  if (gross <= 0) return "—";
+  return `${formatNumber((Number(item.discount ?? 0) / gross) * 100)}%`;
+}
+
 function printTotalLabel(row: PrintTotalRow, totals: PrintTotalRow[], taxLabel = "") {
   if (row.kind !== "tax") return row.label;
   const label = taxLabel.trim() || row.label;
@@ -72,7 +81,7 @@ export interface PrintDocProps {
   signHint?: string;
   note?: string | null;
   /** nhãn cột */
-  cols: { index?: string; product: string; unit: string; qty: string; unitPrice: string; discount?: string; lineTotal: string };
+  cols: { index?: string; product: string; unit: string; qty: string; unitPrice: string; discount?: string; discountPercent?: string; discountAmount?: string; lineTotal: string };
 }
 
 export function PrintDoc(p: PrintDocProps) {
@@ -86,7 +95,10 @@ export function PrintDoc(p: PrintDocProps) {
     t.options.signatureRightLabel?.trim() || p.signatures[2],
   ];
   const signatures = configuredSignatures && (isA4 ? configuredSignatures : [configuredSignatures[0], configuredSignatures[2]]);
-  const showLineDiscount = t.options.showLineDiscount && p.items.some((item) => Number(item.discount ?? 0) > 0);
+  const hasLineDiscount = p.items.some((item) => Number(item.discount ?? 0) > 0);
+  const showLineDiscountPercent = t.options.showLineDiscount && t.options.showLineDiscountPercent && hasLineDiscount;
+  const showLineDiscountAmount = t.options.showLineDiscount && t.options.showLineDiscountAmount && hasLineDiscount;
+  const showLineDiscount = showLineDiscountPercent || showLineDiscountAmount;
   const visibleTotals = p.totals.filter((row) => {
     if (row.kind === "discount") return t.options.showDiscount;
     if (row.kind === "tax") return t.options.showTax;
@@ -143,7 +155,8 @@ export function PrintDoc(p: PrintDocProps) {
             <th className="border border-slate-400 px-2 py-1.5">{p.cols.unit}</th>
             <th className="border border-slate-400 px-2 py-1.5">{p.cols.qty}</th>
             <th className="border border-slate-400 px-2 py-1.5 text-right">{p.cols.unitPrice}</th>
-            {showLineDiscount && <th className="border border-slate-400 px-2 py-1.5 text-right">{p.cols.discount ?? "Giảm giá"}</th>}
+            {showLineDiscountPercent && <th className="border border-slate-400 px-2 py-1.5 text-right">{p.cols.discountPercent ?? "% CK"}</th>}
+            {showLineDiscountAmount && <th className="border border-slate-400 px-2 py-1.5 text-right">{p.cols.discountAmount ?? "Tiền CK"}</th>}
             <th className="border border-slate-400 px-2 py-1.5 text-right">{p.cols.lineTotal}</th>
           </tr>
         </thead>
@@ -158,7 +171,8 @@ export function PrintDoc(p: PrintDocProps) {
               <td className="border border-slate-400 px-2 py-1.5 text-center">{i.unitName}</td>
               <td className="border border-slate-400 px-2 py-1.5 text-center">{formatNumber(i.quantity)}</td>
               <td className="border border-slate-400 px-2 py-1.5 text-right">{formatNumber(showLineDiscount || i.quantity <= 0 ? i.unitPrice : i.total / i.quantity)}</td>
-              {showLineDiscount && <td className="border border-slate-400 px-2 py-1.5 text-right">{Number(i.discount ?? 0) > 0 ? <>{i.lineDiscountMode === "pct" && <div>{formatNumber(i.lineDiscountValue ?? 0)}%</div>}{formatNumber(Number(i.discount))}</> : "—"}</td>}
+              {showLineDiscountPercent && <td className="border border-slate-400 px-2 py-1.5 text-right">{Number(i.discount ?? 0) > 0 ? lineDiscountPercent(i) : "—"}</td>}
+              {showLineDiscountAmount && <td className="border border-slate-400 px-2 py-1.5 text-right">{Number(i.discount ?? 0) > 0 ? formatNumber(Number(i.discount)) : "—"}</td>}
               <td className="border border-slate-400 px-2 py-1.5 text-right">{formatNumber(i.total)}</td>
             </tr>
           ))}
@@ -231,6 +245,8 @@ export function PrintDoc(p: PrintDocProps) {
 
 function K80Doc(p: PrintDocProps) {
   const t = p.template;
+  const showLineDiscountPercent = t.options.showLineDiscount && t.options.showLineDiscountPercent;
+  const showLineDiscountAmount = t.options.showLineDiscount && t.options.showLineDiscountAmount;
   const visibleTotals = p.totals.filter((row) => {
     if (row.kind === "discount") return t.options.showDiscount;
     if (row.kind === "tax") return t.options.showTax;
@@ -284,14 +300,17 @@ function K80Doc(p: PrintDocProps) {
                   {i.unitName}
                   {t.options.showSku && i.sku && <> · {i.sku}</>}
                 </div>
-                {t.options.showLineDiscount && Number(i.discount ?? 0) > 0 && (
+                {(showLineDiscountPercent || showLineDiscountAmount) && Number(i.discount ?? 0) > 0 && (
                   <div className="mt-0.5 text-[8px] text-slate-700">
-                    {p.cols.discount ?? "Giảm giá"}: {i.lineDiscountMode === "pct" && `${formatNumber(i.lineDiscountValue ?? 0)}% · `}−{formatNumber(Number(i.discount))}
+                    {p.cols.discount ?? "Giảm giá"}: {[
+                      showLineDiscountPercent ? lineDiscountPercent(i) : "",
+                      showLineDiscountAmount ? `−${formatNumber(Number(i.discount))}` : "",
+                    ].filter(Boolean).join(" · ")}
                   </div>
                 )}
               </td>
               <td className="px-0.5 py-1.5 text-right align-top tabular-nums">{formatNumber(i.quantity)}</td>
-              <td className="px-0.5 py-1.5 text-right align-top tabular-nums whitespace-nowrap">{formatNumber(t.options.showLineDiscount || i.quantity <= 0 ? i.unitPrice : i.total / i.quantity)}</td>
+              <td className="px-0.5 py-1.5 text-right align-top tabular-nums whitespace-nowrap">{formatNumber(showLineDiscountPercent || showLineDiscountAmount || i.quantity <= 0 ? i.unitPrice : i.total / i.quantity)}</td>
               <td className="py-1.5 pl-0.5 text-right align-top font-bold tabular-nums whitespace-nowrap">{formatNumber(i.total)}</td>
             </tr>
           ))}

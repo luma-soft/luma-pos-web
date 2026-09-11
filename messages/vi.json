@@ -3450,6 +3450,8 @@
       "showDiscount": "Giảm giá toàn hóa đơn",
       "showTax": "Thuế / VAT",
       "showLineDiscount": "Giảm giá từng sản phẩm",
+      "showLineDiscountPercent": "Cột % CK",
+      "showLineDiscountAmount": "Cột Tiền CK",
       "showPaymentQr": "QR và thông tin chuyển khoản",
       "alwaysShowPaymentQr": "Luôn hiện QR kể cả khi đã thanh toán",
       "showInWords": "Số tiền bằng chữ",

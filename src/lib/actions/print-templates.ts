@@ -35,6 +35,8 @@ const saveSchema = z.object({
     showDiscount: z.boolean(),
     showTax: z.boolean(),
     showLineDiscount: z.boolean(),
+    showLineDiscountPercent: z.boolean().default(true),
+    showLineDiscountAmount: z.boolean().default(true),
     showPaymentQr: z.boolean(),
     alwaysShowPaymentQr: z.boolean().default(false),
     showInWords: z.boolean(),
