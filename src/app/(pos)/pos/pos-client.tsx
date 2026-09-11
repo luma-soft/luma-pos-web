@@ -56,6 +56,7 @@ import {
   LEGACY_POS_DRAFTS_KEY,
   loadPosDraftSnapshot,
   parkPosDraftSnapshot,
+  reconcilePosDraftTaxDefaults,
   savePosDraftSnapshot,
 } from "@/lib/pos/draft-storage";
 import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
@@ -587,10 +588,16 @@ export function PosClient({
       if (snapshot) {
         const saved = ensureInvoiceFirst(snapshot.drafts.map(normalizeInvoice));
         const currentProducts = flattenProducts(data.products);
-        const refreshed = saved.map((draft) => ({
-          ...draft,
-          cart: rehydrateCartProducts(draft.cart, currentProducts),
-        }));
+        const refreshed = reconcilePosDraftTaxDefaults(
+          saved.map((draft) => ({
+            ...draft,
+            cart: rehydrateCartProducts(draft.cart, currentProducts),
+          })),
+          {
+            previousDefaultRate: snapshot.taxDefaultRate,
+            currentDefaultRate: defaultDraftTaxRate,
+          },
+        );
         setInvoices(refreshed);
         const savedActive = snapshot.activeId;
         setActiveId(savedActive && refreshed.some((i) => i.id === savedActive) ? savedActive : refreshed[0].id);
@@ -598,14 +605,16 @@ export function PosClient({
       hydratedScopeRef.current = storageScope;
     });
     return () => { cancelled = true; };
-  }, [data.products, initialContext, initialSourceInvoice, storageScope]);
+  }, [data.products, defaultDraftTaxRate, initialContext, initialSourceInvoice, storageScope]);
 
   // Ghi atomically cả danh sách và tab active sau khi đã đọc snapshot cũ.
   useEffect(() => {
     if (initialSourceInvoice || initialContext) return;
     if (hydratedScopeRef.current !== storageScope) return;
-    savePosDraftSnapshot(localStorage, storageScope, invoices, activeId);
-  }, [activeId, initialContext, invoices, initialSourceInvoice, storageScope]);
+    savePosDraftSnapshot(localStorage, storageScope, invoices, activeId, {
+      taxDefaultRate: defaultDraftTaxRate,
+    });
+  }, [activeId, defaultDraftTaxRate, initialContext, invoices, initialSourceInvoice, storageScope]);
 
   // Flush snapshot mới nhất khi rời POS hoặc browser đưa trang xuống nền.
   useEffect(() => {
@@ -618,6 +627,7 @@ export function PosClient({
         storageScope,
         latest.invoices,
         latest.activeId,
+        { taxDefaultRate: defaultDraftTaxRate },
       );
     };
     const onVisibilityChange = () => {
@@ -630,7 +640,7 @@ export function PosClient({
       window.removeEventListener("pagehide", flush);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [initialContext, initialSourceInvoice, storageScope]);
+  }, [defaultDraftTaxRate, initialContext, initialSourceInvoice, storageScope]);
 
   useEffect(() => {
     if (!sepayCheckout || sepayCheckout.status !== "pending") return;
@@ -734,6 +744,7 @@ export function PosClient({
       invoices,
       activeId,
       nextDraft,
+      { taxDefaultRate: defaultDraftTaxRate },
     );
     if (!snapshot) {
       setError(t("pos.held.saveFailed"));

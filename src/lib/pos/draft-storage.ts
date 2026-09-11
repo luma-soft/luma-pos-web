@@ -12,7 +12,12 @@ export interface PosDraftSnapshot<TDraft = Record<string, unknown>> {
   version: 1 | 2;
   activeId: string | null;
   drafts: TDraft[];
+  taxDefaultRate?: number;
   updatedAt?: string;
+}
+
+export interface PosDraftSnapshotOptions {
+  taxDefaultRate?: number;
 }
 
 function scopedKey(key: string, scopeId: string) {
@@ -47,6 +52,9 @@ export function loadPosDraftSnapshot(
         version: 2,
         activeId: typeof parsed.activeId === "string" ? parsed.activeId : null,
         drafts: parsed.drafts as Record<string, unknown>[],
+        taxDefaultRate: typeof parsed.taxDefaultRate === "number" && Number.isFinite(parsed.taxDefaultRate)
+          ? parsed.taxDefaultRate
+          : undefined,
         updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : undefined,
       };
     }
@@ -73,6 +81,7 @@ export function savePosDraftSnapshot<TDraft extends object>(
   scopeId: string,
   drafts: readonly TDraft[],
   activeId: string,
+  options: PosDraftSnapshotOptions = {},
 ): boolean {
   try {
     storage.setItem(
@@ -81,6 +90,9 @@ export function savePosDraftSnapshot<TDraft extends object>(
         version: 2,
         activeId,
         drafts: [...drafts],
+        ...(typeof options.taxDefaultRate === "number"
+          ? { taxDefaultRate: options.taxDefaultRate }
+          : {}),
         updatedAt: new Date().toISOString(),
       } satisfies PosDraftSnapshot<TDraft>),
     );
@@ -97,6 +109,7 @@ export function parkPosDraftSnapshot<TDraft extends object>(
   drafts: readonly TDraft[],
   activeId: string,
   nextDraft: TDraft & { id: string },
+  options: PosDraftSnapshotOptions = {},
 ): PosDraftSnapshot<TDraft & { heldAt?: string }> | null {
   const heldAt = new Date().toISOString();
   const parked = drafts.map((draft) =>
@@ -108,6 +121,39 @@ export function parkPosDraftSnapshot<TDraft extends object>(
     return null;
   }
   const next = [...parked, nextDraft];
-  if (!savePosDraftSnapshot(storage, scopeId, next, nextDraft.id)) return null;
-  return { version: 2, activeId: nextDraft.id, drafts: next };
+  if (!savePosDraftSnapshot(storage, scopeId, next, nextDraft.id, options)) return null;
+  return {
+    version: 2,
+    activeId: nextDraft.id,
+    drafts: next,
+    ...options,
+  };
+}
+
+type TaxDraft = {
+  taxRate: number;
+  source?: unknown;
+};
+
+/**
+ * Reconcile unsaved drafts when the store's automatic VAT default changes.
+ * Source documents and rates that differ from a known previous default are
+ * explicit user/document choices and remain untouched.
+ */
+export function reconcilePosDraftTaxDefaults<TDraft extends TaxDraft>(
+  drafts: readonly TDraft[],
+  input: {
+    currentDefaultRate: number;
+    previousDefaultRate?: number;
+  },
+): TDraft[] {
+  return drafts.map((draft) => {
+    if (draft.source != null) return draft;
+    const usesKnownPreviousDefault = input.previousDefaultRate != null
+      && draft.taxRate === input.previousDefaultRate;
+    const isLegacyDraftWhileAutoVatIsOff = input.previousDefaultRate == null
+      && input.currentDefaultRate === 0;
+    if (!usesKnownPreviousDefault && !isLegacyDraftWhileAutoVatIsOff) return draft;
+    return { ...draft, taxRate: input.currentDefaultRate };
+  });
 }

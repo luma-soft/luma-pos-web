@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parkPosDraftSnapshot, type PosDraftStorage } from "./draft-storage";
+import {
+  loadPosDraftSnapshot,
+  parkPosDraftSnapshot,
+  reconcilePosDraftTaxDefaults,
+  savePosDraftSnapshot,
+  type PosDraftStorage,
+} from "./draft-storage";
 
 class MemoryStorage implements PosDraftStorage {
   value: string | null = null;
@@ -39,4 +45,39 @@ test("storage failure leaves the current cart on screen", () => {
   );
 
   assert.equal(result, null);
+});
+
+test("disabled automatic VAT clears a legacy unsaved draft", () => {
+  const drafts = reconcilePosDraftTaxDefaults(
+    [{ id: "legacy", taxRate: 10, cart: [{ productId: "one" }] }],
+    { currentDefaultRate: 0 },
+  );
+
+  assert.equal(drafts[0]?.taxRate, 0);
+});
+
+test("tax reconciliation updates defaults but preserves manual and source rates", () => {
+  const drafts = reconcilePosDraftTaxDefaults(
+    [
+      { id: "default", taxRate: 10, cart: [] },
+      { id: "manual", taxRate: 8, cart: [] },
+      { id: "source", taxRate: 10, source: { orderId: "saved" }, cart: [] },
+    ],
+    { previousDefaultRate: 10, currentDefaultRate: 0 },
+  );
+
+  assert.deepEqual(drafts.map((draft) => draft.taxRate), [0, 8, 10]);
+});
+
+test("snapshot persists the tax default used by its drafts", () => {
+  const storage = new MemoryStorage();
+  assert.equal(
+    savePosDraftSnapshot(storage, "shop:user", [{ id: "one" }], "one", {
+      taxDefaultRate: 8,
+    }),
+    true,
+  );
+
+  const loaded = loadPosDraftSnapshot(storage, "shop:user");
+  assert.equal(loaded?.taxDefaultRate, 8);
 });
