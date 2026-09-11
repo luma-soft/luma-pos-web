@@ -3,6 +3,8 @@
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { OrderDetailLink } from "@/components/order-detail-link";
+import Link from "next/link";
+import { Printer } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { getCashbook } from "@/lib/data/cashbook";
 
@@ -47,7 +49,13 @@ export function CashbookTable({ rows }: { rows: CashbookRow[] }) {
           <Info label={t("orders.cols.date")} value={formatDate(row.createdAt)} />
           <Info label={t("cashbook.cols.fund")} value={row.fund === "cash" ? t("cashbook.fundCash") : t("cashbook.fundBank")} />
           <Info label={t("cashbook.cols.amount")} value={`${row.type === "in" ? "+" : "-"} ${formatCurrency(Number(row.amount))}`} tone={row.type === "in" ? "ok" : "er"} />
+          <Info label={row.type === "in" ? t("cashbook.payer") : t("cashbook.recipient")} value={row.counterparty ?? "—"} />
           <div className="md:col-span-4"><Info label={t("cashbook.cols.note")} value={row.note ?? "—"} /></div>
+          <div className="md:col-span-4">
+            <Link href={`/cashbook/${row.id}/print`} target="_blank" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-primary-600 hover:bg-surface-2">
+              <Printer className="h-4 w-4" /> {t("cashbook.printVoucher")}
+            </Link>
+          </div>
         </div>
       )}
     />

@@ -15,6 +15,7 @@ const schema = z.object({
   fund: z.enum(["cash", "bank"]),
   amount: z.number().positive(),
   category: z.enum(["expense", "other", "debt_collect", "supplier_payment"]),
+  counterparty: z.string().trim().max(200).optional().default(""),
   note: z.string().min(1, { error: "validation.required" }),
 });
 
@@ -45,6 +46,7 @@ export async function createCashTxForUser(userId: string, input: CreateCashTxInp
         fund: v.fund,
         amount: v.amount.toFixed(2),
         category: v.category,
+        counterparty: v.counterparty || null,
         refType: "manual",
         note: v.note,
         createdBy: profileId,
@@ -62,6 +64,7 @@ export async function createCashTxForUser(userId: string, input: CreateCashTxInp
           fund: v.fund,
           amount: v.amount,
           category: v.category,
+          counterparty: v.counterparty,
           note: v.note,
         },
         metadata: { route: Routes.Cashbook },

@@ -1581,6 +1581,7 @@ export const cashTransactions = pgTable("cash_transactions", {
   amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
   // sale | debt_collect | supplier_payment | refund | expense | other
   category: text("category").notNull(),
+  counterparty: text("counterparty"),
   refType: text("ref_type"),
   refId: uuid("ref_id"),
   note: text("note"),

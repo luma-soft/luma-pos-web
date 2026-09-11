@@ -3738,6 +3738,11 @@
     }
   },
   "cashbook": {
+    "payer": "Người nộp tiền",
+    "recipient": "Người nhận tiền",
+    "payerPlaceholder": "Người nộp tiền",
+    "recipientPlaceholder": "Người nhận tiền",
+    "printVoucher": "In phiếu thu / chi",
     "title": "Sổ quỹ thu chi",
     "createTx": "Phiếu thu / chi",
     "fundCash": "Tiền mặt",

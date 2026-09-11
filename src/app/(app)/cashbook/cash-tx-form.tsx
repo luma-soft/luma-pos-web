@@ -19,6 +19,7 @@ export function CashTxForm() {
   const [fund, setFund] = useState<"cash" | "bank">("cash");
   const [amount, setAmount] = useState(0);
   const [category, setCategory] = useState<"expense" | "other" | "debt_collect" | "supplier_payment">("expense");
+  const [counterparty, setCounterparty] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -27,11 +28,11 @@ export function CashTxForm() {
     if (amount <= 0 || !note.trim() || busy) return;
     setBusy(true);
     setError("");
-    const res = await createCashTx({ type, fund, amount, category, note });
+    const res = await createCashTx({ type, fund, amount, category, counterparty, note });
     setBusy(false);
     if (res.ok) {
       setOpen(false);
-      setAmount(0); setNote("");
+      setAmount(0); setCounterparty(""); setNote("");
       router.refresh();
     } else setError(t(res.error as never));
   }
@@ -79,6 +80,8 @@ export function CashTxForm() {
       <MoneyInput value={amount || ""} placeholder={t("orders.detail.amount")}
         onChange={(v) => setAmount(v ?? 0)}
         className="w-36 text-right tabular-nums" />
+      <Input value={counterparty} placeholder={type === "in" ? t("cashbook.payerPlaceholder") : t("cashbook.recipientPlaceholder")}
+        onChange={(e) => setCounterparty(e.target.value)} className="w-48" />
       <Input value={note} placeholder={t("cashbook.notePlaceholder")}
         onChange={(e) => setNote(e.target.value)} className="w-56" />
       <Button type="button" onClick={submit} disabled={busy || amount <= 0 || !note.trim()} loading={busy} tx="common.save" />

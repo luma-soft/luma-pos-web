@@ -3738,6 +3738,11 @@
     }
   },
   "cashbook": {
+    "payer": "Payer",
+    "recipient": "Recipient",
+    "payerPlaceholder": "Payer name",
+    "recipientPlaceholder": "Recipient name",
+    "printVoucher": "Print cash voucher",
     "title": "Cash book",
     "createTx": "Receipt / payment",
     "fundCash": "Cash",

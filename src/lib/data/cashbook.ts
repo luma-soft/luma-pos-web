@@ -20,6 +20,7 @@ export async function getCashbook(storeId: string, filters: { fund?: string; typ
         fund: cashTransactions.fund,
         amount: cashTransactions.amount,
         category: cashTransactions.category,
+        counterparty: cashTransactions.counterparty,
         refType: cashTransactions.refType,
         refId: cashTransactions.refId,
         note: cashTransactions.note,
@@ -52,4 +53,27 @@ export async function getCashbook(storeId: string, filters: { fund?: string; typ
     cash: { balance: Number(byFund.cash?.balance ?? 0), in: Number(byFund.cash?.totalIn ?? 0), out: Number(byFund.cash?.totalOut ?? 0) },
     bank: { balance: Number(byFund.bank?.balance ?? 0), in: Number(byFund.bank?.totalIn ?? 0), out: Number(byFund.bank?.totalOut ?? 0) },
   };
+}
+
+export async function getCashTransaction(storeId: string, id: string) {
+  const [row] = await db
+    .select({
+      id: cashTransactions.id,
+      code: cashTransactions.code,
+      type: cashTransactions.type,
+      fund: cashTransactions.fund,
+      amount: cashTransactions.amount,
+      category: cashTransactions.category,
+      counterparty: cashTransactions.counterparty,
+      refType: cashTransactions.refType,
+      refId: cashTransactions.refId,
+      note: cashTransactions.note,
+      createdAt: cashTransactions.createdAt,
+      byName: profiles.fullName,
+    })
+    .from(cashTransactions)
+    .leftJoin(profiles, eq(cashTransactions.createdBy, profiles.id))
+    .where(and(eq(cashTransactions.storeId, storeId), eq(cashTransactions.id, id)))
+    .limit(1);
+  return row ?? null;
 }
