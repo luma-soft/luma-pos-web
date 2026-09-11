@@ -40,6 +40,7 @@ const saveSchema = z.object({
     showInWords: z.boolean(),
     showSignatures: z.boolean(),
     showSku: z.boolean(),
+    taxLabel: z.string().trim().max(80).default(""),
     signatureLeftLabel: z.string().trim().max(80).default(""),
     signatureMiddleLabel: z.string().trim().max(80).default(""),
     signatureRightLabel: z.string().trim().max(80).default(""),

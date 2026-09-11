@@ -35,3 +35,9 @@ test("template picker keeps its own row and the add button at control height", (
   expect(form).toContain('rootClassName="w-full min-w-0"');
   expect(form).toContain("shrink-0 self-end items-center justify-center");
 });
+
+test("tax visibility exposes a custom document label", () => {
+  expect(form).toContain('t("printSettings.taxLabel")');
+  expect(form).toContain('patchTextOption("taxLabel", event.target.value)');
+  expect(form).toContain('selected.options.showTax');
+});

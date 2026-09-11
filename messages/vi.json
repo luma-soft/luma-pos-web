@@ -3426,6 +3426,8 @@
     "applyAll": "Áp dụng thông tin cửa hàng cho tất cả mẫu",
     "appliedAll": "Đã áp dụng cho cả 5 mẫu — nhớ Lưu từng mẫu.",
     "optionsSection": "Hiển thị trên chứng từ",
+    "taxLabel": "Nhãn thuế trên chứng từ",
+    "taxLabelPlaceholder": "Để trống dùng nhãn mặc định, ví dụ: VAT",
     "toggles": {
       "showSeller": "Tên người lập/bán",
       "showProject": "Công trình",

@@ -46,7 +46,7 @@ const VIETQR_BANKS = [
 ] as const;
 type ToggleOptionKey = (typeof OPTION_GROUPS)[number]["options"][number];
 type BooleanOptionKey = ToggleOptionKey | (typeof QR_VISIBILITY_OPTIONS)[number];
-type TextOptionKey = (typeof SIGNATURE_LABELS)[number] | "paymentQrTitle" | "paymentQrContentTemplate" | "paymentQrCustomAccountNumber" | "paymentQrCustomAccountName";
+type TextOptionKey = (typeof SIGNATURE_LABELS)[number] | "taxLabel" | "paymentQrTitle" | "paymentQrContentTemplate" | "paymentQrCustomAccountNumber" | "paymentQrCustomAccountName";
 
 export function PrintSettingsForm({ templates, storeDefaults }: { templates: PrintTemplate[]; storeDefaults: PrintTemplateStoreInfo }) {
   const t = useTranslations();
@@ -352,6 +352,17 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                           </label>
                         ))}
                       </div>
+                      {group.key === "pricing" && selected.options.showTax && (
+                        <Field label={t("printSettings.taxLabel")} className="mt-3 sm:max-w-md">
+                          <input
+                            value={selected.options.taxLabel}
+                            placeholder={t("printSettings.taxLabelPlaceholder")}
+                            onChange={(event) => patchTextOption("taxLabel", event.target.value)}
+                            className={inputCls}
+                            maxLength={80}
+                          />
+                        </Field>
+                      )}
                     </section>
                   );
                 })}

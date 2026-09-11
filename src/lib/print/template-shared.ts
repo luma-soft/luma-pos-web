@@ -21,6 +21,7 @@ export interface PrintTemplateOptions {
   showInWords: boolean;
   showSignatures: boolean;
   showSku: boolean;
+  taxLabel: string;
   signatureLeftLabel: string;
   signatureMiddleLabel: string;
   signatureRightLabel: string;
@@ -70,6 +71,7 @@ export const DEFAULT_OPTIONS: PrintTemplateOptions = {
   showInWords: true,
   showSignatures: true,
   showSku: false,
+  taxLabel: "",
   signatureLeftLabel: "",
   signatureMiddleLabel: "",
   signatureRightLabel: "",

@@ -4,9 +4,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { defaultTemplate } from "../../lib/print/template-shared";
 import { PrintDoc } from "./print-doc";
 
-function render(size, showTax = true) {
+function render(size, showTax = true, taxLabel = "") {
   const template = defaultTemplate("order");
   template.options.showTax = showTax;
+  template.options.taxLabel = taxLabel;
   return renderToStaticMarkup(createElement(PrintDoc, {
     template,
     size,
@@ -41,3 +42,11 @@ test("VAT option hides both percent and amount", () => {
   expect(html).not.toContain("Thuế / VAT");
   expect(html).not.toContain(">80.000</td>");
 });
+
+for (const size of ["a4", "a5", "k80"]) {
+  test(`${size} uses the custom tax label`, () => {
+    const html = render(size, true, "VAT");
+    expect(html).toContain("VAT (10%)");
+    expect(html).not.toContain("Thuế / VAT (10%)");
+  });
+}

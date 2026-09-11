@@ -3426,6 +3426,8 @@
     "applyAll": "Apply store info to all templates",
     "appliedAll": "Applied to all 5 templates — remember to Save each.",
     "optionsSection": "Show on document",
+    "taxLabel": "Tax label on document",
+    "taxLabelPlaceholder": "Leave blank for the default label, e.g. VAT",
     "toggles": {
       "showSeller": "Seller name",
       "showProject": "Project",
