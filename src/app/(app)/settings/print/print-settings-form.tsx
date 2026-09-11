@@ -47,6 +47,7 @@ const VIETQR_BANKS = [
 type ToggleOptionKey = (typeof OPTION_GROUPS)[number]["options"][number];
 type BooleanOptionKey = ToggleOptionKey | (typeof QR_VISIBILITY_OPTIONS)[number];
 type TextOptionKey = (typeof SIGNATURE_LABELS)[number] | "taxLabel" | "paymentQrTitle" | "paymentQrContentTemplate" | "paymentQrCustomAccountNumber" | "paymentQrCustomAccountName";
+type PendingAction = "save" | "duplicate" | "setDefault" | "deactivate";
 
 export function PrintSettingsForm({ templates, storeDefaults }: { templates: PrintTemplate[]; storeDefaults: PrintTemplateStoreInfo }) {
   const t = useTranslations();
@@ -56,6 +57,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
   const visible = useMemo(() => drafts.filter((item) => item.docType === docType), [drafts, docType]);
   const [selectedId, setSelectedId] = useState(() => visible[0]?.id ?? defaultTemplate("order", storeDefaults).id);
   const [isPending, startTransition] = useTransition();
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
   const previewSurfaceRef = useRef<HTMLDivElement>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -108,19 +110,25 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
   }
 
   function runAction(
+    pending: PendingAction,
     action: () => Promise<{ ok: true; data: unknown } | { ok: false; error: string }>,
     successKey: string,
     onSuccess?: (data: unknown) => void,
   ) {
+    setPendingAction(pending);
     startTransition(async () => {
-      setMsg(null);
-      const result = await action();
-      if (result.ok) {
-        onSuccess?.(result.data);
-        setMsg({ ok: true, text: t(successKey as never) });
-        router.refresh();
-      } else {
-        setMsg({ ok: false, text: t(result.error as never) });
+      try {
+        setMsg(null);
+        const result = await action();
+        if (result.ok) {
+          onSuccess?.(result.data);
+          setMsg({ ok: true, text: t(successKey as never) });
+          router.refresh();
+        } else {
+          setMsg({ ok: false, text: t(result.error as never) });
+        }
+      } finally {
+        setPendingAction(null);
       }
     });
   }
@@ -128,6 +136,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
   function save() {
     const oldId = selected.id;
     runAction(
+      "save",
       () => savePrintTemplate({
         id: persisted ? selected.id : undefined,
         name: selected.name,
@@ -154,6 +163,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
   }
 
   const inputCls = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm lg:min-h-10";
+  const actionPending = isPending || pendingAction !== null;
   const previewQrReference = formatPrintPaymentReference(selected.options.paymentQrContentTemplate, "XX-000");
 
   useEffect(() => {
@@ -394,20 +404,20 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
             </Panel>
 
             <div className="sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center gap-2 border-t border-border bg-surface/95 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
-              <button type="button" onClick={save} disabled={isPending || customQrAccountInvalid} aria-label={t("common.save")} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50 min-w-11">
-                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              <button type="button" onClick={save} disabled={actionPending || customQrAccountInvalid} aria-label={t("common.save")} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50 min-w-11">
+                {pendingAction === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {t("common.save")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => duplicatePrintTemplate(selected.id), "printSettings.duplicated")} disabled={!persisted || isPending} aria-label={t("printSettings.duplicate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
-                <Copy className="h-4 w-4" />
+              <button type="button" onClick={() => persisted && runAction("duplicate", () => duplicatePrintTemplate(selected.id), "printSettings.duplicated")} disabled={!persisted || actionPending} aria-label={t("printSettings.duplicate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
+                {pendingAction === "duplicate" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
                 {t("printSettings.duplicate")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => setDefaultPrintTemplate(selected.id), "printSettings.defaultSaved")} disabled={!persisted || selected.isDefault || isPending} aria-label={t("printSettings.setDefault")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
-                <Star className="h-4 w-4" />
+              <button type="button" onClick={() => persisted && runAction("setDefault", () => setDefaultPrintTemplate(selected.id), "printSettings.defaultSaved")} disabled={!persisted || selected.isDefault || actionPending} aria-label={t("printSettings.setDefault")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
+                {pendingAction === "setDefault" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Star className="h-4 w-4" />}
                 {t("printSettings.setDefault")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => deactivatePrintTemplate(selected.id), "printSettings.deactivated")} disabled={!persisted || isPending} aria-label={t("printSettings.deactivate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-er/40 px-4 text-sm font-semibold text-er disabled:opacity-50 min-w-11">
-                <EyeOff className="h-4 w-4" />
+              <button type="button" onClick={() => persisted && runAction("deactivate", () => deactivatePrintTemplate(selected.id), "printSettings.deactivated")} disabled={!persisted || actionPending} aria-label={t("printSettings.deactivate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-er/40 px-4 text-sm font-semibold text-er disabled:opacity-50 min-w-11">
+                {pendingAction === "deactivate" ? <Loader2 className="h-4 w-4 animate-spin" /> : <EyeOff className="h-4 w-4" />}
                 {t("printSettings.deactivate")}
               </button>
               {msg && <span className={cn("text-sm font-medium", msg.ok ? "text-ok" : "text-er")}>{msg.text}</span>}

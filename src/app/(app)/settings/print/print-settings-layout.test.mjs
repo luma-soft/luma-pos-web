@@ -41,3 +41,10 @@ test("tax visibility exposes a custom document label", () => {
   expect(form).toContain('patchTextOption("taxLabel", event.target.value)');
   expect(form).toContain('selected.options.showTax');
 });
+
+test("each template action shows loading on the button that triggered it", () => {
+  for (const action of ["save", "duplicate", "setDefault", "deactivate"]) {
+    expect(form).toContain(`pendingAction === "${action}"`);
+  }
+  expect(form).not.toContain("{isPending ? <Loader2");
+});
