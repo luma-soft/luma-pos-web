@@ -4,7 +4,7 @@ import { parseStorePrefs, storePrefsPatchSchema } from "./settings";
 describe("tax preferences", () => {
   test("upgrades legacy stored preferences with safe tax-profile defaults", () => {
     const prefs = parseStorePrefs({ tax: { defaultRate: 10, priceIncludesTax: true } });
-    expect(prefs.tax).toMatchObject({ taxpayerType: "household_business", calculationMethod: "unconfigured", filingFrequency: "unconfigured", vatTreatment: "taxable", autoApplyDefaultVat: true, defaultRate: 10, priceIncludesTax: true, businessActivities: [] });
+    expect(prefs.tax).toMatchObject({ taxpayerType: "household_business", calculationMethod: "unconfigured", filingFrequency: "unconfigured", vatTreatment: "taxable", autoApplyDefaultVat: true, defaultRate: 10, priceIncludesTax: true, businessActivities: [], defaultDirectTaxActivityId: "", defaultTaxReductionOnTransaction: false, defaultTaxReductionForAllProducts: false });
   });
   test("keeps a legacy zero default rate disabled", () => {
     const prefs = parseStorePrefs({ tax: { defaultRate: 0 } });
@@ -17,5 +17,14 @@ describe("tax preferences", () => {
   test("rejects invalid dates, rates, and taxpayer email", () => {
     const result = storePrefsPatchSchema.safeParse({ tax: { effectiveFrom: "01/01/2026", taxpayerEmail: "not-an-email", businessActivities: [{ id: "goods", name: "Hàng hóa", vatRate: 101, pitRate: 0.5 }] } });
     expect(result.success).toBe(false);
+  });
+  test("accepts direct-tax defaults and reduction preferences", () => {
+    const result = storePrefsPatchSchema.safeParse({ tax: {
+      calculationMethod: "revenue_percentage",
+      defaultDirectTaxActivityId: "direct-goods",
+      defaultTaxReductionOnTransaction: true,
+      defaultTaxReductionForAllProducts: true,
+    } });
+    expect(result.success).toBe(true);
   });
 });

@@ -56,6 +56,7 @@ import {
   notificationCategories,
   type NotificationCategory,
 } from "@/lib/notifications/contracts";
+import { applyDirectTaxPreset, DIRECT_TAX_PRESETS, DIRECT_TAX_REDUCTION_PERCENT } from "@/lib/tax/direct-tax";
 
 /* ── sample data (design preview — chưa nối backend) ── */
 const ROLE_LABELS: Record<string, [string, string]> = {
@@ -401,7 +402,7 @@ export function SettingsClient({
           <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.07em] text-primary-600">
             {tSettings("breadcrumb.settings")} · {tSettings(`breadcrumb.${active}`)}
           </div>
-          {active !== "payments" && <h1 className="text-xl font-extrabold tracking-tight">{L ? sec.vi : sec.en}</h1>}
+          {active !== "payments" && active !== "tax" && <h1 className="text-xl font-extrabold tracking-tight">{L ? sec.vi : sec.en}</h1>}
         </div>
 
         {active === "store" && <StoreSection L={L} locale={locale} store={store} canManage={canManage} />}
@@ -1198,7 +1199,13 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
     }]);
   }
   function removeActivity(index: number) {
-    set("businessActivities", form.businessActivities.filter((_, activityIndex) => activityIndex !== index));
+    const removed = form.businessActivities[index];
+    setForm((current) => ({
+      ...current,
+      businessActivities: current.businessActivities.filter((_, activityIndex) => activityIndex !== index),
+      defaultDirectTaxActivityId: removed?.id === current.defaultDirectTaxActivityId ? "" : current.defaultDirectTaxActivityId,
+    }));
+    mark();
   }
   function save() {
     start(async () => {
@@ -1237,23 +1244,52 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
       ? ({ taxable: "Chịu thuế GTGT", zero_rated: "Thuế suất 0%", not_subject: "Không chịu thuế GTGT", not_declared: "Không kê khai, tính nộp GTGT" } as const)[value]
       : ({ taxable: "Subject to VAT", zero_rated: "0% VAT", not_subject: "Not subject to VAT", not_declared: "Not declared for VAT" } as const)[value],
   }));
+  const directTaxPresetOptions = [
+    { value: "", label: L ? "Chưa chọn ngành nghề mặc định" : "No default activity" },
+    ...DIRECT_TAX_PRESETS.map((preset) => ({ value: preset.id, label: L ? preset.vi : preset.en })),
+  ];
+  function selectDirectTaxPreset(value: string) {
+    const preset = DIRECT_TAX_PRESETS.find((item) => item.id === value);
+    setForm((current) => ({
+      ...current,
+      defaultDirectTaxActivityId: value,
+      businessActivities: preset ? applyDirectTaxPreset(current.businessActivities, preset) : current.businessActivities,
+    }));
+    mark();
+  }
   return (
     <>
+      <div className="sticky top-0 z-30 -mx-3 mb-4 hidden min-h-16 items-center justify-between gap-4 border-b border-border bg-canvas/95 px-3 py-2 backdrop-blur md:flex md:-mx-7 md:px-7">
+        <div>
+          <h1 className="text-xl font-extrabold tracking-tight">{L ? "Thuế & Hóa đơn điện tử" : "Tax & E-Invoice"}</h1>
+          <p className="mt-0.5 text-[10px] italic text-slate-400">{L ? "Thiết lập thuế, sổ kế toán và hóa đơn điện tử" : "Tax, accounting book, and e-invoice settings"}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={cn("text-[11px]", error ? "text-er" : "text-slate-500")}>
+            {error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : saved ? (L ? "Đã lưu" : "Saved") : "")}
+          </span>
+          {canManage && (
+            <button disabled={!dirty || pending} onClick={save} className={cn(btnF, "min-h-11 rounded-xl px-5 text-sm disabled:opacity-50")}>
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{L ? "Lưu" : "Save"}
+            </button>
+          )}
+        </div>
+      </div>
       <Card title={L ? "Hồ sơ và phương pháp tính thuế" : "Tax profile and calculation method"} vi={L ? "Quyết định loại sổ kế toán và tờ khai được sử dụng" : "Determines the accounting books and filing forms"}>
         <div className="grid gap-3 p-3.5 md:grid-cols-2">
-          <label className="space-y-1.5">
-            <span className={FL}>{L ? "Loại người nộp thuế" : "Taxpayer type"}</span>
-            <Select disabled={!canManage} value={form.taxpayerType} onValueChange={(value) => set("taxpayerType", value as typeof form.taxpayerType)} options={taxpayerTypeOptions} wrapLabel />
-          </label>
-          <label className="space-y-1.5">
-            <span className={FL}>{L ? "Phương pháp tính thuế" : "Tax calculation method"}</span>
-            <Select disabled={!canManage} value={form.calculationMethod} onValueChange={(value) => set("calculationMethod", value as typeof form.calculationMethod)} options={calculationMethodOptions} wrapLabel />
-          </label>
-          <label className="space-y-1.5">
-            <span className={FL}>{L ? "Kỳ kê khai" : "Filing frequency"}</span>
-            <Select disabled={!canManage} value={form.filingFrequency} onValueChange={(value) => set("filingFrequency", value as typeof form.filingFrequency)} options={filingFrequencyOptions} wrapLabel />
-          </label>
-          <label className="space-y-1.5">
+          <div className="flex min-w-0 flex-col gap-2">
+            <span id="taxpayer-type-label" className={FL}>{L ? "Loại người nộp thuế" : "Taxpayer type"}</span>
+            <Select aria-labelledby="taxpayer-type-label" disabled={!canManage} value={form.taxpayerType} onValueChange={(value) => set("taxpayerType", value as typeof form.taxpayerType)} options={taxpayerTypeOptions} rootClassName="w-full" menuMinWidth={320} wrapLabel />
+          </div>
+          <div className="flex min-w-0 flex-col gap-2">
+            <span id="tax-calculation-method-label" className={FL}>{L ? "Phương pháp tính thuế" : "Tax calculation method"}</span>
+            <Select aria-labelledby="tax-calculation-method-label" disabled={!canManage} value={form.calculationMethod} onValueChange={(value) => set("calculationMethod", value as typeof form.calculationMethod)} options={calculationMethodOptions} rootClassName="w-full" menuMinWidth={520} wrapLabel />
+          </div>
+          <div className="flex min-w-0 flex-col gap-2">
+            <span id="tax-filing-frequency-label" className={FL}>{L ? "Kỳ kê khai" : "Filing frequency"}</span>
+            <Select aria-labelledby="tax-filing-frequency-label" disabled={!canManage} value={form.filingFrequency} onValueChange={(value) => set("filingFrequency", value as typeof form.filingFrequency)} options={filingFrequencyOptions} rootClassName="w-full" menuMinWidth={320} wrapLabel />
+          </div>
+          <label className="flex min-w-0 flex-col gap-2">
             <span className={FL}>{L ? "Áp dụng từ ngày" : "Effective from"}</span>
             <input type="date" disabled={!canManage} value={form.effectiveFrom} onChange={(event) => set("effectiveFrom", event.target.value)} className={FI} />
           </label>
@@ -1264,6 +1300,35 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
           </p>
         )}
       </Card>
+
+      {form.calculationMethod === "revenue_percentage" && (
+        <Card title={L ? "Thiết lập thuế trực tiếp" : "Direct tax settings"} vi={L ? "Mặc định cho giao dịch mới; không thay đổi chứng từ đã lưu" : "Defaults for new transactions; saved documents are unchanged"}>
+          <div className="flex flex-col gap-2 p-3.5">
+            <div className="flex min-w-0 flex-col gap-2">
+              <span id="direct-tax-rate-label" className={FL}>{L ? "Tỷ lệ thuế mặc định" : "Default tax rates"}</span>
+              <Select aria-labelledby="direct-tax-rate-label" disabled={!canManage} value={form.defaultDirectTaxActivityId} onValueChange={selectDirectTaxPreset} options={directTaxPresetOptions} rootClassName="w-full" menuMinWidth={720} wrapLabel />
+              <span className="block text-[10px] leading-relaxed text-slate-500">
+                {L ? "Chọn preset sẽ thêm hoặc cập nhật ngành nghề tương ứng bên dưới; bạn vẫn có thể chỉnh tỷ lệ thủ công." : "Selecting a preset adds or updates the matching activity below; rates can still be edited manually."}
+              </span>
+            </div>
+            <CtrlRow
+              title={L ? "Mặc định giảm thuế cho giao dịch" : "Apply tax reduction to new transactions by default"}
+              desc={L ? `Giảm ${DIRECT_TAX_REDUCTION_PERCENT}% số thuế GTGT theo tỷ lệ doanh thu; không giảm TNCN` : `Reduces revenue-based VAT by ${DIRECT_TAX_REDUCTION_PERCENT}%; PIT is unchanged`}
+              checked={form.defaultTaxReductionOnTransaction}
+              onChange={canManage ? (value) => set("defaultTaxReductionOnTransaction", value) : undefined}
+            />
+            <CtrlRow
+              title={L ? "Mặc định giảm thuế cho tất cả hàng hóa" : "Treat all products as reduction-eligible by default"}
+              desc={L ? "Chỉ bật khi toàn bộ hàng hóa, dịch vụ thuộc diện được giảm; có thể thay đổi trên từng giao dịch mới" : "Enable only when all goods and services are eligible; this can be changed on each new transaction"}
+              checked={form.defaultTaxReductionForAllProducts}
+              onChange={canManage ? (value) => set("defaultTaxReductionForAllProducts", value) : undefined}
+            />
+            <p className="rounded-[10px] border border-warn/25 bg-warn-soft px-3 py-2 text-[10px] leading-relaxed text-warn">
+              {L ? "Luma chỉ tự động giảm thuế khi cả hai tùy chọn trên được bật. Hãy kiểm tra điều kiện áp dụng theo kỳ kê khai trước khi lập tờ khai." : "Luma applies the reduction automatically only when both options are enabled. Confirm eligibility for the filing period before preparing a declaration."}
+            </p>
+          </div>
+        </Card>
+      )}
 
       <Card title={L ? "Thông tin người nộp thuế" : "Taxpayer information"} vi={L ? "Mã số thuế hiện tại lấy từ Thông tin cửa hàng" : "Current tax code comes from Store profile"}>
         <div className="grid gap-3 p-3.5 md:grid-cols-2">
@@ -1276,14 +1341,14 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
 
       <Card title={L ? "Quy tắc thuế GTGT" : "VAT rules"} vi={L ? "Áp cho đơn mới; chứng từ đã lưu không bị đổi" : "Applied to new documents; saved documents are unchanged"}>
         <div className="p-3.5 flex flex-col gap-1.5">
-          <label className="mb-2 space-y-1.5">
-            <span className={FL}>{L ? "Phân loại GTGT mặc định" : "Default VAT treatment"}</span>
-            <Select disabled={!canManage} value={form.vatTreatment} onValueChange={(value) => {
+          <div className="mb-2 flex min-w-0 flex-col gap-2">
+            <span id="vat-treatment-label" className={FL}>{L ? "Phân loại GTGT mặc định" : "Default VAT treatment"}</span>
+            <Select aria-labelledby="vat-treatment-label" disabled={!canManage} value={form.vatTreatment} onValueChange={(value) => {
               const treatment = value as typeof form.vatTreatment;
               setForm((current) => ({ ...current, vatTreatment: treatment, autoApplyDefaultVat: treatment === "taxable" && current.autoApplyDefaultVat }));
               mark();
-            }} options={vatTreatmentOptions} wrapLabel />
-          </label>
+            }} options={vatTreatmentOptions} rootClassName="w-full" menuMinWidth={400} wrapLabel />
+          </div>
           {form.vatTreatment === "taxable" && VAT_RATES.map((v) => {
             const on = v.rate === form.defaultRate;
             return (
@@ -1319,7 +1384,7 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
           ))}
         </div>
       </Card>
-      <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} error={error} />
+      <SaveBar className="md:hidden" L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} error={error} />
     </>
   );
 }
@@ -2107,11 +2172,11 @@ function CtrlRow({ title, desc, checked, onChange }: { title: string; desc?: str
   );
 }
 
-function SaveBar({ L, dirty, saved, pending, canManage, onSave, error = "" }: { L: boolean; dirty: boolean; saved: boolean; pending: boolean; canManage: boolean; onSave: () => void; error?: string }) {
-  if (!canManage) return <p className="text-[11px] text-slate-400 italic mt-1">{L ? "Chỉ Chủ/Quản lý mới sửa được." : "Only Owner/Manager can edit."}</p>;
+function SaveBar({ L, dirty, saved, pending, canManage, onSave, error = "", className }: { L: boolean; dirty: boolean; saved: boolean; pending: boolean; canManage: boolean; onSave: () => void; error?: string; className?: string }) {
+  if (!canManage) return <p className={cn("text-[11px] text-slate-400 italic mt-1", className)}>{L ? "Chỉ Chủ/Quản lý mới sửa được." : "Only Owner/Manager can edit."}</p>;
   if (!dirty && !saved) return null;
   return (
-    <div className="flex items-center gap-2 pt-1">
+    <div className={cn("flex items-center gap-2 pt-1", className)}>
       <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved"))}</span>
       <button disabled={!dirty || pending} onClick={onSave} className={cn(btnF, "disabled:opacity-50")}>
         {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}

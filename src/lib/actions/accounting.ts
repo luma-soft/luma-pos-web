@@ -10,6 +10,7 @@ import { calculateRevenuePercentageTaxes, calculateTaxableIncomeTaxes } from "@/
 import { getAccountingAuxiliaryBooks, getTaxActivityRevenue } from "@/lib/data/accounting";
 import { getRawStorePrefs } from "@/lib/data/settings";
 import { Routes } from "@/lib/routes";
+import { DIRECT_TAX_REDUCTION_PERCENT } from "@/lib/tax/direct-tax";
 
 const classificationSchema = z.array(z.object({ productId: z.uuid(), activityId: z.string().trim().max(80).nullable() })).max(5000);
 
@@ -45,13 +46,28 @@ export async function prepareTaxDeclaration(input: unknown): Promise<ActionResul
   if (prefs.tax.calculationMethod === "unconfigured" || prefs.tax.filingFrequency === "unconfigured") return { ok: false, error: "Cần hoàn tất cài đặt thuế trước khi lập tờ khai" };
   if (parsed.data.periodType !== prefs.tax.filingFrequency) return { ok: false, error: "Kỳ kê khai không khớp với cấu hình thuế hiện tại" };
   const rows = await getTaxActivityRevenue(gate.storeId, from, to);
-  if (rows.some((row) => !row.activityId)) return { ok: false, error: "Còn doanh thu chưa phân loại nhóm ngành thuế" };
+  const defaultActivity = prefs.tax.businessActivities.find((item) => item.enabled && item.id === prefs.tax.defaultDirectTaxActivityId);
+  const normalizedRows = rows.map((row) => row.activityId || !defaultActivity ? row : {
+    ...row,
+    activityId: defaultActivity.id,
+    activityName: defaultActivity.name,
+    vatRate: defaultActivity.vatRate,
+    pitRate: defaultActivity.pitRate,
+  });
+  if (normalizedRows.some((row) => !row.activityId)) return { ok: false, error: "Còn doanh thu chưa phân loại nhóm ngành thuế" };
   const books = await getAccountingAuxiliaryBooks(gate.storeId, from, to);
   const expenses = books.purchases.reduce((sum, row) => sum + row.amount, 0) + books.expenses.reduce((sum, row) => sum + row.amount, 0);
+  const reductionPercent = prefs.tax.calculationMethod === "revenue_percentage"
+    && prefs.tax.defaultTaxReductionOnTransaction
+    && prefs.tax.defaultTaxReductionForAllProducts
+    ? DIRECT_TAX_REDUCTION_PERCENT
+    : 0;
+  const reduction = { reduceVatByPercent: reductionPercent };
   const result = prefs.tax.calculationMethod === "taxable_income"
-    ? calculateTaxableIncomeTaxes(rows, expenses)
-    : calculateRevenuePercentageTaxes(rows);
-  await db.insert(taxDeclarations).values({ storeId: gate.storeId, periodType: parsed.data.periodType, periodKey: parsed.data.periodKey, status: "ready", revenue: String(result.revenue), vatAmount: String(result.vatAmount), pitAmount: String(result.pitAmount), snapshot: { groups: result.groups, from: parsed.data.from, to: parsed.data.to, calculationMethod: prefs.tax.calculationMethod, expenses } }).onConflictDoUpdate({ target: [taxDeclarations.storeId, taxDeclarations.periodType, taxDeclarations.periodKey], set: { status: "ready", revenue: String(result.revenue), vatAmount: String(result.vatAmount), pitAmount: String(result.pitAmount), snapshot: { groups: result.groups, from: parsed.data.from, to: parsed.data.to, calculationMethod: prefs.tax.calculationMethod, expenses }, updatedAt: sql`now()` } });
+    ? calculateTaxableIncomeTaxes(normalizedRows, expenses, reduction)
+    : calculateRevenuePercentageTaxes(normalizedRows, reduction);
+  const snapshot = { groups: result.groups, from: parsed.data.from, to: parsed.data.to, calculationMethod: prefs.tax.calculationMethod, expenses, directTaxReductionPercent: reductionPercent };
+  await db.insert(taxDeclarations).values({ storeId: gate.storeId, periodType: parsed.data.periodType, periodKey: parsed.data.periodKey, status: "ready", revenue: String(result.revenue), vatAmount: String(result.vatAmount), pitAmount: String(result.pitAmount), snapshot }).onConflictDoUpdate({ target: [taxDeclarations.storeId, taxDeclarations.periodType, taxDeclarations.periodKey], set: { status: "ready", revenue: String(result.revenue), vatAmount: String(result.vatAmount), pitAmount: String(result.pitAmount), snapshot, updatedAt: sql`now()` } });
   revalidatePath(Routes.TaxDeclarations);
   return { ok: true, data: undefined };
 }

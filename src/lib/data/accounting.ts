@@ -94,7 +94,7 @@ export async function getRevenueBook(
     sourceId: orders.id,
     code: orders.code,
     date: orders.createdAt,
-    description: sql<string>`concat('Ghi nhận doanh thu bán hàng và thuế cho ', coalesce(${customers.name}, 'Khách lẻ'))`,
+    description: sql<string>`concat('Ghi nhận doanh thu bán hàng và thuế cho ', coalesce(nullif(trim(${customers.name}), ''), 'Người tiêu dùng'))`,
     amount: orders.total,
     einvoiceNumber: einvoices.number,
     einvoiceSerial: einvoices.serial,
@@ -113,7 +113,7 @@ export async function getRevenueBook(
     sourceId: returns.id,
     code: returns.code,
     date: returns.createdAt,
-    description: sql<string>`concat('Điều chỉnh giảm doanh thu do trả hàng', case when ${returns.sourceInvoiceCode} is null then '' else concat(' từ ', ${returns.sourceInvoiceCode}) end)`,
+    description: sql<string>`concat('Điều chỉnh giảm doanh thu bán hàng và thuế do trả hàng', case when ${returns.sourceInvoiceCode} is null then '' else concat(' từ ', ${returns.sourceInvoiceCode}) end)`,
     amount: sql<string>`-${returns.totalRefund}`,
     einvoiceNumber: einvoices.number,
     einvoiceSerial: einvoices.serial,
@@ -144,7 +144,10 @@ export async function getRevenueBook(
   ]);
 
   const enabledActivities = tax.businessActivities.filter((activity) => activity.enabled);
-  const defaultActivity = tax.calculationMethod === "revenue_percentage" ? null : enabledActivities.length === 1 ? enabledActivities[0] : null;
+  const configuredDefaultActivity = enabledActivities.find((activity) => activity.id === tax.defaultDirectTaxActivityId) ?? null;
+  const defaultActivity = tax.calculationMethod === "revenue_percentage"
+    ? configuredDefaultActivity
+    : enabledActivities.length === 1 ? enabledActivities[0] : null;
   const [saleActivityRows, returnActivityRows] = tax.calculationMethod === "revenue_percentage"
     ? await Promise.all([
       saleRows.length === 0 ? Promise.resolve([]) : db.select({
@@ -308,10 +311,13 @@ function expandRevenueRow(
   allocations?: ActivityAllocation[],
 ) {
   if (!allocations?.length) return [toRevenueRow(row, sourceType, defaultActivity)];
-  return allocations.map((allocation, index) => ({
-    ...toRevenueRow({ ...row, id: `${row.id}-${allocation.activityId ?? "unclassified"}-${index}`, amount: String(sourceType === "return" ? -allocation.amount : allocation.amount) }, sourceType, null),
-    activityName: allocation.activityName,
-    vatRate: allocation.vatRate,
-    pitRate: allocation.pitRate,
-  }));
+  return allocations.map((allocation, index) => {
+    const fallback = allocation.activityId ? null : defaultActivity;
+    return {
+      ...toRevenueRow({ ...row, id: `${row.id}-${allocation.activityId ?? fallback?.id ?? "unclassified"}-${index}`, amount: String(sourceType === "return" ? -allocation.amount : allocation.amount) }, sourceType, fallback),
+      activityName: fallback?.name ?? allocation.activityName,
+      vatRate: fallback?.vatRate ?? allocation.vatRate,
+      pitRate: fallback?.pitRate ?? allocation.pitRate,
+    };
+  });
 }
