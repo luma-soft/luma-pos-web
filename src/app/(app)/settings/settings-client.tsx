@@ -397,7 +397,10 @@ export function SettingsClient({
             />
           }
         />
-        <div className="flex-1 overflow-y-auto px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:px-7 md:py-6">
+        <div className={cn(
+          "flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:px-7",
+          active === "tax" ? "pt-0 md:pb-6" : "py-3 md:py-6",
+        )}>
         <div className="hidden md:block">
           <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.07em] text-primary-600">
             {tSettings("breadcrumb.settings")} · {tSettings(`breadcrumb.${active}`)}
@@ -1259,7 +1262,7 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
   }
   return (
     <>
-      <div className="sticky top-0 z-30 -mx-3 mb-4 hidden min-h-16 items-center justify-between gap-4 border-b border-border bg-canvas/95 px-3 py-2 backdrop-blur md:flex md:-mx-7 md:px-7">
+      <div className="sticky top-0 z-30 -mx-3 mb-4 hidden min-h-16 items-center justify-between gap-4 border-b border-border bg-canvas px-3 py-2 md:flex md:-mx-7 md:px-7">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight">{L ? "Thuế & Hóa đơn điện tử" : "Tax & E-Invoice"}</h1>
           <p className="mt-0.5 text-[10px] italic text-slate-400">{L ? "Thiết lập thuế, sổ kế toán và hóa đơn điện tử" : "Tax, accounting book, and e-invoice settings"}</p>

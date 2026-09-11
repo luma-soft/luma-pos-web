@@ -17,6 +17,7 @@ export type DataTableColumn<T> = {
   defaultVisible?: boolean;
   align?: "left" | "right" | "center";
   width?: string;
+  wrap?: boolean;
   headerClassName?: string;
   cellClassName?: string | ((row: T) => string | undefined);
   render: (row: T) => ReactNode;
@@ -581,7 +582,8 @@ export function DataTableShell<T>({
                             <td
                               key={column.key}
                               className={cn(
-                                "truncate px-3 py-3 align-middle",
+                                "px-3 py-3 align-middle",
+                                column.wrap ? "whitespace-normal break-words" : "truncate",
                                 column.align === "right" && "text-right tabular-nums",
                                 column.align === "center" && "text-center",
                                 cellClassName,

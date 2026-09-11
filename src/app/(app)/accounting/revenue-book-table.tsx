@@ -11,12 +11,12 @@ export function RevenueBookTable({ rows, showActivity }: { rows: RevenueBookRow[
   const columns: DataTableColumn<RevenueBookRow>[] = [
     { key: "date", label: "Ngày tháng", required: true, width: "150px", render: (row) => formatDate(row.date) },
     {
-      key: "transaction", label: "Giao dịch", required: true, render: (row) => (
+      key: "transaction", label: "Giao dịch", required: true, width: "360px", wrap: true, render: (row) => (
         <div className="min-w-0">
           {row.sourceType === "sale" ? (
             <Link href={Routes.orderDetail(row.sourceId)} className="font-semibold text-primary-700 hover:underline">{row.code}</Link>
           ) : <div className="font-semibold text-er">{row.code}</div>}
-          <div className="mt-0.5 text-xs text-slate-500">{row.description}</div>
+          <div className="mt-0.5 whitespace-normal break-words text-xs leading-5 text-slate-500">{row.description}</div>
         </div>
       ),
     },
@@ -38,7 +38,7 @@ export function RevenueBookTable({ rows, showActivity }: { rows: RevenueBookRow[
       rows={rows}
       columns={columns}
       getRowId={(row) => `${row.sourceType}-${row.id}`}
-      minWidth={showActivity ? "1180px" : "960px"}
+      minWidth={showActivity ? "1280px" : "1070px"}
       minHeight={420}
       empty={<div className="rounded-card border border-dashed border-border p-12 text-center text-sm text-slate-400">Không có giao dịch trong kỳ đã chọn.</div>}
       renderMobileRow={({ row }) => (
