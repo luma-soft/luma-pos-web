@@ -2,6 +2,7 @@
 
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
@@ -399,7 +400,7 @@ export function SettingsClient({
         />
         <div className={cn(
           "flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:px-7",
-          active === "tax" ? "pt-0 md:pb-6" : "py-3 md:py-6",
+          active === "tax" ? "pt-3 md:pt-4 md:pb-6" : "py-3 md:py-6",
         )}>
         <div className="hidden md:block">
           <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.07em] text-primary-600">
@@ -1272,14 +1273,15 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
             {error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : saved ? (L ? "Đã lưu" : "Saved") : "")}
           </span>
           {canManage && (
-            <button disabled={!dirty || pending} onClick={save} className={cn(btnF, "min-h-11 rounded-xl px-5 text-sm disabled:opacity-50")}>
-              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{L ? "Lưu" : "Save"}
-            </button>
+            <Button disabled={!dirty} loading={pending} onClick={save}>
+              {!pending && <Check />}
+              {L ? "Lưu" : "Save"}
+            </Button>
           )}
         </div>
       </div>
       <Card title={L ? "Hồ sơ và phương pháp tính thuế" : "Tax profile and calculation method"} vi={L ? "Quyết định loại sổ kế toán và tờ khai được sử dụng" : "Determines the accounting books and filing forms"}>
-        <div className="grid gap-3 p-3.5 md:grid-cols-2">
+        <div className="grid gap-4 p-4.5 md:grid-cols-2">
           <div className="flex min-w-0 flex-col gap-2">
             <span id="taxpayer-type-label" className={FL}>{L ? "Loại người nộp thuế" : "Taxpayer type"}</span>
             <Select aria-labelledby="taxpayer-type-label" disabled={!canManage} value={form.taxpayerType} onValueChange={(value) => set("taxpayerType", value as typeof form.taxpayerType)} options={taxpayerTypeOptions} rootClassName="w-full" menuMinWidth={320} wrapLabel />
@@ -1298,9 +1300,11 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
           </label>
         </div>
         {form.calculationMethod === "unconfigured" && (
-          <p className="mx-3.5 mb-3.5 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-[11px] text-warn">
-            {L ? "Cần chọn phương pháp trước khi Luma tạo sổ kế toán hoặc tờ khai." : "Choose a method before Luma generates accounting books or filings."}
-          </p>
+          <div className="px-4.5 pb-4.5">
+            <p className="rounded-lg border border-warn/30 bg-warn-soft px-3.5 py-2.5 text-[11px] leading-relaxed text-warn">
+              {L ? "Cần chọn phương pháp trước khi Luma tạo sổ kế toán hoặc tờ khai." : "Choose a method before Luma generates accounting books or filings."}
+            </p>
+          </div>
         )}
       </Card>
 
