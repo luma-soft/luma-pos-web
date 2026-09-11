@@ -13,12 +13,14 @@ import {
   Lightbulb,
   Images,
   Wrench,
+  BookOpen,
 } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { cn } from "@/lib/utils";
 import { Text } from "@/components/ui/text";
 import type { StoreFeatureSet } from "@/lib/tenancy/store-features";
+import type { Role } from "@/lib/auth/roles";
 import {
   fetchNotificationUnreadCount,
   NOTIFICATION_INBOX_CHANGED_EVENT,
@@ -52,6 +54,8 @@ const GROUPS: Group[] = [
       { href: Routes.HunonicPriceList, icon: Cpu, key: "mobile.more.hunonicPriceList", newTab: true },
       { href: Routes.RangDongSmartPriceList, icon: Lightbulb, key: "mobile.more.rangDongPriceList", newTab: true },
       { href: Routes.Finance, icon: Wallet, key: "nav.groups.finance" },
+      { href: Routes.Accounting, icon: BookOpen, key: "nav.accounting" },
+      { href: Routes.TaxDeclarations, icon: FileText, key: "nav.taxDeclarations" },
     ],
   },
   {
@@ -69,10 +73,12 @@ export function AppNav({
   industry,
   aiConfigured = false,
   features,
+  role,
 }: {
   industry?: string;
   aiConfigured?: boolean;
   features: StoreFeatureSet;
+  role: Role;
 }) {
   const t = useTranslations();
   const pathname = usePathname();
@@ -114,6 +120,7 @@ export function AppNav({
     items: group.items.filter((item) => {
       const feature = featureForHref[item.href];
       if (feature && !features[feature]) return false;
+      if ((item.href === Routes.Accounting || item.href === Routes.TaxDeclarations) && role !== "owner" && role !== "manager") return false;
       return item.href !== "/ai" || aiConfigured;
     }),
   }));

@@ -45,6 +45,8 @@ export const Routes = {
   Customers: "/customers",
   Suppliers: "/suppliers",
   Reports: "/reports",
+  Accounting: "/accounting",
+  TaxDeclarations: "/tax-declarations",
   Library: "/library",
   Notifications: "/notifications",
   OnlineSales: "/online-sales",

@@ -177,6 +177,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
           initialSourceInvoice={sourceInvoice}
           initialContext={initialContext}
           posPrefs={settings.prefs.pos}
+          taxPrefs={settings.prefs.tax}
         />
       </div>
     </div>

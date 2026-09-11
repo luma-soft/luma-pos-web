@@ -49,6 +49,7 @@ export const createOrderSchema = z.object({
   deliveryDate: z.coerce.date().optional(),
   note: z.string().optional(),
   discount: z.number().min(0).default(0),
+  taxEnabled: z.boolean().default(true),
   taxRate: z.number().min(0).max(100).default(0),
   shippingFee: z.number().min(0).default(0),
   // Provider-first checkout creates a draft that must not reserve/consume

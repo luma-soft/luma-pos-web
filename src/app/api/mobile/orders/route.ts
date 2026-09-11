@@ -19,6 +19,7 @@ import { createOrderSchema } from "@/lib/schemas/order";
 import { normalizeOrderItems } from "@/lib/orders/normalize";
 import { evaluateOrderApprovalRequirement } from "@/lib/orders/sensitive-approval";
 import { parseOrderListSearchParams } from "@/lib/orders/list-filter-schema";
+import type { StorePrefs } from "@/lib/schemas/settings";
 
 export async function GET(request: Request) {
   const gate = await requireMobileSalesAccess();
@@ -67,8 +68,10 @@ export async function POST(request: Request) {
     throw error;
   }
   let requirement;
+  let taxPrefs: StorePrefs["tax"] | undefined;
   try {
     const prefs = await getRawStorePrefs(gate.storeId);
+    taxPrefs = prefs.tax;
     requirement = evaluateOrderApprovalRequirement({
       clientId: value.clientId,
       rawItems: value.items,
@@ -97,7 +100,10 @@ export async function POST(request: Request) {
     if (!authorization.ok) return mobileError(authorization.error, 403);
   }
 
-  const result = await createOrderForUser(gate.userId, value, { items: trustedItems });
+  const result = await createOrderForUser(gate.userId, value, {
+    items: trustedItems,
+    taxPrefs,
+  });
   if (!result.ok && result.error === "pos.errors.pricingChanged") return mobileError(result.error, 409);
   return mobileAction(result);
 }

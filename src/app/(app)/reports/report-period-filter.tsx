@@ -26,10 +26,12 @@ export function ReportPeriodFilter({
   period,
   from,
   to,
+  basePath = "/reports",
 }: {
   period: ReportPeriod;
   from: string;
   to: string;
+  basePath?: string;
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -50,7 +52,7 @@ export function ReportPeriodFilter({
       params.delete("from");
       params.delete("to");
     }
-    router.push(`/reports?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`);
   }
 
   function selectPeriod(value: string) {

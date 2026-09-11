@@ -40,6 +40,10 @@ import {
   AI_VISION_MODELS,
   STAFF_ROLES,
   PAPER_SIZES,
+  TAXPAYER_TYPES,
+  TAX_CALCULATION_METHODS,
+  TAX_FILING_FREQUENCIES,
+  VAT_TREATMENTS,
   type StaffRole,
   type PaymentBankAccountInput,
   type StorePrefs,
@@ -112,10 +116,10 @@ const VIETQR_BANKS = [
 ] as const;
 type VietQrBank = (typeof VIETQR_BANKS)[number];
 const VAT_RATES = [
-  { rate: 0, en: "Exempt", vi: "Miễn thuế", itemsEn: "Exports, financial services", itemsVi: "Xuất khẩu, dịch vụ tài chính" },
-  { rate: 5, en: "Reduced", vi: "Giảm thuế", itemsEn: "Essential food, medicine", itemsVi: "Thực phẩm thiết yếu, dược phẩm" },
-  { rate: 8, en: "Standard reduced", vi: "Tiêu chuẩn giảm", itemsEn: "Most goods & services", itemsVi: "Hầu hết hàng hóa & dịch vụ" },
-  { rate: 10, en: "Standard", vi: "Tiêu chuẩn", itemsEn: "Electronics, fashion, cosmetics", itemsVi: "Điện tử, thời trang, mỹ phẩm" },
+  { rate: 0, en: "0% rate", vi: "Thuế suất 0%", itemsEn: "Distinct from exempt or not subject to VAT", itemsVi: "Khác với không chịu thuế hoặc không kê khai" },
+  { rate: 5, en: "5% rate", vi: "Thuế suất 5%", itemsEn: "Apply only to eligible goods and services", itemsVi: "Chỉ áp dụng cho hàng hóa, dịch vụ đủ điều kiện" },
+  { rate: 8, en: "8% reduced rate", vi: "Thuế suất giảm 8%", itemsEn: "Temporary reduction where legally eligible", itemsVi: "Mức giảm có thời hạn, chỉ áp dụng khi đủ điều kiện" },
+  { rate: 10, en: "10% standard rate", vi: "Thuế suất chuẩn 10%", itemsEn: "Standard taxable goods and services", itemsVi: "Hàng hóa, dịch vụ chịu thuế suất chuẩn" },
 ];
 const AI_PROVIDER_OPTIONS = AI_PROVIDERS.map((value) => ({
   value,
@@ -1172,15 +1176,115 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
   const [form, setForm] = useState(prefs);
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
   const [pending, start] = useTransition();
-  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => { setForm((p) => ({ ...p, [k]: v })); setDirty(true); setSaved(false); };
-  function save() { start(async () => { const r = await updateStorePrefs({ tax: form }); if (r.ok) { setDirty(false); setSaved(true); } }); }
+  const mark = () => { setDirty(true); setSaved(false); setError(""); };
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => { setForm((p) => ({ ...p, [k]: v })); mark(); };
+  const setActivity = (index: number, patch: Partial<(typeof form.businessActivities)[number]>) => {
+    setForm((current) => ({
+      ...current,
+      businessActivities: current.businessActivities.map((activity, activityIndex) =>
+        activityIndex === index ? { ...activity, ...patch } : activity),
+    }));
+    mark();
+  };
+  function addActivity() {
+    set("businessActivities", [...form.businessActivities, {
+      id: `activity-${Date.now()}`,
+      name: "",
+      vatRate: 0,
+      pitRate: 0,
+      enabled: true,
+    }]);
+  }
+  function removeActivity(index: number) {
+    set("businessActivities", form.businessActivities.filter((_, activityIndex) => activityIndex !== index));
+  }
+  function save() {
+    start(async () => {
+      const r = await updateStorePrefs({ tax: form });
+      if (r.ok) {
+        setDirty(false);
+        setSaved(true);
+        setError("");
+      } else {
+        setError(L ? "Không lưu được cấu hình thuế. Kiểm tra các trường bắt buộc rồi thử lại." : "Could not save tax settings. Check required fields and try again.");
+      }
+    });
+  }
   const pctColor = (r: number) => r === 0 ? "text-slate-400" : r === 5 ? "text-ok" : r === 8 ? "text-warn" : "text-er";
+  const taxpayerTypeOptions = TAXPAYER_TYPES.map((value) => ({
+    value,
+    label: L
+      ? ({ household_business: "Hộ kinh doanh", individual_business: "Cá nhân kinh doanh", enterprise: "Doanh nghiệp" } as const)[value]
+      : ({ household_business: "Household business", individual_business: "Individual business", enterprise: "Enterprise" } as const)[value],
+  }));
+  const calculationMethodOptions = TAX_CALCULATION_METHODS.map((value) => ({
+    value,
+    label: L
+      ? ({ unconfigured: "Chưa xác định", non_taxable: "Không chịu GTGT / không phải nộp TNCN", revenue_percentage: "GTGT và TNCN theo tỷ lệ doanh thu", taxable_income: "GTGT theo doanh thu, TNCN theo thu nhập" } as const)[value]
+      : ({ unconfigured: "Not configured", non_taxable: "Not subject to VAT / PIT", revenue_percentage: "VAT and PIT as revenue percentages", taxable_income: "VAT on revenue, PIT on taxable income" } as const)[value],
+  }));
+  const filingFrequencyOptions = TAX_FILING_FREQUENCIES.map((value) => ({
+    value,
+    label: L
+      ? ({ unconfigured: "Chưa xác định", monthly: "Theo tháng", quarterly: "Theo quý", annual: "Theo năm", per_occurrence: "Theo từng lần phát sinh" } as const)[value]
+      : ({ unconfigured: "Not configured", monthly: "Monthly", quarterly: "Quarterly", annual: "Annual", per_occurrence: "Per occurrence" } as const)[value],
+  }));
+  const vatTreatmentOptions = VAT_TREATMENTS.map((value) => ({
+    value,
+    label: L
+      ? ({ taxable: "Chịu thuế GTGT", zero_rated: "Thuế suất 0%", not_subject: "Không chịu thuế GTGT", not_declared: "Không kê khai, tính nộp GTGT" } as const)[value]
+      : ({ taxable: "Subject to VAT", zero_rated: "0% VAT", not_subject: "Not subject to VAT", not_declared: "Not declared for VAT" } as const)[value],
+  }));
   return (
     <>
-      <Card title={L ? "Thuế GTGT — Thuế suất mặc định" : "VAT — Default rate"} vi={L ? "Áp khi tạo đơn / phiếu nhập" : "Applied on new orders / purchases"}>
+      <Card title={L ? "Hồ sơ và phương pháp tính thuế" : "Tax profile and calculation method"} vi={L ? "Quyết định loại sổ kế toán và tờ khai được sử dụng" : "Determines the accounting books and filing forms"}>
+        <div className="grid gap-3 p-3.5 md:grid-cols-2">
+          <label className="space-y-1.5">
+            <span className={FL}>{L ? "Loại người nộp thuế" : "Taxpayer type"}</span>
+            <Select disabled={!canManage} value={form.taxpayerType} onValueChange={(value) => set("taxpayerType", value as typeof form.taxpayerType)} options={taxpayerTypeOptions} wrapLabel />
+          </label>
+          <label className="space-y-1.5">
+            <span className={FL}>{L ? "Phương pháp tính thuế" : "Tax calculation method"}</span>
+            <Select disabled={!canManage} value={form.calculationMethod} onValueChange={(value) => set("calculationMethod", value as typeof form.calculationMethod)} options={calculationMethodOptions} wrapLabel />
+          </label>
+          <label className="space-y-1.5">
+            <span className={FL}>{L ? "Kỳ kê khai" : "Filing frequency"}</span>
+            <Select disabled={!canManage} value={form.filingFrequency} onValueChange={(value) => set("filingFrequency", value as typeof form.filingFrequency)} options={filingFrequencyOptions} wrapLabel />
+          </label>
+          <label className="space-y-1.5">
+            <span className={FL}>{L ? "Áp dụng từ ngày" : "Effective from"}</span>
+            <input type="date" disabled={!canManage} value={form.effectiveFrom} onChange={(event) => set("effectiveFrom", event.target.value)} className={FI} />
+          </label>
+        </div>
+        {form.calculationMethod === "unconfigured" && (
+          <p className="mx-3.5 mb-3.5 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-[11px] text-warn">
+            {L ? "Cần chọn phương pháp trước khi Luma tạo sổ kế toán hoặc tờ khai." : "Choose a method before Luma generates accounting books or filings."}
+          </p>
+        )}
+      </Card>
+
+      <Card title={L ? "Thông tin người nộp thuế" : "Taxpayer information"} vi={L ? "Mã số thuế hiện tại lấy từ Thông tin cửa hàng" : "Current tax code comes from Store profile"}>
+        <div className="grid gap-3 p-3.5 md:grid-cols-2">
+          <label className="space-y-1.5"><span className={FL}>{L ? "Tên người nộp thuế" : "Taxpayer name"}</span><input disabled={!canManage} value={form.taxpayerName} onChange={(event) => set("taxpayerName", event.target.value)} className={FI} maxLength={200} /></label>
+          <label className="space-y-1.5"><span className={FL}>{L ? "Mã số thuế cũ" : "Former tax code"}</span><input disabled={!canManage} value={form.formerTaxCode} onChange={(event) => set("formerTaxCode", event.target.value)} className={FI} maxLength={30} /></label>
+          <label className="space-y-1.5"><span className={FL}>{L ? "Email nhận hồ sơ" : "Filing email"}</span><input type="email" disabled={!canManage} value={form.taxpayerEmail} onChange={(event) => set("taxpayerEmail", event.target.value)} className={FI} maxLength={254} /></label>
+          <label className="space-y-1.5 md:col-span-2"><span className={FL}>{L ? "Địa chỉ người nộp thuế" : "Taxpayer address"}</span><input disabled={!canManage} value={form.taxpayerAddress} onChange={(event) => set("taxpayerAddress", event.target.value)} className={FI} maxLength={300} /></label>
+        </div>
+      </Card>
+
+      <Card title={L ? "Quy tắc thuế GTGT" : "VAT rules"} vi={L ? "Áp cho đơn mới; chứng từ đã lưu không bị đổi" : "Applied to new documents; saved documents are unchanged"}>
         <div className="p-3.5 flex flex-col gap-1.5">
-          {VAT_RATES.map((v) => {
+          <label className="mb-2 space-y-1.5">
+            <span className={FL}>{L ? "Phân loại GTGT mặc định" : "Default VAT treatment"}</span>
+            <Select disabled={!canManage} value={form.vatTreatment} onValueChange={(value) => {
+              const treatment = value as typeof form.vatTreatment;
+              setForm((current) => ({ ...current, vatTreatment: treatment, autoApplyDefaultVat: treatment === "taxable" && current.autoApplyDefaultVat }));
+              mark();
+            }} options={vatTreatmentOptions} wrapLabel />
+          </label>
+          {form.vatTreatment === "taxable" && VAT_RATES.map((v) => {
             const on = v.rate === form.defaultRate;
             return (
               <button key={v.rate} type="button" disabled={!canManage} onClick={() => set("defaultRate", v.rate)} className={cn(ROW, "text-left transition", on && "border-primary-500 ring-2 ring-primary-500/20", canManage && "hover:border-primary-400")}>
@@ -1190,10 +1294,32 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
               </button>
             );
           })}
+          {form.vatTreatment === "taxable" && (
+            <label className={cn(ROW, "mt-1")}>
+              <span className="flex-1"><span className="block text-xs font-bold">{L ? "Thuế suất khác" : "Other VAT rate"}</span><span className="block text-[10px] italic text-slate-500">{L ? "Nhập khi mức áp dụng không có trong danh sách trên" : "Use when the applicable rate is not listed above"}</span></span>
+              <NumberInput disabled={!canManage} min={0} max={100} value={form.defaultRate} onChange={(value) => set("defaultRate", value ?? 0)} suffix="%" thousandSeparator={false} className="w-28" />
+            </label>
+          )}
+          <CtrlRow title={L ? "Tự áp dụng VAT cho đơn mới" : "Apply VAT to new documents automatically"} desc={L ? "Đơn mới dùng thuế suất mặc định; từng sản phẩm vẫn được ưu tiên" : "New documents use the default rate; product rates take precedence"} checked={form.autoApplyDefaultVat} onChange={canManage && form.vatTreatment === "taxable" ? (v) => set("autoApplyDefaultVat", v) : undefined} />
           <CtrlRow title={L ? "Giá đã bao gồm thuế" : "Prices include tax"} desc={L ? "Giá niêm yết đã gồm GTGT" : "Listed prices are tax-inclusive"} checked={form.priceIncludesTax} onChange={canManage ? (v) => set("priceIncludesTax", v) : undefined} />
         </div>
       </Card>
-      <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} />
+
+      <Card title={L ? "Ngành nghề và tỷ lệ tính thuế" : "Business activities and tax rates"} vi={L ? "Dùng khi tổng hợp doanh thu, thuế GTGT và TNCN" : "Used to aggregate revenue, VAT, and PIT"} action={canManage ? <button type="button" onClick={addActivity} className={btnS}><Plus className="h-3.5 w-3.5" />{L ? "Thêm" : "Add"}</button> : undefined}>
+        <div className="space-y-2 p-3.5">
+          {form.businessActivities.length === 0 ? (
+            <p className="rounded-[10px] border border-dashed border-border px-3 py-5 text-center text-xs text-slate-400">{L ? "Chưa cấu hình ngành nghề tính thuế." : "No tax activity is configured."}</p>
+          ) : form.businessActivities.map((activity, index) => (
+            <div key={activity.id} className="grid gap-2 rounded-[10px] border border-border-soft bg-canvas p-3 md:grid-cols-[minmax(0,1fr)_110px_110px_auto] md:items-end">
+              <label className="space-y-1.5"><span className={FL}>{L ? "Ngành nghề" : "Activity"}</span><input disabled={!canManage} value={activity.name} onChange={(event) => setActivity(index, { name: event.target.value })} className={FI} maxLength={160} /></label>
+              <label className="space-y-1.5"><span className={FL}>GTGT</span><NumberInput disabled={!canManage} min={0} max={100} value={activity.vatRate} onChange={(value) => setActivity(index, { vatRate: value ?? 0 })} suffix="%" thousandSeparator={false} /></label>
+              <label className="space-y-1.5"><span className={FL}>TNCN</span><NumberInput disabled={!canManage} min={0} max={100} value={activity.pitRate} onChange={(value) => setActivity(index, { pitRate: value ?? 0 })} suffix="%" thousandSeparator={false} /></label>
+              {canManage && <button type="button" onClick={() => removeActivity(index)} aria-label={L ? `Xóa ngành nghề ${activity.name || index + 1}` : `Remove activity ${activity.name || index + 1}`} className={cn(btnS, "text-er")}><Trash2 className="h-3.5 w-3.5" /></button>}
+            </div>
+          ))}
+        </div>
+      </Card>
+      <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} error={error} />
     </>
   );
 }
@@ -1981,12 +2107,12 @@ function CtrlRow({ title, desc, checked, onChange }: { title: string; desc?: str
   );
 }
 
-function SaveBar({ L, dirty, saved, pending, canManage, onSave }: { L: boolean; dirty: boolean; saved: boolean; pending: boolean; canManage: boolean; onSave: () => void }) {
+function SaveBar({ L, dirty, saved, pending, canManage, onSave, error = "" }: { L: boolean; dirty: boolean; saved: boolean; pending: boolean; canManage: boolean; onSave: () => void; error?: string }) {
   if (!canManage) return <p className="text-[11px] text-slate-400 italic mt-1">{L ? "Chỉ Chủ/Quản lý mới sửa được." : "Only Owner/Manager can edit."}</p>;
   if (!dirty && !saved) return null;
   return (
     <div className="flex items-center gap-2 pt-1">
-      <span className="text-[11px] text-slate-500 flex-1">{dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved")}</span>
+      <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved"))}</span>
       <button disabled={!dirty || pending} onClick={onSave} className={cn(btnF, "disabled:opacity-50")}>
         {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
       </button>

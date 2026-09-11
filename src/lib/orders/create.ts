@@ -15,7 +15,8 @@ import { CHECKOUT_PRICING_CHANGED, prepareCheckoutPricing } from "@/lib/orders/c
 import { revalueInventoryProducts } from "@/lib/inventory/cost-valuation";
 import { getOrderStockRestorations, restoreOrderStockInTransaction } from "@/lib/inventory/order-stock-restoration";
 import { getCurrentShift } from "@/lib/data/shifts";
-import { calculateProductTax } from "@/lib/orders/product-tax";
+import { calculateTaxBreakdown } from "@/lib/tax/calculations";
+import type { StorePrefs } from "@/lib/schemas/settings";
 import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
 import { createNotificationEventInTx } from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
@@ -47,7 +48,10 @@ export async function createOrderForUser(
   userId: string,
   input: CreateOrderInput,
   // Server-only authorization context, never parsed from a client payload.
-  authorization?: { items: NormalizedOrderItem[] },
+  authorization?: {
+    items: NormalizedOrderItem[];
+    taxPrefs?: Pick<StorePrefs["tax"], "vatTreatment" | "priceIncludesTax">;
+  },
 ): Promise<ActionResult<{ id: string; code: string }>> {
   const parsed = createOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -55,6 +59,12 @@ export async function createOrderForUser(
   const context = await resolveStoreContextForUser(userId);
   if (!context) return { ok: false, error: "errors.unauthorized" };
   const { storeId } = context;
+  // Callers that already passed the authorization fence also pass the same
+  // store tax snapshot. Direct/internal callers retain the legacy behavior.
+  const taxPrefs = authorization?.taxPrefs ?? {
+    vatTreatment: "taxable" as const,
+    priceIncludesTax: false,
+  };
 
   const paymentPending = v.paymentPending === true;
   if (
@@ -96,13 +106,18 @@ export async function createOrderForUser(
         tx, storeId, v, context.role, authorization?.items,
       );
       const subtotal = trustedItems.reduce((s, i) => s + i.total, 0);
-      const afterDiscount = Math.max(0, subtotal - v.discount);
-      const tax = calculateProductTax({
-        lines: trustedItems.map((item) => ({ total: item.total, vatRate: vatRateByProduct.get(item.productId) ?? null })),
+      const taxEnabled = v.taxEnabled && taxPrefs.vatTreatment === "taxable";
+      const taxBreakdown = calculateTaxBreakdown({
+        lines: trustedItems.map((item) => ({
+          total: item.total,
+          vatRate: taxEnabled ? vatRateByProduct.get(item.productId) ?? null : 0,
+        })),
         discount: v.discount,
-        fallbackVatRate: v.taxRate,
+        fallbackVatRate: taxEnabled ? v.taxRate : 0,
+        priceIncludesTax: taxPrefs.priceIncludesTax,
       });
-      const total = Math.max(0, afterDiscount + tax + v.shippingFee);
+      const tax = taxBreakdown.tax;
+      const total = Math.max(0, taxBreakdown.totalAfterTax + v.shippingFee);
       const paid = isQuote || isBooking || v.payment.method === "credit" ? 0 : Math.min(v.payment.amount, total);
       const remaining = total - paid;
       const paymentStatus = paymentPending ? "unpaid" : paid >= total ? "paid" : paid > 0 ? "deposit" : "unpaid";

@@ -72,6 +72,7 @@ export default async function AppLayout({
           industry={store.industry}
           aiConfigured={store.prefs.ai.openaiApiKeySet}
           features={context.features}
+          role={role}
         />
         <div className="p-3 border-t border-border space-y-2">
           <ModeSwitcher current={mode} />

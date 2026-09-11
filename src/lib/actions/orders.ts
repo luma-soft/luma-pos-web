@@ -21,6 +21,7 @@ import {
   roleCanApproveOrderRequirement,
 } from "@/lib/orders/sensitive-approval";
 import { getRawStorePrefs } from "@/lib/data/settings";
+import type { StorePrefs } from "@/lib/schemas/settings";
 
 export async function createOrder(
   input: CreateOrderInput
@@ -30,6 +31,7 @@ export async function createOrder(
   const parsed = createOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   let trustedItems;
+  let taxPrefs: StorePrefs["tax"] | undefined;
   try {
     trustedItems = await normalizeOrderItems(
       gate.storeId,
@@ -38,6 +40,7 @@ export async function createOrder(
       gate.role,
     );
     const prefs = await getRawStorePrefs(gate.storeId);
+    taxPrefs = prefs.tax;
     const requirement = evaluateOrderApprovalRequirement({
       clientId: parsed.data.clientId,
       rawItems: parsed.data.items,
@@ -69,7 +72,10 @@ export async function createOrder(
     throw error;
   }
   // Lõi tách riêng. Xem src/lib/orders/create.ts.
-  return createOrderForUser(gate.userId, parsed.data, { items: trustedItems });
+  return createOrderForUser(gate.userId, parsed.data, {
+    items: trustedItems,
+    taxPrefs,
+  });
 }
 
 export async function addPayment(input: AddPaymentInput): Promise<ActionResult> {

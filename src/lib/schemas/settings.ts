@@ -46,6 +46,10 @@ export const NOTIF_TYPES = [
   "qrPaymentException",
 ] as const;
 export const PAPER_SIZES = ["K80", "K57", "A5", "A4"] as const;
+export const TAXPAYER_TYPES = ["household_business", "individual_business", "enterprise"] as const;
+export const TAX_CALCULATION_METHODS = ["unconfigured", "non_taxable", "revenue_percentage", "taxable_income"] as const;
+export const TAX_FILING_FREQUENCIES = ["unconfigured", "monthly", "quarterly", "annual", "per_occurrence"] as const;
+export const VAT_TREATMENTS = ["taxable", "zero_rated", "not_subject", "not_declared"] as const;
 export const AI_PROVIDERS = ["openai", "deepseek", "gemini"] as const;
 export const AI_TEXT_MODELS = [
   "gpt-4.1-mini",
@@ -59,9 +63,30 @@ export const AI_TEXT_MODELS = [
 export const AI_VISION_MODELS = ["gpt-4.1-mini", "gpt-4.1", "gpt-4.1-nano", "gemini-2.5-flash", "gemini-2.5-pro"] as const;
 export const AI_ATTACHMENT_BUCKETS = ["ai-attachments", "ai-pos-attachments", "luma-ai-attachments"] as const;
 
+const taxBusinessActivity = z.object({
+  id: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(1).max(160),
+  vatRate: z.number().min(0).max(100),
+  pitRate: z.number().min(0).max(100),
+  enabled: z.boolean().default(true),
+});
+
 const taxPrefs = z.object({
+  taxpayerType: z.enum(TAXPAYER_TYPES).default("household_business"),
+  calculationMethod: z.enum(TAX_CALCULATION_METHODS).default("unconfigured"),
+  filingFrequency: z.enum(TAX_FILING_FREQUENCIES).default("unconfigured"),
+  effectiveFrom: z.union([z.literal(""), z.iso.date()]).default(""),
+  taxpayerName: z.string().trim().max(200).default(""),
+  taxpayerAddress: z.string().trim().max(300).default(""),
+  taxpayerEmail: z.union([z.literal(""), z.email()]).default(""),
+  formerTaxCode: z.string().trim().max(30).default(""),
+  vatTreatment: z.enum(VAT_TREATMENTS).default("taxable"),
+  // Legacy stores applied a positive default rate automatically. Keep that
+  // behavior unless the store explicitly turns it off with the new setting.
+  autoApplyDefaultVat: z.boolean().default(true),
   defaultRate: z.number().min(0).max(100).default(8),
   priceIncludesTax: z.boolean().default(false),
+  businessActivities: z.array(taxBusinessActivity).max(30).default([]),
   einvoiceEnabled: z.boolean().default(false),
   einvoiceProvider: z.string().max(40).default("VNPT"),
   einvoiceTaxId: z.string().max(30).default(""),
@@ -298,7 +323,24 @@ const shopeePrefs = z.object({
 });
 
 export const storePrefsSchema = z.object({
-  tax: taxPrefs.default({ defaultRate: 8, priceIncludesTax: false, einvoiceEnabled: false, einvoiceProvider: "VNPT", einvoiceTaxId: "" }),
+  tax: taxPrefs.default({
+    taxpayerType: "household_business",
+    calculationMethod: "unconfigured",
+    filingFrequency: "unconfigured",
+    effectiveFrom: "",
+    taxpayerName: "",
+    taxpayerAddress: "",
+    taxpayerEmail: "",
+    formerTaxCode: "",
+    vatTreatment: "taxable",
+    autoApplyDefaultVat: true,
+    defaultRate: 8,
+    priceIncludesTax: false,
+    businessActivities: [],
+    einvoiceEnabled: false,
+    einvoiceProvider: "VNPT",
+    einvoiceTaxId: "",
+  }),
   payments: paymentPrefs.default({ cash: true, qr: true, momo: false, zalopay: false, vnpay: false, card: false, credit: true }),
   notifications: notificationPrefs.default({
     lowStock: true,
@@ -395,7 +437,28 @@ export type StorePrefsPatch = z.infer<typeof storePrefsPatchSchema>;
 
 /** Parse prefs lưu trong DB → đầy đủ field (điền default cho field thiếu). */
 export function parseStorePrefs(raw: unknown): StorePrefs {
-  return storePrefsSchema.parse(normalizeStoredNotificationRouting(raw));
+  return storePrefsSchema.parse(
+    normalizeStoredTaxPrefs(normalizeStoredNotificationRouting(raw)),
+  );
+}
+
+function normalizeStoredTaxPrefs(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw ?? {};
+  const prefs = raw as Record<string, unknown>;
+  const tax = prefs.tax;
+  if (!tax || typeof tax !== "object" || Array.isArray(tax)) return raw;
+  const taxRecord = tax as Record<string, unknown>;
+  if (typeof taxRecord.autoApplyDefaultVat === "boolean") return raw;
+  const legacyRate = typeof taxRecord.defaultRate === "number"
+    ? taxRecord.defaultRate
+    : 8;
+  return {
+    ...prefs,
+    tax: {
+      ...taxRecord,
+      autoApplyDefaultVat: legacyRate > 0,
+    },
+  };
 }
 
 function normalizeStoredNotificationRouting(raw: unknown): unknown {

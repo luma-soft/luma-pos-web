@@ -79,6 +79,7 @@ async function buildProductCatalogSnapshot(
         isVariantParent: products.isVariantParent,
         m2PerUnit: products.m2PerUnit,
         priceByWeight: hasComplianceColumns ? products.priceByWeight : sql<boolean>`false`,
+        vatRate: hasComplianceColumns ? products.vatRate : sql<string | null>`null`,
         isStockManaged: sql<boolean>`(
           ${products.productKind} = 'product'
           and (

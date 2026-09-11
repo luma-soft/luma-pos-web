@@ -161,6 +161,8 @@
     "customers": "Khách hàng",
     "suppliers": "Nhà cung cấp",
     "reports": "Báo cáo",
+    "accounting": "Sổ kế toán",
+    "taxDeclarations": "Kê khai thuế",
     "settings": "Cài đặt",
     "tools": "Công cụ",
     "purchases": "Nhập hàng",
@@ -201,6 +203,16 @@
     "mobileInventory": "Kho",
     "mobileOrders": "Đơn",
     "returns": "Trả hàng"
+  },
+  "accounting": {
+    "tabs": {
+      "revenue": "Sổ doanh thu",
+      "incomeExpense": "Doanh thu & chi phí",
+      "inventory": "Hàng hóa",
+      "cash": "Tiền",
+      "otherTax": "Thuế khác",
+      "classification": "Phân loại thuế"
+    }
   },
   "mediaLibrary": {
     "title": "Bộ sưu tập",

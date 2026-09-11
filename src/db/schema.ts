@@ -475,6 +475,7 @@ export const products = pgTable("products", {
   contractorPrice: decimal("contractor_price", { precision: 14, scale: 2 }),
   agentPrice: decimal("agent_price", { precision: 14, scale: 2 }),
   vatRate: decimal("vat_rate", { precision: 5, scale: 2 }),
+  taxActivityId: varchar("tax_activity_id", { length: 80 }),
   priceByWeight: boolean("price_by_weight").notNull().default(false),
   trackBatches: boolean("track_batches").notNull().default(false),
   shelfLifeDays: integer("shelf_life_days"),
@@ -1060,12 +1061,15 @@ export const paymentBankAccounts = pgTable("payment_bank_accounts", {
   webhookSecret: text("webhook_secret"),
   apiKey: text("api_key"),
   note: text("note"),
+  taxRegistrationStatus: varchar("tax_registration_status", { length: 20 }).notNull().default("not_declared"),
+  taxRegisteredAt: timestamp("tax_registered_at", { withTimezone: true }),
   createdBy: uuid("created_by").references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("payment_bank_accounts_provider_idx").on(t.provider),
   index("payment_bank_accounts_enabled_idx").on(t.enabled),
+  check("payment_bank_accounts_tax_registration_check", sql`${t.taxRegistrationStatus} in ('not_declared', 'declared', 'inactive')`),
   uniqueIndex("payment_bank_accounts_provider_account_idx").on(t.provider, t.accountNumber, t.subAccount),
 ]);
 
@@ -1142,6 +1146,10 @@ export const orderItems = pgTable("order_items", {
   discount: decimal("discount", { precision: 14, scale: 2 }).notNull().default("0"),
   total: decimal("total", { precision: 14, scale: 2 }).notNull(),
   note: text("note"),
+  taxActivityId: varchar("tax_activity_id", { length: 80 }),
+  taxActivityName: text("tax_activity_name"),
+  vatRevenueRate: decimal("vat_revenue_rate", { precision: 5, scale: 2 }),
+  pitRevenueRate: decimal("pit_revenue_rate", { precision: 5, scale: 2 }),
 }, (t) => [index("order_items_order_idx").on(t.orderId)]);
 
 // ============= Payments (đặt cọc, thanh toán nhiều đợt) =============
@@ -1522,6 +1530,10 @@ export const returnItems = pgTable("return_items", {
   unitPrice: decimal("unit_price", { precision: 14, scale: 2 }).notNull(),
   total: decimal("total", { precision: 14, scale: 2 }).notNull(),
   restock: boolean("restock").notNull().default(true), // false = hàng hỏng, không nhập lại kho bán
+  taxActivityId: varchar("tax_activity_id", { length: 80 }),
+  taxActivityName: text("tax_activity_name"),
+  vatRevenueRate: decimal("vat_revenue_rate", { precision: 5, scale: 2 }),
+  pitRevenueRate: decimal("pit_revenue_rate", { precision: 5, scale: 2 }),
 }, (t) => [index("return_items_return_idx").on(t.returnId)]);
 
 export const paymentRefunds = pgTable("payment_refunds", {
@@ -2471,6 +2483,50 @@ export const einvoices = pgTable("einvoices", {
 }, (t) => [
   index("einvoices_retry_idx").on(t.status, t.nextAttemptAt),
   index("einvoices_lock_idx").on(t.lockedAt),
+]);
+
+// ============= Tax declarations and other tax obligations =============
+
+export const taxDeclarations = pgTable("tax_declarations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  periodType: varchar("period_type", { length: 20 }).notNull(),
+  periodKey: varchar("period_key", { length: 20 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("draft"),
+  revenue: decimal("revenue", { precision: 14, scale: 2 }).notNull().default("0"),
+  vatAmount: decimal("vat_amount", { precision: 14, scale: 2 }).notNull().default("0"),
+  pitAmount: decimal("pit_amount", { precision: 14, scale: 2 }).notNull().default("0"),
+  snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull().default({}),
+  authorityReference: text("authority_reference"),
+  note: text("note"),
+  submittedBy: uuid("submitted_by").references(() => profiles.id),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("tax_declarations_store_period_unique").on(t.storeId, t.periodType, t.periodKey),
+  index("tax_declarations_store_status_idx").on(t.storeId, t.status),
+  check("tax_declarations_period_type_check", sql`${t.periodType} in ('monthly', 'quarterly', 'annual', 'per_occurrence')`),
+  check("tax_declarations_status_check", sql`${t.status} in ('draft', 'ready', 'submitted', 'accepted', 'rejected')`),
+]);
+
+export const otherTaxObligations = pgTable("other_tax_obligations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  occurredOn: date("occurred_on").notNull(),
+  taxType: varchar("tax_type", { length: 40 }).notNull(),
+  description: text("description").notNull(),
+  reference: text("reference"),
+  payableAmount: decimal("payable_amount", { precision: 14, scale: 2 }).notNull().default("0"),
+  paidAmount: decimal("paid_amount", { precision: 14, scale: 2 }).notNull().default("0"),
+  dueOn: date("due_on"),
+  paidOn: date("paid_on"),
+  createdBy: uuid("created_by").references(() => profiles.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("other_tax_obligations_store_date_idx").on(t.storeId, t.occurredOn),
+  check("other_tax_obligations_amount_check", sql`${t.payableAmount} >= 0 and ${t.paidAmount} >= 0 and ${t.paidAmount} <= ${t.payableAmount}`),
 ]);
 
 // ============= Kiểm kho (stocktake) =============

@@ -161,6 +161,8 @@
     "customers": "Customers",
     "suppliers": "Suppliers",
     "reports": "Reports",
+    "accounting": "Accounting books",
+    "taxDeclarations": "Tax declarations",
     "settings": "Settings",
     "tools": "Tools",
     "purchases": "Purchasing",
@@ -201,6 +203,16 @@
     "mobileInventory": "Inventory",
     "mobileOrders": "Orders",
     "returns": "Returns"
+  },
+  "accounting": {
+    "tabs": {
+      "revenue": "Revenue book",
+      "incomeExpense": "Revenue & expenses",
+      "inventory": "Inventory",
+      "cash": "Cash",
+      "otherTax": "Other taxes",
+      "classification": "Tax classification"
+    }
   },
   "mediaLibrary": {
     "title": "Gallery",

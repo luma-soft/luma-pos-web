@@ -50,6 +50,7 @@ export function catalogItemToPosProduct(
     contractorPrice: product.contractorPrice,
     agentPrice: product.agentPrice,
     priceByWeight: product.priceByWeight,
+    vatRate: product.vatRate,
     m2PerUnit: product.m2PerUnit,
     categoryId: product.categoryId,
     categoryName: product.categoryName,

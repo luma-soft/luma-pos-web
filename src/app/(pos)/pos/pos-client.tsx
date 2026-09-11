@@ -88,6 +88,7 @@ import {
 import { buildPrintPaymentQr, formatPrintPaymentReference, resolvePrintPaymentQrAccount, type PrintPaymentQr } from "@/lib/print/payment-qr";
 import { waitForPrintImages } from "@/lib/print/wait-for-images";
 import { isSellPriceBelowPurchase, purchasePriceForSoldUnit } from "@/lib/pos/below-purchase-warning";
+import { calculateTaxBreakdown } from "@/lib/tax/calculations";
 
 type CartLine = {
   key: string;
@@ -232,24 +233,24 @@ const FIRST_INV_ID = "inv-1"; // id ổn định cho SSR (tránh hydration misma
 const SOURCE_INV_ID = "inv-source";
 
 /** Đơn rỗng. id truyền vào để lần đầu dùng id cố định, các tab sau dùng Date.now. */
-function makeDraft(id?: string, kind: PosDraftKind = "invoice"): PosDraft {
+function makeDraft(id?: string, kind: PosDraftKind = "invoice", defaultTaxRate = 0): PosDraft {
   return {
     id: id ?? `inv-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
     kind,
     cart: [], customerId: "", projectId: "", projectName: "", priceBook: "",
-    discountInput: 0, discountMode: "vnd", taxRate: 0,
+    discountInput: 0, discountMode: "vnd", taxRate: defaultTaxRate,
     shippingFee: 0, payMethod: "cash", paidInput: null,
     returnReason: "other", returnRestock: true,
   };
 }
 
-function makeInvoice(id?: string): PosDraft {
-  return makeDraft(id, "invoice");
+function makeInvoice(id?: string, defaultTaxRate = 0): PosDraft {
+  return makeDraft(id, "invoice", defaultTaxRate);
 }
 
-function makeDraftFromContext(context: PosInitialContext, products: PosProduct[], id = SOURCE_INV_ID): PosDraft {
+function makeDraftFromContext(context: PosInitialContext, products: PosProduct[], id = SOURCE_INV_ID, defaultTaxRate = 0): PosDraft {
   return {
-    ...makeDraft(id, context.kind),
+    ...makeDraft(id, context.kind, defaultTaxRate),
     cameraQuote: context.cameraQuote,
     cameraInitialId: context.cameraId,
     customerId: context.customerId ?? "",
@@ -436,6 +437,7 @@ export function PosClient({
   initialSourceInvoice,
   initialContext,
   posPrefs,
+  taxPrefs,
 }: {
   storageScope: string;
   data: PosData;
@@ -446,6 +448,7 @@ export function PosClient({
   initialSourceInvoice?: PosSourceInvoice | null;
   initialContext?: PosInitialContext | null;
   posPrefs: StorePrefs["pos"];
+  taxPrefs: StorePrefs["tax"];
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -457,6 +460,9 @@ export function PosClient({
     return () => { priceBookSwitchMounted.current = false; };
   }, []);
   const productCatalog = useProductCatalog();
+  const defaultDraftTaxRate = taxPrefs.autoApplyDefaultVat && taxPrefs.vatTreatment === "taxable"
+    ? taxPrefs.defaultRate
+    : 0;
 
   const [search, setSearch] = useState("");
   const [submittingMode, setSubmittingMode] = useState<"sale" | "quote" | "booking" | "return" | null>(null);
@@ -546,11 +552,11 @@ export function PosClient({
 
   // nhiều hóa đơn cùng lúc (tab). id đầu cố định để khớp SSR.
   const [invoices, setInvoices] = useState<PosDraft[]>(() => [
-    makeInvoice(FIRST_INV_ID),
+    makeInvoice(FIRST_INV_ID, defaultDraftTaxRate),
     ...(initialSourceInvoice
       ? [makeDraftFromSource(initialSourceInvoice, data.products, SOURCE_INV_ID)]
       : initialContext
-        ? [makeDraftFromContext(initialContext, data.products)]
+        ? [makeDraftFromContext(initialContext, data.products, SOURCE_INV_ID, defaultDraftTaxRate)]
         : []),
   ]);
   const [activeId, setActiveId] = useState(initialSourceInvoice || initialContext ? SOURCE_INV_ID : FIRST_INV_ID);
@@ -712,7 +718,7 @@ export function PosClient({
 
   /** Thêm tab POS mới và chuyển sang nó. */
   function addDraft(kind: PosDraftKind, cameraQuote = false) {
-    const inv = { ...makeDraft(undefined, kind), cameraQuote };
+    const inv = { ...makeDraft(undefined, kind, defaultDraftTaxRate), cameraQuote };
     setInvoices((list) => [...list, inv]);
     setActiveId(inv.id);
     setAddMenuOpen(false);
@@ -721,7 +727,7 @@ export function PosClient({
 
   function parkActiveDraft() {
     if (cart.length === 0 || initialSourceInvoice || initialContext) return;
-    const nextDraft = makeInvoice();
+    const nextDraft = makeInvoice(undefined, defaultDraftTaxRate);
     const snapshot = parkPosDraftSnapshot(
       localStorage,
       storageScope,
@@ -757,10 +763,10 @@ export function PosClient({
       const closingFirstInvoice = list.length > 1 && list[0]?.id === id && (list[0].kind ?? "invoice") === "invoice";
       if (closingFirstInvoice) {
         setActiveId(id);
-        return [makeInvoice(id), ...list.slice(1)];
+        return [makeInvoice(id, defaultDraftTaxRate), ...list.slice(1)];
       }
       const next = list.filter((i) => i.id !== id);
-      const final = ensureInvoiceFirst(next.length > 0 ? next : [makeInvoice()]);
+      const final = ensureInvoiceFirst(next.length > 0 ? next : [makeInvoice(undefined, defaultDraftTaxRate)]);
       if (id === activeId) setActiveId(final[Math.max(0, list.findIndex((i) => i.id === id) - 1)]?.id ?? final[0].id);
       return final;
     });
@@ -895,7 +901,7 @@ export function PosClient({
   function clearInvoice(id: string) {
     setInvoices((list) => list.map((inv) => {
       if (inv.id !== id) return inv;
-      const next = makeDraft(id, inv.kind ?? "invoice");
+      const next = makeDraft(id, inv.kind ?? "invoice", defaultDraftTaxRate);
       next.cameraQuote = inv.cameraQuote;
       return next;
     }));
@@ -1106,8 +1112,22 @@ export function PosClient({
   const returnQuantity = cart.reduce((sum, line) => sum + line.quantity, 0);
   const hasReturnQuantity = returnQuantity > 0;
   const discountVnd = isReturnDraft ? 0 : discountMode === "pct" ? Math.round(subtotal * discountInput / 100) : discountInput;
-  const taxAmount = isReturnDraft ? 0 : Math.round((subtotal - discountVnd) * taxRate / 100);
-  const total = isReturnDraft ? subtotal : Math.max(0, subtotal - discountVnd + taxAmount + shippingFee);
+  const taxEnabled = taxPrefs.vatTreatment === "taxable"
+    && (taxPrefs.autoApplyDefaultVat || taxRate > 0);
+  const taxBreakdown = calculateTaxBreakdown({
+    lines: cart.map((line) => ({
+      total: effPrice(line).price * line.quantity,
+      vatRate: taxEnabled
+        ? line.product.vatRate == null ? null : Number(line.product.vatRate)
+        : 0,
+    })),
+    discount: discountVnd,
+    fallbackVatRate: taxEnabled ? taxRate : 0,
+    priceIncludesTax: taxPrefs.priceIncludesTax,
+  });
+  const taxAmount = isReturnDraft ? 0 : taxBreakdown.tax;
+  const total = isReturnDraft ? subtotal : Math.max(0, taxBreakdown.totalAfterTax + shippingFee);
+  const mixedTaxRates = taxBreakdown.rates.length > 1;
   const paid = payMethod === "credit" ? 0 : (paidInput ?? total);
   const payableAmount = Math.min(Math.max(0, paid), total);
   const remaining = Math.max(0, total - paid);
@@ -1152,7 +1172,7 @@ export function PosClient({
         subtotal,
         discount: discountVnd,
         tax: taxAmount,
-        taxRate,
+        taxRate: mixedTaxRates ? undefined : taxBreakdown.rates[0] ?? taxRate,
         shipping: shippingFee,
       },
       grandTotal: total,
@@ -1460,6 +1480,7 @@ export function PosClient({
       projectName: projectName || undefined,
       deliveryDate: submitMode === "booking" && deliveryDate ? deliveryDate : undefined,
       discount: discountVnd,
+      taxEnabled,
       taxRate,
       shippingFee,
       priceBookId: priceBook || null,
@@ -2419,10 +2440,10 @@ export function PosClient({
                   onModeChange={setDiscountMode}
                 />
               </PosSummaryAdjustRow>
-              {taxRate > 0 && (
+              {taxPrefs.vatTreatment === "taxable" && (
                 <PosSummaryAdjustRow
-                  label={t("pos.tax")}
-                  hint={`+ ${formatCurrency(taxAmount)}`}
+                  label={`${t("pos.tax")}${mixedTaxRates ? " · nhiều mức" : ""}`}
+                  hint={`${taxPrefs.priceIncludesTax ? "=" : "+"} ${formatCurrency(taxAmount)}`}
                   hintVisible
                 >
                   <PosAmountModeInput value={taxRate} mode="pct" onValueChange={setTaxRate} />

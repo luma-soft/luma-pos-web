@@ -10,6 +10,7 @@ import { catalogProductSearchCondition } from "@/lib/search";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 import { applySystemPriceBooks } from "@/lib/pos/system-price-projection";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
+import { getRawStorePrefs } from "@/lib/data/settings";
 
 export interface PosUnit {
   unitName: string;
@@ -81,6 +82,7 @@ function posProductSelect(
     m2PerUnit: products.m2PerUnit,
     categoryId: products.categoryId,
     categoryName: categories.name,
+    vatRate: hasComplianceColumns ? products.vatRate : sql<string | null>`null`,
     lastSoldAt: lastCompletedSaleAt(),
     comboItems: sql<Array<{ productId: string; quantity: string }>>`coalesce((
       select json_agg(json_build_object(
@@ -300,12 +302,16 @@ export async function getPosData(storeId: string, options?: {
 export async function getMobilePosData(storeId: string, role: Role) {
   // Reuse the POS dataset so mobile gets the same POS projection,
   // manager-only price books, stock reservations, and product image data.
-  const data = await getPosData(storeId, { role, sort: "created" });
+  const [data, prefs] = await Promise.all([
+    getPosData(storeId, { role, sort: "created" }),
+    getRawStorePrefs(storeId),
+  ]);
   return {
     ...data,
     products: data.products.slice(0, 30),
     customers: data.customers.slice(0, 100),
     projects: data.projects.slice(0, 100),
+    taxPrefs: prefs.tax,
   };
 }
 
