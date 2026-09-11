@@ -20,3 +20,18 @@ test("the combined panel keeps template creation and status context", () => {
   expect(form).toContain("item.isDefault ? \"★ · \" : \"\"");
   expect(form).toContain('item.isActive ? t("printSettings.active") : t("printSettings.inactive")');
 });
+
+test("settings and preview use a vertical layout with a fullscreen preview action", () => {
+  expect(form).not.toContain("xl:grid-cols-[minmax(0,1fr)_380px]");
+  expect(form).toContain('className="space-y-6"');
+  expect(form).toContain("isPreviewFullscreen && \"fixed inset-0");
+  expect(form).toContain("previewSurfaceRef.current?.scrollTo({ top: 0, left: 0 })");
+  expect(form).toContain('"printSettings.fullscreenPreview"');
+  expect(form).toContain('"printSettings.exitFullscreenPreview"');
+});
+
+test("template picker keeps its own row and the add button at control height", () => {
+  expect(form).toContain('sm:grid-cols-[minmax(0,1fr)_auto]');
+  expect(form).toContain('rootClassName="w-full min-w-0"');
+  expect(form).toContain("shrink-0 self-end items-center justify-center");
+});

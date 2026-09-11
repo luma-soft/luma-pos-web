@@ -146,6 +146,7 @@ export default async function PrintBatchPage({ searchParams }: Props) {
     paid: t("print.debtSummary.paid"),
     remaining: t("print.debtSummary.remaining"),
     openingDebt: t("print.debtSummary.openingDebt"),
+    openingCredit: t("print.debtSummary.openingCredit"),
     batchTotal: t("print.debtSummary.batchTotal"),
     batchPaid: t("print.debtSummary.batchPaid"),
     batchRemaining: t("print.debtSummary.batchRemaining"),

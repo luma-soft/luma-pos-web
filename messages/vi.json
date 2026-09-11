@@ -3378,11 +3378,12 @@
       "invoiceTotal": "Tiền hàng",
       "paid": "Đã trả",
       "remaining": "Còn nợ",
-      "openingDebt": "Công nợ trước lô in",
-      "batchTotal": "Tổng tiền lô in",
-      "batchPaid": "Đã thanh toán trong lô",
-      "batchRemaining": "Còn nợ trong lô",
-      "currentDebt": "TỔNG CÔNG NỢ HIỆN TẠI"
+      "openingDebt": "Công nợ đầu kỳ",
+      "openingCredit": "Khách trả dư đầu kỳ",
+      "batchTotal": "Tiền hàng trong kỳ",
+      "batchPaid": "Đã thanh toán trong kỳ",
+      "batchRemaining": "Còn nợ phát sinh trong kỳ",
+      "currentDebt": "CÔNG NỢ CUỐI KỲ"
     }
   },
   "printSettings": {
@@ -3502,7 +3503,9 @@
     "previewNote": "Ghi chú mẫu để kiểm tra bố cục.",
     "saveFor": "Lưu mẫu: {type}",
     "saved": "Đã lưu mẫu in ✓",
-    "preview": "Xem trước (rút gọn)",
+    "preview": "Xem trước mẫu in",
+    "fullscreenPreview": "Xem toàn màn hình",
+    "exitFullscreenPreview": "Thoát toàn màn hình",
     "previewHint": "Khi in thật, mẫu tự dàn trang theo khổ A4/A5/K80 đã chọn.",
     "errors": {
       "defaultRequired": "Cần có mẫu mặc định khác trước khi ngừng dùng mẫu này."

@@ -261,8 +261,10 @@ input[type="number"] {
 .hikvision-quote-print-root { display: none; }
 @media print {
   @page { margin: 0; }
-  @page print-a4 { size: A4 portrait; margin: 0; }
-  @page print-a5 { size: A5 portrait; margin: 0; }
+  /* Use physical page margins so every fragmented page gets the same safe area.
+     Padding on one long .print-document only applies to its first/last fragment. */
+  @page print-a4 { size: A4 portrait; margin: 12mm; }
+  @page print-a5 { size: A5 portrait; margin: 10mm; }
 
   /* Bản xem trước chứng từ chạy trong layout app: chỉ cho phép nội dung phiếu đi vào máy in. */
   body:has(.print-document-root) .app-sidebar,
@@ -322,6 +324,14 @@ input[type="number"] {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
+  .print-document-root .print-document--a4 {
+    width: 186mm !important;
+    padding: 0 !important;
+  }
+  .print-document-root .print-document--a5 {
+    width: 128mm !important;
+    padding: 0 !important;
+  }
   .print-document--a4 { page: print-a4; }
   .print-document--a5 { page: print-a5; }
   .print-document-root .print-line-items thead { display: table-header-group; }
@@ -355,11 +365,13 @@ input[type="number"] {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
-  body.pos-printing .print-document--a4 { width: 210mm !important; }
+  body.pos-printing .print-document--a4 {
+    width: 186mm !important;
+    padding: 0 !important;
+  }
   body.pos-printing .print-document--a5 {
-    width: 148mm !important;
-    /* Tránh phần padding tràn dưới A5 vài px tạo thêm một trang trắng. */
-    padding-bottom: 36px !important;
+    width: 128mm !important;
+    padding: 0 !important;
   }
   body.pos-printing .print-line-items thead { display: table-header-group; }
   body.pos-printing .print-line-items tr {

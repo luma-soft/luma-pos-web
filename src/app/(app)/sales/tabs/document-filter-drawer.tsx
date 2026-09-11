@@ -290,6 +290,45 @@ function amountRangeInvalid(draft: DocumentFilterDraft) {
   return hasMin && hasMax && min > max;
 }
 
+export function hasActiveDocumentFilters(
+  kind: DocumentFilterKind,
+  values: DocumentFilterValues,
+) {
+  const commonActive = Boolean(
+    values.customerId ||
+      values.customerLabel ||
+      values.productId ||
+      values.productLabel ||
+      values.timePreset !== DEFAULT_TIME_FILTER_PRESET ||
+      values.minTotal.trim() ||
+      values.maxTotal.trim(),
+  );
+  if (commonActive) return true;
+
+  if (kind === "returns") {
+    return Boolean(
+      values.orderId ||
+        values.orderLabel ||
+        (values.reason && values.reason !== "all") ||
+        (values.refundMethod && values.refundMethod !== "all") ||
+        values.includeCancelled,
+    );
+  }
+
+  const projectActive = Boolean(
+    values.projectId || values.projectLabel || values.projectQuery,
+  );
+  if (kind === "quotes") {
+    return projectActive || Boolean(values.status && values.status !== "quote");
+  }
+  return Boolean(
+    projectActive ||
+      (values.deliveryPreset && values.deliveryPreset !== "all") ||
+      (values.status && values.status !== "all") ||
+      (values.payment && values.payment !== "all"),
+  );
+}
+
 export function DocumentFilterDrawer({
   kind,
   values,
@@ -562,6 +601,7 @@ export function DocumentFilterDrawer({
           onClick={openDrawer}
           label="Lọc"
           hideLabelOnSmallScreens
+          active={hasActiveDocumentFilters(kind, values)}
         />}
       />
 

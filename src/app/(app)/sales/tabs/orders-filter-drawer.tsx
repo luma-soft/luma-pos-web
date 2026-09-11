@@ -133,6 +133,23 @@ function amountRangeInvalid(draft: OrdersFilterDraft) {
   return minSet && maxSet && min > max;
 }
 
+export function hasActiveOrderFilters(values: OrdersFilterValues) {
+  return Boolean(
+    values.customerId ||
+      values.customerLabel ||
+      values.productId ||
+      values.productLabel ||
+      values.status !== "all" ||
+      values.payment !== "all" ||
+      values.paymentMethod !== "all" ||
+      values.source !== "all" ||
+      values.timePreset !== DEFAULT_TIME_FILTER_PRESET ||
+      values.minTotal.trim() ||
+      values.maxTotal.trim() ||
+      values.includeCancelled,
+  );
+}
+
 export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
   const t = useTranslations();
   const router = useRouter();
@@ -353,6 +370,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
           ref={openButtonRef}
           onClick={openDrawer}
           label="Lọc"
+          active={hasActiveOrderFilters(values)}
         />}
       />
 

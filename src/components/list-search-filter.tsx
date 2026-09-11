@@ -48,6 +48,7 @@ export const FilterTriggerButton = forwardRef<HTMLButtonElement, FilterTriggerBu
     {
       active = false,
       "aria-label": ariaLabel,
+      "aria-pressed": ariaPressed,
       className,
       hideLabelOnSmallScreens = false,
       label,
@@ -62,8 +63,12 @@ export const FilterTriggerButton = forwardRef<HTMLButtonElement, FilterTriggerBu
         ref={ref}
         type={type}
         aria-label={ariaLabel ?? label}
+        aria-pressed={ariaPressed ?? active}
         className={cn(
-          "relative inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-primary-600 bg-surface px-4 text-sm font-bold text-primary-700 transition hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+          "relative inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+          active
+            ? "border-primary-600 bg-primary-50 text-primary-700 shadow-sm ring-1 ring-primary-200 hover:bg-primary-100 dark:bg-primary-950/50 dark:text-primary-200 dark:ring-primary-800"
+            : "border-primary-600 bg-surface text-primary-700 hover:bg-primary-50",
           className,
           "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-w-0",
         )}

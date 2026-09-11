@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Select } from "@/components/ui/select";
 import { SlidersHorizontal } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function InstantProductFilters({
   category,
@@ -23,6 +24,7 @@ export function InstantProductFilters({
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const active = Boolean(category) || status !== "active" || view !== "grouped";
 
   function update(key: string, value: string) {
     const next = new URLSearchParams(params.toString());
@@ -49,7 +51,15 @@ export function InstantProductFilters({
         className="min-w-0"
       />
       {showAdditionalFilters && <details className="group w-full sm:contents">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-border bg-surface text-sm font-bold text-slate-600 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:hidden min-w-11">
+        <summary
+          aria-pressed={active}
+          className={cn(
+            "flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-2 rounded-xl border text-sm font-bold marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:hidden",
+            active
+              ? "border-primary-600 bg-primary-50 text-primary-700 shadow-sm ring-1 ring-primary-200"
+              : "border-border bg-surface text-slate-600",
+          )}
+        >
           <SlidersHorizontal className="h-4 w-4" />
           {labels.filters}
         </summary>

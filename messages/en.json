@@ -3378,11 +3378,12 @@
       "invoiceTotal": "Invoice total",
       "paid": "Paid",
       "remaining": "Balance",
-      "openingDebt": "Debt before print batch",
-      "batchTotal": "Print batch total",
-      "batchPaid": "Paid in batch",
-      "batchRemaining": "Balance in batch",
-      "currentDebt": "CURRENT TOTAL DEBT"
+      "openingDebt": "Opening debt",
+      "openingCredit": "Opening customer credit",
+      "batchTotal": "Invoiced during period",
+      "batchPaid": "Paid during period",
+      "batchRemaining": "Debt incurred during period",
+      "currentDebt": "CLOSING DEBT"
     }
   },
   "printSettings": {
@@ -3502,7 +3503,9 @@
     "previewNote": "Sample note for layout checking.",
     "saveFor": "Save template: {type}",
     "saved": "Template saved ✓",
-    "preview": "Preview (condensed)",
+    "preview": "Print template preview",
+    "fullscreenPreview": "View fullscreen",
+    "exitFullscreenPreview": "Exit fullscreen",
     "previewHint": "Actual printing reflows per selected A4/A5/K80 size.",
     "errors": {
       "defaultRequired": "Set another default before deactivating this template."

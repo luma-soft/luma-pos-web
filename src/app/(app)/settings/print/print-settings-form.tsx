@@ -2,10 +2,10 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select } from "@/components/ui/select";
-import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Copy, EyeOff, Loader2, Plus, Save, Star } from "lucide-react";
+import { Copy, EyeOff, Loader2, Maximize2, Minimize2, Plus, Save, Star } from "lucide-react";
 import { PrintDoc } from "@/components/print/print-doc";
 import { PrintRichTextEditor } from "@/components/print/print-rich-text-editor";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
@@ -56,6 +56,8 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
   const visible = useMemo(() => drafts.filter((item) => item.docType === docType), [drafts, docType]);
   const [selectedId, setSelectedId] = useState(() => visible[0]?.id ?? defaultTemplate("order", storeDefaults).id);
   const [isPending, startTransition] = useTransition();
+  const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
+  const previewSurfaceRef = useRef<HTMLDivElement>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const selected = drafts.find((item) => item.id === selectedId && item.docType === docType) ?? visible[0] ?? defaultTemplate(docType, storeDefaults);
   const persisted = !selected.id.startsWith("draft-") && !selected.id.startsWith("default-");
@@ -154,6 +156,23 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
   const inputCls = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm lg:min-h-10";
   const previewQrReference = formatPrintPaymentReference(selected.options.paymentQrContentTemplate, "XX-000");
 
+  useEffect(() => {
+    if (!isPreviewFullscreen) return;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsPreviewFullscreen(false);
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isPreviewFullscreen]);
+
+  useLayoutEffect(() => {
+    if (isPreviewFullscreen) previewSurfaceRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [isPreviewFullscreen]);
   const customQrAccountInvalid = selected.options.showPaymentQr && selected.options.paymentQrAccountSource === "custom"
     && (!selected.options.paymentQrCustomBankCode.trim() || !selected.options.paymentQrCustomAccountNumber.trim());
   const previewQrAccount = resolvePrintPaymentQrAccount(selected.options, {
@@ -191,31 +210,31 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
         ))}
       </div>
 
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="order-1 space-y-4">
+      <div className="space-y-6">
+        <section className="space-y-4">
             <Panel>
-              <div className="grid items-end gap-3 lg:grid-cols-[minmax(220px,1.1fr)_minmax(220px,1fr)_auto]">
-                <div>
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <div className="min-w-0">
                   <span className="mb-1 block text-xs font-semibold text-slate-500">{t("printSettings.templateList")}</span>
-                  <div className="flex gap-2">
-                    <Select
-                      aria-label={t("printSettings.templateList")}
-                      value={selected.id}
-                      onValueChange={(value) => { setSelectedId(value); setMsg(null); }}
-                      options={visible.map((item) => ({
-                        value: item.id,
-                        label: item.name,
-                        description: `${item.isDefault ? "★ · " : ""}${item.paperDefault.toUpperCase()} · ${item.isActive ? t("printSettings.active") : t("printSettings.inactive")}`,
-                      }))}
-                      rootClassName="min-w-0 flex-1"
-                      wrapLabel
-                    />
-                    <button type="button" onClick={addTemplate} aria-label={t("common.add")} className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white min-w-11">
-                      <Plus className="h-3.5 w-3.5" />
-                      {t("common.add")}
-                    </button>
-                  </div>
+                  <Select
+                    aria-label={t("printSettings.templateList")}
+                    value={selected.id}
+                    onValueChange={(value) => { setSelectedId(value); setMsg(null); }}
+                    options={visible.map((item) => ({
+                      value: item.id,
+                      label: item.name,
+                      description: `${item.isDefault ? "★ · " : ""}${item.paperDefault.toUpperCase()} · ${item.isActive ? t("printSettings.active") : t("printSettings.inactive")}`,
+                    }))}
+                    rootClassName="w-full min-w-0"
+                    wrapLabel
+                  />
                 </div>
+                <button type="button" onClick={addTemplate} aria-label={t("common.add")} className="inline-flex min-h-11 shrink-0 self-end items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white min-w-11 lg:min-h-10">
+                  <Plus className="h-4 w-4" />
+                  {t("common.add")}
+                </button>
+              </div>
+              <div className="mt-4 grid items-end gap-3 border-t border-border-soft pt-4 sm:grid-cols-[minmax(220px,1fr)_auto]">
                 <Field label={t("printSettings.templateName")}><input value={selected.name} onChange={(event) => patch({ name: event.target.value })} className={inputCls} /></Field>
                 <Field label={t("printSettings.paperDefault")}>
                   <div className="flex gap-1.5">
@@ -381,12 +400,34 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
               </button>
               {msg && <span className={cn("text-sm font-medium", msg.ok ? "text-ok" : "text-er")}>{msg.text}</span>}
             </div>
-          </div>
+        </section>
 
-          <div className="order-2 min-w-0">
-            <p className="mb-2 text-xs font-semibold text-slate-500">{t("printSettings.preview")}</p>
-            <div className="max-h-[720px] overflow-auto rounded-card border border-border bg-slate-200 p-4 dark:bg-slate-950">
-              <div className="scale-[0.46] origin-top-left">
+        <section
+          role={isPreviewFullscreen ? "dialog" : undefined}
+          aria-modal={isPreviewFullscreen ? true : undefined}
+          aria-label={isPreviewFullscreen ? t("printSettings.preview") : undefined}
+          className={cn(
+            "min-w-0",
+            isPreviewFullscreen && "fixed inset-0 z-[100] flex flex-col bg-surface p-3 sm:p-5",
+          )}
+        >
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-bold">{t("printSettings.preview")}</h2>
+            <button
+              type="button"
+              onClick={() => setIsPreviewFullscreen((current) => !current)}
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold hover:bg-surface-2 lg:min-h-10"
+              aria-label={t(isPreviewFullscreen ? "printSettings.exitFullscreenPreview" : "printSettings.fullscreenPreview")}
+            >
+              {isPreviewFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {t(isPreviewFullscreen ? "printSettings.exitFullscreenPreview" : "printSettings.fullscreenPreview")}
+            </button>
+          </div>
+          <div className={cn(
+            "overflow-auto rounded-card border border-border bg-slate-200 p-4 dark:bg-slate-950",
+            isPreviewFullscreen ? "min-h-0 flex-1" : "max-h-[900px]",
+          )} ref={previewSurfaceRef}>
+            <div className="mx-auto w-max">
                 <PrintDoc
                   template={selected}
                   size={selected.paperDefault as PaperSize}
@@ -427,10 +468,10 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   note={t("printSettings.previewNote")}
                   cols={{ index: t("print.index"), product: t("orders.cols.product"), unit: t("orders.cols.unit"), qty: t("orders.cols.qty"), unitPrice: t("orders.cols.unitPrice"), discount: t("orders.cols.discount"), lineTotal: t("orders.cols.lineTotal") }}
                 />
-              </div>
             </div>
           </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }

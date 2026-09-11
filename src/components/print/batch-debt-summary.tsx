@@ -12,6 +12,7 @@ interface Labels {
   paid: string;
   remaining: string;
   openingDebt: string;
+  openingCredit: string;
   batchTotal: string;
   batchPaid: string;
   batchRemaining: string;
@@ -101,16 +102,22 @@ export function BatchDebtSummary({ template, size, summary, printedAt, labels }:
 }
 
 function DebtTotals({ summary, labels, compact = false }: { summary: Summary; labels: Labels; compact?: boolean }) {
+  const openingBalance = summary.openingDebt < 0
+    ? [labels.openingCredit, Math.abs(summary.openingDebt)] as const
+    : [labels.openingDebt, summary.openingDebt] as const;
   const rows = [
-    [labels.openingDebt, summary.openingDebt],
+    openingBalance,
     [labels.batchTotal, summary.batchTotal],
     [labels.batchPaid, summary.batchPaid],
     [labels.batchRemaining, summary.batchRemaining],
   ] as const;
   return (
-    <div className={compact ? "mt-2 border-y-2 border-black py-1.5" : "mt-4 ml-auto w-[330px] break-inside-avoid"}>
-      {rows.map(([label, value]) => (
-        <div key={label} className="flex justify-between gap-3 py-0.5"><span className="text-slate-600">{label}</span><span className="tabular-nums">{formatNumber(value)}</span></div>
+    <div className={compact ? "mt-2 border-y-2 border-black py-1.5" : "mt-4 ml-auto w-[390px] max-w-full break-inside-avoid"}>
+      {rows.map(([label, value], index) => (
+        <div key={label} className={`flex justify-between gap-3 py-0.5 ${index === 0 ? "mb-1 border-b border-slate-300 pb-1" : ""}`}>
+          <span className="text-slate-600">{label}</span>
+          <span className="shrink-0 tabular-nums">{formatNumber(value)}</span>
+        </div>
       ))}
       <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-black pt-1.5 font-black">
         <span>{labels.currentDebt}</span><span className={compact ? "text-[12px]" : "text-[14px]"}>{formatCurrency(summary.currentDebt)}</span>
