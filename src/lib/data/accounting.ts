@@ -94,7 +94,7 @@ export async function getRevenueBook(
     sourceId: orders.id,
     code: orders.code,
     date: orders.createdAt,
-    description: sql<string>`concat('Ghi nhận doanh thu bán hàng và thuế cho ', coalesce(nullif(trim(${customers.name}), ''), 'Người tiêu dùng'))`,
+    description: sql<string>`'Doanh thu bán hàng hóa, dịch vụ'`,
     amount: orders.total,
     einvoiceNumber: einvoices.number,
     einvoiceSerial: einvoices.serial,
