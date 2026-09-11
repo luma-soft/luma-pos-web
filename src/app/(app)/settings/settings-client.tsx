@@ -400,9 +400,9 @@ export function SettingsClient({
         />
         <div className={cn(
           "flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:px-7",
-          active === "tax" ? "pt-3 md:pt-4 md:pb-6" : "py-3 md:py-6",
+          active === "tax" ? "pt-3 md:pt-0 md:pb-6" : "py-3 md:py-6",
         )}>
-        <div className="hidden md:block">
+        <div className={cn("hidden md:block", active === "tax" && "md:pt-4")}>
           <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.07em] text-primary-600">
             {tSettings("breadcrumb.settings")} · {tSettings(`breadcrumb.${active}`)}
           </div>
