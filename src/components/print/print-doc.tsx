@@ -340,7 +340,6 @@ function K80Doc(p: PrintDocProps) {
           dangerouslySetInnerHTML={{ __html: footerHtml }}
         />
       )}
-      <div className="mt-3 text-center text-[10px] font-bold uppercase tracking-wide">Cảm ơn quý khách!</div>
     </div>
   );
 }

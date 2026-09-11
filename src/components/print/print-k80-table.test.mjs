@@ -80,3 +80,13 @@ test("K80 respects configurable QR title and visible account fields", () => {
   expect(html).toContain("Tài khoản:");
   expect(html).toContain("Nội dung:");
 });
+
+test("K80 renders only the configured footer note", () => {
+  const template = defaultTemplate("order");
+  template.footerNote = "Trân trọng cảm ơn!";
+
+  const html = renderK80({ template });
+
+  expect(html).toContain("Trân trọng cảm ơn!");
+  expect(html).not.toContain("Cảm ơn quý khách!");
+});
