@@ -13,7 +13,7 @@ describe("POS cart line ordering", () => {
     expect(next.map((line) => line.id)).toEqual(["new", "first", "second"]);
   });
 
-  test("increments an existing product without reordering the invoice", () => {
+  test("moves a reselected product to the top while incrementing it", () => {
     const current = [{ id: "first", quantity: 1 }, { id: "second", quantity: 1 }];
     const next = upsertPosCartLine(
       current,
@@ -21,6 +21,6 @@ describe("POS cart line ordering", () => {
       () => ({ id: "second", quantity: 1 }),
       (line) => ({ ...line, quantity: line.quantity + 1 }),
     );
-    expect(next).toEqual([{ id: "first", quantity: 1 }, { id: "second", quantity: 2 }]);
+    expect(next).toEqual([{ id: "second", quantity: 2 }, { id: "first", quantity: 1 }]);
   });
 });

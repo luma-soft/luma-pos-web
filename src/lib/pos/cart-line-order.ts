@@ -6,5 +6,6 @@ export function upsertPosCartLine<T>(
 ): T[] {
   const existingIndex = lines.findIndex(matches);
   if (existingIndex < 0) return [create(), ...lines];
-  return lines.map((line, index) => index === existingIndex ? increment(line) : line);
+  const updated = increment(lines[existingIndex]);
+  return [updated, ...lines.slice(0, existingIndex), ...lines.slice(existingIndex + 1)];
 }

@@ -135,7 +135,7 @@ export function ServiceInstallationBatchCreate({
       unitName: product.baseUnit,
       serialText: "",
     };
-    setDrafts((current) => [...current, draft]);
+    setDrafts((current) => [draft, ...current]);
     setActiveDraftId(draft.clientDraftId);
   }
 

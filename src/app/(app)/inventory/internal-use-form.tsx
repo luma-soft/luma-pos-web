@@ -99,8 +99,11 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
     const units = [{ name: p.baseUnit, mult: 1 }, ...p.units.map((u) => ({ name: u.unitName, mult: Number(u.multiplier) }))];
     setLines((ls) => {
       const ex = ls.findIndex((x) => x.productId === p.id);
-      if (ex >= 0) { const c = [...ls]; c[ex] = { ...c[ex], quantity: c[ex].quantity + 1 }; return c; }
-      return [...ls, { key: `${p.id}-${Date.now()}`, productId: p.id, sku: p.sku, productName: p.name, baseUnit: p.baseUnit, costPrice: cost, units, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, unitCost: cost }];
+      if (ex >= 0) {
+        const updated = { ...ls[ex], quantity: ls[ex].quantity + 1 };
+        return [updated, ...ls.slice(0, ex), ...ls.slice(ex + 1)];
+      }
+      return [{ key: `${p.id}-${Date.now()}`, productId: p.id, sku: p.sku, productName: p.name, baseUnit: p.baseUnit, costPrice: cost, units, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, unitCost: cost }, ...ls];
     });
     setQ(""); setResults([]);
   }
@@ -132,13 +135,13 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
     }
     setLines((current) => {
       const base = applyMode === "replace" ? [] : current;
-      const next = [...base];
+      const additions: Line[] = [];
       for (const product of found) {
-        if (next.some((line) => line.productId === product.id)) continue;
+        if (base.some((line) => line.productId === product.id) || additions.some((line) => line.productId === product.id)) continue;
         const cost = Number(product.costPrice);
         const units = [{ name: product.baseUnit, mult: 1 }, ...product.units.map((u) => ({ name: u.unitName, mult: Number(u.multiplier) }))];
-        next.push({
-          key: `${product.id}-${Date.now()}-${next.length}`,
+        additions.push({
+          key: `${product.id}-${Date.now()}-${additions.length}`,
           productId: product.id,
           sku: product.sku,
           productName: product.name,
@@ -151,7 +154,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
           unitCost: cost,
         });
       }
-      return next;
+      return [...additions, ...base];
     });
   }
   const upd = (key: string, patch: Partial<Line>) => setLines((ls) => ls.map((l) => l.key === key ? { ...l, ...patch } : l));

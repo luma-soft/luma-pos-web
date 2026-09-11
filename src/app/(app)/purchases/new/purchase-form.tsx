@@ -379,7 +379,7 @@ export function PurchaseForm({
   const owed = total - paid;
 
   function addProduct(p: PurchaseProductRow) {
-    setLines((ls) => [...ls, productToLine(p)]);
+    setLines((ls) => [productToLine(p), ...ls]);
     setAiPendingLines((rows) => rows.filter((row) => row.sku !== p.sku && row.label !== p.name));
     setSearch("");
   }

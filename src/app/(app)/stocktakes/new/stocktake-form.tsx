@@ -80,7 +80,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
   }, [added, catalog, search, warehouseId]);
 
   function addLine(p: ProductOption) {
-    setLines((ls) => [...ls, { product: p, actualQty: p.stock }]);
+    setLines((ls) => [{ product: p, actualQty: p.stock }, ...ls]);
     setSearch("");
   }
 
@@ -115,8 +115,8 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
       const base = applyMode === "replace" ? [] : current;
       const existing = new Set(base.map((line) => line.product.id));
       return [
-        ...base,
         ...matched.filter((product) => !existing.has(product.id)).map((product) => ({ product, actualQty: product.stock })),
+        ...base,
       ];
     });
   }

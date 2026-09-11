@@ -119,7 +119,7 @@ export function PurchaseReturnForm({ options, initial }: { options: PurchaseForm
   const unsettled = Math.max(0, totalRefund - clampedRefund - debtAmount);
 
   function addProduct(product: PurchaseReturnProductRow) {
-    setLines((current) => [...current, productToLine(product)]);
+    setLines((current) => [productToLine(product), ...current]);
     setSearch("");
   }
 
@@ -150,7 +150,7 @@ export function PurchaseReturnForm({ options, initial }: { options: PurchaseForm
       nextLines.push({ ...productToLine(product), quantity, returnUnitCost: unitCost });
     }
 
-    if (nextLines.length) setLines((current) => applyMode === "replace" ? nextLines : [...current, ...nextLines]);
+    if (nextLines.length) setLines((current) => applyMode === "replace" ? nextLines : [...nextLines, ...current]);
     else {
       const query = [lookups[0]?.sku, lookups[0]?.productName, lookups[0]?.text].find((value) => typeof value === "string" && value.trim()) as string | undefined;
       if (query) setSearch(query);

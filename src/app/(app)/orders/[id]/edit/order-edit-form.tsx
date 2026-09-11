@@ -69,11 +69,11 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
   function addProduct(id: string) {
     const p = productById.get(id);
     if (!p) return;
-    setItems((ls) => [...ls, {
+    setItems((ls) => [{
       productId: p.id, productName: p.name,
       unitName: p.baseUnit, unitMultiplier: 1,
       quantity: 1, unitPrice: Number(p.retailPrice),
-    }]);
+    }, ...ls]);
   }
 
   async function save() {

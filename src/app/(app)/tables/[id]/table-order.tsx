@@ -86,9 +86,13 @@ export function TableOrder({
     const unitPrice = base + modifiers.reduce((s, m) => s + m.priceDelta, 0);
     if (modifiers.length === 0 && !note) {
       const ex = cart.findIndex((c) => c.productId === p.id && !c.sent && c.modifiers.length === 0 && !c.note);
-      if (ex >= 0) { const c = [...cart]; c[ex] = { ...c[ex], quantity: c[ex].quantity + 1 }; persist(c); return; }
+      if (ex >= 0) {
+        const updated = { ...cart[ex], quantity: cart[ex].quantity + 1 };
+        persist([updated, ...cart.slice(0, ex), ...cart.slice(ex + 1)]);
+        return;
+      }
     }
-    persist([...cart, { lineId: uid(), productId: p.id, productName: p.name, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, basePrice: base, unitPrice, modifiers, note: note || undefined, course: "asap", courseDelayMinutes: 0, sent: false }]);
+    persist([{ lineId: uid(), productId: p.id, productName: p.name, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, basePrice: base, unitPrice, modifiers, note: note || undefined, course: "asap", courseDelayMinutes: 0, sent: false }, ...cart]);
   }
 
   const setQty = (lineId: string, quantity: number) => {
