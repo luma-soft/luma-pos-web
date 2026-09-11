@@ -4,7 +4,7 @@ import { getStoreSettings } from "@/lib/data/settings";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { cache } from "react";
 import {
-  DEFAULT_OPTIONS, PRINT_DOC_TYPES, defaultTemplate,
+  PRINT_DOC_TYPES, defaultOptionsForDocType, defaultTemplate,
   type PrintDocType, type PrintTemplate, type PrintTemplateOptions, type PrintTemplateStoreInfo,
 } from "./template-shared";
 
@@ -28,7 +28,7 @@ function mapTemplateRow(row: typeof printTemplates.$inferSelect): PrintTemplate 
     storePhone: row.storePhone,
     storeTaxCode: row.storeTaxCode,
     footerNote: row.footerNote,
-    options: { ...DEFAULT_OPTIONS, ...(row.options as Partial<PrintTemplateOptions>) },
+    options: { ...defaultOptionsForDocType(row.docType), ...(row.options as Partial<PrintTemplateOptions>) },
   };
 }
 

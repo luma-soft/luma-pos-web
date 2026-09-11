@@ -24,6 +24,14 @@ function render(size, configure = () => {}) {
     totals: [],
     grandTotalLabel: "Tổng cộng",
     grandTotal: 350000,
+    paymentQr: {
+      title: "Quét mã để thanh toán",
+      qrImageUrl: "https://example.com/qr.png",
+      bankLabel: "Ngân hàng",
+      bankName: "Vietcombank",
+      accountNumberLabel: "Tài khoản",
+      accountNumber: "0123456789",
+    },
     inWordsLabel: "Bằng chữ",
     signatures: ["Khách hàng", "Người giao", "Người lập"],
     cols: { index: "STT", product: "Sản phẩm", unit: "ĐVT", qty: "SL", unitPrice: "Đơn giá", lineTotal: "Thành tiền" },
@@ -59,6 +67,24 @@ test("saved signature labels override document defaults", () => {
 test("batch debt summary is enabled for existing and new templates by default", () => {
   expect(defaultTemplate("order").options.showBatchDebtSummary).toBe(true);
 });
+
+test("document defaults only enable payment QR for sales invoices", () => {
+  expect(defaultTemplate("order").options.showPaymentQr).toBe(true);
+  for (const docType of ["quote", "booking", "purchase", "return", "receipt"]) {
+    expect(defaultTemplate(docType).options.showPaymentQr).toBe(false);
+  }
+});
+
+for (const size of ["a4", "k80"]) {
+  test(`${size} receipt uses a money-voucher layout without product columns or QR`, () => {
+    const template = defaultTemplate("receipt");
+    template.options.showPaymentQr = true;
+    const html = render(size, (draft) => Object.assign(draft, template));
+    expect(html).not.toContain("print-line-items");
+    expect(html).not.toContain("Vietcombank");
+    expect(html).toContain("Tổng cộng");
+  });
+}
 
 for (const size of ["a4", "k80"]) {
   test(`${size} can hide party phone and delivery address independently`, () => {

@@ -92,6 +92,49 @@ export const DEFAULT_OPTIONS: PrintTemplateOptions = {
   showPaymentQrReference: true,
 };
 
+const DOC_TYPE_OPTION_OVERRIDES: Record<PrintDocType, Partial<PrintTemplateOptions>> = {
+  order: {},
+  quote: { showDebt: false, showPaymentQr: false, alwaysShowPaymentQr: false },
+  booking: { showPaymentQr: false, alwaysShowPaymentQr: false },
+  purchase: { showProject: false, showDeliveryAddress: false, showPaymentQr: false, alwaysShowPaymentQr: false },
+  return: {
+    showProject: false,
+    showDeliveryAddress: false,
+    showDebt: false,
+    showDiscount: false,
+    showTax: false,
+    showLineDiscount: false,
+    showPaymentQr: false,
+    alwaysShowPaymentQr: false,
+  },
+  receipt: {
+    showProject: false,
+    showPartyPhone: false,
+    showDeliveryAddress: false,
+    showDebt: false,
+    showDiscount: false,
+    showTax: false,
+    showLineDiscount: false,
+    showPaymentQr: false,
+    alwaysShowPaymentQr: false,
+    showSku: false,
+  },
+};
+
+export function defaultOptionsForDocType(docType: PrintDocType): PrintTemplateOptions {
+  return { ...DEFAULT_OPTIONS, ...DOC_TYPE_OPTION_OVERRIDES[docType] };
+}
+
+export function printOptionApplies(docType: PrintDocType, option: keyof PrintTemplateOptions): boolean {
+  if (option === "showBatchDebtSummary") return docType === "order";
+  if (["showPaymentQr", "alwaysShowPaymentQr", "paymentQrTitle", "paymentQrContentTemplate", "paymentQrAccountSource", "paymentQrCustomBankCode", "paymentQrCustomBankName", "paymentQrCustomAccountNumber", "paymentQrCustomAccountName", "showPaymentQrBank", "showPaymentQrAccountNumber", "showPaymentQrAccountName", "showPaymentQrReference"].includes(option)) {
+    return docType === "order";
+  }
+  if (["showProject", "showDeliveryAddress"].includes(option)) return docType === "order" || docType === "quote" || docType === "booking";
+  if (["showDebt", "showDiscount", "showTax", "showLineDiscount", "showSku"].includes(option)) return docType !== "receipt";
+  return true;
+}
+
 export const DEFAULT_FOOTER: Record<PrintDocType, string> = {
   order: "Vui lòng kiểm tra hàng khi nhận. Hàng nguyên kiện chưa khui được đổi/trả trong 7 ngày.",
   quote: "Báo giá có hiệu lực trong 7 ngày. Giá chưa gồm vận chuyển nếu không ghi rõ.",
@@ -115,7 +158,7 @@ export function defaultTemplate(docType: PrintDocType, storeInfo: Partial<PrintT
     storePhone: storeInfo.storePhone ?? "",
     storeTaxCode: storeInfo.storeTaxCode ?? "",
     footerNote: DEFAULT_FOOTER[docType],
-    options: { ...DEFAULT_OPTIONS },
+    options: defaultOptionsForDocType(docType),
   };
 }
 
@@ -125,7 +168,7 @@ export const DEFAULT_TEMPLATE_NAME: Record<PrintDocType, string> = {
   booking: "Mẫu đặt hàng mặc định",
   purchase: "Mẫu nhập hàng mặc định",
   return: "Mẫu trả hàng mặc định",
-  receipt: "Mẫu biên nhận mặc định",
+  receipt: "Mẫu phiếu thu mặc định",
 };
 
 export function isPersistedTemplateId(id: string | null | undefined) {

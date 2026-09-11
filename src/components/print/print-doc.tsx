@@ -1,5 +1,5 @@
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
-import { moneyToWords, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
+import { moneyToWords, printOptionApplies, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
 import { isPrintRichTextEmpty, sanitizePrintRichText } from "@/lib/print/rich-text";
 
 export interface PrintLine {
@@ -54,6 +54,7 @@ export interface PrintDocProps {
   partyLabel: string;       // "Khách hàng" / "Nhà cung cấp"
   partyName: string;
   partyPhone?: string | null;
+  partyAddress?: string | null;
   projectName?: string | null;
   deliveryAddress?: string | null;
   deliverToLabel?: string;
@@ -80,6 +81,7 @@ export interface PrintDocProps {
   signatures?: [string, string, string]; // [trái, giữa, phải]
   signHint?: string;
   note?: string | null;
+  noteLabel?: string;
   /** nhãn cột */
   cols: { index?: string; product: string; unit: string; qty: string; unitPrice: string; discount?: string; discountPercent?: string; discountAmount?: string; lineTotal: string };
 }
@@ -99,6 +101,7 @@ export function PrintDoc(p: PrintDocProps) {
   const showLineDiscountPercent = t.options.showLineDiscount && t.options.showLineDiscountPercent && hasLineDiscount;
   const showLineDiscountAmount = t.options.showLineDiscount && t.options.showLineDiscountAmount && hasLineDiscount;
   const showLineDiscount = showLineDiscountPercent || showLineDiscountAmount;
+  const isMoneyReceipt = t.docType === "receipt";
   const visibleTotals = p.totals.filter((row) => {
     if (row.kind === "discount") return t.options.showDiscount;
     if (row.kind === "tax") return t.options.showTax;
@@ -137,6 +140,7 @@ export function PrintDoc(p: PrintDocProps) {
       <div className="my-3 flex justify-between text-[12.5px]">
         <div>
           <b>{p.partyLabel}:</b> {p.partyName}
+          {p.partyAddress && <><br /><b>Địa chỉ:</b> {p.partyAddress}</>}
           {t.options.showPartyPhone !== false && p.partyPhone && <> — {p.partyPhone}</>}
           {t.options.showProject && p.projectName && <><br /><b>Công trình:</b> {p.projectName}</>}
           {t.options.showDeliveryAddress !== false && p.deliveryAddress && <><br /><b>{p.deliverToLabel ?? "Giao đến"}:</b> {p.deliveryAddress}</>}
@@ -147,7 +151,7 @@ export function PrintDoc(p: PrintDocProps) {
       </div>
 
       {/* items */}
-      <table className="print-line-items w-full border-collapse text-[13.5px]">
+      {!isMoneyReceipt && <table className="print-line-items w-full border-collapse text-[13.5px]">
         <thead>
           <tr className="bg-slate-100">
             <th className="w-9 border border-slate-400 px-1 py-1.5 text-center">{p.cols.index ?? "STT"}</th>
@@ -177,13 +181,13 @@ export function PrintDoc(p: PrintDocProps) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table>}
 
       {/* totals */}
       <div className="mt-3 flex justify-end text-[12.5px] break-inside-avoid">
         <table className={isA4 ? "w-[300px]" : "w-[260px]"}>
           <tbody>
-            {visibleTotals.map((r) => (
+            {!isMoneyReceipt && visibleTotals.map((r) => (
               <tr key={r.label}>
                 <td className="py-0.5 text-slate-600">{printTotalLabel(r, p.totals, t.options.taxLabel)}</td>
                 <td className="text-right">{r.negative ? "− " : ""}{formatNumber(r.value)}</td>
@@ -193,7 +197,7 @@ export function PrintDoc(p: PrintDocProps) {
               <td className="py-1 font-bold">{p.grandTotalLabel}</td>
               <td className="text-right font-bold">{formatCurrency(p.grandTotal)}</td>
             </tr>
-            {(p.afterTotals ?? []).map((r) => (
+            {!isMoneyReceipt && (p.afterTotals ?? []).map((r) => (
               <tr key={r.label} className={r.bold ? "font-bold" : ""}>
                 <td className="py-0.5 text-slate-600">{r.label}</td>
                 <td className="text-right">{formatNumber(r.value)}</td>
@@ -209,7 +213,7 @@ export function PrintDoc(p: PrintDocProps) {
         </div>
       )}
 
-      {t.options.showPaymentQr && p.paymentQr && (
+      {printOptionApplies(t.docType, "showPaymentQr") && t.options.showPaymentQr && p.paymentQr && (
         <div className="mt-3 flex gap-3 rounded border border-slate-300 p-2 text-[12px] break-inside-avoid">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className={isA4 ? "h-24 w-24 object-contain" : "h-20 w-20 object-contain"} />
@@ -223,7 +227,7 @@ export function PrintDoc(p: PrintDocProps) {
         </div>
       )}
 
-      {p.note && <div className="mt-2 text-[12px] break-inside-avoid"><b>Ghi chú:</b> {p.note}</div>}
+      {p.note && <div className="mt-2 text-[12px] break-inside-avoid"><b>{p.noteLabel ?? "Ghi chú"}:</b> {p.note}</div>}
 
       {t.options.showSignatures && signatures && (
         <div className={`flex justify-between text-center text-[12px] break-inside-avoid ${isA4 ? "mt-14" : "mt-8"}`}>
@@ -245,6 +249,7 @@ export function PrintDoc(p: PrintDocProps) {
 
 function K80Doc(p: PrintDocProps) {
   const t = p.template;
+  const isMoneyReceipt = t.docType === "receipt";
   const showLineDiscountPercent = t.options.showLineDiscount && t.options.showLineDiscountPercent;
   const showLineDiscountAmount = t.options.showLineDiscount && t.options.showLineDiscountAmount;
   const visibleTotals = p.totals.filter((row) => {
@@ -272,11 +277,12 @@ function K80Doc(p: PrintDocProps) {
         <div><span className="text-slate-600">Ngày:</span> {formatDate(p.date)}</div>
         {t.options.showSeller && p.sellerName && <div className="truncate text-right"><span className="text-slate-600">NV:</span> {p.sellerName}</div>}
         <div className="col-span-2 truncate"><span className="text-slate-600">{p.partyLabel}:</span> <span className="font-bold">{p.partyName}</span>{t.options.showPartyPhone !== false && p.partyPhone ? ` · ${p.partyPhone}` : ""}</div>
+        {p.partyAddress && <div className="col-span-2"><span className="text-slate-600">Địa chỉ:</span> {p.partyAddress}</div>}
         {t.options.showProject && p.projectName && <div className="col-span-2 truncate"><span className="text-slate-600">Công trình:</span> {p.projectName}</div>}
         {t.options.showDeliveryAddress !== false && p.deliveryAddress && <div className="col-span-2"><span className="text-slate-600">{p.deliverToLabel ?? "Giao đến"}:</span> {p.deliveryAddress}</div>}
       </div>
 
-      <table className="print-line-items mt-3 w-full table-fixed border-collapse text-[9px] leading-tight">
+      {!isMoneyReceipt && <table className="print-line-items mt-3 w-full table-fixed border-collapse text-[9px] leading-tight">
         <colgroup>
           <col className="w-[42%]" />
           <col className="w-[12%]" />
@@ -315,10 +321,10 @@ function K80Doc(p: PrintDocProps) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table>}
 
       <section className="mt-2 border-y-2 border-black py-1.5">
-        {visibleTotals.map((r) => (
+        {!isMoneyReceipt && visibleTotals.map((r) => (
           <div key={r.label} className="flex justify-between gap-3 py-0.5">
             <span className="text-slate-700">{printTotalLabel(r, p.totals, t.options.taxLabel)}</span>
             <span>{r.negative ? "−" : ""}{formatNumber(r.value)}</span>
@@ -328,7 +334,7 @@ function K80Doc(p: PrintDocProps) {
           <span>{p.grandTotalLabel}</span>
           <span className="shrink-0">{formatCurrency(p.grandTotal)}</span>
         </div>
-        {(p.afterTotals ?? []).map((r) => (
+        {!isMoneyReceipt && (p.afterTotals ?? []).map((r) => (
           <div key={r.label} className={`flex justify-between gap-3 py-0.5 ${r.bold ? "font-bold" : ""}`}>
             <span className="text-slate-700">{r.label}</span>
             <span>{formatNumber(r.value)}</span>
@@ -339,8 +345,8 @@ function K80Doc(p: PrintDocProps) {
       {t.options.showInWords && (
         <div className="mt-2 text-[9.5px] italic leading-snug"><span className="not-italic font-bold">{p.inWordsLabel}:</span> {moneyToWords(p.grandTotal)}.</div>
       )}
-      {p.note && <div className="mt-2 border-t border-dashed border-slate-400 pt-2 text-[9.5px]"><span className="font-bold">Ghi chú:</span> {p.note}</div>}
-      {t.options.showPaymentQr && p.paymentQr && (
+      {p.note && <div className="mt-2 border-t border-dashed border-slate-400 pt-2 text-[9.5px]"><span className="font-bold">{p.noteLabel ?? "Ghi chú"}:</span> {p.note}</div>}
+      {printOptionApplies(t.docType, "showPaymentQr") && t.options.showPaymentQr && p.paymentQr && (
         <>
           <div className="mt-3 border-t-2 border-dashed border-black pt-2 text-center">
             {qrTitle && <div className="font-bold uppercase">{qrTitle}</div>}

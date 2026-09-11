@@ -19,10 +19,11 @@ import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { buildVietQrImageUrl, formatPrintPaymentReference, resolvePrintPaymentQrAccount } from "@/lib/print/payment-qr";
 import {
-  DEFAULT_OPTIONS,
   PAPER_SIZES,
   PRINT_DOC_TYPES,
+  defaultOptionsForDocType,
   defaultTemplate,
+  printOptionApplies,
   type PaperSize,
   type PrintDocType,
   type PrintTemplate,
@@ -76,18 +77,18 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
   }
 
   function patchOption(key: BooleanOptionKey, value: boolean) {
-    patch({ options: { ...DEFAULT_OPTIONS, ...selected.options, [key]: value } });
+    patch({ options: { ...defaultOptionsForDocType(selected.docType), ...selected.options, [key]: value } });
   }
 
   function patchTextOption(key: TextOptionKey, value: string) {
-    patch({ options: { ...DEFAULT_OPTIONS, ...selected.options, [key]: value } });
+    patch({ options: { ...defaultOptionsForDocType(selected.docType), ...selected.options, [key]: value } });
   }
 
   function patchCustomQrBank(bankCode: string) {
     const bank = VIETQR_BANKS.find(([code]) => code === bankCode);
     patch({
       options: {
-        ...DEFAULT_OPTIONS,
+        ...defaultOptionsForDocType(selected.docType),
         ...selected.options,
         paymentQrCustomBankCode: bankCode,
         paymentQrCustomBankName: bank?.[1] ?? bankCode,
@@ -150,7 +151,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
         storePhone: selected.storePhone,
         storeTaxCode: selected.storeTaxCode,
         footerNote: selected.footerNote,
-        options: { ...DEFAULT_OPTIONS, ...selected.options },
+        options: { ...defaultOptionsForDocType(selected.docType), ...selected.options },
       }),
       "printSettings.saved",
       (data) => {
@@ -183,7 +184,8 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
   useLayoutEffect(() => {
     if (isPreviewFullscreen) previewSurfaceRef.current?.scrollTo({ top: 0, left: 0 });
   }, [isPreviewFullscreen]);
-  const customQrAccountInvalid = selected.options.showPaymentQr && selected.options.paymentQrAccountSource === "custom"
+  const qrApplies = printOptionApplies(selected.docType, "showPaymentQr");
+  const customQrAccountInvalid = qrApplies && selected.options.showPaymentQr && selected.options.paymentQrAccountSource === "custom"
     && (!selected.options.paymentQrCustomBankCode.trim() || !selected.options.paymentQrCustomAccountNumber.trim());
   const previewQrAccount = resolvePrintPaymentQrAccount(selected.options, {
     bankCode: "VCB",
@@ -191,6 +193,31 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
     accountNumber: "0123456789",
     accountName: "LumaPOS",
   });
+  const isReceiptPreview = selected.docType === "receipt";
+  const previewPartyLabel = selected.docType === "purchase"
+    ? t("purchases.cols.supplier")
+    : isReceiptPreview ? "Người nộp tiền" : t("orders.cols.customer");
+  const previewPartyName = selected.docType === "purchase" ? "Công ty VLXD Minh Phát" : "Nguyễn Văn A";
+  const previewItems = isReceiptPreview ? [] : [{
+    id: "1",
+    name: selected.docType === "return" ? "Gạch ốp lát trả lại" : "Xi măng PCB40",
+    sku: "HT40",
+    unitName: "bao",
+    quantity: selected.docType === "return" ? 2 : 10,
+    unitPrice: 95000,
+    discount: selected.docType === "return" ? 0 : 30000,
+    lineDiscountMode: "pct" as const,
+    lineDiscountValue: 3,
+    total: selected.docType === "return" ? 190000 : 920000,
+  }];
+  const previewGrandTotal = selected.docType === "return" ? 190000 : isReceiptPreview ? 500000 : 972000;
+  const previewSignatures: [string, string, string] = isReceiptPreview
+    ? ["Người nộp tiền", "Người lập phiếu", "Thủ quỹ"]
+    : selected.docType === "purchase"
+      ? [t("print.supplierSign"), t("print.receiverSign"), t("print.sellerSign")]
+      : selected.docType === "return"
+        ? [t("print.buyerSign"), t("print.receiverSign"), t("print.sellerSign")]
+        : [t("print.buyerSign"), t("print.delivererSign"), t("print.sellerSign")];
 
   return (
     <div className="px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:p-6">
@@ -270,7 +297,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
               </label>
             </Panel>
 
-            {selected.options.showPaymentQr && (
+            {qrApplies && selected.options.showPaymentQr && (
               <Panel title={t("printSettings.qrSection")}>
                 <Field label={t("printSettings.qrAccountSource")}>
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -279,7 +306,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                         key={source}
                         type="button"
                         aria-pressed={selected.options.paymentQrAccountSource === source}
-                        onClick={() => patch({ options: { ...DEFAULT_OPTIONS, ...selected.options, paymentQrAccountSource: source } })}
+                        onClick={() => patch({ options: { ...defaultOptionsForDocType(selected.docType), ...selected.options, paymentQrAccountSource: source } })}
                         className={cn(
                           "min-h-11 rounded-lg border px-3 py-2 text-left text-sm font-semibold",
                           selected.options.paymentQrAccountSource === source
@@ -346,7 +373,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
               <div className="space-y-4">
                 {OPTION_GROUPS.map((group) => {
                   const options = group.options
-                    .filter((key) => key !== "showBatchDebtSummary" || docType === "order")
+                    .filter((key) => printOptionApplies(docType, key))
                     .filter((key) => key !== "alwaysShowPaymentQr" || selected.options.showPaymentQr)
                     .filter((key) => !["showLineDiscountPercent", "showLineDiscountAmount"].includes(key) || selected.options.showLineDiscount);
                   if (options.length === 0) return null;
@@ -456,23 +483,24 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   title={t(`printSettings.previewTitles.${selected.docType}`)}
                   code="XX-000"
                   date={new Date()}
-                  partyLabel={selected.docType === "purchase" ? t("purchases.cols.supplier") : t("orders.cols.customer")}
-                  partyName="Nguyen Van A"
+                  partyLabel={previewPartyLabel}
+                  partyName={previewPartyName}
                   partyPhone="0909 000 000"
+                  partyAddress={isReceiptPreview ? "12 Nguyễn Trãi" : undefined}
                   projectName="Nha Q.7"
                   deliveryAddress="12 Nguyen Trai"
                   sellerLabel={t("orders.detail.seller")}
                   sellerName="LumaPOS"
-                  items={[{ id: "1", name: "Xi mang PCB40", sku: "HT40", unitName: "bao", quantity: 10, unitPrice: 95000, discount: 30000, lineDiscountMode: "pct", lineDiscountValue: 3, total: 920000 }]}
-                  totals={[
+                  items={previewItems}
+                  totals={isReceiptPreview || selected.docType === "return" ? [] : [
                     { label: t("pos.subtotal"), value: 920000, kind: "subtotal" },
                     { label: t("pos.discount"), value: 20000, negative: true, kind: "discount" },
                     { label: t("pos.tax"), value: 72000, kind: "tax" },
                   ]}
-                  grandTotalLabel={t("print.grandTotal")}
-                  grandTotal={972000}
-                  afterTotals={[{ label: t("print.paid"), value: 500000 }, { label: t("print.remaining"), value: 472000, bold: true }]}
-                  paymentQr={previewQrAccount ? {
+                  grandTotalLabel={isReceiptPreview ? "SỐ TIỀN" : selected.docType === "return" ? "TỔNG HOÀN" : t("print.grandTotal")}
+                  grandTotal={previewGrandTotal}
+                  afterTotals={selected.docType === "order" ? [{ label: t("print.paid"), value: 500000 }, { label: t("print.remaining"), value: 472000, bold: true }] : selected.docType === "booking" ? [{ label: "Đã đặt cọc", value: 500000 }, { label: "Còn lại", value: 472000, bold: true }] : []}
+                  paymentQr={qrApplies && selected.options.showPaymentQr && previewQrAccount ? {
                     title: t("pos.sepay.title"),
                     qrImageUrl: buildVietQrImageUrl({ bankCode: previewQrAccount.bankCode, accountNumber: previewQrAccount.accountNumber, amount: 420000, reference: previewQrReference }),
                     bankLabel: t("pos.sepay.bank"),
@@ -485,9 +513,10 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                     reference: previewQrReference,
                   } : null}
                   inWordsLabel={t("print.inWords")}
-                  signatures={[t("print.buyerSign"), t("print.delivererSign"), t("print.sellerSign")]}
+                  signatures={previewSignatures}
                   signHint={t("print.signHint")}
-                  note={t("printSettings.previewNote")}
+                  note={isReceiptPreview ? "Thu tiền bán hàng" : selected.docType === "quote" ? "Hiệu lực 7 ngày · Giao hàng theo thỏa thuận" : selected.docType === "booking" ? "Ngày giao dự kiến: 20/09/2026" : selected.docType === "purchase" ? "Kho nhận: Kho chính" : selected.docType === "return" ? "Lý do: Hàng không đúng quy cách" : t("printSettings.previewNote")}
+                  noteLabel={isReceiptPreview ? "Lý do nộp" : undefined}
                   cols={{ index: t("print.index"), product: t("orders.cols.product"), unit: t("orders.cols.unit"), qty: t("orders.cols.qty"), unitPrice: t("orders.cols.unitPrice"), discount: t("orders.cols.discount"), lineTotal: t("orders.cols.lineTotal") }}
                 />
             </div>
