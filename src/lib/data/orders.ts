@@ -4,6 +4,7 @@ import {
   desc,
   eq,
   exists,
+  getTableColumns,
   gte,
   inArray,
   lte,
@@ -376,10 +377,24 @@ export async function getOrder(storeId: string, id: string) {
   if (!order) return null;
 
   const [items, paymentRows, returnRows] = await Promise.all([
-    db.select().from(orderItems).where(and(
-      eq(orderItems.orderId, id),
-      eq(orderItems.storeId, storeId),
-    )),
+    db
+      .select({
+        ...getTableColumns(orderItems),
+        productImageUrls: products.imageUrls,
+        productImageUpdatedAt: products.imageUpdatedAt,
+      })
+      .from(orderItems)
+      .leftJoin(
+        products,
+        and(
+          eq(products.id, orderItems.productId),
+          eq(products.storeId, storeId),
+        ),
+      )
+      .where(and(
+        eq(orderItems.orderId, id),
+        eq(orderItems.storeId, storeId),
+      )),
     db
       .select()
       .from(payments)
