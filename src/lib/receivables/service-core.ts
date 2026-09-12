@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import {
   customerReceivableAllocations,
   customerReceivableEntries,
@@ -76,14 +76,14 @@ export async function collectCustomerReceivable(
   actor: Actor,
 ): Promise<ReceivableResult<{ receiptId: string; replayed: boolean; notificationEventId?: string }>> {
   const amount = money(input.amount);
-  const allocations = input.allocations.map((row) => ({ ...row, amount: money(row.amount) }));
-  const allocationTotal = money(allocations.reduce((sum, row) => sum + row.amount, 0));
-  const ids = allocations.map((row) => row.orderId);
+  const requestedAllocations = input.allocations.map((row) => ({ ...row, amount: money(row.amount) }));
+  const allocationTotal = money(requestedAllocations.reduce((sum, row) => sum + row.amount, 0));
+  const ids = requestedAllocations.map((row) => row.orderId);
   if (
     !input.customerId || !validRequestId(input.clientRequestId) || amount <= 0 ||
     !["cash", "bank_transfer", "card"].includes(input.method) ||
     new Set(ids).size !== ids.length ||
-    allocations.some((row) => !row.orderId || row.amount <= 0) ||
+    requestedAllocations.some((row) => !row.orderId || row.amount <= 0) ||
     allocationTotal - amount > 1e-9
   ) return { ok: false, error: "errors.invalidData" };
 
@@ -102,18 +102,53 @@ export async function collectCustomerReceivable(
         return { ok: true as const, data: { receiptId: existing.id, replayed: true } };
       }
 
-      const invoiceRows = await tx.select().from(orders).where(and(eq(orders.storeId, actor.storeId), inArray(orders.id, ids))).for("update");
-      if (invoiceRows.length !== ids.length) throw new Error("ORDER_NOT_PAYABLE");
+      // Lock every open invoice so omitted allocation details cannot leave the
+      // customer balance and invoice amountPaid fields out of sync. Any excess
+      // after all invoices are paid remains a genuine customer advance.
+      const invoiceRows = await tx
+        .select()
+        .from(orders)
+        .where(and(
+          eq(orders.storeId, actor.storeId),
+          eq(orders.customerId, input.customerId),
+          inArray(orders.status, ["completed", "returned"]),
+          sql`${orders.total} > ${orders.amountPaid}`,
+        ))
+        .orderBy(asc(orders.createdAt), asc(orders.id))
+        .for("update");
       const invoices = new Map<string, typeof orders.$inferSelect>(
         invoiceRows.map((order: typeof orders.$inferSelect) => [order.id, order]),
       );
-      for (const allocation of allocations) {
+      if (ids.some((id) => !invoices.has(id))) throw new Error("ORDER_NOT_PAYABLE");
+      for (const allocation of requestedAllocations) {
         const order = invoices.get(allocation.orderId);
         if (!order || order.customerId !== input.customerId) throw new Error("ORDER_NOT_CUSTOMER");
         if (order.status !== "completed" && order.status !== "returned") throw new Error("ORDER_NOT_PAYABLE");
         if (allocation.amount > money(Number(order.total) - Number(order.amountPaid)) + 1e-9) {
           throw new Error("ALLOCATION_EXCEEDS_REMAINING");
         }
+      }
+
+      const allocations = requestedAllocations.map((row) => ({ ...row }));
+      const allocationsByOrder = new Map(
+        allocations.map((allocation) => [allocation.orderId, allocation]),
+      );
+      let unallocated = money(amount - allocationTotal);
+      for (const order of invoiceRows) {
+        if (unallocated <= 0) break;
+        const explicit = allocationsByOrder.get(order.id);
+        const available = money(
+          Number(order.total) - Number(order.amountPaid) - (explicit?.amount ?? 0),
+        );
+        const automaticAmount = money(Math.min(unallocated, Math.max(0, available)));
+        if (automaticAmount <= 0) continue;
+        if (explicit) explicit.amount = money(explicit.amount + automaticAmount);
+        else {
+          const automatic = { orderId: order.id, amount: automaticAmount };
+          allocations.push(automatic);
+          allocationsByOrder.set(order.id, automatic);
+        }
+        unallocated = money(unallocated - automaticAmount);
       }
 
       const [receipt] = await tx.insert(customerReceivableReceipts).values({

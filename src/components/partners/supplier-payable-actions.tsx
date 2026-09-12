@@ -10,6 +10,7 @@ import {
   PartnerDebtDialog,
 } from "@/components/partners/partner-debt-dialog";
 import { cn, formatCurrency } from "@/lib/utils";
+import { autoAllocatePayment } from "@/lib/payments/auto-allocation";
 
 type Invoice = { id: string; code: string; createdAt: string; remaining: number };
 export type SupplierPayableOverview = {
@@ -83,6 +84,8 @@ function SupplierPaymentDialog({
 
   function setPaymentAmount(value: number) {
     setAmount(value);
+    const automatic = autoAllocatePayment(value, overview.invoices, "newest");
+    setAllocations(automatic.map((row) => ({ purchaseOrderId: row.id, amount: row.amount })));
   }
 
   function submit() {

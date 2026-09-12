@@ -12,6 +12,7 @@ import {
   PartnerDebtDialog,
 } from "@/components/partners/partner-debt-dialog";
 import { cn, formatCurrency } from "@/lib/utils";
+import { autoAllocatePayment } from "@/lib/payments/auto-allocation";
 
 type Invoice = { id: string; code: string; createdAt: string; remaining: number };
 type Overview = { currentDebt: number; invoices: Invoice[] };
@@ -126,7 +127,11 @@ function CollectDialog({ customerId, overview, error, onError, onClose }: { cust
   const [clientRequestId] = useState(() => requestId("web-receivable"));
   const allocationTotal = useMemo(() => allocations.reduce((sum, row) => sum + row.amount, 0), [allocations]);
   const valid = Boolean(overview && amount > 0 && allocationTotal <= amount + 0.01);
-  function setPaymentAmount(value: number) { setAmount(value); }
+  function setPaymentAmount(value: number) {
+    setAmount(value);
+    const automatic = autoAllocatePayment(value, overview?.invoices ?? []);
+    setAllocations(automatic.map((row) => ({ orderId: row.id, amount: row.amount })));
+  }
   function submit() {
     if (!valid || pending) return;
     startTransition(async () => {

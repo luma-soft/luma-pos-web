@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   purchaseOrders,
   supplierPayableAllocations,
@@ -81,17 +81,17 @@ export async function paySupplierPayable(
   actor: Actor,
 ): Promise<PayableResult<{ receiptId: string; replayed: boolean; notificationEventId?: string }>> {
   const amount = money(input.amount);
-  const allocations = input.allocations.map((row) => ({
+  const requestedAllocations = input.allocations.map((row) => ({
     ...row,
     amount: money(row.amount),
   }));
-  const allocationTotal = money(allocations.reduce((sum, row) => sum + row.amount, 0));
-  const ids = allocations.map((row) => row.purchaseOrderId);
+  const allocationTotal = money(requestedAllocations.reduce((sum, row) => sum + row.amount, 0));
+  const ids = requestedAllocations.map((row) => row.purchaseOrderId);
   if (
     !input.supplierId || !validRequestId(input.clientRequestId) || amount <= 0 ||
     !["cash", "bank_transfer"].includes(input.method) ||
     new Set(ids).size !== ids.length ||
-    allocations.some((row) => !row.purchaseOrderId || row.amount <= 0) ||
+    requestedAllocations.some((row) => !row.purchaseOrderId || row.amount <= 0) ||
     allocationTotal - amount > 1e-9
   ) {
     return { ok: false, error: "errors.invalidData" };
@@ -128,13 +128,15 @@ export async function paySupplierPayable(
           })
           .from(supplierPayableAllocations)
           .where(and(eq(supplierPayableAllocations.storeId, actor.storeId), eq(supplierPayableAllocations.receiptId, existing.id)));
-        const allocationMatches = existingAllocations.length === allocations.length &&
-          existingAllocations.every((row: { purchaseOrderId: string; amount: string }) => {
-            const requested = allocations.find(
-              (allocation) => allocation.purchaseOrderId === row.purchaseOrderId,
-            );
-            return requested && Math.abs(Number(row.amount) - requested.amount) <= 1e-9;
-          });
+        // The service may add FIFO allocations that were omitted by the caller.
+        // On an idempotent replay, ensure every caller-specified allocation is
+        // represented without requiring the generated rows to be sent back.
+        const allocationMatches = requestedAllocations.every((requested) => {
+          const stored = existingAllocations.find(
+            (row: { purchaseOrderId: string; amount: string }) => row.purchaseOrderId === requested.purchaseOrderId,
+          );
+          return stored && Number(stored.amount) + 1e-9 >= requested.amount;
+        });
         if (
           existing.supplierId !== input.supplierId ||
           Math.abs(Number(existing.amount) - amount) > 1e-9 ||
@@ -150,16 +152,28 @@ export async function paySupplierPayable(
         throw new Error("DEBT_EXCEEDS_CURRENT");
       }
 
+      // Lock every open receipt for this supplier so any unallocated part of
+      // the payment can be applied deterministically to the newest receipt.
+      // Supplier payments in this flow normally settle the receipt just entered;
+      // older imported balances may already be offset by unlinked returns.
+      // keeps purchase.amountPaid (used by list/detail/print screens) aligned
+      // with the supplier balance even when a client omits allocations.
       const purchaseRows = await tx
         .select()
         .from(purchaseOrders)
-        .where(and(eq(purchaseOrders.storeId, actor.storeId), inArray(purchaseOrders.id, ids)))
+        .where(and(
+          eq(purchaseOrders.storeId, actor.storeId),
+          eq(purchaseOrders.supplierId, input.supplierId),
+          inArray(purchaseOrders.status, ["received", "returned"]),
+          sql`${purchaseOrders.total} > ${purchaseOrders.amountPaid}`,
+        ))
+        .orderBy(desc(purchaseOrders.createdAt), desc(purchaseOrders.id))
         .for("update");
-      if (purchaseRows.length !== ids.length) throw new Error("PURCHASE_NOT_PAYABLE");
       const purchases = new Map<string, typeof purchaseOrders.$inferSelect>(
         purchaseRows.map((purchase: typeof purchaseOrders.$inferSelect) => [purchase.id, purchase]),
       );
-      for (const allocation of allocations) {
+      if (ids.some((id) => !purchases.has(id))) throw new Error("PURCHASE_NOT_PAYABLE");
+      for (const allocation of requestedAllocations) {
         const purchase = purchases.get(allocation.purchaseOrderId);
         if (!purchase || purchase.supplierId !== input.supplierId) {
           throw new Error("PURCHASE_NOT_SUPPLIER");
@@ -171,6 +185,28 @@ export async function paySupplierPayable(
         if (allocation.amount > remaining + 1e-9) {
           throw new Error("ALLOCATION_EXCEEDS_REMAINING");
         }
+      }
+
+      const allocations = requestedAllocations.map((row) => ({ ...row }));
+      const allocationsByPurchase = new Map(
+        allocations.map((allocation) => [allocation.purchaseOrderId, allocation]),
+      );
+      let unallocated = money(amount - allocationTotal);
+      for (const purchase of purchaseRows) {
+        if (unallocated <= 0) break;
+        const explicit = allocationsByPurchase.get(purchase.id);
+        const available = money(
+          Number(purchase.total) - Number(purchase.amountPaid) - (explicit?.amount ?? 0),
+        );
+        const automaticAmount = money(Math.min(unallocated, Math.max(0, available)));
+        if (automaticAmount <= 0) continue;
+        if (explicit) explicit.amount = money(explicit.amount + automaticAmount);
+        else {
+          const automatic = { purchaseOrderId: purchase.id, amount: automaticAmount };
+          allocations.push(automatic);
+          allocationsByPurchase.set(purchase.id, automatic);
+        }
+        unallocated = money(unallocated - automaticAmount);
       }
 
       const [receipt] = await tx
