@@ -144,7 +144,10 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
           readOnly={readOnly}
           aria-label={inputLabel}
           className={cn(
-            "h-full rounded-none border-0 px-1 text-center focus:border-transparent focus:ring-0",
+            // Keep the entered quantity centered in the whole middle cell.
+            // NumberInput normally reserves right padding for suffixes, which
+            // makes `0 /1` look separated and pushes the number off-center.
+            "h-full rounded-none border-0 !px-1 !text-center focus:border-transparent focus:ring-0",
             inputClassName,
           )}
         />

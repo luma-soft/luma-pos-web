@@ -1,4 +1,4 @@
-import { createExchangeForUser, createReturnForUser } from "@/lib/actions/returns";
+import { createExchangeForUser, createPosReturn, createReturnForUser } from "@/lib/actions/returns";
 import { authorizeMobileSensitiveAction } from "@/lib/auth/mobile-approval";
 import { getReturns } from "@/lib/data/returns";
 import { requireMobileSalesAccess } from "@/lib/mobile/auth";
@@ -43,6 +43,12 @@ export async function POST(request: Request) {
     return mobileAction({ ok: false, error: "errors.invalidData" });
   }
   const orderId = "orderId" in body ? String(body.orderId).trim() : "";
+  if ("warehouseId" in body) {
+    const result = await createPosReturn(body as Parameters<typeof createPosReturn>[0]);
+    return result.ok
+      ? mobileAction({ ok: true, data: result.data })
+      : mobileAction({ ok: false, error: result.error });
+  }
   if (!orderId) return mobileError("errors.invalidData");
   const authorization = await authorizeMobileSensitiveAction({
     request,
