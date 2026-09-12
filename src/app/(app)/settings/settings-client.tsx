@@ -951,8 +951,18 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
                   <button type="button" onClick={() => edit(account)} className={btnS} aria-label={t("edit")}>
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
-                  <button type="button" disabled={account.isDefault || pending} onClick={() => makeDefault(account.id)} className={btnS} aria-label={t("setDefault")}>
-                    <Star className="w-3.5 h-3.5" />
+                  <button
+                    type="button"
+                    disabled={account.isDefault || pending}
+                    onClick={() => makeDefault(account.id)}
+                    className={cn(
+                      btnS,
+                      account.isDefault && "border-primary-200 bg-primary-50 text-primary-700 disabled:opacity-100 dark:border-primary-800 dark:bg-primary-950/40 dark:text-primary-300",
+                    )}
+                    aria-label={t("setDefault")}
+                    aria-pressed={account.isDefault}
+                  >
+                    <Star className={cn("w-3.5 h-3.5", account.isDefault && "fill-current")} />
                   </button>
                   <button type="button" disabled={pending} onClick={() => toggleEnabled(account.id, !account.enabled)} className={btnS} aria-label={account.enabled ? t("disable") : t("enable")}>
                     <Power className="w-3.5 h-3.5" />
@@ -1064,7 +1074,7 @@ function BankSelect({ value, onChange, placeholder }: { value: string; onChange:
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className={cn("relative", open && "z-20")}>
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
@@ -1084,7 +1094,7 @@ function BankSelect({ value, onChange, placeholder }: { value: string; onChange:
         <ChevronDown className="ml-auto w-4 h-4 shrink-0 text-slate-400" />
       </button>
       {open && (
-        <div className="mt-1 overflow-hidden rounded-xl border border-border bg-surface shadow-e1">
+        <div className="absolute inset-x-0 top-full z-[30] mt-1 overflow-hidden rounded-xl border border-border bg-surface shadow-e1">
           <div className="border-b border-border-soft">
             <input
               autoFocus
