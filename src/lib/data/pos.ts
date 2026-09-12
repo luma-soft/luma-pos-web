@@ -303,7 +303,7 @@ export async function getMobilePosData(storeId: string, role: Role) {
   // Reuse the POS dataset so mobile gets the same POS projection,
   // manager-only price books, stock reservations, and product image data.
   const [data, prefs] = await Promise.all([
-    getPosData(storeId, { role, sort: "created" }),
+    getPosData(storeId, { role, sort: "recent_sales" }),
     getRawStorePrefs(storeId),
   ]);
   return {

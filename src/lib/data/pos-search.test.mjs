@@ -147,6 +147,11 @@ test("search orders child and root matches together by their latest completed sa
 
   const rows = await searchPosProductRows(storeId, "SORT");
   expect(rows.map((row) => row.id)).toEqual([rootId, childId]);
+
+  const response = await GET(new Request("http://localhost/api/mobile/pos/search?q=SORT"));
+  expect(response.status).toBe(200);
+  const mobileRows = (await response.json()).data;
+  expect(mobileRows.map((row) => row.id)).toEqual([rootId, childId]);
 });
 
 test("web and mobile POS find a variant by its variant value", async () => {
