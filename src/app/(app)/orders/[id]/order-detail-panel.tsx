@@ -345,7 +345,7 @@ export async function OrderDetailPanel({
             </Link>
           )}
           {order.status === "completed" && (
-            <Link href={posSourceHref("return")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 lg:h-9")}>
+            <Link href={posSourceHref("return")} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 lg:h-9")}>
               {t("returns.action")}
             </Link>
           )}

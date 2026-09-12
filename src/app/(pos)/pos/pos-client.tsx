@@ -1901,7 +1901,7 @@ export function PosClient({
                   className="mt-2 block min-h-11 max-h-16 w-full resize-none overflow-y-auto rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-xs leading-4 text-slate-400 outline-none [scrollbar-width:none] focus:border-primary-600 focus:bg-primary-50/30 [&::-webkit-scrollbar]:hidden dark:focus:bg-primary-950/20 placeholder:text-slate-300 dark:placeholder:text-slate-600 lg:min-h-4"
                 />
               </div>
-              <div className="hidden items-center gap-2 px-3 py-3 lg:flex">
+              <div className="hidden items-center gap-2 px-3 py-2 lg:flex">
                 <span className="w-5 text-center text-xs text-slate-400 shrink-0 tabular-nums">{idx + 1}</span>
                 <button disabled={isCameraQuoteDraft} onClick={() => setCart((c) => c.filter((x) => x.key !== l.key))} className="text-slate-400 hover:text-er shrink-0 disabled:cursor-not-allowed disabled:opacity-40">
                   <Trash2 className="w-4 h-4" />
@@ -1991,7 +1991,7 @@ export function PosClient({
                 </div>
                 <span className="w-28 shrink-0 text-right text-base font-bold leading-6 tabular-nums">{formatCurrency(eff.price * l.quantity)}</span>
               </div>
-              <div className="-mt-1 hidden items-start gap-2 px-3 pb-1 lg:flex">
+              <div className="-mt-2 hidden items-start gap-2 px-3 pb-0 lg:flex">
                 <span className="w-5 shrink-0" />
                 <span className="w-4 shrink-0" />
                 <span className="w-24 shrink-0" />
