@@ -382,6 +382,8 @@ export async function getOrder(storeId: string, id: string) {
         ...getTableColumns(orderItems),
         productImageUrls: products.imageUrls,
         productImageUpdatedAt: products.imageUpdatedAt,
+        productVariantName: products.variantName,
+        productSpecs: products.specs,
       })
       .from(orderItems)
       .leftJoin(

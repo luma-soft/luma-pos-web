@@ -16,6 +16,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { OrderDetailActionGroup } from "@/components/order-detail-action-group";
 import { OrderProductLink } from "@/components/order-product-link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
+import { productDisplayName } from "@/lib/products/variant-presentation";
 import { BookingCreateOrderButton, QuoteDeleteButton } from "../../quotes/quote-actions";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -118,7 +119,7 @@ export async function OrderDetailPanel({
                 <div key={item.id} className="p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 font-medium">
-                      <OrderProductLink productId={item.productId} productName={item.productName} />
+                      <OrderProductLink productId={item.productId} productName={productDisplayName({ name: item.productName, variantName: item.productVariantName, specs: item.productSpecs })} />
                       {item.priceBookName && <div className="mt-1 text-xs font-normal text-slate-500">{item.priceBookName}</div>}
                       {(order.returnedByItem[item.id] ?? 0) > 0 && (
                         <div className="mt-1 text-xs font-normal text-warn">
@@ -155,7 +156,7 @@ export async function OrderDetailPanel({
                     return (
                     <tr key={item.id}>
                       <td className="px-3 py-3 font-medium">
-                        <OrderProductLink productId={item.productId} productName={item.productName} />
+                        <OrderProductLink productId={item.productId} productName={productDisplayName({ name: item.productName, variantName: item.productVariantName, specs: item.productSpecs })} />
                         {item.priceBookName && <div className="mt-1 text-xs font-normal text-slate-500">{item.priceBookName}</div>}
                         {(order.returnedByItem[item.id] ?? 0) > 0 && (
                           <span className="ml-2 text-xs font-normal text-warn">

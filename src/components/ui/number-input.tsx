@@ -24,6 +24,7 @@ export interface NumberInputProps
   decimals?: number;
   /** Keep incomplete edits local until blur (e.g. quantity 1 → 0 → 0.5). */
   commitOnBlur?: boolean;
+  clearZeroOnFocus?: boolean;
 }
 
 const formatNumber = (val: number, sep: boolean, decimals = 0): string => {
@@ -42,7 +43,7 @@ const affixPadding = (value: string) =>
   `calc(1rem + ${Math.max(1, Array.from(value.trim()).length)}ch)`;
 
 export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
-  ({ value, defaultValue, onChange, thousandSeparator = true, formatOnChange = false, suffix, prefix, min, max, decimals = 0, commitOnBlur = false, className, name, style, onFocus, onBlur, onKeyDown, ...props }, ref) => {
+  ({ value, defaultValue, onChange, thousandSeparator = true, formatOnChange = false, suffix, prefix, min, max, decimals = 0, commitOnBlur = false, clearZeroOnFocus = false, className, name, style, onFocus, onBlur, onKeyDown, ...props }, ref) => {
     const initialValue = value ?? defaultValue ?? null;
     const [text, setText] = React.useState<string>(
       value != null ? formatNumber(value, thousandSeparator, decimals) :
@@ -128,7 +129,8 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
           onBlur={handleBlur}
           onFocus={(e) => {
             editing.current = true;
-            if (decimals > 0 && !formatOnChange) setText(numericValue == null ? "" : String(numericValue));
+            if (clearZeroOnFocus && numericValue === 0) setText("");
+            else if (decimals > 0 && !formatOnChange) setText(numericValue == null ? "" : String(numericValue));
             onFocus?.(e);
           }}
           onKeyDown={(e) => {

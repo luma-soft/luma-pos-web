@@ -21,6 +21,8 @@ export interface QuantityInputProps {
   decrementLabel?: string;
   inputLabel?: string;
   incrementLabel?: string;
+  suffix?: string;
+  clearZeroOnFocus?: boolean;
 }
 
 export function normalizeQuantity(
@@ -85,6 +87,8 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
       decrementLabel = "Decrease quantity",
       inputLabel = "Quantity",
       incrementLabel = "Increase quantity",
+      suffix,
+      clearZeroOnFocus = false,
     },
     ref,
   ) => {
@@ -133,6 +137,8 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
           decimals={decimals}
           thousandSeparator={false}
           commitOnBlur
+          suffix={suffix}
+          clearZeroOnFocus={clearZeroOnFocus}
           size={size}
           disabled={disabled}
           readOnly={readOnly}

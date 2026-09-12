@@ -9,6 +9,7 @@ import { getPrintTemplatesForDoc } from "@/lib/print/template";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { ReturnActions } from "./return-actions";
+import { productDisplayName } from "@/lib/products/variant-presentation";
 
 type ReturnDetail = NonNullable<Awaited<ReturnType<typeof getReturn>>>;
 
@@ -51,7 +52,7 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
                 <div key={item.id} className="space-y-2 p-3 text-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="break-words font-semibold">{item.productName}</div>
+                      <div className="break-words font-semibold">{productDisplayName({ name: item.productName, variantName: item.productVariantName, specs: item.productSpecs })}</div>
                       <div className="mt-0.5 text-xs text-slate-500">{formatNumber(Number(item.quantity))} {item.unitName} × {formatCurrency(Number(item.unitPrice))}</div>
                     </div>
                     <div className="shrink-0 font-semibold tabular-nums text-er">- {formatCurrency(Number(item.total))}</div>
@@ -77,7 +78,7 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
                 <tbody className="divide-y divide-border-soft">
                   {ret.items.map((item) => (
                     <tr key={item.id}>
-                      <td className="px-3 py-3 font-medium">{item.productName}</td>
+                      <td className="px-3 py-3 font-medium">{productDisplayName({ name: item.productName, variantName: item.productVariantName, specs: item.productSpecs })}</td>
                       <td className="px-3 py-3 text-slate-500">{item.unitName}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.unitPrice))}</td>

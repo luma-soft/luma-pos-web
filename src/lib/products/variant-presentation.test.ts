@@ -1,6 +1,6 @@
 import { describe, it as test } from "node:test";
 import assert from "node:assert/strict";
-import { matchesProductVariant, productVariantLabel, selectableProductIds } from "./variant-presentation";
+import { matchesProductVariant, productDisplayName, productVariantLabel, productVariantValues, selectableProductIds } from "./variant-presentation";
 
 describe("variant presentation", () => {
   const e = { id: "e", name: "Ruijie RAP2200", sku: "RG-RAP2200(E)", specs: { "Phiên bản": ["E"], __orderNote: ["private"] } };
@@ -9,6 +9,13 @@ describe("variant presentation", () => {
   test("compact labels use distinguishing attributes without internal notes", () => {
     assert.equal(productVariantLabel(e), "E");
     assert.equal(productVariantLabel({ ...e, variantName: "Bản E" }), "Bản E");
+  });
+
+  test("product items show every distinguishing attribute once", () => {
+    const tile = { ...e, variantName: "34601", specs: { "Mã": ["34601"], "Đơn vị": ["m2"], __orderNote: ["private"] } };
+    assert.deepEqual(productVariantValues(tile), ["34601", "m2"]);
+    assert.equal(productDisplayName(tile), "Ruijie RAP2200 · 34601 · m2");
+    assert.equal(productDisplayName({ ...tile, name: "Ruijie RAP2200 34601" }), "Ruijie RAP2200 34601 · m2");
   });
 
   test("search locates SKU or Vietnamese attribute across words", () => {

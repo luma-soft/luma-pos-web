@@ -1,7 +1,7 @@
-import { and, count, desc, eq, exists, gte, lte, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, exists, getTableColumns, gte, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
-import { customers, orders, profiles, returnItems, returns, warehouses } from "@/db/schema";
+import { customers, orders, profiles, products, returnItems, returns, warehouses } from "@/db/schema";
 import { accentInsensitiveLike } from "@/lib/search";
 import type {
   ReturnReasonFilter,
@@ -231,9 +231,12 @@ export async function getReturn(storeId: string, id: string) {
     .limit(1);
   if (!ret) return null;
 
-  const items = await db.select().from(returnItems).where(and(
-    eq(returnItems.returnId, id),
-    eq(returnItems.storeId, storeId),
-  ));
+  const items = await db.select({
+    ...getTableColumns(returnItems),
+    productVariantName: products.variantName,
+    productSpecs: products.specs,
+  }).from(returnItems)
+    .leftJoin(products, and(eq(products.id, returnItems.productId), eq(products.storeId, storeId)))
+    .where(and(eq(returnItems.returnId, id), eq(returnItems.storeId, storeId)));
   return { ...ret, items };
 }

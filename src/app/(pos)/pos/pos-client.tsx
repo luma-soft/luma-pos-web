@@ -90,6 +90,7 @@ import { buildPrintPaymentQr, formatPrintPaymentReference, resolvePrintPaymentQr
 import { waitForPrintImages } from "@/lib/print/wait-for-images";
 import { isSellPriceBelowPurchase, purchasePriceForSoldUnit } from "@/lib/pos/below-purchase-warning";
 import { calculateTaxBreakdown } from "@/lib/tax/calculations";
+import { productDisplayName } from "@/lib/products/variant-presentation";
 
 type CartLine = {
   key: string;
@@ -1832,7 +1833,7 @@ export function PosClient({
                     rel="noopener noreferrer"
                     className="block min-h-11 min-w-0 flex-1 text-left hover:text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                   >
-                    <p className={cn("text-sm font-semibold leading-5", stockInsufficient && "text-er")}>{l.product.name}</p>
+                    <p className={cn("text-sm font-semibold leading-5", stockInsufficient && "text-er")}>{productDisplayName(l.product)}</p>
                     <p className="mt-0.5 truncate text-xs text-slate-400">{l.product.sku ?? ""}</p>
                   </Link>
                   <button
@@ -1862,6 +1863,8 @@ export function PosClient({
                     onChange={(quantity) => setQty(l.key, quantity)}
                     min={0}
                     max={l.returnSoldQuantity}
+                    suffix={isReturnDraft && l.returnSoldQuantity != null ? `/${formatNumber(l.returnSoldQuantity)}` : undefined}
+                    clearZeroOnFocus={isReturnDraft && l.returnSoldQuantity != null}
                     readOnly={isCameraQuoteDraft}
                     size="sm"
                     className={cn(unitOptions.length > 0 ? "w-full" : "w-[8.25rem]", stockInsufficient && "border-er text-er focus-within:border-er")}
@@ -1928,7 +1931,7 @@ export function PosClient({
                       stockInsufficient && "text-er",
                     )}
                   >
-                    {l.product.name}
+                    {productDisplayName(l.product)}
                   </Link>
                   {eff.pct > 0 && (
                     <span className={cn(
@@ -1955,16 +1958,13 @@ export function PosClient({
                     onChange={(quantity) => setQty(l.key, quantity)}
                     min={0}
                     max={l.returnSoldQuantity}
+                    suffix={isReturnDraft && l.returnSoldQuantity != null ? `/${formatNumber(l.returnSoldQuantity)}` : undefined}
+                    clearZeroOnFocus={isReturnDraft && l.returnSoldQuantity != null}
                     readOnly={isCameraQuoteDraft}
                     size="sm"
                     className={cn("w-full", stockInsufficient && "border-er text-er focus-within:border-er")}
                     inputClassName={cn(stockInsufficient && "border-er text-er")}
                   />
-                  {isReturnDraft && l.returnSoldQuantity != null && (
-                    <div className="mt-1 text-center text-xs font-medium tabular-nums text-slate-500">
-                      / {formatNumber(l.returnSoldQuantity)}
-                    </div>
-                  )}
                   {stockManaged && (
                     <PosStockQuantityTooltip
                       stock={Number(l.product.stock)}
@@ -2210,7 +2210,7 @@ export function PosClient({
                           summary={(
                             <>
                             <div className="text-sm font-medium whitespace-normal break-words">
-                              {p.name}{resultUnit == null ? "" : ` · ${resultUnit}`}
+                              {productDisplayName(p)}{resultUnit == null ? "" : ` · ${resultUnit}`}
                             </div>
                             {p.isVariantParent ? (
                               <div className="text-xs text-slate-400">{children.length} SKU con</div>
@@ -2230,6 +2230,8 @@ export function PosClient({
                                   onChange={(quantity) => setQty(line.key, quantity)}
                                   min={0}
                                   max={line.returnSoldQuantity}
+                                  suffix={isReturnDraft && line.returnSoldQuantity != null ? `/${formatNumber(line.returnSoldQuantity)}` : undefined}
+                                  clearZeroOnFocus={isReturnDraft && line.returnSoldQuantity != null}
                                   size="sm"
                                   className={cn("w-full", stockInsufficient && "border-er text-er focus-within:border-er")}
                                   inputClassName={cn(stockInsufficient && "border-er text-er")}
@@ -2841,7 +2843,7 @@ function VariantPickerModal({
       >
         <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
-            <div id="pos-variant-picker-title" className="whitespace-normal break-words font-semibold">{parent.name}</div>
+            <div id="pos-variant-picker-title" className="whitespace-normal break-words font-semibold">{productDisplayName(parent)}</div>
             <div className="mt-0.5 text-xs text-slate-500">{children.length} SKU con · {priceLabelFor(parent, priceBook)}</div>
           </div>
           <button type="button" onClick={onClose} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-600 lg:h-8 lg:w-8">
@@ -2864,7 +2866,7 @@ function VariantPickerModal({
                     className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-left hover:border-primary-300 hover:bg-primary-50/50 dark:hover:bg-primary-950/20"
                   >
                     <span className="min-w-0">
-                      <span className="block whitespace-normal break-words text-sm font-semibold">{child.variantName ?? child.name}</span>
+                      <span className="block whitespace-normal break-words text-sm font-semibold">{productDisplayName(child)}</span>
                       <span className="block text-xs text-slate-500">{child.sku}{child.barcode ? ` · ${child.barcode}` : ""}</span>
                     </span>
                     <span className="shrink-0 text-right">
