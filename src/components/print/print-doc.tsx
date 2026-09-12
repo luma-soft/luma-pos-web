@@ -1,5 +1,5 @@
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
-import { moneyToWords, printOptionApplies, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
+import { moneyToWords, printOptionApplies, resolveLineDiscountColumns, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
 import { isPrintRichTextEmpty, sanitizePrintRichText } from "@/lib/print/rich-text";
 
 export interface PrintLine {
@@ -98,8 +98,9 @@ export function PrintDoc(p: PrintDocProps) {
   ];
   const signatures = configuredSignatures && (isA4 ? configuredSignatures : [configuredSignatures[0], configuredSignatures[2]]);
   const hasLineDiscount = p.items.some((item) => Number(item.discount ?? 0) > 0);
-  const showLineDiscountPercent = t.options.showLineDiscount && t.options.showLineDiscountPercent && hasLineDiscount;
-  const showLineDiscountAmount = t.options.showLineDiscount && t.options.showLineDiscountAmount && hasLineDiscount;
+  const lineDiscountColumns = resolveLineDiscountColumns(t.options);
+  const showLineDiscountPercent = lineDiscountColumns.showPercent && hasLineDiscount;
+  const showLineDiscountAmount = lineDiscountColumns.showAmount && hasLineDiscount;
   const showLineDiscount = showLineDiscountPercent || showLineDiscountAmount;
   const isMoneyReceipt = t.docType === "receipt";
   const visibleTotals = p.totals.filter((row) => {
@@ -250,8 +251,7 @@ export function PrintDoc(p: PrintDocProps) {
 function K80Doc(p: PrintDocProps) {
   const t = p.template;
   const isMoneyReceipt = t.docType === "receipt";
-  const showLineDiscountPercent = t.options.showLineDiscount && t.options.showLineDiscountPercent;
-  const showLineDiscountAmount = t.options.showLineDiscount && t.options.showLineDiscountAmount;
+  const { showPercent: showLineDiscountPercent, showAmount: showLineDiscountAmount } = resolveLineDiscountColumns(t.options);
   const visibleTotals = p.totals.filter((row) => {
     if (row.kind === "discount") return t.options.showDiscount;
     if (row.kind === "tax") return t.options.showTax;

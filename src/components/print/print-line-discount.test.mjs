@@ -47,6 +47,14 @@ test("a4 controls discount percent and amount as separate columns", () => {
   expect(amountOnly).toContain("60.000");
 });
 
+test("a4 repairs a legacy template with product discount enabled but no columns selected", () => {
+  const html = render("a4", true, { showLineDiscountPercent: false, showLineDiscountAmount: false });
+  expect(html).toContain("% CK");
+  expect(html).toContain("20%");
+  expect(html).toContain("Tiền CK");
+  expect(html).toContain("60.000");
+});
+
 test("k80 preview respects the separate line discount controls", () => {
   const percentOnly = render("k80", true, { showLineDiscountPercent: true, showLineDiscountAmount: false });
   expect(percentOnly).toContain("Chiết khấu: 20%");

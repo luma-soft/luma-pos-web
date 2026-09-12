@@ -40,6 +40,34 @@ export interface PrintTemplateOptions {
   showPaymentQrReference: boolean;
 }
 
+export type LineDiscountOptionKey = "showLineDiscount" | "showLineDiscountPercent" | "showLineDiscountAmount";
+
+export function normalizeLineDiscountOptions<T extends PrintTemplateOptions>(options: T): T {
+  if (!options.showLineDiscount || options.showLineDiscountPercent || options.showLineDiscountAmount) return options;
+  return { ...options, showLineDiscountPercent: true, showLineDiscountAmount: true } as T;
+}
+
+export function updateLineDiscountOption(
+  options: PrintTemplateOptions,
+  key: LineDiscountOptionKey,
+  value: boolean,
+): PrintTemplateOptions {
+  const next = { ...options, [key]: value };
+  if (key === "showLineDiscount" && value) return normalizeLineDiscountOptions(next);
+  if (key !== "showLineDiscount" && !next.showLineDiscountPercent && !next.showLineDiscountAmount) {
+    return { ...next, showLineDiscount: false };
+  }
+  return next;
+}
+
+export function resolveLineDiscountColumns(options: PrintTemplateOptions) {
+  const normalized = normalizeLineDiscountOptions(options);
+  return {
+    showPercent: normalized.showLineDiscount && normalized.showLineDiscountPercent,
+    showAmount: normalized.showLineDiscount && normalized.showLineDiscountAmount,
+  };
+}
+
 export interface PrintTemplate {
   id: string;
   name: string;

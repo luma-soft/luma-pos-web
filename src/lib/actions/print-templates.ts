@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { printTemplates } from "@/db/schema";
 import { type ActionResult, requireManager } from "./common";
-import { isPersistedTemplateId } from "@/lib/print/template-shared";
+import { isPersistedTemplateId, normalizeLineDiscountOptions } from "@/lib/print/template-shared";
 import { sanitizePrintRichText } from "@/lib/print/rich-text";
 
 const saveSchema = z.object({
@@ -70,7 +70,7 @@ export async function savePrintTemplate(input: SavePrintTemplateInput): Promise<
   const gate = await requireManager(); if (!gate.ok) return gate;
   const parsed = saveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
-  const v = parsed.data;
+  const v = { ...parsed.data, options: normalizeLineDiscountOptions(parsed.data.options) };
 
   try {
     const saved = await db.transaction(async (tx) => {

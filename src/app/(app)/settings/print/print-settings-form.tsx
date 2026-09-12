@@ -24,6 +24,7 @@ import {
   defaultOptionsForDocType,
   defaultTemplate,
   printOptionApplies,
+  updateLineDiscountOption,
   type PaperSize,
   type PrintDocType,
   type PrintTemplate,
@@ -77,7 +78,12 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
   }
 
   function patchOption(key: BooleanOptionKey, value: boolean) {
-    patch({ options: { ...defaultOptionsForDocType(selected.docType), ...selected.options, [key]: value } });
+    const options = { ...defaultOptionsForDocType(selected.docType), ...selected.options };
+    patch({
+      options: ["showLineDiscount", "showLineDiscountPercent", "showLineDiscountAmount"].includes(key)
+        ? updateLineDiscountOption(options, key as "showLineDiscount" | "showLineDiscountPercent" | "showLineDiscountAmount", value)
+        : { ...options, [key]: value },
+    });
   }
 
   function patchTextOption(key: TextOptionKey, value: string) {
