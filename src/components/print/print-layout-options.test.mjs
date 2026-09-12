@@ -64,6 +64,16 @@ test("saved signature labels override document defaults", () => {
   expect(html).not.toContain(">Người giao</b>");
 });
 
+test("a4 can hide each signature position independently", () => {
+  const html = render("a4", (template) => {
+    template.options.showSignatureMiddle = false;
+  });
+
+  expect(html).toContain("<b>Khách hàng</b>");
+  expect(html).not.toContain("<b>Người giao</b>");
+  expect(html).toContain("<b>Người lập</b>");
+});
+
 test("batch debt summary is enabled for existing and new templates by default", () => {
   expect(defaultTemplate("order").options.showBatchDebtSummary).toBe(true);
 });

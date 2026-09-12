@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { printTemplates } from "@/db/schema";
 import { type ActionResult, requireManager } from "./common";
-import { isPersistedTemplateId, normalizeLineDiscountOptions } from "@/lib/print/template-shared";
+import { isPersistedTemplateId, normalizeLineDiscountOptions, normalizeSignatureOptions } from "@/lib/print/template-shared";
 import { sanitizePrintRichText } from "@/lib/print/rich-text";
 
 const saveSchema = z.object({
@@ -41,6 +41,9 @@ const saveSchema = z.object({
     alwaysShowPaymentQr: z.boolean().default(false),
     showInWords: z.boolean(),
     showSignatures: z.boolean(),
+    showSignatureLeft: z.boolean().default(true),
+    showSignatureMiddle: z.boolean().default(true),
+    showSignatureRight: z.boolean().default(true),
     showSku: z.boolean(),
     taxLabel: z.string().trim().max(80).default(""),
     signatureLeftLabel: z.string().trim().max(80).default(""),
@@ -70,7 +73,7 @@ export async function savePrintTemplate(input: SavePrintTemplateInput): Promise<
   const gate = await requireManager(); if (!gate.ok) return gate;
   const parsed = saveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
-  const v = { ...parsed.data, options: normalizeLineDiscountOptions(parsed.data.options) };
+  const v = { ...parsed.data, options: normalizeSignatureOptions(normalizeLineDiscountOptions(parsed.data.options)) };
 
   try {
     const saved = await db.transaction(async (tx) => {

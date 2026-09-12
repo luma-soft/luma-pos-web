@@ -3456,6 +3456,9 @@
       "alwaysShowPaymentQr": "Luôn hiện QR kể cả khi đã thanh toán",
       "showInWords": "Số tiền bằng chữ",
       "showSignatures": "Khu vực chữ ký",
+      "showSignatureLeft": "Chữ ký bên trái",
+      "showSignatureMiddle": "Chữ ký ở giữa",
+      "showSignatureRight": "Chữ ký bên phải",
       "showSku": "Mã SKU cạnh tên SP"
     },
     "optionGroups": {

@@ -1,5 +1,5 @@
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
-import { moneyToWords, printOptionApplies, resolveLineDiscountColumns, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
+import { moneyToWords, printOptionApplies, resolveLineDiscountColumns, resolveSignaturePositions, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
 import { isPrintRichTextEmpty, sanitizePrintRichText } from "@/lib/print/rich-text";
 
 export interface PrintLine {
@@ -96,7 +96,12 @@ export function PrintDoc(p: PrintDocProps) {
     t.options.signatureMiddleLabel?.trim() || p.signatures[1],
     t.options.signatureRightLabel?.trim() || p.signatures[2],
   ];
-  const signatures = configuredSignatures && (isA4 ? configuredSignatures : [configuredSignatures[0], configuredSignatures[2]]);
+  const signaturePositions = resolveSignaturePositions(t.options);
+  const signatures = configuredSignatures && [
+    ...(signaturePositions.showLeft ? [configuredSignatures[0]] : []),
+    ...(isA4 && signaturePositions.showMiddle ? [configuredSignatures[1]] : []),
+    ...(signaturePositions.showRight ? [configuredSignatures[2]] : []),
+  ];
   const hasLineDiscount = p.items.some((item) => Number(item.discount ?? 0) > 0);
   const lineDiscountColumns = resolveLineDiscountColumns(t.options);
   const showLineDiscountPercent = lineDiscountColumns.showPercent && hasLineDiscount;
@@ -230,7 +235,7 @@ export function PrintDoc(p: PrintDocProps) {
 
       {p.note && <div className="mt-2 text-[12px] break-inside-avoid"><b>{p.noteLabel ?? "Ghi chú"}:</b> {p.note}</div>}
 
-      {t.options.showSignatures && signatures && (
+      {signatures && signatures.length > 0 && (
         <div className={`flex justify-between text-center text-[12px] break-inside-avoid ${isA4 ? "mt-14" : "mt-8"}`}>
           {signatures.map((s) => (
             <div key={s}><b>{s}</b><br /><i className="text-[10px] text-slate-500">{p.signHint ?? "(ký, họ tên)"}</i></div>

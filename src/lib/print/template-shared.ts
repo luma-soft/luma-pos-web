@@ -22,6 +22,9 @@ export interface PrintTemplateOptions {
   alwaysShowPaymentQr: boolean;
   showInWords: boolean;
   showSignatures: boolean;
+  showSignatureLeft: boolean;
+  showSignatureMiddle: boolean;
+  showSignatureRight: boolean;
   showSku: boolean;
   taxLabel: string;
   signatureLeftLabel: string;
@@ -68,6 +71,35 @@ export function resolveLineDiscountColumns(options: PrintTemplateOptions) {
   };
 }
 
+export type SignatureOptionKey = "showSignatures" | "showSignatureLeft" | "showSignatureMiddle" | "showSignatureRight";
+
+export function normalizeSignatureOptions<T extends PrintTemplateOptions>(options: T): T {
+  if (!options.showSignatures || options.showSignatureLeft || options.showSignatureMiddle || options.showSignatureRight) return options;
+  return { ...options, showSignatureLeft: true, showSignatureMiddle: true, showSignatureRight: true } as T;
+}
+
+export function updateSignatureOption(
+  options: PrintTemplateOptions,
+  key: SignatureOptionKey,
+  value: boolean,
+): PrintTemplateOptions {
+  const next = { ...options, [key]: value };
+  if (key === "showSignatures" && value) return normalizeSignatureOptions(next);
+  if (key !== "showSignatures" && !next.showSignatureLeft && !next.showSignatureMiddle && !next.showSignatureRight) {
+    return { ...next, showSignatures: false };
+  }
+  return next;
+}
+
+export function resolveSignaturePositions(options: PrintTemplateOptions) {
+  const normalized = normalizeSignatureOptions(options);
+  return {
+    showLeft: normalized.showSignatures && normalized.showSignatureLeft,
+    showMiddle: normalized.showSignatures && normalized.showSignatureMiddle,
+    showRight: normalized.showSignatures && normalized.showSignatureRight,
+  };
+}
+
 export interface PrintTemplate {
   id: string;
   name: string;
@@ -102,6 +134,9 @@ export const DEFAULT_OPTIONS: PrintTemplateOptions = {
   alwaysShowPaymentQr: false,
   showInWords: true,
   showSignatures: true,
+  showSignatureLeft: true,
+  showSignatureMiddle: true,
+  showSignatureRight: true,
   showSku: false,
   taxLabel: "",
   signatureLeftLabel: "",

@@ -25,6 +25,7 @@ import {
   defaultTemplate,
   printOptionApplies,
   updateLineDiscountOption,
+  updateSignatureOption,
   type PaperSize,
   type PrintDocType,
   type PrintTemplate,
@@ -32,7 +33,7 @@ import {
 } from "@/lib/print/template-shared";
 
 const OPTION_GROUPS = [
-  { key: "content", options: ["showSeller", "showProject", "showPartyPhone", "showDeliveryAddress", "showInWords", "showSignatures", "showSku"] },
+  { key: "content", options: ["showSeller", "showProject", "showPartyPhone", "showDeliveryAddress", "showInWords", "showSignatures", "showSignatureLeft", "showSignatureMiddle", "showSignatureRight", "showSku"] },
   { key: "pricing", options: ["showDebt", "showDiscount", "showLineDiscount", "showLineDiscountPercent", "showLineDiscountAmount", "showTax", "showPaymentQr", "alwaysShowPaymentQr"] },
   { key: "batch", options: ["showBatchDebtSummary"] },
 ] as const;
@@ -82,6 +83,8 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
     patch({
       options: ["showLineDiscount", "showLineDiscountPercent", "showLineDiscountAmount"].includes(key)
         ? updateLineDiscountOption(options, key as "showLineDiscount" | "showLineDiscountPercent" | "showLineDiscountAmount", value)
+        : ["showSignatures", "showSignatureLeft", "showSignatureMiddle", "showSignatureRight"].includes(key)
+          ? updateSignatureOption(options, key as "showSignatures" | "showSignatureLeft" | "showSignatureMiddle" | "showSignatureRight", value)
         : { ...options, [key]: value },
     });
   }
@@ -381,7 +384,8 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   const options = group.options
                     .filter((key) => printOptionApplies(docType, key))
                     .filter((key) => key !== "alwaysShowPaymentQr" || selected.options.showPaymentQr)
-                    .filter((key) => !["showLineDiscountPercent", "showLineDiscountAmount"].includes(key) || selected.options.showLineDiscount);
+                    .filter((key) => !["showLineDiscountPercent", "showLineDiscountAmount"].includes(key) || selected.options.showLineDiscount)
+                    .filter((key) => !["showSignatureLeft", "showSignatureMiddle", "showSignatureRight"].includes(key) || selected.options.showSignatures);
                   if (options.length === 0) return null;
                   return (
                     <section key={group.key} aria-labelledby={`print-option-group-${group.key}`}>
