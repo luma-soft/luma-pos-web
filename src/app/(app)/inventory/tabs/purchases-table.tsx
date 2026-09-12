@@ -249,6 +249,11 @@ function PurchaseDetailFooter({ purchase, printTemplates }: { purchase: Purchase
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {(purchase.status === "received" || purchase.status === "returned") && (
+          <Link href={`${Routes.PurchaseReturns}/new?purchaseOrderId=${encodeURIComponent(purchase.id)}`} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-primary-200 px-3 text-xs font-semibold text-primary-600 hover:bg-primary-50 lg:min-h-8 min-w-11 lg:min-w-0">
+            Trả hàng NCC
+          </Link>
+        )}
         <PrintTemplateMenu baseHref={printHref} templates={printTemplates} label={t("print.printBtn")} className="min-h-11 min-w-11 rounded-lg border border-border px-3 text-xs font-semibold text-primary-600 hover:bg-surface-2 lg:min-h-8 lg:min-w-0" />
         {canChange && (
           <Link href={Routes.purchaseEdit(purchase.id)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white hover:brightness-110 lg:min-h-8 min-w-11 lg:min-w-0">

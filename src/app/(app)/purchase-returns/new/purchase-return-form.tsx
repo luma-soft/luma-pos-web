@@ -24,6 +24,7 @@ import { createPurchaseReturn, updatePurchaseReturn } from "@/lib/actions/purcha
 import type { AiActionPreview } from "@/lib/ai/actions";
 import type { PurchaseFormOptions } from "@/lib/data/inventory";
 import type { getPurchaseReturn, PurchaseReturnProductRow } from "@/lib/data/purchase-returns";
+import type { getPurchase } from "@/lib/data/inventory";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { useProductCatalog } from "@/components/product-catalog-provider";
@@ -58,24 +59,28 @@ function productToLine(product: PurchaseReturnProductRow): Line {
   };
 }
 
-export function PurchaseReturnForm({ options, initial }: { options: PurchaseFormOptions; initial?: NonNullable<Awaited<ReturnType<typeof getPurchaseReturn>>> }) {
+export function PurchaseReturnForm({ options, initial, initialPurchase }: { options: PurchaseFormOptions; initial?: NonNullable<Awaited<ReturnType<typeof getPurchaseReturn>>>; initialPurchase?: NonNullable<Awaited<ReturnType<typeof getPurchase>>> | null }) {
   const t = useTranslations();
   const router = useRouter();
   const catalog = useProductCatalog();
   const [documentDate] = useState(() => (initial ? new Date(initial.createdAt) : new Date()).toLocaleDateString("vi-VN"));
-  const [supplierId, setSupplierId] = useState(initial?.supplierId ?? "");
-  const [warehouseId] = useState(initial?.warehouseId ?? options.warehouses[0]?.id ?? "");
+  const [supplierId, setSupplierId] = useState(initial?.supplierId ?? initialPurchase?.supplierId ?? "");
+  const [warehouseId] = useState(initial?.warehouseId ?? initialPurchase?.warehouseId ?? options.warehouses[0]?.id ?? "");
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<PurchaseReturnProductRow[]>([]);
-  const [lines, setLines] = useState<Line[]>(() => initial?.items.map((item) => {
-    const product = catalog.products.find((p) => p.id === item.productId);
-    const quantity = Number(item.quantity);
+  const [lines, setLines] = useState<Line[]>(() => (initial?.items ?? initialPurchase?.items ?? []).map((item) => {
+    const raw = item as unknown as Record<string, unknown>;
+    const productId = String(raw.productId ?? "");
+    const product = catalog.products.find((p) => p.id === productId);
+    const quantity = Number(raw.quantity ?? 0);
+    const unitCost = Number(raw.unitCost ?? raw.cost ?? 0);
+    const total = Number(raw.total ?? quantity * unitCost);
     return {
-      key: item.id, productId: item.productId, sku: item.sku, name: item.productName,
-      unitName: item.unitName, unitMultiplier: Number(item.unitMultiplier) || 1,
-      quantity, unitCost: Number(item.unitCost),
-      returnUnitCost: quantity > 0 ? Number(item.total) / quantity : Number(item.returnUnitCost),
-      stock: product ? getCatalogWarehouseStock(product, initial.warehouseId) : 0,
+      key: String(raw.id ?? productId), productId, sku: String(raw.sku ?? ""), name: String(raw.productName ?? raw.name ?? ""),
+      unitName: String(raw.unitName ?? raw.baseUnit ?? "Cái"), unitMultiplier: Number(raw.unitMultiplier) || 1,
+      quantity, unitCost,
+      returnUnitCost: quantity > 0 ? total / quantity : Number(raw.returnUnitCost ?? unitCost),
+      stock: product ? getCatalogWarehouseStock(product, initial?.warehouseId ?? initialPurchase?.warehouseId ?? warehouseId) : Number.POSITIVE_INFINITY,
     };
   }) ?? []);
   const [discount, setDiscount] = useState(Number(initial?.discount ?? 0));
@@ -181,7 +186,7 @@ export function PurchaseReturnForm({ options, initial }: { options: PurchaseForm
     setBusy(true);
     setError("");
     const payload = {
-      purchaseOrderId: initial?.purchaseOrderId,
+      purchaseOrderId: initial?.purchaseOrderId ?? initialPurchase?.id,
       supplierId,
       warehouseId,
       discount,

@@ -22,6 +22,8 @@ export interface QuantityInputProps {
   inputLabel?: string;
   incrementLabel?: string;
   suffix?: string;
+  suffixBelow?: boolean;
+  hideStepperButtons?: boolean;
   clearZeroOnFocus?: boolean;
 }
 
@@ -88,6 +90,8 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
       inputLabel = "Quantity",
       incrementLabel = "Increase quantity",
       suffix,
+      suffixBelow = false,
+      hideStepperButtons = false,
       clearZeroOnFocus = false,
     },
     ref,
@@ -113,13 +117,15 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
       <div
         className={cn(
           "grid shrink-0 grid-cols-[44px_minmax(44px,1fr)_44px] overflow-hidden rounded-lg border border-border bg-surface transition-[border-color] duration-150 focus-within:border-primary-600 lg:grid-cols-[32px_minmax(44px,1fr)_32px]",
+          suffixBelow && "h-auto grid-cols-1 overflow-visible border-0 bg-transparent focus-within:border-0",
+          hideStepperButtons && "grid-cols-1 lg:grid-cols-1",
           size === "sm" ? "h-11 lg:h-8" : "h-11 lg:h-10",
           touchTargets && "min-h-11 grid-cols-[44px_minmax(44px,1fr)_44px]",
           disabled && "cursor-not-allowed opacity-50",
           className,
         )}
       >
-        <button
+        {!hideStepperButtons && <button
           type="button"
           disabled={locked || decreasedValue === value}
           onClick={() => onChange(decreasedValue)}
@@ -127,7 +133,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
           className="grid h-full place-items-center border-r border-border text-slate-500 transition-colors hover:bg-surface-2 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Minus className="h-3.5 w-3.5" />
-        </button>
+        </button>}
         <NumberInput
           ref={ref}
           value={value}
@@ -136,8 +142,8 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
           max={upperBound}
           decimals={decimals}
           thousandSeparator={false}
-          commitOnBlur
-          suffix={suffix}
+          commitOnBlur={max == null}
+          suffix={suffixBelow ? undefined : suffix}
           clearZeroOnFocus={clearZeroOnFocus}
           size={size}
           disabled={disabled}
@@ -151,7 +157,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
             inputClassName,
           )}
         />
-        <button
+        {!hideStepperButtons && <button
           type="button"
           disabled={locked || increasedValue === value}
           onClick={() => onChange(increasedValue)}
@@ -159,7 +165,10 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
           className="grid h-full place-items-center border-l border-border text-slate-500 transition-colors hover:bg-surface-2 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Plus className="h-3.5 w-3.5" />
-        </button>
+        </button>}
+        {suffixBelow && suffix && (
+          <span className="mt-0.5 text-center text-xs leading-4 text-slate-500">{suffix}</span>
+        )}
       </div>
     );
   },

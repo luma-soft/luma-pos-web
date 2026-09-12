@@ -1864,6 +1864,7 @@ export function PosClient({
                     min={0}
                     max={l.returnSoldQuantity}
                     suffix={isReturnDraft && l.returnSoldQuantity != null ? `/${formatNumber(l.returnSoldQuantity)}` : undefined}
+                    suffixBelow={isReturnDraft && l.returnSoldQuantity != null}
                     clearZeroOnFocus={isReturnDraft && l.returnSoldQuantity != null}
                     readOnly={isCameraQuoteDraft}
                     size="sm"
@@ -1959,6 +1960,7 @@ export function PosClient({
                     min={0}
                     max={l.returnSoldQuantity}
                     suffix={isReturnDraft && l.returnSoldQuantity != null ? `/${formatNumber(l.returnSoldQuantity)}` : undefined}
+                    suffixBelow={isReturnDraft && l.returnSoldQuantity != null}
                     clearZeroOnFocus={isReturnDraft && l.returnSoldQuantity != null}
                     readOnly={isCameraQuoteDraft}
                     size="sm"
@@ -2231,6 +2233,7 @@ export function PosClient({
                                   min={0}
                                   max={line.returnSoldQuantity}
                                   suffix={isReturnDraft && line.returnSoldQuantity != null ? `/${formatNumber(line.returnSoldQuantity)}` : undefined}
+                                  suffixBelow={isReturnDraft && line.returnSoldQuantity != null}
                                   clearZeroOnFocus={isReturnDraft && line.returnSoldQuantity != null}
                                   size="sm"
                                   className={cn("w-full", stockInsufficient && "border-er text-er focus-within:border-er")}

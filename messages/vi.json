@@ -1499,11 +1499,11 @@
       "menuFor": "Thao tác {name}",
       "rename": "Đổi tên",
       "renameTitle": "Đổi tên hóa đơn",
-      "delete": "Xóa đơn tạm",
+      "delete": "Xóa",
       "renameDescription": "Tên này giúp nhận biết đơn đang soạn; số hóa đơn không thay đổi.",
       "nameLabel": "Tên hóa đơn",
       "saveName": "Lưu tên",
-      "deleteTitle": "Xóa đơn tạm?",
+      "deleteTitle": "Xóa?",
       "deleteDescriptionWithItems": "Bạn có chắc muốn xóa “{name}” cùng {count} sản phẩm trong đơn? Thao tác này không thể hoàn tác.",
       "keep": "Giữ lại"
     },

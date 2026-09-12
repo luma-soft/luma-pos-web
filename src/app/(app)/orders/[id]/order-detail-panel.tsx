@@ -88,6 +88,14 @@ export async function OrderDetailPanel({
             </h2>
             <span className="text-sm font-semibold text-slate-500">{order.code}</span>
             <OrderStatusBadge status={order.status} />
+            {order.returns.length > 0 && (
+              <Link
+                href="#order-returns"
+                className="inline-flex rounded-full bg-warn-soft px-2.5 py-0.5 text-xs font-semibold text-warn hover:underline"
+              >
+                Đã trả hàng ({order.returns.length})
+              </Link>
+            )}
             {!isQuote && <PaymentStatusBadge status={order.paymentStatus} />}
             {showOpenAction && (
               <Link href={openInListHref} className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-primary-600 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:min-h-0 lg:px-0 min-w-11 lg:min-w-0">
@@ -222,7 +230,7 @@ export async function OrderDetailPanel({
           )}
 
           {order.returns.length > 0 && (
-            <div className="overflow-hidden rounded-lg border border-border">
+            <div id="order-returns" className="overflow-hidden rounded-lg border border-border">
               <div className="border-b border-border px-3 py-2 text-sm font-semibold">{t("returns.sectionTitle")} ({order.returns.length})</div>
               <div className="divide-y divide-border-soft lg:hidden" data-mobile-audit="order-returns">
                 {order.returns.map((row) => (
@@ -230,7 +238,7 @@ export async function OrderDetailPanel({
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">{row.code}</span>
+                          <Link href={`/sales?tab=returns&expandedReturn=${encodeURIComponent(row.id)}`} className="font-semibold text-primary-600 hover:underline">{row.code}</Link>
                           {row.status === "cancelled" && <span className="rounded-full bg-er-soft px-2 py-0.5 text-[11px] font-semibold text-er">{t("returns.status.cancelled")}</span>}
                         </div>
                         <div className="mt-0.5 text-xs text-slate-500">{formatDate(row.createdAt)}</div>
@@ -256,7 +264,7 @@ export async function OrderDetailPanel({
                     {order.returns.map((row) => (
                       <tr key={row.id}>
                         <td className="px-3 py-3 font-medium">
-                          <span>{row.code}</span>
+                          <Link href={`/sales?tab=returns&expandedReturn=${encodeURIComponent(row.id)}`} className="text-primary-600 hover:underline">{row.code}</Link>
                           {row.status === "cancelled" && <span className="ml-2 rounded-full bg-er-soft px-2 py-0.5 text-[11px] font-semibold text-er">{t("returns.status.cancelled")}</span>}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap text-slate-500">{formatDate(row.createdAt)}</td>
