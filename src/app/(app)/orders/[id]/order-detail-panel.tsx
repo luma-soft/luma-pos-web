@@ -88,15 +88,12 @@ export async function OrderDetailPanel({
             </h2>
             <span className="text-sm font-semibold text-slate-500">{order.code}</span>
             <OrderStatusBadge status={order.status} />
+            {!isQuote && <PaymentStatusBadge status={order.paymentStatus} />}
             {order.returns.length > 0 && (
-              <Link
-                href="#order-returns"
-                className="inline-flex rounded-full bg-warn-soft px-2.5 py-0.5 text-xs font-semibold text-warn hover:underline"
-              >
+              <Link href="#order-returns" className="inline-flex rounded-full bg-warn-soft px-2.5 py-0.5 text-xs font-semibold text-warn hover:underline">
                 Đã trả hàng ({order.returns.length})
               </Link>
             )}
-            {!isQuote && <PaymentStatusBadge status={order.paymentStatus} />}
             {showOpenAction && (
               <Link href={openInListHref} className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-primary-600 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:min-h-0 lg:px-0 min-w-11 lg:min-w-0">
                 <ExternalLink className="h-4 w-4" />

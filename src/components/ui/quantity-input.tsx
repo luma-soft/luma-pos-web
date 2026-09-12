@@ -117,7 +117,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
       <div
         className={cn(
           "grid shrink-0 grid-cols-[44px_minmax(44px,1fr)_44px] overflow-hidden rounded-lg border border-border bg-surface transition-[border-color] duration-150 focus-within:border-primary-600 lg:grid-cols-[32px_minmax(44px,1fr)_32px]",
-          suffixBelow && "h-auto grid-cols-1 overflow-visible border-0 bg-transparent focus-within:border-0",
+          suffixBelow && "!h-auto grid-cols-[44px_minmax(44px,1fr)_44px] overflow-visible lg:grid-cols-[32px_minmax(44px,1fr)_32px]",
           hideStepperButtons && "grid-cols-1 lg:grid-cols-1",
           size === "sm" ? "h-11 lg:h-8" : "h-11 lg:h-10",
           touchTargets && "min-h-11 grid-cols-[44px_minmax(44px,1fr)_44px]",
@@ -167,7 +167,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
           <Plus className="h-3.5 w-3.5" />
         </button>}
         {suffixBelow && suffix && (
-          <span className="mt-0.5 text-center text-xs leading-4 text-slate-500">{suffix}</span>
+          <span className="col-span-3 mt-0.5 text-center text-xs leading-4 text-slate-500">{suffix}</span>
         )}
       </div>
     );
