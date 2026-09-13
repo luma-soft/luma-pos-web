@@ -18,6 +18,11 @@ export async function POST(request: Request) {
   const orderId = typeof input.orderId === "string" ? input.orderId : "";
   const amount = Number(input.amount);
   const requestedBankAccountId = typeof input.bankAccountId === "string" ? input.bankAccountId : "";
+  const clientRequestId = typeof input.clientRequestId === "string"
+    ? input.clientRequestId.trim()
+    : typeof input.reference === "string"
+      ? input.reference.trim()
+      : "checkout";
   if (!orderId || !Number.isFinite(amount) || amount <= 0) return mobileError("errors.invalidData");
 
   const [account] = requestedBankAccountId
@@ -52,7 +57,7 @@ export async function POST(request: Request) {
     orderId,
     bankAccountId: account.id,
     amount,
-    reference: typeof input.reference === "string" ? input.reference : undefined,
+    clientRequestId,
     note: typeof input.note === "string" ? input.note : undefined,
     createdBy: profileId ?? gate.userId,
   });
@@ -79,7 +84,7 @@ export async function POST(request: Request) {
         accountName: account.accountName,
       },
       status: "pending",
-      expiresAt: new Date(Date.now() + SEPAY_PAYMENT_TIMEOUT_MS).toISOString(),
+      expiresAt: new Date(result.data.createdAt.getTime() + SEPAY_PAYMENT_TIMEOUT_MS).toISOString(),
     },
   });
 }

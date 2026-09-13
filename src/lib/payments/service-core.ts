@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import {
   cashTransactions,
@@ -167,6 +168,14 @@ export function generatePaymentReference(prefix = "LUMA") {
   return `${prefix}-${stamp}-${rand}`;
 }
 
+function sepayClientRequestId(orderId: string, value: string | null | undefined) {
+  const digest = createHash("sha256")
+    .update(`${orderId}:${value?.trim() || "checkout"}`)
+    .digest("hex")
+    .slice(0, 24);
+  return `sepay:${orderId}:${digest}`;
+}
+
 async function confirmPaymentInTx(
   tx: DbLike,
   input: {
@@ -331,11 +340,11 @@ export async function createPendingSepayPayment(
     orderId: string;
     bankAccountId: string;
     amount: number;
-    reference?: string;
+    clientRequestId?: string;
     note?: string;
     createdBy?: string | null;
   }
-): Promise<PaymentActionResult<{ id: string; reference: string }>> {
+): Promise<PaymentActionResult<{ id: string; reference: string; createdAt: Date }>> {
   const amount = safeAmount(input.amount);
   if (amount <= 0) return { ok: false, error: "errors.invalidData" };
 
@@ -355,33 +364,41 @@ export async function createPendingSepayPayment(
       const remaining = Math.max(0, Number(order.total) - Number(order.amountPaid));
       if (amount > remaining + 1e-9) throw new Error("AMOUNT_EXCEEDS_REMAINING");
 
-      const reference = input.reference?.trim() || generateSepayPaymentReference();
+      const clientRequestId = sepayClientRequestId(order.id, input.clientRequestId);
       const [existing] = await tx
         .select({
           id: payments.id,
           reference: payments.reference,
           amount: payments.amount,
           bankAccountId: payments.bankAccountId,
+          orderId: payments.orderId,
           status: payments.status,
+          createdAt: payments.createdAt,
         })
         .from(payments)
         .where(and(
           eq(payments.orderId, order.id),
           eq(payments.provider, "sepay"),
-          eq(payments.reference, reference),
+          eq(payments.clientRequestId, clientRequestId),
         ))
         .limit(1);
       if (existing) {
         if (
           Number(existing.amount) !== amount ||
-          existing.bankAccountId !== bankAccount.id
+          existing.bankAccountId !== bankAccount.id ||
+          existing.orderId !== order.id ||
+          !existing.reference
         ) {
           throw new Error("REFERENCE_CONFLICT");
         }
-        return { ok: true, data: { id: existing.id, reference } };
+        return {
+          ok: true,
+          data: { id: existing.id, reference: existing.reference, createdAt: existing.createdAt },
+        };
       }
+      const reference = generateSepayPaymentReference();
       const shiftId = await currentShiftIdForProfile(tx, input.createdBy);
-      const [payment] = await tx.insert(payments).values({
+      const [inserted] = await tx.insert(payments).values({
         storeId: order.storeId,
         orderId: order.id,
         shiftId,
@@ -390,16 +407,45 @@ export async function createPendingSepayPayment(
         status: "pending",
         provider: "sepay",
         bankAccountId: bankAccount.id,
+        clientRequestId,
         gateway: bankAccount.gateway || bankAccount.bankCode,
         accountNumber: bankAccount.accountNumber,
         reference,
         note: input.note?.trim() || null,
         createdBy: input.createdBy ?? null,
+      }).onConflictDoNothing({
+        target: [payments.provider, payments.clientRequestId],
       }).returning();
 
-      await recordPaymentActivityInTx(tx, payment, "payment.requested", null, input.createdBy ?? null, false);
+      const payment = inserted ?? (await tx
+        .select()
+        .from(payments)
+        .where(and(
+          eq(payments.provider, "sepay"),
+          eq(payments.clientRequestId, clientRequestId),
+        ))
+        .limit(1))[0];
+      if (!payment) throw new Error("PAYMENT_CREATE_FAILED");
+      if (
+        payment.orderId !== order.id ||
+        payment.bankAccountId !== bankAccount.id ||
+        Number(payment.amount) !== amount
+      ) {
+        throw new Error("REFERENCE_CONFLICT");
+      }
 
-      return { ok: true, data: { id: payment.id, reference: payment.reference ?? reference } };
+      if (inserted) {
+        await recordPaymentActivityInTx(tx, payment, "payment.requested", null, input.createdBy ?? null, false);
+      }
+
+      return {
+        ok: true,
+        data: {
+          id: payment.id,
+          reference: payment.reference ?? reference,
+          createdAt: payment.createdAt,
+        },
+      };
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
