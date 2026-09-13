@@ -1579,6 +1579,7 @@
       "sourceRequired": "Invoice returns require a source invoice.",
       "sourceHint": "Pick the source invoice, then add returned items to the cart.",
       "sourceSelected": "Returning against invoice {code}",
+      "invoiceCatalogLocked": "Invoice returns only contain products from the source invoice. Adjust the return quantities in the list below.",
       "quickHint": "No source invoice; use for quick returns or imported legacy data.",
       "restock": "Restock",
       "onlineRequired": "Creating returns requires an online connection."

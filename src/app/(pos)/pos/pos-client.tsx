@@ -63,6 +63,7 @@ import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
 import { buildExpectedPosPricing, countPosPricingConflicts, requestPosOrder } from "@/lib/pos/checkout-pricing";
 import { resolvePosCartUnit } from "@/lib/pos/cart-unit";
 import { upsertPosCartLine } from "@/lib/pos/cart-line-order";
+import { canAddCatalogProductsToPosDraft } from "@/lib/pos/catalog-add-policy";
 import { expandPosSearchUnitResults } from "@/lib/pos/search-unit-results";
 import {
   createLinePriceEditorState,
@@ -696,6 +697,7 @@ export function PosClient({
   const isBookingDraft = activeKind === "booking";
   const isReturnDraft = isReturnKind(activeKind);
   const isReturnInvoiceDraft = activeKind === "return_invoice";
+  const canAddCatalogProducts = canAddCatalogProductsToPosDraft(activeKind);
   const priceBook: PriceBook = active.priceBook ?? ""; // "" = bảng giá mặc định
   const defaultBook = data.priceBooks.find((b) => b.isDefault) ?? data.priceBooks[0];
   const isDefaultBook = !priceBook || priceBook === defaultBook?.id;
@@ -1209,6 +1211,7 @@ export function PosClient({
   }
 
   function addToCart(p: PosProduct, selectedUnitName = p.baseUnit) {
+    if (!canAddCatalogProducts) return;
     if (p.isVariantParent) {
       setVariantParent(p);
       return;
@@ -1236,6 +1239,7 @@ export function PosClient({
   }
 
   const addQuantityToCart = useCallback((p: PosProduct, quantity: number) => {
+    if (!canAddCatalogProducts) return;
     const safeQuantity = positiveQuantityOrDefault(quantity);
     if (!Number.isFinite(basePriceFor(p, priceBook, data.priceBooks))) {
       setError(t("pricing.errors.priceUnavailable"));
@@ -1257,7 +1261,7 @@ export function PosClient({
         (line) => ({ ...line, quantity: line.quantity + safeQuantity }),
       );
     });
-  }, [priceBook, setCart, t, data.priceBooks]);
+  }, [canAddCatalogProducts, priceBook, setCart, t, data.priceBooks]);
 
   const applyRawAiCartItems = useCallback(async (rawItems: unknown[], payload?: Record<string, unknown>) => {
     const { matched, unresolved } = await resolveAiCartDraftItems(
@@ -1346,6 +1350,7 @@ export function PosClient({
   }, [applyRawAiCartItems, searchableProducts, storageScope]);
 
   function selectProduct(p: PosProduct, unitName?: string | null) {
+    if (!canAddCatalogProducts) return;
     if (p.isVariantParent && productChildren(p).length > 0) {
       setVariantParent(p);
       return;
@@ -2157,7 +2162,12 @@ export function PosClient({
               onChange={setCameraPackages}
             />
           )}
-          {!isCameraQuoteDraft && <div ref={searchRef} className="relative flex gap-2">
+          {isReturnInvoiceDraft && (
+            <div className="flex min-h-[50px] items-center rounded-xl border border-primary-200 bg-primary-50/70 px-4 text-sm text-primary-800 dark:border-primary-900 dark:bg-primary-950/30 dark:text-primary-200">
+              {t("pos.returns.invoiceCatalogLocked")}
+            </div>
+          )}
+          {!isCameraQuoteDraft && canAddCatalogProducts && <div ref={searchRef} className="relative flex gap-2">
             <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
