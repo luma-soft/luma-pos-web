@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  categories, internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, stockLevels, stockMovements, suppliers, warehouses,
+  categories, internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, stockMovements, suppliers, warehouses,
 } from "@/db/schema";
 import { unstable_cache } from "next/cache";
 import { accentInsensitiveLike, catalogProductSearchCondition } from "@/lib/search";
@@ -75,16 +75,10 @@ export async function getInventory(storeId: string, filters: { q?: string; low?:
     eq(products.isActive, true),
     stockManagedCategoryCondition(),
   ];
-  const availableStock = filters.warehouseId?.trim()
-    ? sql<string>`coalesce((
-        select sl.quantity
-        from ${stockLevels} sl
-        where sl.product_id = ${products.id}
-          and sl.store_id = ${storeId}
-          and sl.warehouse_id = ${filters.warehouseId.trim()}
-        limit 1
-      ), 0)`
-    : products.totalStock;
+  // This app operates a single warehouse. Keep the canonical stock source
+  // consistent across web and mobile instead of switching to a warehouse
+  // scoped alias when a warehouse id is present.
+  const totalStock = products.totalStock;
   if (filters.q?.trim()) {
     const q = filters.q.trim();
     const c = catalogProductSearchCondition(products, q);
@@ -96,13 +90,13 @@ export async function getInventory(storeId: string, filters: { q?: string; low?:
   const stock: StockFilter = filters.low ? "low" : (filters.stock ?? "all");
   const statusCondition = pricingStockCondition(
     stock,
-    availableStock,
+    totalStock,
     products.minStock,
   );
   if (statusCondition) conditions.push(statusCondition);
-  else if (stock === "instock") conditions.push(sql`${availableStock} > 0`);
-  else if (stock === "out") conditions.push(sql`${availableStock} <= 0`);
-  else if (stock === "low") conditions.push(sql`${availableStock} <= ${products.minStock} and ${products.minStock} > 0`);
+    else if (stock === "instock") conditions.push(sql`${totalStock} > 0`);
+  else if (stock === "out") conditions.push(sql`${totalStock} <= 0`);
+  else if (stock === "low") conditions.push(sql`${totalStock} <= ${products.minStock} and ${products.minStock} > 0`);
   const where = and(...conditions);
 
   const [rows, [{ n: total }]] = await Promise.all([
@@ -115,9 +109,9 @@ export async function getInventory(storeId: string, filters: { q?: string; low?:
         costPrice: products.costPrice,
         trackBatches: hasComplianceColumns ? products.trackBatches : sql<boolean>`false`,
         shelfLifeDays: hasComplianceColumns ? products.shelfLifeDays : sql<number | null>`null`,
-        totalStock: availableStock,
+        totalStock,
         minLevel: products.minStock,
-        stockValue: sql<string>`${availableStock} * ${products.costPrice}`,
+        stockValue: sql<string>`${totalStock} * ${products.costPrice}`,
         units: sql<{ unitName: string; multiplier: string; barcode: string | null }[]>`coalesce((
           select json_agg(json_build_object('unitName', pu.unit_name, 'multiplier', pu.multiplier, 'barcode', pu.barcode) order by pu.sort_order)
           from product_units pu where pu.product_id = ${products.id}

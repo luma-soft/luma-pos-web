@@ -166,7 +166,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
     setLines((current) => current.map((line) => line.key === key ? { ...line, ...next } : line));
   }
 
-  function availableStock(line: Line) {
+  function totalStock(line: Line) {
     // Return quantities are recorded in their selected unit; inventory is in base units.
     const restored = initial?.status === "completed" ? initial.items.reduce((sum, item) =>
       item.productId === line.productId ? sum + Number(item.quantity) * (Number(item.unitMultiplier) || 1) : sum, 0) : 0;
@@ -178,7 +178,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
 
   async function submit() {
     if (busy || !supplierId || !warehouseId || lines.length === 0) return;
-    const invalid = lines.some((line) => line.quantity <= 0 || line.returnUnitCost < 0 || line.quantity > availableStock(line) + 1e-9);
+    const invalid = lines.some((line) => line.quantity <= 0 || line.returnUnitCost < 0 || line.quantity > totalStock(line) + 1e-9);
     if (invalid) {
       setError(t("purchaseReturns.errors.insufficientStock"));
       return;
@@ -252,7 +252,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
               ) : (
                 <div className="space-y-2 p-3">
                   {lines.map((line) => {
-                    const overStock = line.quantity > availableStock(line) + 1e-9;
+                    const overStock = line.quantity > totalStock(line) + 1e-9;
                     return (
                       <MobileFormLineCard
                         key={line.key}
@@ -273,14 +273,14 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                       >
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
-                            <div className="text-xs font-semibold text-slate-500">{t("purchaseReturns.availableStock", { stock: formatNumber(availableStock(line)), unit: line.unitName })}</div>
+                            <div className="text-xs font-semibold text-slate-500">{t("purchaseReturns.availableStock", { stock: formatNumber(totalStock(line)), unit: line.unitName })}</div>
                             <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{line.unitName}</div>
                           </div>
                           <div className="col-span-2 space-y-1 text-xs font-semibold text-slate-500">
                             <span>{t("purchaseReturns.cols.qty")}</span>
                             <QuantityInput
                               min={0}
-                              max={availableStock(line)}
+                              max={totalStock(line)}
                               value={line.quantity}
                               onChange={(quantity) => patch(line.key, { quantity })}
                               touchTargets
@@ -342,7 +342,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                     </td>
                   </tr>
                 ) : lines.map((line, index) => {
-                  const overStock = line.quantity > availableStock(line) + 1e-9;
+                  const overStock = line.quantity > totalStock(line) + 1e-9;
                   return (
                     <tr key={line.key}>
                       <td className="px-3 py-2 text-center text-slate-500">{index + 1}</td>
@@ -350,14 +350,14 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                       <td className="px-3 py-2">
                         <div className="truncate font-medium">{line.name}</div>
                         <div className={cn("text-xs", overStock ? "text-er" : "text-slate-400")}>
-                          {t("purchaseReturns.availableStock", { stock: formatNumber(availableStock(line)), unit: line.unitName })}
+                          {t("purchaseReturns.availableStock", { stock: formatNumber(totalStock(line)), unit: line.unitName })}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-slate-500">{line.unitName}</td>
                       <td className="px-3 py-2">
                         <QuantityInput
                           min={0}
-                          max={availableStock(line)}
+                          max={totalStock(line)}
                           value={line.quantity}
                           onChange={(quantity) => patch(line.key, { quantity })}
                           size="sm"
