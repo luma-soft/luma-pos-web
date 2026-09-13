@@ -100,36 +100,42 @@ async function StockStatusDetail({
     ]);
 
   return (
-    <div className="space-y-5" data-layout="inventory-stock-status-detail">
-      <header>
-        <Link
-          href={`${Routes.Inventory}?tab=stock`}
-          className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-700 hover:underline dark:text-primary-300 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          {t("inventory.backToWarehouse")}
-        </Link>
-        <h2 className="mt-1 text-2xl font-extrabold tracking-[-0.02em] text-slate-950 dark:text-white">
-          {t(`inventory.statusCards.${status}.label`)}
-        </h2>
-        <div className="mt-1 text-sm font-medium text-slate-500">
-          {t("inventory.skuTotal", { count: formatNumber(total) })}
-        </div>
-        <p className="mt-5 text-sm text-slate-500">
-          {t(`inventory.statusCards.${status}.description`)}
-        </p>
-      </header>
+    <div className="space-y-4" data-layout="inventory-stock-status-detail">
+      <section className="grid gap-3 border-b border-border-soft pb-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,560px)] lg:items-end">
+        <header>
+          <Link
+            href={`${Routes.Inventory}?tab=stock`}
+            className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-700 hover:underline dark:text-primary-300 lg:min-h-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            {t("inventory.backToWarehouse")}
+          </Link>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2 className="text-2xl font-extrabold tracking-[-0.02em] text-slate-950 dark:text-white">
+              {t(`inventory.statusCards.${status}.label`)}
+            </h2>
+            <span className="text-sm font-medium text-slate-500">
+              {t("inventory.skuTotal", { count: formatNumber(total) })}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            {t(`inventory.statusCards.${status}.description`)}
+          </p>
+        </header>
 
-      <ListSearchFilterBar
-        search={(
-          <InstantFilterForm action={Routes.Inventory}>
-            <input type="hidden" name="tab" value="stock" />
-            <input type="hidden" name="stockStatus" value={status} />
-            <ListSearchInput name="q" defaultValue={searchParams.q ?? ""} placeholder={t("inventory.searchPlaceholder")} />
-          </InstantFilterForm>
-        )}
-        filter={<InventoryFilterDrawer title="Bộ lọc kho hàng" values={searchParams} fields={["category", "stock"]} categories={productOptions.categories.map((item) => ({ value: item.id, label: item.name }))} />}
-      />
+        <ListSearchFilterBar
+          className="w-full"
+          searchClassName="min-w-0 flex-1"
+          search={(
+            <InstantFilterForm action={Routes.Inventory}>
+              <input type="hidden" name="tab" value="stock" />
+              <input type="hidden" name="stockStatus" value={status} />
+              <ListSearchInput name="q" defaultValue={searchParams.q ?? ""} placeholder={t("inventory.searchPlaceholder")} />
+            </InstantFilterForm>
+          )}
+          filter={<InventoryFilterDrawer title="Bộ lọc kho hàng" values={searchParams} fields={["category", "stock"]} categories={productOptions.categories.map((item) => ({ value: item.id, label: item.name }))} />}
+        />
+      </section>
 
       <section aria-labelledby="inventory-product-list-heading">
         <div className="mb-3 flex items-center justify-between gap-3">

@@ -1887,6 +1887,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
             icon={PackagePlus}
             label={t("products.actions.purchase")}
             href={Routes.purchaseNewForProduct(product.id)}
+            target="_blank"
           />}
           {product.isVariantParent && <ActionLink icon={Plus} label={t("products.actions.addSameType")} href={productModalHref({ productModal: "groupAdd", sameTypeAs: sameTypeSourceId })} />}
           <div className="relative">
@@ -1985,6 +1986,7 @@ function ActionLink({
   tone = "neutral",
   replace = false,
   className,
+  target,
 }: {
   href: string;
   icon: LucideIcon;
@@ -1992,11 +1994,14 @@ function ActionLink({
   tone?: "neutral" | "primary";
   replace?: boolean;
   className?: string;
+  target?: "_blank";
 }) {
   return (
     <Link
       href={href}
       replace={replace}
+      target={target}
+      rel={target ? "noreferrer" : undefined}
       className={cn(
         actionClassName,
         tone === "primary"

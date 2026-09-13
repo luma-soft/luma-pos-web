@@ -136,6 +136,8 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
                 <div className="flex items-start justify-between gap-3">
                   <Link
                     href={Routes.product(item.productId)}
+                    target="_blank"
+                    rel="noreferrer"
                     className="inline-flex min-h-11 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11"
                   >
                     {item.productName}
@@ -169,7 +171,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
                 return (
                   <tr key={item.id}>
                     <td className="px-3 py-3">
-                      <Link href={Routes.product(item.productId)} className="font-medium text-primary-600 hover:underline">
+                      <Link href={Routes.product(item.productId)} target="_blank" rel="noreferrer" className="font-medium text-primary-600 hover:underline">
                         {item.sku}
                       </Link>
                     </td>
@@ -242,7 +244,7 @@ function PurchaseDetailFooter({ purchase, printTemplates }: { purchase: Purchase
       <div className="flex flex-wrap items-center gap-2">
         {canChange && <PurchaseCancelButton purchaseId={purchase.id} compact className="min-h-11 lg:min-h-8" />}
         {canChange && (
-          <Link href={Routes.purchaseCopy(purchase.id)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-slate-600 hover:bg-surface-2 lg:min-h-8 min-w-11 lg:min-w-0">
+          <Link href={Routes.purchaseCopy(purchase.id)} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-slate-600 hover:bg-surface-2 lg:min-h-8 min-w-11 lg:min-w-0">
             <Copy className="h-3.5 w-3.5" />
             {t("purchases.copy")}
           </Link>
@@ -250,13 +252,13 @@ function PurchaseDetailFooter({ purchase, printTemplates }: { purchase: Purchase
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {(purchase.status === "received" || purchase.status === "returned") && (
-          <Link href={`${Routes.PurchaseReturns}/new?purchaseOrderId=${encodeURIComponent(purchase.id)}`} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-primary-200 px-3 text-xs font-semibold text-primary-600 hover:bg-primary-50 lg:min-h-8 min-w-11 lg:min-w-0">
+          <Link href={`${Routes.PurchaseReturns}/new?purchaseOrderId=${encodeURIComponent(purchase.id)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-primary-200 px-3 text-xs font-semibold text-primary-600 hover:bg-primary-50 lg:min-h-8 min-w-11 lg:min-w-0">
             Trả hàng NCC
           </Link>
         )}
         <PrintTemplateMenu baseHref={printHref} templates={printTemplates} label={t("print.printBtn")} className="min-h-11 min-w-11 rounded-lg border border-border px-3 text-xs font-semibold text-primary-600 hover:bg-surface-2 lg:min-h-8 lg:min-w-0" />
         {canChange && (
-          <Link href={Routes.purchaseEdit(purchase.id)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white hover:brightness-110 lg:min-h-8 min-w-11 lg:min-w-0">
+          <Link href={Routes.purchaseEdit(purchase.id)} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white hover:brightness-110 lg:min-h-8 min-w-11 lg:min-w-0">
             <FilePenLine className="h-3.5 w-3.5" />
             {t("purchases.edit")}
           </Link>

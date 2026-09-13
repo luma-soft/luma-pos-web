@@ -180,6 +180,7 @@ export function DataTableShell<T>({
   detailFooter,
   detailSize = "xl",
   detailBodyClassName,
+  detailPanelClassName,
   renderMobileRow,
   mobileListClassName,
   mobileRowClassName,
@@ -217,6 +218,8 @@ export function DataTableShell<T>({
   detailFooter?: (row: T) => ReactNode;
   detailSize?: "md" | "lg" | "xl" | "full";
   detailBodyClassName?: string;
+  /** Overrides the preview panel geometry when the detail is intentionally content-sized. */
+  detailPanelClassName?: string;
   renderMobileRow?: (props: MobileRenderProps<T>) => ReactNode;
   mobileListClassName?: string;
   mobileRowClassName?: string;
@@ -625,6 +628,7 @@ export function DataTableShell<T>({
           footer={detailFooter?.(selectedDetailRow)}
           size={detailSize}
           bodyClassName={detailBodyClassName}
+          panelClassName={detailPanelClassName}
         >
           {renderDetail(selectedDetailRow)}
         </RowPreviewModal>

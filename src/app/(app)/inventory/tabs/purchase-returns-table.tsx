@@ -103,6 +103,8 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
               <div className="flex items-start justify-between gap-3">
                 <Link
                   href={Routes.product(item.productId)}
+                  target="_blank"
+                  rel="noreferrer"
                   className="inline-flex min-h-11 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11"
                 >
                   {item.productName}
@@ -133,7 +135,7 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
               {row.items.map((item) => (
                 <tr key={item.id}>
                   <td className="px-3 py-3">
-                    <Link href={Routes.product(item.productId)} className="font-medium text-primary-600 hover:underline">{item.sku}</Link>
+                    <Link href={Routes.product(item.productId)} target="_blank" rel="noreferrer" className="font-medium text-primary-600 hover:underline">{item.sku}</Link>
                   </td>
                   <td className="px-3 py-3">
                     <div className="min-w-40 break-words font-medium">{item.productName}</div>

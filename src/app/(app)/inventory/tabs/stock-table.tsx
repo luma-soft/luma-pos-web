@@ -52,6 +52,8 @@ export function StockTable({ rows }: { rows: StockRow[]; stock?: StockFilter }) 
       getRowId={(row) => row.id}
       minWidth="980px"
       renderDetail={(row) => <ExpandedStock row={row} />}
+      detailPanelClassName="h-auto max-h-[min(720px,calc(100dvh-3rem))] sm:max-w-6xl"
+      detailBodyClassName="p-0"
     />
   );
 }
@@ -158,9 +160,11 @@ function ExpandedStock({ row }: { row: StockRow }) {
 
       <div className="border-t border-border-soft pt-4 mt-4">
         <div className="flex flex-wrap justify-end gap-2">
-          <ActionLink href={Routes.purchaseNewForProduct(row.id)} icon={PackagePlus} label={t("products.actions.purchase")} />
+          <ActionLink href={Routes.purchaseNewForProduct(row.id)} icon={PackagePlus} label={t("products.actions.purchase")} target="_blank" />
           <Link
             href={Routes.product(row.id)}
+            target="_blank"
+            rel="noreferrer"
             className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-primary-600 bg-primary-600 px-3 text-sm font-semibold text-white transition-colors hover:border-primary-700 hover:bg-primary-700 lg:min-h-10 min-w-11 lg:min-w-0"
           >
             {t("inventory.expand.openProduct" as never)}
@@ -222,14 +226,18 @@ function ActionLink({
   href,
   icon: Icon,
   label,
+  target,
 }: {
   href: string;
   icon: typeof PackagePlus;
   label: string;
+  target?: "_blank";
 }) {
   return (
     <Link
       href={href}
+      target={target}
+      rel={target ? "noreferrer" : undefined}
       className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-surface-2 dark:text-slate-200 lg:min-h-10 min-w-11 lg:min-w-0"
     >
       <Icon className="h-4 w-4" />
