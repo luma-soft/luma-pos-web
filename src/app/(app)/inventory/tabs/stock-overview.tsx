@@ -150,7 +150,7 @@ function StatusCard({
         "inline-flex min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-[116px] lg:min-w-0",
       )}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex w-full items-center gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-current/20 bg-surface/65">
           <Icon className="h-5 w-5" strokeWidth={2} />
         </span>

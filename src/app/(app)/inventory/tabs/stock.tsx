@@ -137,19 +137,7 @@ async function StockStatusDetail({
         />
       </section>
 
-      <section aria-labelledby="inventory-product-list-heading">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h3
-            id="inventory-product-list-heading"
-            className="text-base font-bold text-slate-900 dark:text-slate-100"
-          >
-            {t("inventory.productList")}
-          </h3>
-          <span className="text-sm font-medium text-slate-500">
-            {t("inventory.skuTotal", { count: formatNumber(total) })}
-          </span>
-        </div>
-
+      <section aria-label={t("inventory.productList")}>
         {rows.length === 0 ? (
           <div className="rounded-card border border-border bg-surface p-12 text-center text-slate-400 shadow-e1">
             <Warehouse className="mx-auto mb-3 h-10 w-10 opacity-60" />
