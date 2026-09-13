@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { PackagePlus } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
@@ -35,6 +36,7 @@ export function stockSev(stock: number, min: number): Sev {
 
 export function StockTable({ rows }: { rows: StockRow[]; stock?: StockFilter }) {
   const t = useTranslations();
+  const router = useRouter();
   const columns: DataTableColumn<StockRow>[] = [
     { key: "product", label: t("orders.cols.product"), required: true, render: (row) => <span><span className="font-medium">{row.name}</span><span className="ml-2 text-xs text-slate-400">{row.sku}</span></span> },
     { key: "stock", label: t("inventory.cols.stock"), defaultVisible: true, align: "right", cellClassName: (row) => stockClass(row), render: (row) => `${formatNumber(Number(row.totalStock))} ${row.baseUnit}` },
@@ -51,6 +53,7 @@ export function StockTable({ rows }: { rows: StockRow[]; stock?: StockFilter }) 
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="980px"
+      onRowClick={(row) => router.push(Routes.productDetail(row.id), { scroll: false })}
       renderDetail={(row) => <ExpandedStock row={row} />}
       detailPanelClassName="h-auto max-h-[min(720px,calc(100dvh-3rem))] sm:max-w-6xl"
       detailBodyClassName="p-0"
