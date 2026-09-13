@@ -56,15 +56,7 @@ export function stepQuantity(
     "min" | "max" | "step" | "decimals"
   > = {},
 ) {
-  const tolerance = 1e-9;
-  const stepIndex =
-    direction === 1
-      ? Math.floor(value / step + tolerance) + 1
-      : Math.ceil(value / step - tolerance) - 1;
-  const candidate = stepIndex * step;
-  if (candidate < min - tolerance) return value;
-  if (max != null && max >= min && candidate > max + tolerance) return value;
-  return normalizeQuantity(candidate, {
+  return normalizeQuantity(value + direction * step, {
     min,
     max,
     decimals,

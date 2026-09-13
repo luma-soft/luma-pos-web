@@ -864,7 +864,7 @@ function ComboItemsField({
                   </span>
                   <QuantityInput
                     value={item.quantity}
-                    min={0.0001}
+                    min={0}
                     decimals={4}
                     onChange={(quantity) => {
                       setValue(

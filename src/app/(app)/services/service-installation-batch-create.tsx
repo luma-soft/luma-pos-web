@@ -353,7 +353,7 @@ export function ServiceInstallationBatchCreate({
                           value={draft.quantity}
                           onChange={(quantity) => updateDraft(draft.clientDraftId, { quantity })}
                           min={draft.tracking === "asset" ? 1 : 0.0001}
-                          step={draft.tracking === "asset" ? 1 : 0.1}
+                          step={1}
                           decimals={draft.tracking === "asset" ? 0 : 4}
                           inputLabel={`Số lượng ${draft.product.name}`}
                         />
@@ -389,7 +389,7 @@ export function ServiceInstallationBatchCreate({
                       value={activeDraft.quantity}
                       onChange={(quantity) => updateDraft(activeDraft.clientDraftId, { quantity })}
                       min={activeDraft.tracking === "asset" ? 1 : 0.0001}
-                      step={activeDraft.tracking === "asset" ? 1 : 0.1}
+                      step={1}
                       decimals={activeDraft.tracking === "asset" ? 0 : 4}
                       inputLabel={`Số lượng ${activeDraft.product.name}`}
                     />

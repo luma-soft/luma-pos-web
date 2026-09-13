@@ -17,7 +17,6 @@ import {
   priceBooks,
   productUnits,
   products,
-  stockLevels,
   suppliers,
 } from "@/db/schema";
 import { coercePageSize } from "@/lib/pagination";
@@ -84,7 +83,7 @@ export interface PricingProductRow {
   costPrice: number;
   lastPurchasePrice: number | null;
   lastPurchaseNetPrice: number | null;
-  availableStock: number;
+  totalStock: number;
 }
 
 export interface PricingCategory {
@@ -113,23 +112,10 @@ export function pricingSellableProductCondition(): SQL {
   )!;
 }
 
-function pricingAvailableStock(storeId: string, query: PricingQuery) {
-  return query.warehouseId?.trim()
-    ? sql<string>`coalesce((
-        select sl.quantity
-        from ${stockLevels} sl
-        where sl.product_id = ${products.id}
-          and sl.store_id = ${storeId}
-          and sl.warehouse_id = ${query.warehouseId.trim()}
-        limit 1
-      ), 0)`
-    : products.totalStock;
-}
-
 /** Shared listing/mutation filters, intentionally independent of pagination. */
 export function pricingFilterCondition(storeId: string, query: PricingQuery = {}): SQL {
   const conditions: SQL[] = [eq(products.storeId, storeId), eq(products.isVariantParent, false)];
-  const availableStock = pricingAvailableStock(storeId, query);
+  const totalStock = products.totalStock;
   const lifecycle = query.lifecycle ?? "active";
   const q = query.q?.trim();
   if (q) {
@@ -177,7 +163,7 @@ export function pricingFilterCondition(storeId: string, query: PricingQuery = {}
   }
   const stockCondition = pricingStockCondition(
     query.stock,
-    availableStock,
+    totalStock,
     products.minStock,
   );
   if (stockCondition) {
@@ -191,7 +177,7 @@ export function pricingFilterCondition(storeId: string, query: PricingQuery = {}
 export async function getPricingPage(storeId: string, query: PricingQuery = {}): Promise<PricingProductPage> {
   const page = Math.max(1, Math.trunc(query.page ?? 1));
   const pageSize = coercePageSize(query.pageSize, 50);
-  const availableStock = pricingAvailableStock(storeId, query);
+  const totalStock = products.totalStock;
   const where = pricingFilterCondition(storeId, query);
   const selectedPrice = query.priceBookId?.trim()
     ? sql<string>`(
@@ -209,7 +195,7 @@ export async function getPricingPage(storeId: string, query: PricingQuery = {}):
   const orderBy = pricingOrderBy(
     query.sort ?? "updated",
     selectedPrice,
-    availableStock,
+    totalStock,
   );
 
   const [rawRows, [{ total }]] = await Promise.all([
@@ -260,7 +246,7 @@ export async function getPricingPage(storeId: string, query: PricingQuery = {}):
         costPrice: products.costPrice,
         lastPurchasePrice: products.lastPurchasePrice,
         lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
-        availableStock,
+        totalStock,
       })
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
@@ -310,7 +296,7 @@ export async function getPricingPage(storeId: string, query: PricingQuery = {}):
           ? null
           : Number(row.lastPurchasePrice),
       lastPurchaseNetPrice: row.lastPurchaseNetPrice == null ? null : Number(row.lastPurchaseNetPrice),
-      availableStock: Number(row.availableStock),
+      totalStock: Number(row.totalStock),
     })),
     total: Number(total),
     page,
@@ -352,7 +338,7 @@ export async function getPricingSuppliers(storeId: string): Promise<PricingCateg
 function pricingOrderBy(
   sort: PricingSort,
   selectedPrice: SQL | typeof products.retailPrice,
-  availableStock: SQL | typeof products.totalStock,
+  totalStock: SQL | typeof products.totalStock,
 ): SQL[] {
   const [primarySpec] = pricingSortSpec(sort);
   const primary = (() => {
@@ -366,7 +352,7 @@ function pricingOrderBy(
       case "effectivePrice":
         return desc(selectedPrice);
       case "stock":
-        return asc(availableStock);
+        return asc(totalStock);
       default:
         return desc(products.updatedAt);
     }

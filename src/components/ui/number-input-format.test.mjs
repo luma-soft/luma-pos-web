@@ -35,7 +35,9 @@ test("fractional quantities render and submit without localized-string loss", ()
   expect(quantity).toContain('value="0.5"');
   expect(normalizeQuantity(0.5)).toBe(0.5);
   expect(normalizeQuantity(1.2345)).toBe(1.2345);
-  expect(stepQuantity(0.5, 1)).toBe(1);
+  expect(stepQuantity(0.5, 1)).toBe(1.5);
+  expect(stepQuantity(1.5, -1)).toBe(0.5);
+  expect(stepQuantity(0.5, -1, { min: 0 })).toBe(0);
 });
 
 test("quantity input uses one integrated focus border", () => {

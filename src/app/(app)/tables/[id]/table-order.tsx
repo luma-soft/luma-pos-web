@@ -247,7 +247,7 @@ export function TableOrder({
                   amount={`${formatCurrency(Math.ceil(payable / guests))}/${t("tables.perGuest")}`}
                   quantityControl={(
                     <QuantityInput
-                      min={0.0001}
+                      min={0}
                       value={guests}
                       onChange={setGuests}
                       size="sm"

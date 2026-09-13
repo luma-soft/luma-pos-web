@@ -9,33 +9,33 @@ export type PricingStockFilter =
 
 export function pricingStockCondition(
   filter: string | undefined,
-  availableStock: SQLWrapper,
+  totalStock: SQLWrapper,
   minStock: SQLWrapper,
 ): SQL | undefined {
-  if (filter === "negativeStock") return sql`${availableStock} < 0`;
-  if (filter === "outOfStock") return sql`${availableStock} = 0`;
+  if (filter === "negativeStock") return sql`${totalStock} < 0`;
+  if (filter === "outOfStock") return sql`${totalStock} = 0`;
   if (filter === "lowStock") {
-    return sql`${availableStock} > 0 and ${availableStock} < ${minStock}`;
+    return sql`${totalStock} > 0 and ${totalStock} < ${minStock}`;
   }
   if (filter === "inStock") {
-    return sql`${availableStock} > 0 and ${availableStock} >= ${minStock}`;
+    return sql`${totalStock} > 0 and ${totalStock} >= ${minStock}`;
   }
-  if (filter === "available") return sql`${availableStock} > 0`;
+  if (filter === "available") return sql`${totalStock} > 0`;
   return undefined;
 }
 
 export function matchesPricingStockFilter(
   filter: PricingStockFilter,
-  availableStock: number,
+  totalStock: number,
   minStock: number,
 ): boolean {
-  if (filter === "negativeStock") return availableStock < 0;
-  if (filter === "outOfStock") return availableStock === 0;
+  if (filter === "negativeStock") return totalStock < 0;
+  if (filter === "outOfStock") return totalStock === 0;
   if (filter === "lowStock") {
-    return availableStock > 0 && availableStock < minStock;
+    return totalStock > 0 && totalStock < minStock;
   }
   if (filter === "inStock") {
-    return availableStock > 0 && availableStock >= minStock;
+    return totalStock > 0 && totalStock >= minStock;
   }
-  return availableStock > 0;
+  return totalStock > 0;
 }
