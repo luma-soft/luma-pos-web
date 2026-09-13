@@ -117,7 +117,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
       <div
         className={cn(
           "relative grid shrink-0 grid-cols-[44px_minmax(44px,1fr)_44px] overflow-hidden rounded-lg border border-border bg-surface transition-[border-color] duration-150 focus-within:border-primary-600 lg:grid-cols-[32px_minmax(44px,1fr)_32px]",
-          suffixBelow && "overflow-visible",
+          suffixBelow && "overflow-visible ring-1 ring-inset ring-border focus-within:ring-primary-600",
           hideStepperButtons && "grid-cols-1 lg:grid-cols-1",
           size === "sm" ? "h-11 lg:h-8" : "h-11 lg:h-10",
           touchTargets && "min-h-11 grid-cols-[44px_minmax(44px,1fr)_44px]",
