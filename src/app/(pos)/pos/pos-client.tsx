@@ -1993,11 +1993,21 @@ export function PosClient({
                 </div>
                 <span className="w-28 shrink-0 text-right text-base font-bold leading-6 tabular-nums">{formatCurrency(eff.price * l.quantity)}</span>
               </div>
-              <div className="-mt-2 hidden items-start gap-2 px-3 pb-0 lg:flex">
+              <div className={cn(
+                "hidden items-start gap-2 px-3 pb-0 lg:flex",
+                // A return line shows the sold quantity below its stepper.
+                // Reserve that vertical space here instead of making the stepper
+                // wrapper taller, which would misalign it with the unit picker.
+                isReturnDraft ? "mt-2" : "-mt-2",
+              )}>
                 <span className="w-5 shrink-0" />
                 <span className="w-4 shrink-0" />
                 <span className="w-24 shrink-0" />
-                <div className="min-w-0 flex flex-1 items-start gap-1.5 pr-[17rem]">
+                <div className={cn(
+                  "min-w-0 flex flex-1 items-start gap-1.5",
+                  // Keep a line note clear of the returned-quantity suffix.
+                  isReturnDraft ? "pr-[21.5rem]" : "pr-[17rem]",
+                )}>
                   <span className="w-3.5 shrink-0" />
                   <textarea
                     rows={1}

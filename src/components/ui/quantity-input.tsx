@@ -106,7 +106,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
     });
 
     return (
-      <div className={cn("relative shrink-0", suffixBelow && "pb-[18px]")}>
+      <div className="relative shrink-0">
         <div
           className={cn(
             "grid w-full grid-cols-[44px_minmax(44px,1fr)_44px] overflow-hidden rounded-lg border border-border bg-surface transition-[border-color] duration-150 focus-within:border-primary-600 lg:grid-cols-[32px_minmax(44px,1fr)_32px]",
@@ -160,7 +160,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
         </button>}
         </div>
         {suffixBelow && suffix && (
-          <span className="pointer-events-none absolute inset-x-0 bottom-0 text-center text-xs leading-4 text-slate-500">{suffix}</span>
+          <span className="pointer-events-none absolute inset-x-0 top-full mt-0.5 text-center text-xs leading-4 text-slate-500">{suffix}</span>
         )}
       </div>
     );

@@ -76,7 +76,7 @@ test("quantity input keeps its bottom border when displaying a suffix below", ()
   );
 
   expect(html).toContain("overflow-hidden rounded-lg border border-border");
-  expect(html).toContain("pb-[18px]");
+  expect(html).not.toContain("pb-[18px]");
   expect(html).toContain(">/1</span>");
   expect(html).not.toContain("overflow-visible");
 });
