@@ -61,6 +61,26 @@ test("quantity input uses one integrated focus border", () => {
   expect(html).not.toContain("rounded-none border-y-0");
 });
 
+test("quantity input keeps its bottom border when displaying a suffix below", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      NextIntlClientProvider,
+      { locale: "vi", messages: {}, timeZone: "Asia/Ho_Chi_Minh" },
+      React.createElement(QuantityInput, {
+        value: 0,
+        suffix: "/1",
+        suffixBelow: true,
+        onChange() {},
+      }),
+    ),
+  );
+
+  expect(html).toContain("overflow-hidden rounded-lg border border-border");
+  expect(html).toContain("pb-[18px]");
+  expect(html).toContain(">/1</span>");
+  expect(html).not.toContain("overflow-visible");
+});
+
 test("imported quantities preserve fractions and reject non-finite/invalid numbers", () => {
   for (const value of [0.5, "0.5", 1.5, "1.5"]) expect(positiveQuantityOrDefault(value)).toBe(Number(value));
   for (const value of [0, -1, null, undefined, Infinity, "not a number"]) expect(positiveQuantityOrDefault(value)).toBe(1);

@@ -106,17 +106,17 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
     });
 
     return (
-      <div
-        className={cn(
-          "relative grid shrink-0 grid-cols-[44px_minmax(44px,1fr)_44px] overflow-hidden rounded-lg border border-border bg-surface transition-[border-color] duration-150 focus-within:border-primary-600 lg:grid-cols-[32px_minmax(44px,1fr)_32px]",
-          suffixBelow && "overflow-visible ring-1 ring-inset ring-border focus-within:ring-primary-600",
-          hideStepperButtons && "grid-cols-1 lg:grid-cols-1",
-          size === "sm" ? "h-11 lg:h-8" : "h-11 lg:h-10",
-          touchTargets && "min-h-11 grid-cols-[44px_minmax(44px,1fr)_44px]",
-          disabled && "cursor-not-allowed opacity-50",
-          className,
-        )}
-      >
+      <div className={cn("relative shrink-0", suffixBelow && "pb-[18px]")}>
+        <div
+          className={cn(
+            "grid w-full grid-cols-[44px_minmax(44px,1fr)_44px] overflow-hidden rounded-lg border border-border bg-surface transition-[border-color] duration-150 focus-within:border-primary-600 lg:grid-cols-[32px_minmax(44px,1fr)_32px]",
+            hideStepperButtons && "grid-cols-1 lg:grid-cols-1",
+            size === "sm" ? "h-11 lg:h-8" : "h-11 lg:h-10",
+            touchTargets && "min-h-11 grid-cols-[44px_minmax(44px,1fr)_44px]",
+            disabled && "cursor-not-allowed opacity-50",
+            className,
+          )}
+        >
         {!hideStepperButtons && <button
           type="button"
           disabled={locked || decreasedValue === value}
@@ -158,8 +158,9 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
         >
           <Plus className="h-3.5 w-3.5" />
         </button>}
+        </div>
         {suffixBelow && suffix && (
-          <span className="pointer-events-none absolute left-0 right-0 top-full mt-0.5 text-center text-xs leading-4 text-slate-500">{suffix}</span>
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 text-center text-xs leading-4 text-slate-500">{suffix}</span>
         )}
       </div>
     );
