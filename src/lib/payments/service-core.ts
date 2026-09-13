@@ -13,7 +13,7 @@ import {
   stockLevels,
   stockMovements,
 } from "@/db/schema";
-import type { SepayWebhookInput } from "@/lib/payments/sepay";
+import { generateSepayPaymentReference, type SepayWebhookInput } from "@/lib/payments/sepay";
 import type { GatewayProvider } from "@/lib/payments/gateways";
 import type { GatewayInquiryResult } from "@/lib/payments/gateway-adapter";
 import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
@@ -41,7 +41,7 @@ type SepayExceptionReason =
   | "amount_mismatch"
   | "payment_already_confirmed";
 
-export const SEPAY_PAYMENT_TIMEOUT_MS = 90_000;
+export const SEPAY_PAYMENT_TIMEOUT_MS = 10 * 60_000;
 export const GATEWAY_PAYMENT_TIMEOUT_MS = 15 * 60_000;
 export const GATEWAY_INQUIRY_MIN_INTERVAL_MS = 10_000;
 
@@ -355,7 +355,7 @@ export async function createPendingSepayPayment(
       const remaining = Math.max(0, Number(order.total) - Number(order.amountPaid));
       if (amount > remaining + 1e-9) throw new Error("AMOUNT_EXCEEDS_REMAINING");
 
-      const reference = input.reference?.trim() || generatePaymentReference("LUMA");
+      const reference = input.reference?.trim() || generateSepayPaymentReference();
       const [existing] = await tx
         .select({
           id: payments.id,
@@ -1535,6 +1535,9 @@ export async function matchSepayWebhookEvent(
           eq(paymentBankAccounts.provider, "sepay"),
           eq(paymentBankAccounts.storeId, event.storeId),
           eq(paymentBankAccounts.accountNumber, event.accountNumber ?? ""),
+          event.subAccount
+            ? eq(paymentBankAccounts.subAccount, event.subAccount)
+            : isNull(paymentBankAccounts.subAccount),
           eq(paymentBankAccounts.enabled, true),
         ))
         .limit(1);

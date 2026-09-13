@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 export { buildVietQrImageUrl as buildSepayVietQrImageUrl } from "@/lib/print/payment-qr";
 
 export type SepayWebhookInput = {
@@ -14,7 +14,8 @@ export type SepayWebhookInput = {
   rawPayload: Record<string, unknown>;
 };
 
-const REFERENCE_RE = /\bLUMA-[A-Z0-9-]+\b/i;
+const REFERENCE_RE = /\bLUMA(?:-[A-Z0-9-]+|[A-Z0-9]+)\b/i;
+const SEPAY_SIGNATURE_MAX_AGE_SECONDS = 300;
 
 function firstString(payload: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
@@ -55,7 +56,9 @@ export function normalizeSepayWebhookPayload(raw: unknown): SepayWebhookInput | 
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const payload = raw as Record<string, unknown>;
   const content = firstString(payload, ["content", "description", "transaction_content", "transactionContent", "transfer_content"]);
-  const referenceCode = firstString(payload, ["referenceCode", "reference_code", "reference", "code", "payment_reference"])
+  // SePay's `code` is the merchant payment code. `referenceCode` is the
+  // bank-generated transaction reference and must never match a Luma payment.
+  const referenceCode = firstString(payload, ["code", "payment_reference"])
     ?? content?.match(REFERENCE_RE)?.[0].toUpperCase()
     ?? null;
   const accountNumber = firstString(payload, ["accountNumber", "account_number", "acc", "bankAccount", "bank_account"]);
@@ -88,13 +91,34 @@ function safeHexEqual(leftHex: string, rightHex: string) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-export function verifySepaySignature(rawBody: string, signature: string | null, secret: string | null, timestamp?: string | null) {
+export function verifySepaySignature(
+  rawBody: string,
+  signature: string | null,
+  secret: string | null,
+  timestamp?: string | null,
+  nowMs = Date.now(),
+) {
   if (!secret) return true;
-  if (!signature) return false;
+  if (!signature || !timestamp) return false;
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isInteger(timestampSeconds)) return false;
+  const nowSeconds = Math.floor(nowMs / 1000);
+  if (Math.abs(nowSeconds - timestampSeconds) > SEPAY_SIGNATURE_MAX_AGE_SECONDS) return false;
   const cleaned = signature.replace(/^sha256=/i, "").trim();
-  const candidates = [
-    createHmac("sha256", secret).update(rawBody).digest("hex"),
-    ...(timestamp ? [createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex")] : []),
-  ];
-  return candidates.some((expected) => safeHexEqual(cleaned, expected));
+  const expected = createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex");
+  return safeHexEqual(cleaned, expected);
+}
+
+export function extractSepayApiKey(authorization: string | null) {
+  return authorization?.match(/^(?:Apikey|Bearer)\s+(.+)$/i)?.[1]?.trim() ?? null;
+}
+
+export function generateSepayPaymentReference(
+  date = new Date(),
+  suffix = randomBytes(2).toString("hex").toUpperCase(),
+) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const stamp = `${String(date.getUTCFullYear()).slice(2)}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}`;
+  const normalizedSuffix = suffix.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 4).padEnd(4, "0");
+  return `LUMA${stamp}${normalizedSuffix}`;
 }

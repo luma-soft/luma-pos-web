@@ -1,13 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { paymentBankAccounts } from "@/db/schema";
 import { matchSepayWebhookEvent, recordSepayWebhookEvent } from "@/lib/payments/service";
-import { normalizeSepayWebhookPayload, verifySepaySignature } from "@/lib/payments/sepay";
-
-function bearerToken(value: string | null) {
-  return value?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() ?? null;
-}
+import { extractSepayApiKey, normalizeSepayWebhookPayload, verifySepaySignature } from "@/lib/payments/sepay";
 
 function headerSignature(request: Request) {
   return request.headers.get("x-sepay-signature")
@@ -18,7 +14,7 @@ function headerSignature(request: Request) {
 function headerApiKey(request: Request) {
   return request.headers.get("x-sepay-api-key")
     ?? request.headers.get("x-api-key")
-    ?? bearerToken(request.headers.get("authorization"));
+    ?? extractSepayApiKey(request.headers.get("authorization"));
 }
 
 function headerTimestamp(request: Request) {
@@ -47,6 +43,9 @@ export async function POST(request: Request) {
     .where(and(
       eq(paymentBankAccounts.provider, "sepay"),
       eq(paymentBankAccounts.accountNumber, event.accountNumber),
+      event.subAccount
+        ? eq(paymentBankAccounts.subAccount, event.subAccount)
+        : isNull(paymentBankAccounts.subAccount),
       eq(paymentBankAccounts.enabled, true),
     ))
     .limit(2);
@@ -84,29 +83,8 @@ export async function POST(request: Request) {
   if (!recorded.ok) {
     return NextResponse.json({ ok: false, error: recorded.error }, { status: 500 });
   }
-  if (!account) {
-    return NextResponse.json({
-      success: true,
-      ok: true,
-      data: {
-        eventId: recorded.data.eventId,
-        duplicate: recorded.data.duplicate,
-        matched: false,
-        reason: "bank_account_not_found",
-      },
-    });
-  }
   if (!account.webhookEnabled) {
-    return NextResponse.json({
-      success: true,
-      ok: true,
-      data: {
-        eventId: recorded.data.eventId,
-        duplicate: recorded.data.duplicate,
-        matched: false,
-        reason: "webhook_disabled",
-      },
-    });
+    return NextResponse.json({ success: true });
   }
 
   const matched = await matchSepayWebhookEvent(recorded.data.eventId);
@@ -114,14 +92,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: matched.error }, { status: 500 });
   }
 
-  return NextResponse.json({
-    success: true,
-    ok: true,
-    data: {
-      eventId: recorded.data.eventId,
-      duplicate: recorded.data.duplicate,
-      matched: matched.data.matched,
-      reason: matched.data.reason,
-    },
-  });
+  return NextResponse.json({ success: true });
 }

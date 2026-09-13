@@ -26,6 +26,7 @@ export async function POST(request: Request) {
       .from(paymentBankAccounts)
       .where(and(
         eq(paymentBankAccounts.id, requestedBankAccountId),
+        eq(paymentBankAccounts.storeId, gate.storeId),
         eq(paymentBankAccounts.provider, "sepay"),
         eq(paymentBankAccounts.enabled, true),
       ))
@@ -33,7 +34,11 @@ export async function POST(request: Request) {
     : await db
       .select()
       .from(paymentBankAccounts)
-      .where(and(eq(paymentBankAccounts.provider, "sepay"), eq(paymentBankAccounts.enabled, true)))
+      .where(and(
+        eq(paymentBankAccounts.storeId, gate.storeId),
+        eq(paymentBankAccounts.provider, "sepay"),
+        eq(paymentBankAccounts.enabled, true),
+      ))
       .orderBy(sql`${paymentBankAccounts.isDefault} desc`, paymentBankAccounts.createdAt)
       .limit(1);
 
