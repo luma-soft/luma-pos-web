@@ -40,8 +40,8 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
 
   const totals = [
     { label: t("pos.subtotal"), value: Number(order.subtotal), kind: "subtotal" as const },
-    ...(Number(order.discount) > 0 ? [{ label: t("pos.discount"), value: Number(order.discount), negative: true, kind: "discount" as const }] : []),
-    ...(Number(order.tax) > 0 ? [{ label: t("pos.tax"), value: Number(order.tax), kind: "tax" as const }] : []),
+    ...(template.options.showDiscount ? [{ label: t("pos.discount"), value: Number(order.discount), negative: true, kind: "discount" as const }] : []),
+    ...(template.options.showTax ? [{ label: t("pos.tax"), value: Number(order.tax), kind: "tax" as const }] : []),
     ...(Number(order.shippingFee) > 0 ? [{ label: t("pos.shipping"), value: Number(order.shippingFee), kind: "shipping" as const }] : []),
   ];
   const afterTotals = isQuote || isBooking ? [] : [
