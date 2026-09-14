@@ -239,7 +239,7 @@ export function PrintDoc(p: PrintDocProps) {
       {signatures && signatures.length > 0 && (
         <div className={`flex justify-between text-center break-inside-avoid ${isA4 ? "mt-14" : "mt-8"}`} style={{ fontSize: ty.signatures }}>
           {signatures.map((s) => (
-            <div key={s}><b>{s}</b><br /><i className="text-[10px] text-slate-500">{p.signHint ?? "(ký, họ tên)"}</i></div>
+            <div key={s}><b>{s}</b><br /><i className="text-slate-500" style={{ fontSize: ty.signatures }}>{p.signHint ?? "(ký, họ tên)"}</i></div>
           ))}
         </div>
       )}
