@@ -1575,6 +1575,8 @@
     "returns": {
       "quickTitle": "Quick return",
       "invoiceTitle": "Return by invoice",
+      "itemsTitle": "Returns ({count})",
+      "invoiceSource": "Return for order {code}",
       "sourcePlaceholder": "Find source invoice by code, customer, phone...",
       "sourceRequired": "Invoice returns require a source invoice.",
       "sourceHint": "Pick the source invoice, then add returned items to the cart.",

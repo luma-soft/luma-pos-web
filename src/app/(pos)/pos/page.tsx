@@ -6,6 +6,7 @@ import { CAMERA_QUOTE_UTILITY_SKUS } from "@/lib/data/camera-quote-constants";
 import { getStoreSettings } from "@/lib/data/settings";
 import { getOrder } from "@/lib/data/orders";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
+import { sourceInvoicePriceBookId } from "@/lib/pos/source-invoice-price-book";
 import { getPrintTemplate } from "@/lib/print/template";
 import { Routes } from "@/lib/routes";
 import { formatDate } from "@/lib/utils";
@@ -59,6 +60,7 @@ async function sourceInvoiceFromParams(storeId: string, params: PosSearchParams)
     shippingFee: Number(order.shippingFee),
     tax: Number(order.tax ?? 0),
     subtotal: Number(order.subtotal),
+    priceBookId: sourceInvoicePriceBookId(order.items),
     items: order.items.map((item) => {
       const pricing = readOrderLinePricing(item);
       return {

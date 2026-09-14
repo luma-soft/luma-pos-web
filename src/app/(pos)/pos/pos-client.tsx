@@ -42,7 +42,7 @@ import type { PaperSize, PrintTemplate } from "@/lib/print/template-shared";
 import type { StorePrefs } from "@/lib/schemas/settings";
 import type { AiActionPreview } from "@/lib/ai/actions";
 import { createOrder } from "@/lib/actions/orders";
-import { createPosReturn, searchReturnableOrders, type ReturnableOrderOption } from "@/lib/actions/returns";
+import { createPosReturn } from "@/lib/actions/returns";
 import { searchPosProducts } from "@/lib/actions/pos-search";
 import { createPosCustomer } from "@/lib/actions/pos-customers";
 import { enqueueOrder, getOutbox, removeOutbox, markFailed } from "@/lib/offline/pos-store";
@@ -63,7 +63,7 @@ import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
 import { buildExpectedPosPricing, countPosPricingConflicts, requestPosOrder } from "@/lib/pos/checkout-pricing";
 import { resolvePosCartUnit } from "@/lib/pos/cart-unit";
 import { upsertPosCartLine } from "@/lib/pos/cart-line-order";
-import { canAddCatalogProductsToPosDraft } from "@/lib/pos/catalog-add-policy";
+import { canAddCatalogProductsToPosDraft, canEditPriceBookForPosDraft } from "@/lib/pos/catalog-add-policy";
 import { expandPosSearchUnitResults } from "@/lib/pos/search-unit-results";
 import {
   createLinePriceEditorState,
@@ -170,6 +170,7 @@ export type PosSourceInvoice = {
   shippingFee?: number;
   tax?: number;
   subtotal?: number;
+  priceBookId?: string | null;
   items?: Array<{
     productId: string;
     unitName: string;
@@ -284,6 +285,7 @@ function makeDraftFromSource(source: PosSourceInvoice, products: PosProduct[], i
     return {
       ...makeDraft(id, "return_invoice"),
       source,
+      priceBook: source.priceBookId ?? "",
       cart: (source.items ?? []).flatMap((item) => {
         const product = products.find((p) => p.id === item.productId);
         if (!product) return [];
@@ -698,6 +700,7 @@ export function PosClient({
   const isReturnDraft = isReturnKind(activeKind);
   const isReturnInvoiceDraft = activeKind === "return_invoice";
   const canAddCatalogProducts = canAddCatalogProductsToPosDraft(activeKind);
+  const canEditPriceBook = canEditPriceBookForPosDraft(activeKind);
   const priceBook: PriceBook = active.priceBook ?? ""; // "" = bảng giá mặc định
   const defaultBook = data.priceBooks.find((b) => b.isDefault) ?? data.priceBooks[0];
   const isDefaultBook = !priceBook || priceBook === defaultBook?.id;
@@ -723,11 +726,6 @@ export function PosClient({
   const setPaidInput = (v: number | null) => patchActive({ paidInput: v });
   const setReturnReason = (v: string) => patchActive({ returnReason: v });
   const setReturnRestock = (v: boolean) => patchActive({ returnRestock: v });
-  const setReturnSourceOrder = (order: ReturnableOrderOption | null) => patchActive({
-    returnOrderId: order?.id,
-    returnOrderCode: order?.code,
-    customerId: order?.customerId ?? customerId,
-  });
 
   /** Thêm tab POS mới và chuyển sang nó. */
   function addDraft(kind: PosDraftKind, cameraQuote = false) {
@@ -897,9 +895,6 @@ export function PosClient({
   // Khi gõ tìm kiếm: hỏi server (quét toàn bộ SP, bỏ dấu) — khớp trang Sản phẩm.
   const [serverResults, setServerResults] = useState<PosProduct[]>([]);
   const [searching, setSearching] = useState(false);
-  const [returnSourceQuery, setReturnSourceQuery] = useState("");
-  const [returnSourceOptions, setReturnSourceOptions] = useState<ReturnableOrderOption[]>([]);
-  const [returnSourceSearching, setReturnSourceSearching] = useState(false);
   // ===== offline (Mức A) =====
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
@@ -951,38 +946,6 @@ export function PosClient({
     }, q ? 250 : 0);
     return () => { cancelled = true; clearTimeout(h); };
   }, [data.priceBooks, data.warehouse?.id, productCatalog, search]);
-
-  useEffect(() => {
-    if (!isReturnInvoiceDraft) return;
-    const q = returnSourceQuery.trim();
-    let cancelled = false;
-    const id = setTimeout(() => {
-      if (cancelled) return;
-      if (!q) {
-        setReturnSourceOptions([]);
-        setReturnSourceSearching(false);
-        return;
-      }
-      setReturnSourceSearching(true);
-      searchReturnableOrders(q)
-        .then((rows) => {
-          if (!cancelled) {
-            setReturnSourceOptions(rows);
-            setReturnSourceSearching(false);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setReturnSourceOptions([]);
-            setReturnSourceSearching(false);
-          }
-        });
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(id);
-    };
-  }, [isReturnInvoiceDraft, returnSourceQuery]);
 
   const syncingRef = useRef(false);
   async function flushOutbox() {
@@ -1778,7 +1741,11 @@ export function PosClient({
   const orderLinesPanel = (
     <div className="mb-16 flex flex-1 flex-col min-h-0 overflow-hidden rounded-xl border border-border bg-surface lg:mb-0">
       <div className="px-3 py-2 border-b border-border flex items-center">
-        <h2 className="font-semibold text-sm">{isCameraQuoteDraft ? t("pos.cameraQuote.lineItems") : t("pos.order")} ({cart.length})</h2>
+        <h2 className="font-semibold text-sm">
+          {isReturnInvoiceDraft
+            ? t("pos.returns.itemsTitle", { count: cart.length })
+            : `${isCameraQuoteDraft ? t("pos.cameraQuote.lineItems") : t("pos.order")} (${cart.length})`}
+        </h2>
       </div>
       <div className="flex-1 overflow-auto">
         {cart.length === 0 && (
@@ -2340,6 +2307,7 @@ export function PosClient({
               placeholder={t("pos.priceBook.title")}
               allowClear={false}
               showSearch={false}
+              disabled={!canEditPriceBook}
               className={cn("w-48 shrink-0", !isDefaultBook && "[&_button]:border-primary-500 [&_button]:text-primary-700 dark:[&_button]:text-primary-300")}
               options={data.priceBooks.map((pb) => ({ value: pb.id, label: pb.name }))}
             />
@@ -2354,75 +2322,39 @@ export function PosClient({
           )}
           {isReturnDraft && (
             <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold">{t(isReturnInvoiceDraft ? "pos.returns.invoiceTitle" : "pos.returns.quickTitle")}</div>
-                <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  <Checkbox
-                    checked={returnRestock ?? true}
-                    onChange={(e) => setReturnRestock(e.target.checked)}
-                    className="h-4 w-4"
-                  />
-                  {t("pos.returns.restock")}
-                </label>
-              </div>
-              {isReturnInvoiceDraft && (
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={returnOrderCode ? `${returnOrderCode}${returnSourceQuery ? ` · ${returnSourceQuery}` : ""}` : returnSourceQuery}
-                    onChange={(e) => {
-                      setReturnSourceOrder(null);
-                      setReturnSourceQuery(e.target.value);
-                    }}
-                    placeholder={t("pos.returns.sourcePlaceholder")}
-                    className="min-h-11 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm"
-                  />
-                  {(returnSourceSearching || returnSourceOptions.length > 0) && !returnOrderId && (
-                    <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border bg-surface shadow-e2">
-                      {returnSourceSearching ? (
-                        <div className="px-3 py-3 text-sm text-slate-400"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />{t("common.search")}</div>
-                      ) : (
-                        returnSourceOptions.map((order) => (
-                          <button
-                            key={order.id}
-                            type="button"
-                            onClick={() => {
-                              setReturnSourceOrder(order);
-                              setReturnSourceQuery("");
-                              setReturnSourceOptions([]);
-                            }}
-                            className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-surface-2"
-                          >
-                            <span className="min-w-0">
-                              <span className="font-semibold text-primary-600">{order.code}</span>
-                              <span className="ml-2 text-slate-500">{order.customerName ?? t("orders.walkIn")}</span>
-                            </span>
-                            <span className="shrink-0 tabular-nums text-slate-500">{formatCurrency(Number(order.total))}</span>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
+              {isReturnInvoiceDraft ? (
+                <div className="text-sm font-semibold">
+                  {t("pos.returns.invoiceSource", { code: returnOrderCode ?? "—" })}
                 </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold">{t("pos.returns.quickTitle")}</div>
+                    <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+                      <Checkbox
+                        checked={returnRestock ?? true}
+                        onChange={(e) => setReturnRestock(e.target.checked)}
+                        className="h-4 w-4"
+                      />
+                      {t("pos.returns.restock")}
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <Select
+                      value={returnReason ?? "other"}
+                      onChange={(e) => setReturnReason(e.target.value)}
+                      size="sm"
+                      options={[
+                        { value: "defective", label: t("returns.reasons.defective") },
+                        { value: "wrong_item", label: t("returns.reasons.wrong_item") },
+                        { value: "changed_mind", label: t("returns.reasons.changed_mind") },
+                        { value: "other", label: t("returns.reasons.other") },
+                      ]}
+                    />
+                    <div className="text-xs leading-8 text-slate-500">{t("pos.returns.quickHint")}</div>
+                  </div>
+                </>
               )}
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Select
-                  value={returnReason ?? "other"}
-                  onChange={(e) => setReturnReason(e.target.value)}
-                  size="sm"
-                  options={[
-                    { value: "defective", label: t("returns.reasons.defective") },
-                    { value: "wrong_item", label: t("returns.reasons.wrong_item") },
-                    { value: "changed_mind", label: t("returns.reasons.changed_mind") },
-                    { value: "other", label: t("returns.reasons.other") },
-                  ]}
-                />
-                <div className="text-xs leading-8 text-slate-500">
-                  {isReturnInvoiceDraft
-                    ? returnOrderCode ? t("pos.returns.sourceSelected", { code: returnOrderCode }) : t("pos.returns.sourceHint")
-                    : t("pos.returns.quickHint")}
-                </div>
-              </div>
             </div>
           )}
           {posPrefs.showProjectFields && !isReturnDraft && (

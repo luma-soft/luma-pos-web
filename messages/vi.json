@@ -1575,6 +1575,8 @@
     "returns": {
       "quickTitle": "Trả hàng nhanh",
       "invoiceTitle": "Trả hàng theo hóa đơn",
+      "itemsTitle": "Trả hàng ({count})",
+      "invoiceSource": "Trả hàng theo đơn {code}",
       "sourcePlaceholder": "Tìm hóa đơn nguồn theo mã, khách, SĐT...",
       "sourceRequired": "Trả hàng theo hóa đơn cần chọn hóa đơn nguồn.",
       "sourceHint": "Chọn hóa đơn nguồn rồi thêm hàng cần trả vào giỏ.",
