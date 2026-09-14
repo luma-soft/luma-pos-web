@@ -220,7 +220,7 @@ export function PrintDoc(p: PrintDocProps) {
       )}
 
       {printOptionApplies(t.docType, "showPaymentQr") && t.options.showPaymentQr && p.paymentQr && (
-        <div className="mt-3 flex gap-3 rounded border border-slate-300 p-2 break-inside-avoid" style={{ fontSize: ty.paymentInfo }}>
+        <div className="mt-3 flex gap-3 rounded border border-slate-300 p-2 break-inside-avoid" style={{ fontSize: ty.qrInfo ?? ty.paymentInfo }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className={isA4 ? "h-24 w-24 object-contain" : "h-20 w-20 object-contain"} />
           <div className="min-w-0 flex-1">
@@ -267,7 +267,7 @@ function K80Doc(p: PrintDocProps) {
   const qrTitle = t.options.paymentQrTitle?.trim() || (t.docType !== "order" ? p.paymentQr?.title : "");
   const footerHtml = sanitizePrintRichText(t.footerNote);
   return (
-    <div className="print-document w-[302px] bg-white px-3 py-4 font-mono leading-[1.45] text-black shadow-lg print:shadow-none" style={{ fontSize: ty.customer }}>
+    <div className="print-document w-[302px] bg-white px-3 pb-10 pt-4 font-mono leading-[1.45] text-black shadow-lg print:shadow-none" style={{ fontSize: ty.customer }}>
       <header className="text-center">
         <div className="font-black uppercase tracking-tight" style={{ fontSize: ty.storeName }}>{t.storeName || "—"}</div>
         {t.storeAddress && <div className="mt-1 leading-snug" style={{ fontSize: ty.storeInfo }}>{t.storeAddress}</div>}
@@ -355,7 +355,7 @@ function K80Doc(p: PrintDocProps) {
       {p.note && <div className="mt-2 border-t border-dashed border-slate-400 pt-2" style={{ fontSize: ty.inWords }}><span className="font-bold">{p.noteLabel ?? "Ghi chú"}:</span> {p.note}</div>}
       {printOptionApplies(t.docType, "showPaymentQr") && t.options.showPaymentQr && p.paymentQr && (
         <>
-          <div className="mt-3 border-t-2 border-dashed border-black pt-2 text-center" style={{ fontSize: ty.paymentInfo }}>
+          <div className="mt-3 border-t-2 border-dashed border-black pt-2 text-center" style={{ fontSize: ty.qrInfo ?? ty.paymentInfo }}>
             {qrTitle && <div className="font-bold uppercase">{qrTitle}</div>}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className="mx-auto my-1 h-32 w-32 object-contain" />

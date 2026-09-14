@@ -58,6 +58,7 @@ export interface PrintTypography {
   grandTotal: number;
   inWords: number;
   paymentInfo: number;
+  qrInfo: number;
   signatures: number;
   footer: number;
 }
@@ -66,7 +67,7 @@ export const DEFAULT_TYPOGRAPHY: PrintTypography = {
   storeName: 28, storeInfo: 20, documentTitle: 26, documentMeta: 20,
   customer: 20, tableHeader: 20, productName: 20, productMeta: 18,
   numbers: 20, lineTotal: 22, grandTotal: 24, inWords: 19,
-  paymentInfo: 20, signatures: 19, footer: 18,
+  paymentInfo: 20, qrInfo: 18, signatures: 19, footer: 18,
 };
 
 export function typographyForPaper(paper: PaperSize, input?: Partial<PrintTypography>): PrintTypography {

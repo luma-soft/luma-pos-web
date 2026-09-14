@@ -35,7 +35,7 @@ import {
 const TYPOGRAPHY_KEYS = [
   "storeName", "storeInfo", "documentTitle", "documentMeta", "customer",
   "tableHeader", "productName", "productMeta", "numbers", "lineTotal",
-  "grandTotal", "inWords", "paymentInfo", "signatures", "footer",
+  "grandTotal", "inWords", "paymentInfo", "qrInfo", "signatures", "footer",
 ] as const;
 
 const OPTION_GROUPS = [

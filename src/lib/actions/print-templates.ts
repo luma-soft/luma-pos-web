@@ -40,6 +40,7 @@ const saveSchema = z.object({
       grandTotal: z.number().int().min(8).max(40),
       inWords: z.number().int().min(8).max(40),
       paymentInfo: z.number().int().min(8).max(40),
+      qrInfo: z.number().int().min(8).max(40),
       signatures: z.number().int().min(8).max(40),
       footer: z.number().int().min(8).max(40),
     }).partial().default({}),
