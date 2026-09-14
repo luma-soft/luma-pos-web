@@ -1573,7 +1573,6 @@
     "printA5Short": "A5",
     "printK80Short": "K80",
     "returns": {
-      "quickTitle": "Quick return",
       "invoiceTitle": "Return by invoice",
       "itemsTitle": "Returns ({count})",
       "invoiceSource": "Return for order {code}",
@@ -1582,8 +1581,6 @@
       "sourceHint": "Pick the source invoice, then add returned items to the cart.",
       "sourceSelected": "Returning against invoice {code}",
       "invoiceCatalogLocked": "Invoice returns only contain products from the source invoice. Adjust the return quantities in the list below.",
-      "quickHint": "No source invoice; use for quick returns or imported legacy data.",
-      "restock": "Restock",
       "onlineRequired": "Creating returns requires an online connection."
     }
   },

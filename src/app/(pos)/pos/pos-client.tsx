@@ -6,7 +6,6 @@ import { approvePriceBookSwitch, prepareInvoicePriceBookSwitch, prepareLinePrice
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 
 import { DateInput } from "@/components/ui/date-input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -224,8 +223,6 @@ interface PosDraft {
   note?: string;
   returnOrderId?: string;
   returnOrderCode?: string;
-  returnReason?: string;
-  returnRestock?: boolean;
   heldAt?: string;
 }
 
@@ -244,7 +241,6 @@ function makeDraft(id?: string, kind: PosDraftKind = "invoice", defaultTaxRate =
     cart: [], customerId: "", projectId: "", projectName: "", priceBook: "",
     discountInput: 0, discountMode: "vnd", taxRate: defaultTaxRate,
     shippingFee: 0, payMethod: "cash", paidInput: null,
-    returnReason: "other", returnRestock: true,
   };
 }
 
@@ -689,8 +685,6 @@ export function PosClient({
     note: orderNote,
     returnOrderId,
     returnOrderCode,
-    returnReason,
-    returnRestock,
   } = active;
   const activeKind = active.kind ?? "invoice";
   const isInvoiceDraft = activeKind === "invoice";
@@ -724,8 +718,6 @@ export function PosClient({
   const setOrderNote = (v: string) => patchActive({ note: v });
   const setPayMethod = (v: PayMethod) => patchActive({ payMethod: v });
   const setPaidInput = (v: number | null) => patchActive({ paidInput: v });
-  const setReturnReason = (v: string) => patchActive({ returnReason: v });
-  const setReturnRestock = (v: boolean) => patchActive({ returnRestock: v });
 
   /** Thêm tab POS mới và chuyển sang nó. */
   function addDraft(kind: PosDraftKind, cameraQuote = false) {
@@ -1607,12 +1599,12 @@ export function PosClient({
         customerId: customerId || null,
         warehouseId: data.warehouse.id,
         priceBookId: priceBook || null,
-        reason: returnReason || "other",
+        reason: "other",
         refundMethod: payMethod === "credit" ? "debt_deduct" : payMethod,
         note: orderNote || undefined,
         items: cart.filter((l) => l.quantity > 0).map((l) => ({
           ...buildPosOrderItemPayload(l),
-          restock: returnRestock ?? true,
+          restock: true,
         })),
       });
       if (res.ok) {
@@ -2320,41 +2312,11 @@ export function PosClient({
               {t("pos.customerDebt", { debt: formatCurrency(Number(customer.currentDebt)) })}
             </p>
           )}
-          {isReturnDraft && (
+          {isReturnInvoiceDraft && (
             <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
-              {isReturnInvoiceDraft ? (
-                <div className="text-sm font-semibold">
-                  {t("pos.returns.invoiceSource", { code: returnOrderCode ?? "—" })}
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold">{t("pos.returns.quickTitle")}</div>
-                    <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
-                      <Checkbox
-                        checked={returnRestock ?? true}
-                        onChange={(e) => setReturnRestock(e.target.checked)}
-                        className="h-4 w-4"
-                      />
-                      {t("pos.returns.restock")}
-                    </label>
-                  </div>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <Select
-                      value={returnReason ?? "other"}
-                      onChange={(e) => setReturnReason(e.target.value)}
-                      size="sm"
-                      options={[
-                        { value: "defective", label: t("returns.reasons.defective") },
-                        { value: "wrong_item", label: t("returns.reasons.wrong_item") },
-                        { value: "changed_mind", label: t("returns.reasons.changed_mind") },
-                        { value: "other", label: t("returns.reasons.other") },
-                      ]}
-                    />
-                    <div className="text-xs leading-8 text-slate-500">{t("pos.returns.quickHint")}</div>
-                  </div>
-                </>
-              )}
+              <div className="text-sm font-semibold">
+                {t("pos.returns.invoiceSource", { code: returnOrderCode ?? "—" })}
+              </div>
             </div>
           )}
           {posPrefs.showProjectFields && !isReturnDraft && (

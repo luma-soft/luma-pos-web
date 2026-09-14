@@ -1573,7 +1573,6 @@
     "printA5Short": "A5",
     "printK80Short": "K80",
     "returns": {
-      "quickTitle": "Trả hàng nhanh",
       "invoiceTitle": "Trả hàng theo hóa đơn",
       "itemsTitle": "Trả hàng ({count})",
       "invoiceSource": "Trả hàng theo đơn {code}",
@@ -1582,8 +1581,6 @@
       "sourceHint": "Chọn hóa đơn nguồn rồi thêm hàng cần trả vào giỏ.",
       "sourceSelected": "Đang trả theo hóa đơn {code}",
       "invoiceCatalogLocked": "Phiếu trả hàng chỉ gồm sản phẩm từ hóa đơn gốc. Điều chỉnh số lượng cần trả ở danh sách bên dưới.",
-      "quickHint": "Không gắn hóa đơn nguồn; dùng cho hàng trả nhanh hoặc dữ liệu cũ.",
-      "restock": "Nhập lại kho",
       "onlineRequired": "Lập phiếu trả hàng cần có mạng để đồng bộ ngay."
     }
   },
