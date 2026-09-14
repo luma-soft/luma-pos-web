@@ -360,10 +360,10 @@ function K80Doc(p: PrintDocProps) {
             {qrTitle && <div className="font-bold uppercase">{qrTitle}</div>}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className="mx-auto my-1 h-32 w-32 object-contain" />
-            {t.options.showPaymentQrBank !== false && <div className="text-[10px]">{p.paymentQr.bankLabel}: <b>{p.paymentQr.bankName}</b></div>}
-            {t.options.showPaymentQrAccountNumber !== false && <div className="text-[10px]">{p.paymentQr.accountLabel}: <b>{p.paymentQr.accountNumber}</b></div>}
-            {t.options.showPaymentQrAccountName !== false && <div className="text-[10px]">{p.paymentQr.nameLabel}: <b>{p.paymentQr.accountName}</b></div>}
-            {t.options.showPaymentQrReference !== false && <div className="text-[9px] text-slate-700">{p.paymentQr.referenceLabel}: {p.paymentQr.reference}</div>}
+            {t.options.showPaymentQrBank !== false && <div>{p.paymentQr.bankLabel}: <b>{p.paymentQr.bankName}</b></div>}
+            {t.options.showPaymentQrAccountNumber !== false && <div>{p.paymentQr.accountLabel}: <b>{p.paymentQr.accountNumber}</b></div>}
+            {t.options.showPaymentQrAccountName !== false && <div>{p.paymentQr.nameLabel}: <b>{p.paymentQr.accountName}</b></div>}
+            {t.options.showPaymentQrReference !== false && <div className="text-slate-700">{p.paymentQr.referenceLabel}: {p.paymentQr.reference}</div>}
           </div>
         </>
       )}
