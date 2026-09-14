@@ -3014,7 +3014,7 @@ function LinePriceEditor({
         </div>
         {belowPurchasePrice && purchaseUnitPrice != null && (
           <p role="alert" className="rounded-md bg-red-50 px-2.5 py-2 text-xs font-semibold text-er dark:bg-red-950/30">
-            Giá bán sau chiết khấu thấp hơn Giá nhập cuối ({formatCurrency(purchaseUnitPrice)} / {line.unitName}).
+            Giá bán đang nhỏ hơn Giá nhập cuối ({formatCurrency(purchaseUnitPrice)} / {line.unitName}).
           </p>
         )}
         <div className="flex items-center justify-between gap-2">
