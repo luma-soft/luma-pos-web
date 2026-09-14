@@ -375,6 +375,9 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                 <p className="mt-2 text-xs text-slate-500">{t("printSettings.qrAccountHint")}</p>
                 {customQrAccountInvalid && <p className="mt-1 text-xs font-semibold text-er">{t("printSettings.qrCustomRequired")}</p>}
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Field label="Kích thước QR (px)">
+                    <input type="number" min={64} max={320} step={1} value={selected.options.paymentQrSize ?? (selected.paperDefault === "k80" ? 150 : 112)} onChange={(event) => patch({ options: { ...selected.options, paymentQrSize: Math.max(64, Math.min(320, Number(event.target.value) || 112)) } })} className={inputCls} />
+                  </Field>
                   <Field label={t("printSettings.qrTitle")}>
                     <input value={selected.options.paymentQrTitle} onChange={(event) => patchTextOption("paymentQrTitle", event.target.value)} placeholder={t("printSettings.qrTitlePlaceholder")} maxLength={100} className={inputCls} />
                   </Field>

@@ -32,6 +32,7 @@ export interface PrintTemplateOptions {
   signatureMiddleLabel: string;
   signatureRightLabel: string;
   paymentQrTitle: string;
+  paymentQrSize: number;
   paymentQrContentTemplate: string;
   paymentQrAccountSource: "default" | "custom";
   paymentQrCustomBankCode: string;
@@ -177,6 +178,7 @@ export const DEFAULT_OPTIONS: PrintTemplateOptions = {
   signatureMiddleLabel: "",
   signatureRightLabel: "",
   paymentQrTitle: "",
+  paymentQrSize: 112,
   paymentQrContentTemplate: "{invoiceCode}",
   paymentQrAccountSource: "default",
   paymentQrCustomBankCode: "",
@@ -224,7 +226,7 @@ export function defaultOptionsForDocType(docType: PrintDocType): PrintTemplateOp
 
 export function printOptionApplies(docType: PrintDocType, option: keyof PrintTemplateOptions): boolean {
   if (option === "showBatchDebtSummary") return docType === "order";
-  if (["showPaymentQr", "alwaysShowPaymentQr", "paymentQrTitle", "paymentQrContentTemplate", "paymentQrAccountSource", "paymentQrCustomBankCode", "paymentQrCustomBankName", "paymentQrCustomAccountNumber", "paymentQrCustomAccountName", "showPaymentQrBank", "showPaymentQrAccountNumber", "showPaymentQrAccountName", "showPaymentQrReference"].includes(option)) {
+  if (["showPaymentQr", "alwaysShowPaymentQr", "paymentQrTitle", "paymentQrSize", "paymentQrContentTemplate", "paymentQrAccountSource", "paymentQrCustomBankCode", "paymentQrCustomBankName", "paymentQrCustomAccountNumber", "paymentQrCustomAccountName", "showPaymentQrBank", "showPaymentQrAccountNumber", "showPaymentQrAccountName", "showPaymentQrReference"].includes(option)) {
     return docType === "order";
   }
   if (["showProject", "showDeliveryAddress"].includes(option)) return docType === "order" || docType === "quote" || docType === "booking";

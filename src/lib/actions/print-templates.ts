@@ -44,6 +44,7 @@ const saveSchema = z.object({
       signatures: z.number().int().min(8).max(40),
       footer: z.number().int().min(8).max(40),
     }).partial().default({}),
+    paymentQrSize: z.number().int().min(64).max(320).default(112),
     showSeller: z.boolean(),
     showProject: z.boolean(),
     showPartyPhone: z.boolean().default(true),

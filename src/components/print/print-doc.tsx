@@ -222,7 +222,7 @@ export function PrintDoc(p: PrintDocProps) {
       {printOptionApplies(t.docType, "showPaymentQr") && t.options.showPaymentQr && p.paymentQr && (
         <div className="mt-3 flex gap-3 rounded border border-slate-300 p-2 break-inside-avoid" style={{ fontSize: ty.qrInfo ?? ty.paymentInfo }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className={isA4 ? "h-24 w-24 object-contain" : "h-20 w-20 object-contain"} />
+          <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} style={{ width: Math.max(64, Math.min(320, t.options.paymentQrSize ?? (isA4 ? 112 : 80))), height: Math.max(64, Math.min(320, t.options.paymentQrSize ?? (isA4 ? 112 : 80))) }} className="object-contain" />
           <div className="min-w-0 flex-1">
             {qrTitle && <div className="font-bold">{qrTitle}</div>}
             {t.options.showPaymentQrBank !== false && <div>{p.paymentQr.bankLabel}: <b>{p.paymentQr.bankName}</b></div>}
@@ -358,7 +358,7 @@ function K80Doc(p: PrintDocProps) {
           <div className="mt-3 border-t-2 border-dashed border-black pt-2 text-center" style={{ fontSize: ty.qrInfo ?? ty.paymentInfo }}>
             {qrTitle && <div className="font-bold uppercase">{qrTitle}</div>}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className="mx-auto my-1 h-32 w-32 object-contain" />
+            <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} style={{ width: Math.max(64, Math.min(220, t.options.paymentQrSize ?? 128)), height: Math.max(64, Math.min(220, t.options.paymentQrSize ?? 128)) }} className="mx-auto my-1 object-contain" />
             {t.options.showPaymentQrBank !== false && <div>{p.paymentQr.bankLabel}: <b>{p.paymentQr.bankName}</b></div>}
             {t.options.showPaymentQrAccountNumber !== false && <div>{p.paymentQr.accountLabel}: <b>{p.paymentQr.accountNumber}</b></div>}
             {t.options.showPaymentQrAccountName !== false && <div>{p.paymentQr.nameLabel}: <b>{p.paymentQr.accountName}</b></div>}
