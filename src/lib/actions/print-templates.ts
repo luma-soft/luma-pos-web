@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { printTemplates } from "@/db/schema";
 import { type ActionResult, requireManager } from "./common";
-import { isPersistedTemplateId, normalizeLineDiscountOptions, normalizeSignatureOptions } from "@/lib/print/template-shared";
+import { isPersistedTemplateId, normalizeLineDiscountOptions, normalizeSignatureOptions, defaultOptionsForDocType, typographyForPaper, type PrintTemplateOptions } from "@/lib/print/template-shared";
 import { sanitizePrintRichText } from "@/lib/print/rich-text";
 
 const saveSchema = z.object({
@@ -26,6 +26,23 @@ const saveSchema = z.object({
   storeTaxCode: z.string().max(30).default(""),
   footerNote: z.string().max(10_000).default("").transform(sanitizePrintRichText),
   options: z.object({
+    typography: z.object({
+      storeName: z.number().int().min(8).max(40),
+      storeInfo: z.number().int().min(8).max(40),
+      documentTitle: z.number().int().min(8).max(40),
+      documentMeta: z.number().int().min(8).max(40),
+      customer: z.number().int().min(8).max(40),
+      tableHeader: z.number().int().min(8).max(40),
+      productName: z.number().int().min(8).max(40),
+      productMeta: z.number().int().min(8).max(40),
+      numbers: z.number().int().min(8).max(40),
+      lineTotal: z.number().int().min(8).max(40),
+      grandTotal: z.number().int().min(8).max(40),
+      inWords: z.number().int().min(8).max(40),
+      paymentInfo: z.number().int().min(8).max(40),
+      signatures: z.number().int().min(8).max(40),
+      footer: z.number().int().min(8).max(40),
+    }).partial().default({}),
     showSeller: z.boolean(),
     showProject: z.boolean(),
     showPartyPhone: z.boolean().default(true),
@@ -73,7 +90,14 @@ export async function savePrintTemplate(input: SavePrintTemplateInput): Promise<
   const gate = await requireManager(); if (!gate.ok) return gate;
   const parsed = saveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
-  const v = { ...parsed.data, options: normalizeSignatureOptions(normalizeLineDiscountOptions(parsed.data.options)) };
+  const v = {
+    ...parsed.data,
+    options: normalizeSignatureOptions(normalizeLineDiscountOptions({
+      ...defaultOptionsForDocType(parsed.data.docType),
+      ...parsed.data.options,
+      typography: typographyForPaper(parsed.data.paperDefault, parsed.data.options.typography),
+    } as PrintTemplateOptions)),
+  };
 
   try {
     const saved = await db.transaction(async (tx) => {
@@ -109,7 +133,7 @@ export async function savePrintTemplate(input: SavePrintTemplateInput): Promise<
             storePhone: v.storePhone,
             storeTaxCode: v.storeTaxCode,
             footerNote: v.footerNote,
-            options: v.options,
+            options: v.options as unknown as Record<string, boolean | string | number | Record<string, number>>,
             updatedAt: sql`now()`,
           })
           .where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.id, v.id!)))
@@ -137,7 +161,7 @@ export async function savePrintTemplate(input: SavePrintTemplateInput): Promise<
           storePhone: v.storePhone,
           storeTaxCode: v.storeTaxCode,
           footerNote: v.footerNote,
-          options: v.options,
+          options: v.options as unknown as Record<string, boolean | string | number | Record<string, number>>,
         })
         .returning({ id: printTemplates.id });
       await recordActivity(tx, {

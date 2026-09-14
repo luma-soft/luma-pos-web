@@ -32,6 +32,12 @@ import {
   type PrintTemplateStoreInfo,
 } from "@/lib/print/template-shared";
 
+const TYPOGRAPHY_KEYS = [
+  "storeName", "storeInfo", "documentTitle", "documentMeta", "customer",
+  "tableHeader", "productName", "productMeta", "numbers", "lineTotal",
+  "grandTotal", "inWords", "paymentInfo", "signatures", "footer",
+] as const;
+
 const OPTION_GROUPS = [
   { key: "content", options: ["showSeller", "showProject", "showPartyPhone", "showDeliveryAddress", "showInWords", "showSignatures", "showSignatureLeft", "showSignatureMiddle", "showSignatureRight", "showSku"] },
   { key: "pricing", options: ["showDebt", "showDiscount", "showLineDiscount", "showLineDiscountPercent", "showLineDiscountAmount", "showTax", "showPaymentQr", "alwaysShowPaymentQr"] },
@@ -91,6 +97,11 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
 
   function patchTextOption(key: TextOptionKey, value: string) {
     patch({ options: { ...defaultOptionsForDocType(selected.docType), ...selected.options, [key]: value } });
+  }
+
+  function patchTypography(key: (typeof TYPOGRAPHY_KEYS)[number], value: number) {
+    const typography = { ...selected.options.typography, [key]: Math.max(8, Math.min(40, Math.round(value))) };
+    patch({ options: { ...defaultOptionsForDocType(selected.docType), ...selected.options, typography } });
   }
 
   function patchCustomQrBank(bankCode: string) {
@@ -304,6 +315,20 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                 <Checkbox checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
                 {t("printSettings.defaultTemplate")}
               </label>
+            </Panel>
+
+            <Panel title={`${t("printSettings.fontSize")} (px)`}>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {TYPOGRAPHY_KEYS.map((key) => (
+                  <div key={key} className="flex min-h-11 items-center gap-2 rounded-lg border border-border-soft px-3 py-2">
+                    <span className="min-w-0 flex-1 text-sm font-semibold">{t(`printSettings.typography.${key}`)}</span>
+                    <button type="button" aria-label={`${t("printSettings.decreaseFont")} ${key}`} onClick={() => patchTypography(key, selected.options.typography[key] - 1)} className="min-h-9 min-w-9 rounded border border-border">−</button>
+                    <span className="w-12 text-center text-sm font-bold">{selected.options.typography[key]} px</span>
+                    <button type="button" aria-label={`${t("printSettings.increaseFont")} ${key}`} onClick={() => patchTypography(key, selected.options.typography[key] + 1)} className="min-h-9 min-w-9 rounded border border-border">+</button>
+                    <button type="button" aria-label={`${t("printSettings.resetFont")} ${key}`} onClick={() => patchTypography(key, defaultOptionsForDocType(selected.docType).typography[key])} className="min-h-9 min-w-9 rounded border border-border">↺</button>
+                  </div>
+                ))}
+              </div>
             </Panel>
 
             {qrApplies && selected.options.showPaymentQr && (

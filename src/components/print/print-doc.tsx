@@ -1,5 +1,5 @@
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
-import { moneyToWords, printOptionApplies, resolveLineDiscountColumns, resolveSignaturePositions, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
+import { moneyToWords, printOptionApplies, resolveLineDiscountColumns, resolveSignaturePositions, typographyForPaper, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
 import { isPrintRichTextEmpty, sanitizePrintRichText } from "@/lib/print/rich-text";
 
 export interface PrintLine {
@@ -89,6 +89,7 @@ export interface PrintDocProps {
 export function PrintDoc(p: PrintDocProps) {
   const t = p.template;
   if (p.size === "k80") return <K80Doc {...p} />;
+  const ty = t.options.typography ?? typographyForPaper(p.size);
 
   const isA4 = p.size === "a4";
   const configuredSignatures = p.signatures && [
@@ -126,16 +127,16 @@ export function PrintDoc(p: PrintDocProps) {
       {/* header */}
       <div className="flex justify-between border-b-2 border-black pb-3">
         <div>
-          <div className={isA4 ? "font-bold text-[18px]" : "font-bold text-[16px]"}>{t.storeName || "—"}</div>
-          <div className="text-[12px] text-slate-600">
+          <div className="font-bold" style={{ fontSize: ty.storeName }}>{t.storeName || "—"}</div>
+          <div className="text-slate-600" style={{ fontSize: ty.storeInfo }}>
             {t.storeAddress}
             {t.storePhone && <><br />ĐT: {t.storePhone}</>}
             {t.storeTaxCode && <> · MST: {t.storeTaxCode}</>}
           </div>
         </div>
         <div className="text-right">
-          <div className={isA4 ? "font-bold text-[17px]" : "font-bold text-[15px]"}>{p.title}</div>
-          <div className="text-[12px] text-slate-600">
+          <div className="font-bold" style={{ fontSize: ty.documentTitle }}>{p.title}</div>
+          <div className="text-slate-600" style={{ fontSize: ty.documentMeta }}>
             Số: <b>{p.code}</b><br />
             Ngày: {formatDate(p.date)}
           </div>
@@ -143,7 +144,7 @@ export function PrintDoc(p: PrintDocProps) {
       </div>
 
       {/* party */}
-      <div className="my-3 flex justify-between text-[12.5px]">
+      <div className="my-3 flex justify-between" style={{ fontSize: ty.customer }}>
         <div>
           <b>{p.partyLabel}:</b> {p.partyName}
           {p.partyAddress && <><br /><b>Địa chỉ:</b> {p.partyAddress}</>}
@@ -157,7 +158,7 @@ export function PrintDoc(p: PrintDocProps) {
       </div>
 
       {/* items */}
-      {!isMoneyReceipt && <table className="print-line-items w-full border-collapse text-[13.5px]">
+      {!isMoneyReceipt && <table className="print-line-items w-full border-collapse" style={{ fontSize: ty.tableHeader }}>
         <thead>
           <tr className="bg-slate-100">
             <th className="w-9 border border-slate-400 px-1 py-1.5 text-center">{p.cols.index ?? "STT"}</th>
@@ -175,8 +176,8 @@ export function PrintDoc(p: PrintDocProps) {
           <tr key={i.id} className="break-inside-avoid">
               <td className="border border-slate-400 px-1 py-1.5 text-center tabular-nums">{index + 1}</td>
               <td className="border border-slate-400 px-2 py-1.5">
-                {i.name}
-                {t.options.showSku && i.sku && <span className="text-slate-500 text-[10px]"> ({i.sku})</span>}
+                <span style={{ fontSize: ty.productName }}>{i.name}</span>
+                {t.options.showSku && i.sku && <span className="text-slate-500" style={{ fontSize: ty.productMeta }}> ({i.sku})</span>}
               </td>
               <td className="border border-slate-400 px-2 py-1.5 text-center">{i.unitName}</td>
               <td className="border border-slate-400 px-2 py-1.5 text-center">{formatNumber(i.quantity)}</td>
@@ -190,7 +191,7 @@ export function PrintDoc(p: PrintDocProps) {
       </table>}
 
       {/* totals */}
-      <div className="mt-3 flex justify-end text-[12.5px] break-inside-avoid">
+      <div className="mt-3 flex justify-end break-inside-avoid" style={{ fontSize: ty.numbers }}>
         <table className={isA4 ? "w-[300px]" : "w-[260px]"}>
           <tbody>
             {!isMoneyReceipt && visibleTotals.map((r) => (
@@ -199,7 +200,7 @@ export function PrintDoc(p: PrintDocProps) {
                 <td className="text-right">{r.negative ? "− " : ""}{formatNumber(r.value)}</td>
               </tr>
             ))}
-            <tr className="text-[14px]">
+            <tr style={{ fontSize: ty.grandTotal }}>
               <td className="py-1 font-bold">{p.grandTotalLabel}</td>
               <td className="text-right font-bold">{formatCurrency(p.grandTotal)}</td>
             </tr>
@@ -214,13 +215,13 @@ export function PrintDoc(p: PrintDocProps) {
       </div>
 
       {t.options.showInWords && (
-        <div className="mt-2 text-[12px] italic text-slate-600 break-inside-avoid">
+        <div className="mt-2 italic text-slate-600 break-inside-avoid" style={{ fontSize: ty.inWords }}>
           {p.inWordsLabel}: {moneyToWords(p.grandTotal)}.
         </div>
       )}
 
       {printOptionApplies(t.docType, "showPaymentQr") && t.options.showPaymentQr && p.paymentQr && (
-        <div className="mt-3 flex gap-3 rounded border border-slate-300 p-2 text-[12px] break-inside-avoid">
+        <div className="mt-3 flex gap-3 rounded border border-slate-300 p-2 break-inside-avoid" style={{ fontSize: ty.paymentInfo }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className={isA4 ? "h-24 w-24 object-contain" : "h-20 w-20 object-contain"} />
           <div className="min-w-0 flex-1">
@@ -233,10 +234,10 @@ export function PrintDoc(p: PrintDocProps) {
         </div>
       )}
 
-      {p.note && <div className="mt-2 text-[12px] break-inside-avoid"><b>{p.noteLabel ?? "Ghi chú"}:</b> {p.note}</div>}
+      {p.note && <div className="mt-2 break-inside-avoid" style={{ fontSize: ty.inWords }}><b>{p.noteLabel ?? "Ghi chú"}:</b> {p.note}</div>}
 
       {signatures && signatures.length > 0 && (
-        <div className={`flex justify-between text-center text-[12px] break-inside-avoid ${isA4 ? "mt-14" : "mt-8"}`}>
+        <div className={`flex justify-between text-center break-inside-avoid ${isA4 ? "mt-14" : "mt-8"}`} style={{ fontSize: ty.signatures }}>
           {signatures.map((s) => (
             <div key={s}><b>{s}</b><br /><i className="text-[10px] text-slate-500">{p.signHint ?? "(ký, họ tên)"}</i></div>
           ))}
@@ -245,7 +246,8 @@ export function PrintDoc(p: PrintDocProps) {
 
       {!isPrintRichTextEmpty(footerHtml) && (
         <div
-          className={`print-rich-text mt-6 whitespace-pre-wrap border-t border-dashed border-slate-400 pt-2 text-[10.5px] text-slate-500 break-inside-avoid [&_h3]:text-[1.15em] [&_h3]:font-bold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-0.5 [&_ul]:list-disc [&_ul]:pl-5 ${isA4 ? "" : "mt-5"}`}
+          className={`print-rich-text mt-6 whitespace-pre-wrap border-t border-dashed border-slate-400 pt-2 text-slate-500 break-inside-avoid [&_h3]:text-[1.15em] [&_h3]:font-bold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-0.5 [&_ul]:list-disc [&_ul]:pl-5 ${isA4 ? "" : "mt-5"}`}
+          style={{ fontSize: ty.footer }}
           dangerouslySetInnerHTML={{ __html: footerHtml }}
         />
       )}
@@ -255,6 +257,7 @@ export function PrintDoc(p: PrintDocProps) {
 
 function K80Doc(p: PrintDocProps) {
   const t = p.template;
+  const ty = t.options.typography ?? typographyForPaper("k80");
   const isMoneyReceipt = t.docType === "receipt";
   const { showPercent: showLineDiscountPercent, showAmount: showLineDiscountAmount } = resolveLineDiscountColumns(t.options);
   const visibleTotals = p.totals.filter((row) => {
@@ -265,20 +268,20 @@ function K80Doc(p: PrintDocProps) {
   const qrTitle = t.options.paymentQrTitle?.trim() || (t.docType !== "order" ? p.paymentQr?.title : "");
   const footerHtml = sanitizePrintRichText(t.footerNote);
   return (
-    <div className="print-document w-[302px] bg-white px-3 py-4 font-mono text-[11px] leading-[1.45] text-black shadow-lg print:shadow-none">
+    <div className="print-document w-[302px] bg-white px-3 py-4 font-mono leading-[1.45] text-black shadow-lg print:shadow-none" style={{ fontSize: ty.customer }}>
       <header className="text-center">
-        <div className="text-[15px] font-black uppercase tracking-tight">{t.storeName || "—"}</div>
-        {t.storeAddress && <div className="mt-1 text-[10px] leading-snug">{t.storeAddress}</div>}
-        {t.storePhone && <div className="text-[10px]">ĐT: {t.storePhone}</div>}
-        {t.storeTaxCode && <div className="text-[10px]">MST: {t.storeTaxCode}</div>}
+        <div className="font-black uppercase tracking-tight" style={{ fontSize: ty.storeName }}>{t.storeName || "—"}</div>
+        {t.storeAddress && <div className="mt-1 leading-snug" style={{ fontSize: ty.storeInfo }}>{t.storeAddress}</div>}
+        {t.storePhone && <div style={{ fontSize: ty.storeInfo }}>ĐT: {t.storePhone}</div>}
+        {t.storeTaxCode && <div style={{ fontSize: ty.storeInfo }}>MST: {t.storeTaxCode}</div>}
       </header>
 
       <div className="my-3 border-y-2 border-black py-1.5 text-center">
-        <div className="text-[12px] font-black uppercase tracking-wide">{p.title}</div>
-        <div className="mt-0.5 text-[10px] font-bold">{p.code}</div>
+        <div className="font-black uppercase tracking-wide" style={{ fontSize: ty.documentTitle }}>{p.title}</div>
+        <div className="mt-0.5 font-bold" style={{ fontSize: ty.documentMeta }}>{p.code}</div>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5" style={{ fontSize: ty.customer }}>
         <div><span className="text-slate-600">Ngày:</span> {formatDate(p.date)}</div>
         {t.options.showSeller && p.sellerName && <div className="truncate text-right"><span className="text-slate-600">NV:</span> {p.sellerName}</div>}
         <div className="col-span-2 truncate"><span className="text-slate-600">{p.partyLabel}:</span> <span className="font-bold">{p.partyName}</span>{t.options.showPartyPhone !== false && p.partyPhone ? ` · ${p.partyPhone}` : ""}</div>
@@ -287,7 +290,7 @@ function K80Doc(p: PrintDocProps) {
         {t.options.showDeliveryAddress !== false && p.deliveryAddress && <div className="col-span-2"><span className="text-slate-600">{p.deliverToLabel ?? "Giao đến"}:</span> {p.deliveryAddress}</div>}
       </div>
 
-      {!isMoneyReceipt && <table className="print-line-items mt-3 w-full table-fixed border-collapse text-[9px] leading-tight">
+      {!isMoneyReceipt && <table className="print-line-items mt-3 w-full table-fixed border-collapse leading-tight" style={{ fontSize: ty.tableHeader }}>
         <colgroup>
           <col className="w-[42%]" />
           <col className="w-[12%]" />
@@ -306,13 +309,13 @@ function K80Doc(p: PrintDocProps) {
           {p.items.map((i) => (
             <tr key={i.id} className="break-inside-avoid border-b border-dashed border-slate-400">
               <td className="py-1.5 pr-1 align-top">
-                <div className="break-words font-bold leading-snug">{i.name}</div>
-                <div className="mt-0.5 text-[8px] text-slate-600">
+                <div className="break-words font-bold leading-snug" style={{ fontSize: ty.productName }}>{i.name}</div>
+                <div className="mt-0.5 text-slate-600" style={{ fontSize: ty.productMeta }}>
                   {i.unitName}
                   {t.options.showSku && i.sku && <> · {i.sku}</>}
                 </div>
                 {(showLineDiscountPercent || showLineDiscountAmount) && Number(i.discount ?? 0) > 0 && (
-                  <div className="mt-0.5 text-[8px] text-slate-700">
+                  <div className="mt-0.5 text-slate-700" style={{ fontSize: ty.productMeta }}>
                     {p.cols.discount ?? "Giảm giá"}: {[
                       showLineDiscountPercent ? lineDiscountPercent(i) : "",
                       showLineDiscountAmount ? `−${formatNumber(Number(i.discount))}` : "",
@@ -328,14 +331,14 @@ function K80Doc(p: PrintDocProps) {
         </tbody>
       </table>}
 
-      <section className="mt-2 border-y-2 border-black py-1.5">
+      <section className="mt-2 border-y-2 border-black py-1.5" style={{ fontSize: ty.numbers }}>
         {!isMoneyReceipt && visibleTotals.map((r) => (
           <div key={r.label} className="flex justify-between gap-3 py-0.5">
             <span className="text-slate-700">{printTotalLabel(r, p.totals, t.options.taxLabel)}</span>
             <span>{r.negative ? "−" : ""}{formatNumber(r.value)}</span>
           </div>
         ))}
-        <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-black pt-1.5 text-[14px] font-black">
+        <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-black pt-1.5 font-black" style={{ fontSize: ty.grandTotal }}>
           <span>{p.grandTotalLabel}</span>
           <span className="shrink-0">{formatCurrency(p.grandTotal)}</span>
         </div>
@@ -348,12 +351,12 @@ function K80Doc(p: PrintDocProps) {
       </section>
 
       {t.options.showInWords && (
-        <div className="mt-2 text-[9.5px] italic leading-snug"><span className="not-italic font-bold">{p.inWordsLabel}:</span> {moneyToWords(p.grandTotal)}.</div>
+        <div className="mt-2 italic leading-snug" style={{ fontSize: ty.inWords }}><span className="not-italic font-bold">{p.inWordsLabel}:</span> {moneyToWords(p.grandTotal)}.</div>
       )}
-      {p.note && <div className="mt-2 border-t border-dashed border-slate-400 pt-2 text-[9.5px]"><span className="font-bold">{p.noteLabel ?? "Ghi chú"}:</span> {p.note}</div>}
+      {p.note && <div className="mt-2 border-t border-dashed border-slate-400 pt-2" style={{ fontSize: ty.inWords }}><span className="font-bold">{p.noteLabel ?? "Ghi chú"}:</span> {p.note}</div>}
       {printOptionApplies(t.docType, "showPaymentQr") && t.options.showPaymentQr && p.paymentQr && (
         <>
-          <div className="mt-3 border-t-2 border-dashed border-black pt-2 text-center">
+          <div className="mt-3 border-t-2 border-dashed border-black pt-2 text-center" style={{ fontSize: ty.paymentInfo }}>
             {qrTitle && <div className="font-bold uppercase">{qrTitle}</div>}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className="mx-auto my-1 h-32 w-32 object-contain" />
@@ -366,7 +369,8 @@ function K80Doc(p: PrintDocProps) {
       )}
       {!isPrintRichTextEmpty(footerHtml) && (
         <div
-          className="print-rich-text mt-3 whitespace-pre-wrap border-t border-dashed border-slate-400 pt-2 text-[9.5px] leading-snug [&_h3]:text-[1.1em] [&_h3]:font-bold [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:my-0.5 [&_ul]:list-disc [&_ul]:pl-4"
+          className="print-rich-text mt-3 whitespace-pre-wrap border-t border-dashed border-slate-400 pt-2 leading-snug [&_h3]:text-[1.1em] [&_h3]:font-bold [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:my-0.5 [&_ul]:list-disc [&_ul]:pl-4"
+          style={{ fontSize: ty.footer }}
           dangerouslySetInnerHTML={{ __html: footerHtml }}
         />
       )}

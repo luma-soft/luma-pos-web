@@ -2577,7 +2577,7 @@ export const printTemplates = pgTable("print_templates", {
   storeTaxCode: text("store_tax_code").notNull().default(""),
   footerNote: text("footer_note").notNull().default(""),
   // toggles: showSeller, showProject, showDebt, showInWords, showSignatures, fontSize...
-  options: jsonb("options").$type<Record<string, boolean | string | number>>().notNull().default({}),
+  options: jsonb("options").$type<Record<string, boolean | string | number | Record<string, number>>>().notNull().default({}),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("print_templates_doc_type_idx").on(t.docType),

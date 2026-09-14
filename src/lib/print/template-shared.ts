@@ -7,6 +7,7 @@ export const PRINT_DOC_TYPES = ["order", "quote", "booking", "purchase", "return
 export const PAPER_SIZES = ["a4", "a5", "k80"] as const satisfies readonly PaperSize[];
 
 export interface PrintTemplateOptions {
+  typography: PrintTypography;
   showSeller: boolean;
   showProject: boolean;
   showPartyPhone: boolean;
@@ -41,6 +42,37 @@ export interface PrintTemplateOptions {
   showPaymentQrAccountNumber: boolean;
   showPaymentQrAccountName: boolean;
   showPaymentQrReference: boolean;
+}
+
+export interface PrintTypography {
+  storeName: number;
+  storeInfo: number;
+  documentTitle: number;
+  documentMeta: number;
+  customer: number;
+  tableHeader: number;
+  productName: number;
+  productMeta: number;
+  numbers: number;
+  lineTotal: number;
+  grandTotal: number;
+  inWords: number;
+  paymentInfo: number;
+  signatures: number;
+  footer: number;
+}
+
+export const DEFAULT_TYPOGRAPHY: PrintTypography = {
+  storeName: 28, storeInfo: 20, documentTitle: 26, documentMeta: 20,
+  customer: 20, tableHeader: 20, productName: 20, productMeta: 18,
+  numbers: 20, lineTotal: 22, grandTotal: 24, inWords: 19,
+  paymentInfo: 20, signatures: 19, footer: 18,
+};
+
+export function typographyForPaper(paper: PaperSize, input?: Partial<PrintTypography>): PrintTypography {
+  const scale = paper === "k80" ? 1 : 0.75;
+  const base = Object.fromEntries(Object.entries(DEFAULT_TYPOGRAPHY).map(([key, value]) => [key, Math.round(value * scale)])) as unknown as PrintTypography;
+  return { ...base, ...input };
 }
 
 export type LineDiscountOptionKey = "showLineDiscount" | "showLineDiscountPercent" | "showLineDiscountAmount";
@@ -119,6 +151,7 @@ export interface PrintTemplate {
 export type PrintTemplateStoreInfo = Pick<PrintTemplate, "storeName" | "storeAddress" | "storePhone" | "storeTaxCode">;
 
 export const DEFAULT_OPTIONS: PrintTemplateOptions = {
+  typography: DEFAULT_TYPOGRAPHY,
   showSeller: true,
   showProject: true,
   showPartyPhone: true,
@@ -221,7 +254,12 @@ export function defaultTemplate(docType: PrintDocType, storeInfo: Partial<PrintT
     storePhone: storeInfo.storePhone ?? "",
     storeTaxCode: storeInfo.storeTaxCode ?? "",
     footerNote: DEFAULT_FOOTER[docType],
-    options: defaultOptionsForDocType(docType),
+    options: {
+      ...defaultOptionsForDocType(docType),
+      typography: typographyForPaper(
+        docType === "quote" || docType === "booking" || docType === "purchase" ? "a4" : "a5",
+      ),
+    },
   };
 }
 
