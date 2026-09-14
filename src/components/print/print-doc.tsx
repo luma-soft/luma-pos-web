@@ -103,10 +103,9 @@ export function PrintDoc(p: PrintDocProps) {
     ...(isA4 && signaturePositions.showMiddle ? [configuredSignatures[1]] : []),
     ...(signaturePositions.showRight ? [configuredSignatures[2]] : []),
   ];
-  const hasLineDiscount = p.items.some((item) => Number(item.discount ?? 0) > 0);
   const lineDiscountColumns = resolveLineDiscountColumns(t.options);
-  const showLineDiscountPercent = lineDiscountColumns.showPercent && hasLineDiscount;
-  const showLineDiscountAmount = lineDiscountColumns.showAmount && hasLineDiscount;
+  const showLineDiscountPercent = lineDiscountColumns.showPercent;
+  const showLineDiscountAmount = lineDiscountColumns.showAmount;
   const showLineDiscount = showLineDiscountPercent || showLineDiscountAmount;
   const isMoneyReceipt = t.docType === "receipt";
   const visibleTotals = p.totals.filter((row) => {
