@@ -91,6 +91,13 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
         onFocus={(e) => {
           editing.current = true;
           focusValue.current = numericValue;
+          // Numeric fields are replacement-oriented: selecting on the first
+          // focus lets a newly typed amount replace the formatted old value.
+          requestAnimationFrame(() => {
+            if (document.activeElement === e.currentTarget) {
+              e.currentTarget.select();
+            }
+          });
           onFocus?.(e);
         }}
         onChange={(e) => {

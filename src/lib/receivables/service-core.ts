@@ -33,7 +33,9 @@ export type CollectReceivableInput = {
 export type ReceivableEntryInput = {
   customerId: string;
   orderId?: string;
-  amount: number;
+  /** Legacy delta semantics. Prefer targetDebt for adjustments. */
+  amount?: number;
+  targetDebt?: number;
   type: "adjustment_debit" | "adjustment_credit" | "settlement_discount";
   reason: string;
   clientRequestId: string;
@@ -215,10 +217,14 @@ export async function createCustomerReceivableEntry(
   input: ReceivableEntryInput,
   actor: Actor,
 ): Promise<ReceivableResult<{ entryId: string; replayed: boolean; notificationEventId?: string }>> {
-  const amount = money(input.amount);
-  if (!input.customerId || !validRequestId(input.clientRequestId) || !input.reason.trim() || amount === 0 ||
+  const requestedAmount = input.amount == null ? Number.NaN : money(input.amount);
+  const targetDebt = input.targetDebt == null ? null : money(input.targetDebt);
+  if (!input.customerId || !validRequestId(input.clientRequestId) || !input.reason.trim() ||
+    (targetDebt == null && (!Number.isFinite(requestedAmount) || requestedAmount === 0)) ||
+    (targetDebt != null && !Number.isFinite(targetDebt)) ||
     !["adjustment_debit", "adjustment_credit", "settlement_discount"].includes(input.type) ||
-    (input.type === "adjustment_debit" && amount < 0) || (input.type !== "adjustment_debit" && amount > 0)) {
+    (targetDebt == null && input.type === "adjustment_debit" && requestedAmount < 0) ||
+    (targetDebt == null && input.type !== "adjustment_debit" && requestedAmount > 0)) {
     return { ok: false, error: "errors.invalidData" };
   }
   try {
@@ -226,6 +232,13 @@ export async function createCustomerReceivableEntry(
       const [customer] = await tx.select({ id: customers.id, code: customers.code, name: customers.name, currentDebt: customers.currentDebt })
         .from(customers).where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId))).limit(1).for("update");
       if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
+      const amount = targetDebt == null
+        ? requestedAmount
+        : money(targetDebt - Number(customer.currentDebt));
+      if (!Number.isFinite(amount) || amount === 0) return { ok: false, error: "errors.invalidData" };
+      const entryType = targetDebt == null
+        ? input.type
+        : amount > 0 ? "adjustment_debit" : "adjustment_credit";
       const [existing] = await tx.select({ id: customerReceivableEntries.id, customerId: customerReceivableEntries.customerId, amount: customerReceivableEntries.amount })
         .from(customerReceivableEntries).where(and(eq(customerReceivableEntries.storeId, actor.storeId), eq(customerReceivableEntries.clientRequestId, input.clientRequestId.trim()))).limit(1);
       if (existing) {
@@ -234,8 +247,8 @@ export async function createCustomerReceivableEntry(
       }
       const [entry] = await tx.insert(customerReceivableEntries).values({
         storeId: actor.storeId,
-        code: generateCode(input.type === "settlement_discount" ? "CKTT" : "DCN"), customerId: input.customerId,
-        orderId: input.orderId || null, type: input.type, amount: amount.toFixed(2), reason: input.reason.trim(),
+        code: generateCode(entryType === "settlement_discount" ? "CKTT" : "DCN"), customerId: input.customerId,
+        orderId: input.orderId || null, type: entryType, amount: amount.toFixed(2), reason: input.reason.trim(),
         reference: input.reference?.trim() || null, note: input.note?.trim() || null,
         clientRequestId: input.clientRequestId.trim(), createdBy: actor.profileId, approvedBy: actor.profileId,
       }).returning({ id: customerReceivableEntries.id, code: customerReceivableEntries.code });
@@ -245,12 +258,12 @@ export async function createCustomerReceivableEntry(
         storeId: actor.storeId, actorId: actor.profileId,
         action: "customer.receivable.adjusted", entityType: "customer_receivable_entry", entityId: entry.id,
         before: { currentDebt: Number(customer.currentDebt) },
-        after: { code: entry.code, customerName: customer.name, amount, type: input.type, reason: input.reason.trim(), currentDebt: money(Number(customer.currentDebt) + amount) },
+        after: { code: entry.code, customerName: customer.name, amount, targetDebt: targetDebt ?? undefined, type: entryType, reason: input.reason.trim(), currentDebt: money(Number(customer.currentDebt) + amount) },
         affectedRecords: [{ type: "customer", id: customer.id, code: customer.code, name: customer.name }],
       });
       const notification = await createDebtChangedEventInTx(tx, {
         storeId: actor.storeId,
-        entityType: "customer", entityId: input.customerId, operationType: input.type,
+        entityType: "customer", entityId: input.customerId, operationType: entryType,
         operationId: entry.id, delta: amount, actorId: actor.profileId,
       });
       return { ok: true as const, data: { entryId: entry.id, replayed: false, ...(notification?.created ? { notificationEventId: notification.eventId } : {}) } };

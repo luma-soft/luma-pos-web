@@ -131,6 +131,11 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
             editing.current = true;
             if (clearZeroOnFocus && numericValue === 0) setText("");
             else if (decimals > 0 && !formatOnChange) setText(numericValue == null ? "" : String(numericValue));
+            requestAnimationFrame(() => {
+              if (document.activeElement === e.currentTarget) {
+                e.currentTarget.select();
+              }
+            });
             onFocus?.(e);
           }}
           onKeyDown={(e) => {

@@ -165,20 +165,21 @@ function SupplierAdjustmentDialog({
   onClose: () => void;
   onChanged: () => void | Promise<void>;
 }) {
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState<number | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const [clientRequestId] = useState(() => requestId("web-supplier-payable-entry"));
-  const valid = amount !== 0 && reason.trim().length > 0 && amount >= -currentDebt;
+  const valid = amount != null && amount !== currentDebt && reason.trim().length > 0;
 
   function submit() {
-    if (!valid || pending) return;
+    if (!valid || pending || amount == null) return;
+    const targetDebt = amount;
     setError("");
     startTransition(async () => {
       const result = await createSupplierPayableEntry({
         supplierId,
-        amount,
+        targetDebt,
         reason: reason.trim(),
         clientRequestId,
       });
@@ -196,9 +197,9 @@ function SupplierAdjustmentDialog({
       <div className="space-y-4">
         <DebtBalanceSummary value={currentDebt} tone="warning" />
         <label className="block text-sm font-medium">
-          Số tiền
-          <MoneyInput value={amount} min={-currentDebt} onChange={(value) => setAmount(value ?? 0)} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-right" />
-          <span className="mt-1 block text-xs text-slate-500">Nhập số dương để tăng nợ; nhập số âm để giảm nợ.</span>
+          Công nợ mới
+          <MoneyInput value={amount} min={-Number.MAX_SAFE_INTEGER} onChange={setAmount} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-right" />
+          <span className="mt-1 block text-xs text-slate-500">Nhập số âm nếu nhà cung cấp đang có số dư/trả trước.</span>
         </label>
         <label className="block text-sm font-medium">
           Lý do

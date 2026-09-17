@@ -381,7 +381,8 @@ export function PurchaseForm({
   function addProduct(p: PurchaseProductRow) {
     setLines((ls) => [productToLine(p), ...ls]);
     setAiPendingLines((rows) => rows.filter((row) => row.sku !== p.sku && row.label !== p.name));
-    setSearch("");
+    // Keep the query and result popover open so users can add several products
+    // from one search. Selected products are excluded by the catalog query.
   }
   function patch(id: string, p: Partial<Line>) {
     setLines((ls) => ls.map((l) => (l.productId === id ? { ...l, ...p } : l)));
@@ -500,7 +501,7 @@ export function PurchaseForm({
                       <Text as="span" weight="medium" text={p.name} />
                       <Text as="span" variant="muted" size="xs" className="ml-1" text={p.sku} />
                     </Text>
-                    <Text as="span" variant="muted" size="xs" className="shrink-0 tabular-nums" text={formatCurrency(Number(p.costPrice))} />
+                    <Text as="span" variant="muted" size="xs" className="shrink-0 tabular-nums" text={`${formatCurrency(Number(p.costPrice))} đ/${p.baseUnit}`} />
                   </Button>
                 ))}
               </div>

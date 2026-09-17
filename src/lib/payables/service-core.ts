@@ -41,7 +41,9 @@ export type PaySupplierInput = {
 export type SupplierPayableEntryInput = {
   supplierId: string;
   purchaseOrderId?: string;
-  amount: number;
+  /** Legacy delta semantics. Prefer targetDebt for adjustments. */
+  amount?: number;
+  targetDebt?: number;
   reason: string;
   clientRequestId: string;
   reference?: string;
@@ -318,10 +320,13 @@ export async function createSupplierPayableEntry(
   input: SupplierPayableEntryInput,
   actor: Actor,
 ): Promise<PayableResult<{ entryId: string; replayed: boolean; notificationEventId?: string }>> {
-  const amount = money(input.amount);
+  const requestedAmount = input.amount == null ? Number.NaN : money(input.amount);
+  const targetDebt = input.targetDebt == null ? null : money(input.targetDebt);
   if (
     !input.supplierId || !validRequestId(input.clientRequestId) ||
-    !input.reason.trim() || amount === 0
+    !input.reason.trim() ||
+    (targetDebt == null && (!Number.isFinite(requestedAmount) || requestedAmount === 0)) ||
+    (targetDebt != null && !Number.isFinite(targetDebt))
   ) return { ok: false, error: "errors.invalidData" };
 
   try {
@@ -333,6 +338,10 @@ export async function createSupplierPayableEntry(
         .limit(1)
         .for("update");
       if (!supplier) throw new Error("SUPPLIER_NOT_FOUND");
+      const amount = targetDebt == null
+        ? requestedAmount
+        : money(targetDebt - Number(supplier.currentDebt));
+      if (!Number.isFinite(amount) || amount === 0) return { ok: false, error: "errors.invalidData" };
 
       const [existing] = await tx
         .select({
@@ -360,7 +369,9 @@ export async function createSupplierPayableEntry(
         return { ok: true as const, data: { entryId: existing.id, replayed: true } };
       }
 
-      if (amount < 0 && Math.abs(amount) > Number(supplier.currentDebt) + 1e-9) {
+      // targetDebt semantics intentionally allow negative balances (supplier
+      // credit/prepayment). Legacy delta callers keep the old guard.
+      if (targetDebt == null && amount < 0 && Math.abs(amount) > Number(supplier.currentDebt) + 1e-9) {
         throw new Error("DEBT_EXCEEDS_CURRENT");
       }
       if (input.purchaseOrderId) {
@@ -409,6 +420,7 @@ export async function createSupplierPayableEntry(
           code: entry.code,
           supplierName: supplier.name,
           supplierId: input.supplierId,
+          targetDebt: targetDebt ?? undefined,
           currentDebt: money(Number(supplier.currentDebt) + amount),
           amount,
           reason: input.reason.trim(),
