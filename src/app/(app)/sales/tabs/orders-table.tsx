@@ -383,13 +383,6 @@ export function OrdersTable({
       render: (order) => <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} />,
     },
     {
-      key: "channel",
-      label: "Channel",
-      defaultVisible: true,
-      width: "110px",
-      render: (order) => <ChannelBadge source={order.sourceMode} />,
-    },
-    {
       key: "project",
       label: t("orders.cols.project"),
       defaultVisible: false,
@@ -451,7 +444,7 @@ export function OrdersTable({
         rows={rows}
         columns={columns}
         getRowId={(order) => order.id}
-        minWidth="1120px"
+        minWidth="1010px"
         onRowClick={openOrder}
         rowClassName={(order) =>
           cn(
@@ -498,20 +491,6 @@ export function OrdersTable({
         )}
       />
     </form>
-  );
-}
-
-function ChannelBadge({ source }: { source?: string | null }) {
-  const online = Boolean(source && source !== "pos");
-  return (
-    <span
-      className={cn(
-        "inline-flex rounded-md px-2 py-1 text-xs font-bold",
-        online ? "bg-warn-soft text-warn" : "bg-surface-2 text-slate-600",
-      )}
-    >
-      {channelLabel(source)}
-    </span>
   );
 }
 
