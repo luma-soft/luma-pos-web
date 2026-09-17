@@ -28,6 +28,7 @@ import type { InternalUseIssueRow } from "@/lib/data/internal-use";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
+import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 
 const DEPARTMENTS = [
   ["kitchen", "Kitchen", "Bếp"], ["office", "Office", "Văn phòng"], ["marketing", "Marketing", "Tiếp thị"],
@@ -96,10 +97,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
     const units = [{ name: p.baseUnit, mult: 1 }, ...p.units.map((u) => ({ name: u.unitName, mult: Number(u.multiplier) }))];
     setLines((ls) => {
       const ex = ls.findIndex((x) => x.productId === p.id);
-      if (ex >= 0) {
-        const updated = { ...ls[ex], quantity: ls[ex].quantity + 1 };
-        return [updated, ...ls.slice(0, ex), ...ls.slice(ex + 1)];
-      }
+      if (ex >= 0) return ls;
       return [{ key: `${p.id}-${Date.now()}`, productId: p.id, sku: p.sku, productName: p.name, baseUnit: p.baseUnit, costPrice: cost, units, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, unitCost: cost }, ...ls];
     });
     setQ("");
@@ -154,7 +152,14 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
       return [...additions, ...base];
     });
   }
-  const upd = (key: string, patch: Partial<Line>) => setLines((ls) => ls.map((l) => l.key === key ? { ...l, ...patch } : l));
+  const upd = (key: string, patch: Partial<Line>) => setLines((ls) => patch.quantity == null
+    ? ls.map((line) => line.key === key ? { ...line, ...patch } : line)
+    : setSelectedProductQuantity(
+        ls,
+        patch.quantity,
+        (line) => line.key === key,
+        (line, quantity) => ({ ...line, ...patch, quantity }),
+      ));
   const changeUnit = (l: Line, name: string) => {
     const u = l.units.find((x) => x.name === name) ?? l.units[0];
     upd(l.key, { unitName: u.name, unitMultiplier: u.mult, unitCost: Math.round(l.costPrice * u.mult) });
@@ -206,7 +211,6 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                   loadingMessage={t("common.loading")}
                   unavailableMessage={t("common.error")}
                   closeLabel={t("common.close")}
-                  loadMoreLabel={t("common.loadMore")}
                   catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                   className="flex-1"
                   renderItem={(product, { selected }) => {

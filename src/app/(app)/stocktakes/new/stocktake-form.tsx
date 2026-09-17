@@ -23,6 +23,7 @@ import type { AiActionPreview } from "@/lib/ai/actions";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
+import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 
 interface ProductOption {
   id: string;
@@ -90,7 +91,9 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
   }, [catalog, warehouseId]);
 
   function addLine(p: ProductOption) {
-    setLines((ls) => [{ product: p, actualQty: p.stock }, ...ls]);
+    setLines((ls) => ls.some((line) => line.product.id === p.id)
+      ? ls
+      : [{ product: p, actualQty: p.stock }, ...ls]);
     setSearch("");
   }
 
@@ -132,7 +135,12 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
   }
 
   function setQty(id: string, qty: number) {
-    setLines((ls) => ls.map((l) => (l.product.id === id ? { ...l, actualQty: Math.max(0, qty) } : l)));
+    setLines((ls) => setSelectedProductQuantity(
+      ls,
+      qty,
+      (line) => line.product.id === id,
+      (line, quantity) => ({ ...line, actualQty: quantity }),
+    ));
   }
 
   const totals = useMemo(() => {
@@ -223,7 +231,6 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                   loadingMessage={t("common.loading")}
                   unavailableMessage={t("common.error")}
                   closeLabel={t("common.close")}
-                  loadMoreLabel={t("common.loadMore")}
                   catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                   className="flex-1"
                   inputClassName="h-12 bg-canvas text-base"

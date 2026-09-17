@@ -32,6 +32,7 @@ import { catalogItemToPurchaseReturnProduct } from "@/lib/inventory/product-cata
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
+import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 
 type Line = {
   key: string;
@@ -120,7 +121,9 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   const unsettled = Math.max(0, totalRefund - clampedRefund - debtAmount);
 
   function addProduct(product: PurchaseReturnProductRow) {
-    setLines((current) => [productToLine(product), ...current]);
+    setLines((current) => current.some((line) => line.productId === product.id)
+      ? current
+      : [productToLine(product), ...current]);
     setSearch("");
   }
 
@@ -159,7 +162,14 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   }
 
   function patch(key: string, next: Partial<Line>) {
-    setLines((current) => current.map((line) => line.key === key ? { ...line, ...next } : line));
+    setLines((current) => next.quantity == null
+      ? current.map((line) => line.key === key ? { ...line, ...next } : line)
+      : setSelectedProductQuantity(
+          current,
+          next.quantity,
+          (line) => line.key === key,
+          (line, quantity) => ({ ...line, ...next, quantity }),
+        ));
   }
 
   function totalStock(line: Line) {
@@ -241,7 +251,6 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                 loadingMessage={t("common.loading")}
                 unavailableMessage={t("common.error")}
                 closeLabel={t("common.close")}
-                loadMoreLabel={t("common.loadMore")}
                 catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                 className="flex-1"
                 renderItem={(product, { selected }) => {

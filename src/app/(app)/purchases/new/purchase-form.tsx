@@ -36,6 +36,7 @@ import {
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
+import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 
 type PUnit = { unitName: string; multiplier: number };
 type Line = {
@@ -379,13 +380,22 @@ export function PurchaseForm({
   const owed = total - paid;
 
   function addProduct(p: PurchaseProductRow) {
-    setLines((ls) => [productToLine(p), ...ls]);
+    setLines((ls) => ls.some((line) => line.productId === p.id)
+      ? ls
+      : [productToLine(p), ...ls]);
     setAiPendingLines((rows) => rows.filter((row) => row.sku !== p.sku && row.label !== p.name));
     // Keep the query and result popover open so users can add several products
     // from one search. Selected products are excluded by the catalog query.
   }
   function patch(id: string, p: Partial<Line>) {
-    setLines((ls) => ls.map((l) => (l.productId === id ? { ...l, ...p } : l)));
+    setLines((ls) => p.quantity == null
+      ? ls.map((l) => (l.productId === id ? { ...l, ...p } : l))
+      : setSelectedProductQuantity(
+          ls,
+          p.quantity,
+          (line) => line.productId === id,
+          (line, quantity) => ({ ...line, ...p, quantity }),
+        ));
   }
   function patchLineTotal(id: string, desiredTotal: number) {
     setLines((current) => current.map((line) => line.productId === id
@@ -496,7 +506,6 @@ export function PurchaseForm({
                 loadingMessage={t("common.loading")}
                 unavailableMessage={t("common.error")}
                 closeLabel={t("common.close")}
-                loadMoreLabel={t("common.loadMore")}
                 catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                 className="flex-1"
                 renderItem={(product, { selected }) => (

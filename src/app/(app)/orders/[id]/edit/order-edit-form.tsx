@@ -16,6 +16,7 @@ import type { ProductCatalogItem } from "@/lib/product-catalog";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
+import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 
 interface Line {
   productId: string;
@@ -65,19 +66,28 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
   const newRemaining = Math.max(0, total - initial.amountPaid);
 
   function patch(idx: number, p: Partial<Line>) {
-    setItems((ls) => ls.map((l, i) => (i === idx ? {
-      ...l,
-      ...p,
-      ...(p.unitPrice == null ? {} : { preDiscountUnitPrice: p.unitPrice, lineDiscount: 0, lineDiscountMode: "vnd" as const, lineDiscountValue: 0 }),
-    } : l)));
+    setItems((ls) => p.quantity == null
+      ? ls.map((l, i) => (i === idx ? {
+          ...l,
+          ...p,
+          ...(p.unitPrice == null ? {} : { preDiscountUnitPrice: p.unitPrice, lineDiscount: 0, lineDiscountMode: "vnd" as const, lineDiscountValue: 0 }),
+        } : l))
+      : setSelectedProductQuantity(
+          ls,
+          p.quantity,
+          (_, index) => index === idx,
+          (line, quantity) => ({ ...line, ...p, quantity }),
+        ));
   }
 
   function addProduct(p: ProductCatalogItem) {
-    setItems((ls) => [{
-      productId: p.id, productName: p.name,
-      unitName: p.baseUnit, unitMultiplier: 1,
-      quantity: 1, unitPrice: Number(p.retailPrice),
-    }, ...ls]);
+    setItems((ls) => ls.some((line) => line.productId === p.id)
+      ? ls
+      : [{
+          productId: p.id, productName: p.name,
+          unitName: p.baseUnit, unitMultiplier: 1,
+          quantity: 1, unitPrice: Number(p.retailPrice),
+        }, ...ls]);
   }
 
   async function save() {
@@ -198,7 +208,6 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
             loadingMessage={t("common.loading")}
             unavailableMessage={t("common.error")}
             closeLabel={t("common.close")}
-            loadMoreLabel={t("common.loadMore")}
             catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
             inputClassName="border-dashed bg-transparent"
             renderItem={(product, { selected }) => {

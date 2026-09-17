@@ -26,6 +26,7 @@ describe("ProductSearchPicker", () => {
   test("exposes selected state to result renderers for POS-style highlighting", async () => {
     const source = await Bun.file(new URL("./product-search-picker.tsx", import.meta.url)).text();
     expect(source).toContain("isItemSelected");
+    expect(source).toContain("shouldSelectProductSearchItem");
     expect(source).toContain("selected: boolean");
     expect(source).toContain("selected: isItemSelected?.(item) ?? false");
   });
@@ -34,7 +35,7 @@ describe("ProductSearchPicker", () => {
     const source = await Bun.file(new URL("./product-search-picker.tsx", import.meta.url)).text();
     expect(source).toContain("visibleCount");
     expect(source).toContain("canLoadMore");
-    expect(source).toContain("loadMoreLabel");
     expect(source).toContain("onScroll=");
+    expect(source).not.toContain("loadMoreLabel");
   });
 });

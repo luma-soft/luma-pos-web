@@ -15,6 +15,7 @@ import {
   PRODUCT_SEARCH_DEBOUNCE_MS,
   ProductSearchRequestGate,
   nextProductSearchActiveIndex,
+  shouldSelectProductSearchItem,
 } from "./product-search-state";
 
 export type ProductSearchPickerStatus = "ready" | "loading" | "unavailable";
@@ -38,7 +39,6 @@ export type ProductSearchPickerProps<T> = {
   debounceMs?: number;
   resultLimit?: number;
   pageSize?: number;
-  loadMoreLabel?: string;
   keepOpenOnSelect?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -72,7 +72,6 @@ export function ProductSearchPicker<T>({
   debounceMs = PRODUCT_SEARCH_DEBOUNCE_MS,
   resultLimit = Number.MAX_SAFE_INTEGER,
   pageSize = 30,
-  loadMoreLabel = "Tải thêm",
   keepOpenOnSelect = false,
   open: controlledOpen,
   onOpenChange,
@@ -161,7 +160,10 @@ export function ProductSearchPicker<T>({
   }, [debounceMs, loadItems, open, query]);
 
   function select(item: T) {
-    if (isItemDisabled?.(item)) return;
+    if (!shouldSelectProductSearchItem({
+      selected: isItemSelected?.(item) ?? false,
+      disabled: isItemDisabled?.(item) ?? false,
+    })) return;
     onSelect(item);
     if (!keepOpenOnSelect) close();
     else setActiveIndex(-1);
@@ -268,12 +270,13 @@ export function ProductSearchPicker<T>({
             <div className="py-1">
               {visibleItems.map((item, index) => {
                 const active = index === activeIndex;
+                const selected = isItemSelected?.(item) ?? false;
                 return (
                   <div
                     id={`${listboxId}-option-${index}`}
                     key={itemKey(item)}
                     role="option"
-                    aria-selected={active}
+                    aria-selected={selected}
                     aria-disabled={isItemDisabled?.(item) || undefined}
                     onMouseEnter={() => setActiveIndex(index)}
                     onMouseDown={(event) => {
@@ -286,22 +289,10 @@ export function ProductSearchPicker<T>({
                     onClick={() => select(item)}
                     className={cn(active && "bg-surface-2")}
                   >
-                    {renderItem(item, { active, selected: isItemSelected?.(item) ?? false })}
+                    {renderItem(item, { active, selected })}
                   </div>
                 );
               })}
-              {canLoadMore && (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    loadNextPage();
-                  }}
-                  className="mx-auto my-2 block min-h-10 rounded-lg px-4 text-sm font-semibold text-primary-700 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-950/40"
-                >
-                  {loadMoreLabel}
-                </button>
-              )}
             </div>
           )}
         </div>

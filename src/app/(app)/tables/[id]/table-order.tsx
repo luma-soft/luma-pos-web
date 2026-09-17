@@ -180,7 +180,6 @@ export function TableOrder({
             loadingMessage={t("common.loading")}
             unavailableMessage={t("common.error")}
             closeLabel={t("common.close")}
-            loadMoreLabel={t("common.loadMore")}
             catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
             className="mb-3 w-full max-w-md"
             renderItem={(product, { selected }) => {

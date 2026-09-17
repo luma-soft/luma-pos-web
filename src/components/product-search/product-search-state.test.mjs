@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
   PRODUCT_SEARCH_DEBOUNCE_MS,
   ProductSearchRequestGate,
+  setSelectedProductQuantity,
+  shouldSelectProductSearchItem,
   nextProductSearchActiveIndex,
 } from "./product-search-state.ts";
 
@@ -23,5 +25,19 @@ describe("shared product search state", () => {
 
   test("uses the POS-compatible debounce interval", () => {
     expect(PRODUCT_SEARCH_DEBOUNCE_MS).toBe(250);
+  });
+
+  test("does not select an item that is already selected", () => {
+    expect(shouldSelectProductSearchItem({ selected: true, disabled: false })).toBeFalse();
+    expect(shouldSelectProductSearchItem({ selected: false, disabled: true })).toBeFalse();
+    expect(shouldSelectProductSearchItem({ selected: false, disabled: false })).toBeTrue();
+  });
+
+  test("removes a selected product when its quantity reaches zero", () => {
+    const rows = [{ id: "one", quantity: 1 }, { id: "two", quantity: 2 }];
+    expect(setSelectedProductQuantity(rows, 0, (row) => row.id === "one", (row, quantity) => ({ ...row, quantity })))
+      .toEqual([{ id: "two", quantity: 2 }]);
+    expect(setSelectedProductQuantity(rows, 3, (row) => row.id === "one", (row, quantity) => ({ ...row, quantity })))
+      .toEqual([{ id: "one", quantity: 3 }, { id: "two", quantity: 2 }]);
   });
 });

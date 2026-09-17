@@ -2112,7 +2112,6 @@ export function PosClient({
               loadingMessage={t("common.loading")}
               unavailableMessage={t("common.error")}
               closeLabel={t("common.close")}
-              loadMoreLabel={t("common.loadMore")}
               className="flex-1"
               inputClassName="h-[50px]"
               renderItem={(result) => {

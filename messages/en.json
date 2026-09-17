@@ -27,8 +27,7 @@
     "primaryNavigation": "Primary navigation",
     "decreaseProductQuantity": "Decrease quantity for {product}",
     "productQuantity": "Quantity for {product}",
-    "increaseProductQuantity": "Increase quantity for {product}",
-    "loadMore": "Load more"
+    "increaseProductQuantity": "Increase quantity for {product}"
   },
   "mediaMetadata": {
     "title": "File information",
