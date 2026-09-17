@@ -1,5 +1,5 @@
 import { getRole } from "@/lib/actions/common";
-import { getCameraQuoteFormOptions } from "@/lib/data/camera-quotes";
+import { getCameraQuoteFormOptions, type CameraQuoteProductOption } from "@/lib/data/camera-quotes";
 import { createClient } from "@/lib/supabase/server";
 import { CameraPriceListClient } from "@/app/(app)/camera-price-list/camera-price-list-client";
 import { estimateStorageDays } from "@/lib/camera-storage-estimate";
@@ -22,9 +22,12 @@ export async function CameraBrandPriceList({ brand, storeId }: { brand: CameraBr
   const installationPrice = options.installations[0]?.retailPrice ?? 0;
   const materialPrice = options.materials[0]?.retailPrice ?? 0;
   const basePrice = installationPrice + materialPrice;
-  const memoryOptions = options.cards.filter((card) =>
-    ["32GB", "64GB", "128GB", "512GB"].includes(card.specs["Dung lượng"]?.[0] ?? ""),
-  );
+  // Older/imported card records may have prices but no structured specs. Keep
+  // those cards in the quote by deriving capacity from their name/SKU.
+  const memoryOptions = options.cards.filter((card) => {
+    const capacity = memoryCardLabel(card);
+    return ["32GB", "64GB", "128GB", "512GB"].includes(capacity ?? "");
+  });
   const models = options.cameras
     .filter((camera) => camera.brand === brand)
     .map((camera) => {
@@ -61,7 +64,7 @@ export async function CameraBrandPriceList({ brand, storeId }: { brand: CameraBr
   return (
     <CameraPriceListClient
       models={models}
-      memoryLabels={memoryOptions.map((card) => `Thẻ nhớ ${card.specs["Dung lượng"]?.[0] ?? card.name}`)}
+      memoryLabels={memoryOptions.map((card) => `Thẻ nhớ ${memoryCardLabel(card) ?? card.name}`)}
       canEdit={canEdit}
       brandName={brand}
     />
@@ -79,6 +82,11 @@ function cameraInstallationLocation(name: string, specs: Record<string, string[]
 
 function memoryCardCapacityGb(specs: Record<string, string[]>) {
   return storageCapacityGb(specs["Dung lượng"]?.join(" ") ?? "");
+}
+
+function memoryCardLabel(card: Pick<CameraQuoteProductOption, "name" | "specs">) {
+  return card.specs["Dung lượng"]?.[0]
+    ?? card.name.match(/\b(32|64|128|512)\s*GB\b/i)?.[0]?.replace(/\s+/g, "").toUpperCase();
 }
 
 function cameraMaxStorageGb(specs: Record<string, string[]>) {
