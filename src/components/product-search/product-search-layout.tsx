@@ -17,7 +17,7 @@ export function ProductSearchResultLayout({
   return (
     <div
       className={cn(
-        "grid min-h-11 grid-cols-[36px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-3 py-2 text-left sm:flex sm:gap-3",
+        "grid min-h-16 grid-cols-[36px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-3 py-2 text-left sm:flex sm:gap-3",
         selected ? "bg-primary-50 dark:bg-primary-950/40" : "cursor-pointer hover:bg-surface-2",
         className,
       )}
