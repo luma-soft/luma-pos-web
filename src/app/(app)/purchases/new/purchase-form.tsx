@@ -362,17 +362,16 @@ export function PurchaseForm({
   );
   const browseProducts = useMemo(
     () => catalog.products
-      .filter((product) => product.isStockManaged && !selectedProductIds.has(product.id))
+      .filter((product) => product.isStockManaged)
       .slice(0, 60),
-    [catalog.products, selectedProductIds],
+    [catalog.products],
   );
   const searchProducts = useCallback((query: string) => {
     return catalog.search(query, {
         stockManagedOnly: true,
-        excludeIds: selectedProductIds,
         limit: 60,
       });
-  }, [catalog, selectedProductIds]);
+  }, [catalog]);
 
   const subtotal = lines.reduce((s, l) => s + purchaseLineTotal(l), 0);
   const afterDiscount = Math.max(0, subtotal - discount);
@@ -492,6 +491,7 @@ export function PurchaseForm({
                 loadItems={searchProducts}
                 itemKey={(product) => product.id}
                 onSelect={(product) => addProduct(catalogItemToPurchaseProduct(product))}
+                isItemSelected={(product) => selectedProductIds.has(product.id)}
                 keepOpenOnSelect
                 placeholder={t("purchases.searchProduct")}
                 emptyMessage={t("common.noResults")}
@@ -500,11 +500,22 @@ export function PurchaseForm({
                 closeLabel={t("common.close")}
                 catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                 className="flex-1"
-                renderItem={(product) => (
+                renderItem={(product, { selected }) => (
                   <ProductSearchResultLayout
+                    selected={selected}
                     leading={<ProductSearchThumbnail product={product} />}
                     summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {product.baseUnit}</div></>}
-                    controls={<span className="shrink-0 text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.costPrice ?? 0))}/{product.baseUnit}</span>}
+                    controls={selected ? (
+                      <div onClick={(event) => event.stopPropagation()}>
+                        <QuantityInput
+                          size="sm"
+                          min={0}
+                          value={lines.find((line) => line.productId === product.id)?.quantity ?? 0}
+                          onChange={(quantity) => patch(product.id, { quantity })}
+                          inputLabel={t("common.productQuantity", { product: product.name })}
+                        />
+                      </div>
+                    ) : <span className="shrink-0 text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.costPrice ?? 0))}/{product.baseUnit}</span>}
                   />
                 )}
               />

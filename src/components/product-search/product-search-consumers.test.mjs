@@ -20,7 +20,7 @@ describe("shared product search consumers", () => {
   test("purchase keeps the picker open for multi-add", () => {
     const source = readFileSync(new URL(consumers[1], import.meta.url), "utf8");
     expect(source).toContain("keepOpenOnSelect");
-    expect(source).toContain("excludeIds: selectedProductIds");
+    expect(source).toContain("isItemSelected={(product) => selectedProductIds.has(product.id)}");
   });
 
   test("stocktake and returns keep warehouse-aware stock mapping", () => {
@@ -28,6 +28,14 @@ describe("shared product search consumers", () => {
     const purchaseReturn = readFileSync(new URL(consumers[4], import.meta.url), "utf8");
     expect(stocktake).toContain("getCatalogWarehouseStock(product, warehouseId)");
     expect(purchaseReturn).toContain("getCatalogWarehouseStock(product, warehouseId)");
+  });
+
+  test("numeric search consumers expose selected product quantity controls", () => {
+    for (const path of consumers.slice(1, 5)) {
+      const source = readFileSync(new URL(path, import.meta.url), "utf8");
+      expect(source).toContain("isItemSelected");
+      expect(source).toContain("<QuantityInput");
+    }
   });
 
   test("table ordering still enters its modifier flow", () => {

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Input, type InputProps } from "./input";
 import { Text } from "./text";
 import { parseNumberInput } from "./number-input-format";
+import { hasInvalidNumericCharacters, useNumericInputBehavior } from "./numeric-input-behavior";
 
 export interface NumberInputProps
   extends Omit<InputProps, "type" | "value" | "onChange" | "defaultValue"> {
@@ -43,7 +44,7 @@ const affixPadding = (value: string) =>
   `calc(1rem + ${Math.max(1, Array.from(value.trim()).length)}ch)`;
 
 export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
-  ({ value, defaultValue, onChange, thousandSeparator = true, formatOnChange = false, suffix, prefix, min, max, decimals = 0, commitOnBlur = false, clearZeroOnFocus = false, className, name, style, onFocus, onBlur, onKeyDown, ...props }, ref) => {
+  ({ value, defaultValue, onChange, thousandSeparator = true, formatOnChange = false, suffix, prefix, min, max, decimals = 0, commitOnBlur = false, clearZeroOnFocus = false, className, name, style, onFocus, onBlur, onKeyDown, onBeforeInput, onPaste, ...props }, ref) => {
     const initialValue = value ?? defaultValue ?? null;
     const [text, setText] = React.useState<string>(
       value != null ? formatNumber(value, thousandSeparator, decimals) :
@@ -55,6 +56,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
 
     const editing = React.useRef(false);
     const parseNumber = (raw: string) => parseNumberInput(raw, { thousandSeparator, decimals });
+    const numericBehavior = useNumericInputBehavior({ allowNegative: (min ?? 0) < 0, onFocus, onBeforeInput, onPaste });
 
     React.useEffect(() => {
       if (editing.current) return;
@@ -69,6 +71,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
 
     function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
       const raw = e.target.value;
+      if (hasInvalidNumericCharacters(raw, (min ?? 0) < 0)) return;
       const parsed = parseNumber(raw);
       if (commitOnBlur) {
         setText(raw);
@@ -128,17 +131,13 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
           onChange={handleChange}
           onBlur={handleBlur}
           onFocus={(e) => {
-            const target = e.currentTarget;
             editing.current = true;
             if (clearZeroOnFocus && numericValue === 0) setText("");
             else if (decimals > 0 && !formatOnChange) setText(numericValue == null ? "" : String(numericValue));
-            requestAnimationFrame(() => {
-              if (document.activeElement === target) {
-                target.select();
-              }
-            });
-            onFocus?.(e);
+            numericBehavior.onFocus(e);
           }}
+          onBeforeInput={numericBehavior.onBeforeInput}
+          onPaste={numericBehavior.onPaste}
           onKeyDown={(e) => {
             if (commitOnBlur && e.key === "Enter") e.currentTarget.blur();
             onKeyDown?.(e);

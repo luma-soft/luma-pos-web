@@ -174,6 +174,7 @@ export function TableOrder({
             loadItems={searchProducts}
             itemKey={(product) => product.id}
             onSelect={choose}
+            isItemSelected={(product) => cart.some((line) => line.productId === product.id && !line.sent)}
             placeholder={t("pos.searchPlaceholder")}
             emptyMessage={t("pos.noSearchResults")}
             loadingMessage={t("common.loading")}
@@ -181,13 +182,21 @@ export function TableOrder({
             closeLabel={t("common.close")}
             catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
             className="mb-3 w-full max-w-md"
-            renderItem={(product) => (
+            renderItem={(product, { selected }) => {
+              const line = cart.find((item) => item.productId === product.id && !item.sent && item.modifiers.length === 0 && !item.note);
+              return (
               <ProductSearchResultLayout
+                selected={selected}
                 leading={<ProductSearchThumbnail product={product} />}
                 summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
-                controls={<span className="shrink-0 text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.retailPrice))}</span>}
+                controls={selected && line ? (
+                  <div onClick={(event) => event.stopPropagation()}>
+                    <QuantityInput size="sm" min={0} value={line.quantity} onChange={(quantity) => setQty(line.lineId, quantity)} inputLabel={t("common.productQuantity", { product: product.name })} />
+                  </div>
+                ) : <span className="shrink-0 text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.retailPrice))}</span>}
               />
-            )}
+              );
+            }}
           />
         </div>
 

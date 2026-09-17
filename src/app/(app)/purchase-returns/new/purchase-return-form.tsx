@@ -102,17 +102,16 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   );
   const browseProducts = useMemo(
     () => catalog.products
-      .filter((product) => product.isStockManaged && !selectedProductIds.has(product.id))
+      .filter((product) => product.isStockManaged)
       .slice(0, 60),
-    [catalog.products, selectedProductIds],
+    [catalog.products],
   );
   const searchProducts = useCallback((query: string) => {
     return catalog.search(query, {
         stockManagedOnly: true,
-        excludeIds: selectedProductIds,
         limit: 60,
       });
-  }, [catalog, selectedProductIds]);
+  }, [catalog]);
 
   const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.returnUnitCost, 0);
   const afterDiscount = Math.max(0, subtotal - discount);
@@ -238,6 +237,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                 loadItems={searchProducts}
                 itemKey={(product) => product.id}
                 onSelect={(product) => addProduct(catalogItemToPurchaseReturnProduct(product, warehouseId))}
+                isItemSelected={(product) => selectedProductIds.has(product.id)}
                 placeholder={t("purchaseReturns.searchProduct")}
                 emptyMessage={t("common.noResults")}
                 loadingMessage={t("common.loading")}
@@ -245,13 +245,26 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                 closeLabel={t("common.close")}
                 catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                 className="flex-1"
-                renderItem={(product) => {
+                renderItem={(product, { selected }) => {
                   const stock = getCatalogWarehouseStock(product, warehouseId);
+                  const line = lines.find((item) => item.productId === product.id);
                   return (
                     <ProductSearchResultLayout
+                      selected={selected}
                       leading={<ProductSearchThumbnail product={product} />}
                       summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
-                      controls={<span className="shrink-0 text-sm text-slate-500 tabular-nums">{formatNumber(stock)} {product.baseUnit}</span>}
+                      controls={selected && line ? (
+                        <div onClick={(event) => event.stopPropagation()}>
+                          <QuantityInput
+                            size="sm"
+                            min={0}
+                            max={totalStock(line)}
+                            value={line.quantity}
+                            onChange={(quantity) => patch(line.key, { quantity })}
+                            inputLabel={t("common.productQuantity", { product: product.name })}
+                          />
+                        </div>
+                      ) : <span className="shrink-0 text-sm text-slate-500 tabular-nums">{formatNumber(stock)} {product.baseUnit}</span>}
                     />
                   );
                 }}

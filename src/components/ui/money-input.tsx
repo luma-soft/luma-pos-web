@@ -3,6 +3,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { formatMoneyInput, formatMoneyInputDraft, moneyInputCaret, moneyInputEditText, parseMoneyInput, readMoneyInput } from "./money-input-format";
+import { hasInvalidNumericCharacters, useNumericInputBehavior } from "./numeric-input-behavior";
 
 function toNum(v: number | string | null | undefined): number | null {
   if (v == null || v === "") return null;
@@ -31,7 +32,7 @@ export interface MoneyInputProps
  * an toàn trong ô bảng và layout inline.
  */
 export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
-  ({ value, defaultValue, onChange, min = 0, max, decimals = 0, suffix, name, disabled, form, style, onFocus, onBlur, className, ...props }, ref) => {
+  ({ value, defaultValue, onChange, min = 0, max, decimals = 0, suffix, name, disabled, form, style, onFocus, onBlur, onBeforeInput, onPaste, className, ...props }, ref) => {
     const format = (amount: number | null) => formatMoneyInput(amount, decimals);
     const parse = (input: string, negative: boolean) => parseMoneyInput(input, negative, decimals);
     const initialValue = toNum(value === undefined ? defaultValue : value);
@@ -49,6 +50,7 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
     const editing = React.useRef(false);
     const focusValue = React.useRef(initialValue);
     const invalid = React.useRef(false);
+    const numericBehavior = useNumericInputBehavior({ allowNegative: min < 0, onFocus, onBeforeInput, onPaste });
 
     // đồng bộ khi value đổi từ ngoài — không phá lúc người dùng đang gõ
     React.useEffect(() => {
@@ -88,20 +90,18 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
           "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
         )}
         value={text}
-        onFocus={(e) => {
-          editing.current = true;
-          focusValue.current = numericValue;
+          onFocus={(e) => {
+            editing.current = true;
+            focusValue.current = numericValue;
           // Numeric fields are replacement-oriented: selecting on the first
           // focus lets a newly typed amount replace the formatted old value.
-          requestAnimationFrame(() => {
-            if (document.activeElement === e.currentTarget) {
-              e.currentTarget.select();
-            }
-          });
-          onFocus?.(e);
-        }}
+            numericBehavior.onFocus(e);
+          }}
+        onBeforeInput={numericBehavior.onBeforeInput}
+        onPaste={numericBehavior.onPaste}
         onChange={(e) => {
           const native = e.nativeEvent as InputEvent;
+          if (hasInvalidNumericCharacters(e.target.value, min < 0)) return;
           const raw = moneyInputEditText(e.target.value, text, native.inputType ?? "", native.data, decimals);
           if (!(min < 0 && raw.trim() === "-") && !readMoneyInput(raw, min < 0, decimals).valid) {
             invalid.current = true;

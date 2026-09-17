@@ -192,6 +192,7 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
             loadItems={searchProducts}
             itemKey={(product) => product.id}
             onSelect={addProduct}
+            isItemSelected={(product) => items.some((line) => line.productId === product.id)}
             placeholder={`＋ ${t("purchases.addProduct")}`}
             emptyMessage={t("pos.noSearchResults")}
             loadingMessage={t("common.loading")}
@@ -199,13 +200,22 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
             closeLabel={t("common.close")}
             catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
             inputClassName="border-dashed bg-transparent"
-            renderItem={(product) => (
-              <ProductSearchResultLayout
-                leading={<ProductSearchThumbnail product={product} />}
-                summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {product.baseUnit}</div></>}
-                controls={<span className="text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.retailPrice))}</span>}
-              />
-            )}
+            renderItem={(product, { selected }) => {
+              const lineIndex = items.findIndex((line) => line.productId === product.id);
+              const line = lineIndex >= 0 ? items[lineIndex] : null;
+              return (
+                <ProductSearchResultLayout
+                  selected={selected}
+                  leading={<ProductSearchThumbnail product={product} />}
+                  summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {product.baseUnit}</div></>}
+                  controls={selected && line ? (
+                    <div onClick={(event) => event.stopPropagation()}>
+                      <QuantityInput size="sm" min={0} value={line.quantity} onChange={(quantity) => patch(lineIndex, { quantity })} inputLabel={t("common.productQuantity", { product: product.name })} />
+                    </div>
+                  ) : <span className="text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.retailPrice))}</span>}
+                />
+              );
+            }}
           />
         </div>
       </div>

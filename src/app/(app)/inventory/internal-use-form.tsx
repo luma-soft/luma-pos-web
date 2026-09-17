@@ -200,6 +200,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                   loadItems={searchProducts}
                   itemKey={(product) => product.id}
                   onSelect={(product) => addItem(catalogItemToPurchaseProduct(product))}
+                  isItemSelected={(product) => lines.some((line) => line.productId === product.id)}
                   placeholder={t("internalUse.searchProduct")}
                   emptyMessage={t("common.noResults")}
                   loadingMessage={t("common.loading")}
@@ -207,13 +208,25 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                   closeLabel={t("common.close")}
                   catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                   className="flex-1"
-                  renderItem={(product) => {
+                  renderItem={(product, { selected }) => {
                     const stock = warehouse ? getCatalogWarehouseStock(product, warehouse.id) : Number(product.warehouseStock.reduce((sum, row) => sum + Number(row.quantity), 0));
+                    const line = lines.find((item) => item.productId === product.id);
                     return (
                       <ProductSearchResultLayout
+                        selected={selected}
                         leading={<ProductSearchThumbnail product={product} />}
                         summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {formatNumber(stock)} {product.baseUnit}</div></>}
-                        controls={<span className="text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.costPrice ?? 0))}/{product.baseUnit}</span>}
+                        controls={selected && line ? (
+                          <div onClick={(event) => event.stopPropagation()}>
+                            <QuantityInput
+                              size="sm"
+                              min={0}
+                              value={line.quantity}
+                              onChange={(quantity) => upd(line.key, { quantity })}
+                              inputLabel={t("common.productQuantity", { product: product.name })}
+                            />
+                          </div>
+                        ) : <span className="text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.costPrice ?? 0))}/{product.baseUnit}</span>}
                       />
                     );
                   }}

@@ -79,16 +79,15 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
   );
 
   const browseProducts = useMemo(
-    () => products.filter((product) => !added.has(product.id)).slice(0, 60),
-    [added, products],
+    () => products.slice(0, 60),
+    [products],
   );
   const searchProducts = useCallback((query: string) => {
     return catalog.search(query, {
       stockManagedOnly: true,
-      excludeIds: added,
       limit: 60,
     }).map((product) => toProductOption(product, warehouseId));
-  }, [added, catalog, warehouseId]);
+  }, [catalog, warehouseId]);
 
   function addLine(p: ProductOption) {
     setLines((ls) => [{ product: p, actualQty: p.stock }, ...ls]);
@@ -218,6 +217,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                   loadItems={searchProducts}
                   itemKey={(product) => product.id}
                   onSelect={addLine}
+                  isItemSelected={(product) => added.has(product.id)}
                   placeholder={t("stocktakes.searchPlaceholder")}
                   emptyMessage={t("common.noResults")}
                   loadingMessage={t("common.loading")}
@@ -226,11 +226,22 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                   catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                   className="flex-1"
                   inputClassName="h-12 bg-canvas text-base"
-                  renderItem={(product) => (
+                  renderItem={(product, { selected }) => (
                     <ProductSearchResultLayout
+                      selected={selected}
                       leading={<ProductSearchThumbnail product={product} />}
                       summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
-                      controls={<span className="shrink-0 text-sm text-slate-500 tabular-nums">{t("pos.stockLabel")}: {formatNumber(product.stock)} {product.baseUnit}</span>}
+                      controls={selected ? (
+                        <div onClick={(event) => event.stopPropagation()}>
+                          <QuantityInput
+                            size="sm"
+                            min={0}
+                            value={lines.find((line) => line.product.id === product.id)?.actualQty ?? 0}
+                            onChange={(quantity) => setQty(product.id, quantity)}
+                            inputLabel={t("common.productQuantity", { product: product.name })}
+                          />
+                        </div>
+                      ) : <span className="shrink-0 text-sm text-slate-500 tabular-nums">{t("pos.stockLabel")}: {formatNumber(product.stock)} {product.baseUnit}</span>}
                     />
                   )}
                 />

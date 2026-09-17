@@ -25,9 +25,10 @@ export type ProductSearchPickerProps<T> = {
   browseItems: readonly T[];
   loadItems: (query: string) => readonly T[] | Promise<readonly T[]>;
   itemKey: (item: T) => string;
-  renderItem: (item: T, state: { active: boolean }) => ReactNode;
+  renderItem: (item: T, state: { active: boolean; selected: boolean }) => ReactNode;
   onSelect: (item: T) => void;
   isItemDisabled?: (item: T) => boolean;
+  isItemSelected?: (item: T) => boolean;
   placeholder: string;
   emptyMessage: string;
   loadingMessage?: string;
@@ -59,6 +60,7 @@ export function ProductSearchPicker<T>({
   renderItem,
   onSelect,
   isItemDisabled,
+  isItemSelected,
   placeholder,
   emptyMessage,
   loadingMessage = "Đang tìm sản phẩm…",
@@ -252,11 +254,17 @@ export function ProductSearchPicker<T>({
                     aria-selected={active}
                     aria-disabled={isItemDisabled?.(item) || undefined}
                     onMouseEnter={() => setActiveIndex(index)}
-                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseDown={(event) => {
+                      // Nested quantity/price controls must be focusable; the
+                      // default-prevention is only for row clicks so selecting
+                      // a result does not steal focus from the search field.
+                      if ((event.target as HTMLElement).closest("input,button,textarea,select")) return;
+                      event.preventDefault();
+                    }}
                     onClick={() => select(item)}
                     className={cn(active && "bg-surface-2")}
                   >
-                    {renderItem(item, { active })}
+                    {renderItem(item, { active, selected: isItemSelected?.(item) ?? false })}
                   </div>
                 );
               })}

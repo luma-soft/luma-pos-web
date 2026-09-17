@@ -22,4 +22,11 @@ describe("ProductSearchPicker", () => {
     expect(html).toContain('aria-autocomplete="list"');
     expect(html).toContain('placeholder="Tìm sản phẩm"');
   });
+
+  test("exposes selected state to result renderers for POS-style highlighting", async () => {
+    const source = await Bun.file(new URL("./product-search-picker.tsx", import.meta.url)).text();
+    expect(source).toContain("isItemSelected");
+    expect(source).toContain("selected: boolean");
+    expect(source).toContain("selected: isItemSelected?.(item) ?? false");
+  });
 });
