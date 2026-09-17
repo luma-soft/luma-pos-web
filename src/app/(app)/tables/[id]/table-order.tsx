@@ -1,10 +1,10 @@
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { useRef, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Plus, Trash2, Loader2, Check, ChefHat, Split, X, MoveRight } from "lucide-react";
+import { Plus, Trash2, Loader2, Check, ChefHat, Split, X, MoveRight } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { setTableCart, checkoutTable, closeTable, sendToKitchen, moveTable } from "@/lib/actions/tables";
@@ -16,6 +16,9 @@ import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { SplitGuestRow } from "./split-guest-row";
+import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
+import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 
 type Method = "cash" | "bank_transfer" | "credit";
 const METHODS: Method[] = ["cash", "bank_transfer", "credit"];
@@ -40,8 +43,6 @@ export function TableOrder({
   const catalog = useProductCatalog();
   const [cart, setCart] = useState<TableCartItem[]>(initialCart);
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<PosResult[]>([]);
-  const [searching, setSearching] = useState(false);
   const [pending, start] = useTransition();
   const [err, setErr] = useState("");
   const [picker, setPicker] = useState<{ product: PosResult; groups: ModifierGroup[] } | null>(null);
@@ -50,7 +51,6 @@ export function TableOrder({
   const [guests, setGuests] = useState(2);
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveTargetId, setMoveTargetId] = useState("");
-  const sref = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const total = cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
   const hasUnsent = cart.some((i) => !i.sent);
@@ -58,24 +58,22 @@ export function TableOrder({
 
   function persist(next: TableCartItem[]) { setCart(next); setTableCart(id, next); }
 
-  function onSearch(v: string) {
-    setQ(v); if (sref.current) clearTimeout(sref.current);
-    if (!v.trim()) { setResults([]); return; }
-    setSearching(true);
-    sref.current = setTimeout(() => {
-      setResults(catalog.search(v, { limit: 30 }).map((product) =>
-        catalogItemToPosProduct(product, catalog.products, catalog.snapshot?.warehouses.find((warehouse) => warehouse.isDefault)?.id ?? null)
-      ));
-      setSearching(false);
-    }, 250);
-  }
+  const defaultWarehouseId = catalog.snapshot?.warehouses.find((warehouse) => warehouse.isDefault)?.id ?? null;
+  const browseProducts = useMemo(
+    () => catalog.products.slice(0, 60).map((product) => catalogItemToPosProduct(product, catalog.products, defaultWarehouseId)),
+    [catalog.products, defaultWarehouseId],
+  );
+  const searchProducts = useCallback(
+    (query: string) => catalog.search(query, { limit: 60 }).map((product) => catalogItemToPosProduct(product, catalog.products, defaultWarehouseId)),
+    [catalog, defaultWarehouseId],
+  );
 
   function groupsFor(categoryId: string | null) {
     return modifierGroups.filter((g) => g.categoryIds.length === 0 || (categoryId && g.categoryIds.includes(categoryId)));
   }
 
   function choose(p: PosResult) {
-    setQ(""); setResults([]);
+    setQ("");
     const groups = groupsFor(p.categoryId ?? null);
     if (groups.length === 0) addLine(p, [], "");
     else setPicker({ product: p, groups });
@@ -169,20 +167,28 @@ export function TableOrder({
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4">
         <div>
-          <div className="relative w-full max-w-md mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input value={q} onChange={(e) => onSearch(e.target.value)} placeholder={t("pos.searchPlaceholder")} className="min-h-11 w-full rounded-[10px] border border-border bg-surface py-2.5 pl-9 pr-3 text-sm" />
-            {(results.length > 0 || searching) && q.trim() && (
-              <div className="absolute z-30 left-0 right-0 mt-1 bg-surface border border-border rounded-xl shadow-e2 overflow-hidden max-h-[min(70dvh,520px)] overflow-y-auto">
-                {searching ? <div className="px-4 py-4 text-center text-sm text-slate-400"><Loader2 className="w-4 h-4 animate-spin inline" /></div>
-                  : results.slice(0, 30).map((p) => (
-                    <button key={p.id} onClick={() => choose(p)} className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm hover:bg-surface-2">
-                      <span className="truncate">{p.name}</span><span className="font-mono text-primary-600 shrink-0">{formatCurrency(Number(p.retailPrice))}</span>
-                    </button>
-                  ))}
-              </div>
+          <ProductSearchPicker
+            query={q}
+            onQueryChange={setQ}
+            browseItems={browseProducts}
+            loadItems={searchProducts}
+            itemKey={(product) => product.id}
+            onSelect={choose}
+            placeholder={t("pos.searchPlaceholder")}
+            emptyMessage={t("pos.noSearchResults")}
+            loadingMessage={t("common.loading")}
+            unavailableMessage={t("common.error")}
+            closeLabel={t("common.close")}
+            catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
+            className="mb-3 w-full max-w-md"
+            renderItem={(product) => (
+              <ProductSearchResultLayout
+                leading={<ProductSearchThumbnail product={product} />}
+                summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
+                controls={<span className="shrink-0 text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.retailPrice))}</span>}
+              />
             )}
-          </div>
+          />
         </div>
 
         <div className="bg-surface border border-border rounded-card shadow-e1 flex flex-col self-start">

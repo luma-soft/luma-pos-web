@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2, Save, Trash2 } from "lucide-react";
@@ -9,10 +9,13 @@ import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { cn, formatCurrency } from "@/lib/utils";
 import { MoneyInput } from "@/components/ui/money-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
-import { Select } from "@/components/ui/select";
 import { OrderEditMobileLine } from "@/components/order-edit-mobile-line";
 import { updateOrder } from "@/lib/actions/order-edit";
 import { useProductCatalog } from "@/components/product-catalog-provider";
+import type { ProductCatalogItem } from "@/lib/product-catalog";
+import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
+import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 
 interface Line {
   productId: string;
@@ -40,7 +43,7 @@ interface Props {
 export function OrderEditForm({ orderId, orderCode, initial }: Props) {
   const t = useTranslations();
   const router = useRouter();
-  const { products: productOptions } = useProductCatalog();
+  const catalog = useProductCatalog();
 
   const [items, setItems] = useState<Line[]>(initial.items);
   const [discount, setDiscount] = useState(initial.discount);
@@ -49,8 +52,11 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
   const [note, setNote] = useState(initial.note);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  const productById = useMemo(() => new Map(productOptions.map((p) => [p.id, p])), [productOptions]);
+  const [productQuery, setProductQuery] = useState("");
+  const searchProducts = useCallback(
+    (query: string) => catalog.search(query, { limit: 60 }),
+    [catalog],
+  );
 
   const subtotal = items.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
   const total = Math.max(0, subtotal - discount + shippingFee);
@@ -66,9 +72,7 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
     } : l)));
   }
 
-  function addProduct(id: string) {
-    const p = productById.get(id);
-    if (!p) return;
+  function addProduct(p: ProductCatalogItem) {
     setItems((ls) => [{
       productId: p.id, productName: p.name,
       unitName: p.baseUnit, unitMultiplier: 1,
@@ -181,14 +185,27 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
           </table>
         </div>
         <div className="px-4 py-3 border-t border-border">
-          <Select
-            value=""
-            onChange={(e) => addProduct(e.target.value)}
-            options={[
-              { value: "", label: `＋ ${t("purchases.addProduct")}` },
-              ...productOptions.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` })),
-            ]}
-            className="w-full border-dashed bg-transparent text-slate-500"
+          <ProductSearchPicker
+            query={productQuery}
+            onQueryChange={setProductQuery}
+            browseItems={catalog.products.slice(0, 60)}
+            loadItems={searchProducts}
+            itemKey={(product) => product.id}
+            onSelect={addProduct}
+            placeholder={`＋ ${t("purchases.addProduct")}`}
+            emptyMessage={t("pos.noSearchResults")}
+            loadingMessage={t("common.loading")}
+            unavailableMessage={t("common.error")}
+            closeLabel={t("common.close")}
+            catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
+            inputClassName="border-dashed bg-transparent"
+            renderItem={(product) => (
+              <ProductSearchResultLayout
+                leading={<ProductSearchThumbnail product={product} />}
+                summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {product.baseUnit}</div></>}
+                controls={<span className="text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.retailPrice))}</span>}
+              />
+            )}
           />
         </div>
       </div>

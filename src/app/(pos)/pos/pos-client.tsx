@@ -33,10 +33,10 @@ import {
   buildPosUnitOptions,
   PosCartScrollSurface,
   PosQuantitySlot,
-  PosSearchResultLayout,
-  PosSearchResultsSurface,
   posUnitSuffix,
 } from "@/components/pos/pos-mobile-layout";
+import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
+import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import type { PaperSize, PrintTemplate } from "@/lib/print/template-shared";
 import type { StorePrefs } from "@/lib/schemas/settings";
 import type { AiActionPreview } from "@/lib/ai/actions";
@@ -63,7 +63,7 @@ import { buildExpectedPosPricing, countPosPricingConflicts, requestPosOrder } fr
 import { resolvePosCartUnit } from "@/lib/pos/cart-unit";
 import { upsertPosCartLine } from "@/lib/pos/cart-line-order";
 import { canAddCatalogProductsToPosDraft, canEditPriceBookForPosDraft } from "@/lib/pos/catalog-add-policy";
-import { expandPosSearchUnitResults } from "@/lib/pos/search-unit-results";
+import { expandPosSearchUnitResults, type PosSearchUnitResult } from "@/lib/pos/search-unit-results";
 import {
   createLinePriceEditorState,
   resolveLinePriceEditor,
@@ -482,8 +482,7 @@ export function PosClient({
   const [customerOptions, setCustomerOptions] = useState<PosCustomer[]>(() => data.customers);
   const [customerCreateOpen, setCustomerCreateOpen] = useState(false);
   const [variantParent, setVariantParent] = useState<PosProduct | null>(null);
-  const [browsing, setBrowsing] = useState(false); // click vào ô tìm → mở dropdown SP
-  const searchRef = useRef<HTMLDivElement>(null);
+  const [browsing, setBrowsing] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const addMenuButtonRef = useRef<HTMLButtonElement>(null);
   const [addMenuPosition, setAddMenuPosition] = useState<{ top: number; left: number } | null>(null);
@@ -536,17 +535,6 @@ export function PosClient({
     });
     return () => { cancelled = true; window.removeEventListener("afterprint", restore); document.body.classList.remove("pos-printing"); };
   }, [printSize]);
-  // Đóng dropdown tìm kiếm khi click ra ngoài hoặc nhấn Esc.
-  useEffect(() => {
-    if (!browsing && !search.trim()) return;
-    const onDown = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) { setBrowsing(false); setSearch(""); }
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setBrowsing(false); setSearch(""); } };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
-  }, [browsing, search]);
   const [editKey, setEditKey] = useState<string | null>(null); // dòng đang mở popup sửa giá
   const [renameDraftId, setRenameDraftId] = useState<string | null>(null);
   const [renameDraftValue, setRenameDraftValue] = useState("");
@@ -884,9 +872,6 @@ export function PosClient({
     return () => { cancelled = true; };
   }, [active.cameraInitialId, active.cameraPackages?.length, active.cameraQuote, initialContext?.cameraQuote, productById, searchableProducts, patchActive, cameraPackagesToCart]);
 
-  // Khi gõ tìm kiếm: hỏi server (quét toàn bộ SP, bỏ dấu) — khớp trang Sản phẩm.
-  const [serverResults, setServerResults] = useState<PosProduct[]>([]);
-  const [searching, setSearching] = useState(false);
   // ===== offline (Mức A) =====
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
@@ -912,32 +897,32 @@ export function PosClient({
     setAiHighlightedProductIds([]);
   }
 
-  useEffect(() => {
-    const q = search.trim();
-    let cancelled = false;
-    const h = setTimeout(() => {
-      if (cancelled) return;
-      if (!q) { setServerResults([]); setSearching(false); return; }
+  const sortSearchProducts = useCallback((products: readonly PosProduct[]) => [...products].sort((a, b) => {
+    const bTime = b.lastSoldAt ? new Date(b.lastSoldAt).getTime() : 0;
+    const aTime = a.lastSoldAt ? new Date(a.lastSoldAt).getTime() : 0;
+    return bTime - aTime || a.name.localeCompare(b.name, "vi");
+  }), []);
+  const browseSearchResults = useMemo(
+    () => expandPosSearchUnitResults(sortSearchProducts(data.products)),
+    [data.products, sortSearchProducts],
+  );
+  const loadPosSearchResults = useCallback(async (query: string): Promise<PosSearchUnitResult<PosProduct>[]> => {
       const costPriceBookIds = data.priceBooks.filter((book) => book.costBased).map((book) => book.id);
-      const cachedResults = () => productCatalog.search(q, { limit: 40 }).map((product) =>
+      const cachedResults = () => productCatalog.search(query, { limit: 40 }).map((product) =>
         catalogItemToPosProduct(product, productCatalog.products, data.warehouse?.id ?? null, costPriceBookIds)
       );
-      // offline → tìm trong Product Catalog dùng chung; online → hỏi server
+      let products: PosProduct[];
       if (typeof navigator !== "undefined" && !navigator.onLine) {
-        setServerResults(cachedResults());
-        setSearching(false);
-        return;
+        products = cachedResults();
+      } else {
+        try {
+          products = await searchPosProducts(query);
+        } catch {
+          products = cachedResults();
+        }
       }
-      setSearching(true);
-      searchPosProducts(q)
-        .then((res) => { if (!cancelled) { setServerResults(res); setSearching(false); } })
-        .catch(() => { if (!cancelled) { // mất mạng giữa chừng → dùng catalog chung
-          setServerResults(cachedResults());
-          setSearching(false);
-        } });
-    }, q ? 250 : 0);
-    return () => { cancelled = true; clearTimeout(h); };
-  }, [data.priceBooks, data.warehouse?.id, productCatalog, search]);
+      return expandPosSearchUnitResults(sortSearchProducts(products));
+  }, [data.priceBooks, data.warehouse?.id, productCatalog, sortSearchProducts]);
 
   const syncingRef = useRef(false);
   async function flushOutbox() {
@@ -985,20 +970,6 @@ export function PosClient({
     // Chỉ đăng ký listener một lần; flushOutbox dùng state khởi tạo và tự chống chạy trùng.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const filtered = useMemo(() => {
-    // có từ khoá → dùng kết quả server; không → lưới SP mặc định
-    const products = search.trim() ? serverResults : data.products;
-    return [...products].sort((a, b) => {
-      const bTime = b.lastSoldAt ? new Date(b.lastSoldAt).getTime() : 0;
-      const aTime = a.lastSoldAt ? new Date(a.lastSoldAt).getTime() : 0;
-      return bTime - aTime || a.name.localeCompare(b.name, "vi");
-    });
-  }, [search, serverResults, data.products]);
-  const searchUnitResults = useMemo(
-    () => expandPosSearchUnitResults(filtered),
-    [filtered],
-  );
 
   function usesCompanyPrice(l: CartLine) {
     return data.priceBooks.find((book) => book.id === (l.priceBook ?? priceBook))?.systemType === "list";
@@ -1649,8 +1620,6 @@ export function PosClient({
     }), size);
   };
 
-  // Khu chính hiện lưới SP khi đang tìm hoặc khi bấm vào ô tìm; ngược lại hiện dòng hàng đã chọn.
-  const showResults = browsing || search.trim() !== "";
   const closeSearch = () => { setBrowsing(false); setSearch(""); };
   const isEditMode = sourceInvoice?.mode === "edit";
   const isCopyMode = sourceInvoice?.mode === "copy";
@@ -2101,7 +2070,7 @@ export function PosClient({
                   <button
                     key={item.key}
                     type="button"
-                    onClick={() => setSearch(item.sku ?? item.label)}
+                    onClick={() => { setBrowsing(true); setSearch(item.sku ?? item.label); }}
                     className="max-w-full rounded-full border border-amber-300 bg-white px-2.5 py-1 text-left text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/30"
                     title={item.reason}
                   >
@@ -2126,120 +2095,84 @@ export function PosClient({
               {t("pos.returns.invoiceCatalogLocked")}
             </div>
           )}
-          {!isCameraQuoteDraft && canAddCatalogProducts && <div ref={searchRef} className="relative flex gap-2">
-            <div className="relative min-w-0 flex-1">
-              <Search className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onFocus={() => setBrowsing(true)}
-                placeholder={t("pos.searchPlaceholder")}
-                className="w-full rounded-xl border border-border bg-surface py-3 pl-10 pr-10"
-              />
-            </div>
+          {!isCameraQuoteDraft && canAddCatalogProducts && <div className="relative flex gap-2">
+            <ProductSearchPicker
+              query={search}
+              onQueryChange={setSearch}
+              browseItems={browseSearchResults}
+              loadItems={loadPosSearchResults}
+              itemKey={(result) => `${result.product.id}:${result.unitName ?? "variants"}`}
+              onSelect={(result) => selectProduct(result.product, result.unitName)}
+              isItemDisabled={(result) => cart.some((line) => line.product.id === result.product.id && (result.unitName == null || line.unitName === result.unitName))}
+              keepOpenOnSelect
+              open={browsing}
+              onOpenChange={setBrowsing}
+              placeholder={t("pos.searchPlaceholder")}
+              emptyMessage={search.trim() ? t("pos.noSearchResults") : t("pos.noProducts")}
+              loadingMessage={t("common.loading")}
+              unavailableMessage={t("common.error")}
+              closeLabel={t("common.close")}
+              className="flex-1"
+              inputClassName="h-[50px]"
+              renderItem={(result) => {
+                const p = result.product;
+                const resultUnit = result.unitName;
+                const stock = Number(p.stock);
+                const stockManaged = isProductStockManaged(p.categoryName);
+                const line = cart.find((item) => item.product.id === p.id && (resultUnit == null || item.unitName === resultUnit));
+                const ordered = orderedBaseQuantityByProduct.get(p.id) ?? 0;
+                const stockInsufficient = exceedsAvailableStock(stockManaged, stock, ordered + Number(p.booked), isReturnDraft);
+                const children = productChildren(p);
+                const resultPriceLabel = line
+                  ? `${formatCurrency(effPrice(line).price)}${posUnitSuffix(line.unitName)}`
+                  : p.isVariantParent || resultUnit == null
+                    ? priceLabelFor(p, priceBook)
+                    : `${formatCurrency(unitPriceFor(p, result.alternateUnit, priceBook, data.priceBooks))}${posUnitSuffix(resultUnit)}`;
+                return (
+                  <ProductSearchResultLayout
+                    selected={Boolean(line)}
+                    leading={<PosProductThumbnail product={p} />}
+                    summary={(
+                      <>
+                        <div className="text-sm font-medium whitespace-normal break-words">{productDisplayName(p)}{resultUnit == null ? "" : ` · ${resultUnit}`}</div>
+                        {p.isVariantParent ? (
+                          <div className="text-xs text-slate-400">{children.length} SKU con</div>
+                        ) : stockManaged ? (
+                          <div className={cn("text-xs", stockInsufficient ? "text-er" : "text-slate-400")}>{t("pos.stockLabel")} {formatNumber(stock)} {p.baseUnit}</div>
+                        ) : null}
+                      </>
+                    )}
+                    controls={(
+                      <>
+                        {line && (
+                          <PosQuantitySlot onClick={(event) => event.stopPropagation()}>
+                            <QuantityInput
+                              value={line.quantity}
+                              onChange={(quantity) => setQty(line.key, quantity)}
+                              min={0}
+                              max={line.returnSoldQuantity}
+                              suffix={isReturnDraft && line.returnSoldQuantity != null ? `/${formatNumber(line.returnSoldQuantity)}` : undefined}
+                              suffixBelow={isReturnDraft && line.returnSoldQuantity != null}
+                              clearZeroOnFocus={isReturnDraft && line.returnSoldQuantity != null}
+                              size="sm"
+                              className={cn("w-full", stockInsufficient && "border-er text-er focus-within:border-er")}
+                              inputClassName={cn(stockInsufficient && "border-er text-er")}
+                            />
+                            {stockManaged && <PosStockQuantityTooltip stock={stock} ordered={ordered} reserved={Number(p.booked)} unit={p.baseUnit} />}
+                          </PosQuantitySlot>
+                        )}
+                        <div className="w-24 text-right text-sm font-semibold text-primary-600 tabular-nums sm:w-32">{resultPriceLabel}</div>
+                      </>
+                    )}
+                  />
+                );
+              }}
+            />
             <AiQuickActionButton
               onClick={() => setAiQuickOpen(true)}
               label={t("aiQuick.pos.open")}
               className="h-[50px] w-12"
             />
-            {showResults && (
-              <button
-                type="button"
-                onClick={closeSearch}
-                title={t("common.close")}
-                className="absolute right-16 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-surface-2 hover:text-slate-600 lg:h-7 lg:w-7"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-
-            {/* dropdown kết quả nổi dưới ô tìm — giỏ hàng vẫn hiện phía sau */}
-            {showResults && (
-              <PosSearchResultsSurface>
-                {searching ? (
-                  <div className="px-4 py-6 text-center text-sm text-slate-400">
-                    <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />{t("common.search")}…</span>
-                  </div>
-                ) : filtered.length === 0 ? (
-                  <div className="px-4 py-6 text-center text-sm text-slate-400">{search.trim() ? t("pos.noSearchResults") : t("pos.noProducts")}</div>
-                ) : (
-                  <div className="py-1">
-                    {searchUnitResults.slice(0, 60).map((result) => {
-                      const p = result.product;
-                      const resultUnit = result.unitName;
-                      const stock = Number(p.stock);
-                      const stockManaged = isProductStockManaged(p.categoryName);
-                      const line = cart.find((l) =>
-                        l.product.id === p.id &&
-                        (resultUnit == null || l.unitName === resultUnit)
-                      );
-                      const ordered = orderedBaseQuantityByProduct.get(p.id) ?? 0;
-                      const stockInsufficient = exceedsAvailableStock(stockManaged, stock, ordered + Number(p.booked), isReturnDraft);
-                      const children = productChildren(p);
-                      const resultPriceLabel = line
-                        ? `${formatCurrency(effPrice(line).price)}${posUnitSuffix(line.unitName)}`
-                        : p.isVariantParent || resultUnit == null
-                          ? priceLabelFor(p, priceBook)
-                          : `${formatCurrency(unitPriceFor(p, result.alternateUnit, priceBook, data.priceBooks))}${posUnitSuffix(resultUnit)}`;
-                      return (
-                        <PosSearchResultLayout
-                          key={`${p.id}:${resultUnit ?? "variants"}`}
-                          selected={Boolean(line)}
-                          onClick={line ? undefined : () => selectProduct(p, resultUnit)}
-                          leading={<PosProductThumbnail product={p} />}
-                          summary={(
-                            <>
-                            <div className="text-sm font-medium whitespace-normal break-words">
-                              {productDisplayName(p)}{resultUnit == null ? "" : ` · ${resultUnit}`}
-                            </div>
-                            {p.isVariantParent ? (
-                              <div className="text-xs text-slate-400">{children.length} SKU con</div>
-                            ) : stockManaged ? (
-                              <div className={cn("text-xs", stockInsufficient ? "text-er" : "text-slate-400")}>
-                                {t("pos.stockLabel")} {formatNumber(stock)} {p.baseUnit}
-                              </div>
-                            ) : null}
-                            </>
-                          )}
-                          controls={(
-                            <>
-                            {line && (
-                              <PosQuantitySlot onClick={(e) => e.stopPropagation()}>
-                                <QuantityInput
-                                  value={line.quantity}
-                                  onChange={(quantity) => setQty(line.key, quantity)}
-                                  min={0}
-                                  max={line.returnSoldQuantity}
-                                  suffix={isReturnDraft && line.returnSoldQuantity != null ? `/${formatNumber(line.returnSoldQuantity)}` : undefined}
-                                  suffixBelow={isReturnDraft && line.returnSoldQuantity != null}
-                                  clearZeroOnFocus={isReturnDraft && line.returnSoldQuantity != null}
-                                  size="sm"
-                                  className={cn("w-full", stockInsufficient && "border-er text-er focus-within:border-er")}
-                                  inputClassName={cn(stockInsufficient && "border-er text-er")}
-                                />
-                                {stockManaged && (
-                                  <PosStockQuantityTooltip
-                                    stock={stock}
-                                    ordered={ordered}
-                                    reserved={Number(p.booked)}
-                                    unit={p.baseUnit}
-                                  />
-                                )}
-                              </PosQuantitySlot>
-                            )}
-                            <div className="text-sm font-semibold text-primary-600 tabular-nums text-right w-24 sm:w-32">
-                              {resultPriceLabel}
-                            </div>
-                            </>
-                          )}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-              </PosSearchResultsSurface>
-            )}
           </div>}
         </div>
 

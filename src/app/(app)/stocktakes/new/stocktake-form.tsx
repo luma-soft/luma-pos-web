@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Check, ClipboardCheck, Loader2, PackageSearch, Save, Search, Trash2 } from "lucide-react";
+import { Check, ClipboardCheck, PackageSearch, Save, Trash2 } from "lucide-react";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
@@ -20,6 +20,9 @@ import { createStocktake } from "@/lib/actions/stocktakes";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { getCatalogWarehouseStock, type ProductCatalogItem } from "@/lib/product-catalog";
 import type { AiActionPreview } from "@/lib/ai/actions";
+import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
+import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 
 interface ProductOption {
   id: string;
@@ -29,6 +32,8 @@ interface ProductOption {
   baseUnit: string;
   costPrice: number;
   stock: number;
+  categoryName: string | null;
+  imageUrls: string[] | null;
 }
 
 interface Line {
@@ -45,6 +50,8 @@ function toProductOption(product: ProductCatalogItem, warehouseId: string): Prod
     baseUnit: product.baseUnit,
     costPrice: Number(product.costPrice ?? 0),
     stock: getCatalogWarehouseStock(product, warehouseId),
+    categoryName: product.categoryName,
+    imageUrls: product.imageUrls,
   };
 }
 
@@ -71,13 +78,17 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
     [catalog.products, warehouseId],
   );
 
-  const suggestions = useMemo(() => {
-    return catalog.search(search, {
+  const browseProducts = useMemo(
+    () => products.filter((product) => !added.has(product.id)).slice(0, 60),
+    [added, products],
+  );
+  const searchProducts = useCallback((query: string) => {
+    return catalog.search(query, {
       stockManagedOnly: true,
       excludeIds: added,
-      limit: 8,
+      limit: 60,
     }).map((product) => toProductOption(product, warehouseId));
-  }, [added, catalog, search, warehouseId]);
+  }, [added, catalog, warehouseId]);
 
   function addLine(p: ProductOption) {
     setLines((ls) => [{ product: p, actualQty: p.stock }, ...ls]);
@@ -200,36 +211,31 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
           <div className="border-b border-border-soft bg-surface px-4 py-4 sm:px-5">
             <div className="relative">
               <div className="flex gap-2">
-                <div className="min-w-0 flex-1">
-                  <Input
-                    value={search} onChange={(e) => setSearch(e.target.value)}
-                    placeholder={t("stocktakes.searchPlaceholder")}
-                    leftIcon={<Search />}
-                    size="lg"
-                    className="h-12 bg-canvas text-base"
-                  />
-                </div>
+                <ProductSearchPicker
+                  query={search}
+                  onQueryChange={setSearch}
+                  browseItems={browseProducts}
+                  loadItems={searchProducts}
+                  itemKey={(product) => product.id}
+                  onSelect={addLine}
+                  placeholder={t("stocktakes.searchPlaceholder")}
+                  emptyMessage={t("common.noResults")}
+                  loadingMessage={t("common.loading")}
+                  unavailableMessage={t("common.error")}
+                  closeLabel={t("common.close")}
+                  catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
+                  className="flex-1"
+                  inputClassName="h-12 bg-canvas text-base"
+                  renderItem={(product) => (
+                    <ProductSearchResultLayout
+                      leading={<ProductSearchThumbnail product={product} />}
+                      summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
+                      controls={<span className="shrink-0 text-sm text-slate-500 tabular-nums">{t("pos.stockLabel")}: {formatNumber(product.stock)} {product.baseUnit}</span>}
+                    />
+                  )}
+                />
                 <AiQuickActionButton onClick={() => setAiQuickOpen(true)} label={t("aiQuick.stock.create_stocktake.label")} className="h-12 w-14" />
               </div>
-              {search.trim() && (
-                <div className="absolute left-0 right-16 z-20 mt-2 overflow-hidden rounded-card border border-border-soft bg-surface shadow-e2">
-                  {suggestions.map((p) => (
-                    <button
-                      key={p.id} onClick={() => addLine(p)}
-                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left text-sm transition hover:bg-surface-2 min-h-11"
-                    >
-                      <span className="min-w-0"><b className="block truncate">{p.name}</b><span className="font-mono text-xs text-slate-400">{p.sku}</span></span>
-                      <span className="shrink-0 text-slate-500 tabular-nums">{t("pos.stockLabel")}: {formatNumber(p.stock)} {p.baseUnit}</span>
-                    </button>
-                  ))}
-                  {suggestions.length === 0 && (
-                    <div className="flex items-center gap-2 px-4 py-3 text-sm text-slate-500">
-                      {catalog.status === "loading" && <Loader2 className="h-4 w-4 animate-spin" />}
-                      {t(catalog.status === "loading" ? "common.loading" : "common.noResults")}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
 

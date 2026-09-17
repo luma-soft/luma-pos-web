@@ -20,7 +20,7 @@ mock.module("next-intl", () => ({ useTranslations: () => translate, useLocale: (
 mock.module("next-intl/server", () => ({ getTranslations: async () => translate }));
 mock.module("@/lib/auth/store-context", () => ({ requireStoreContext: async () => ({ storeId: "store-1", role: "owner" }) }));
 mock.module("@/components/tenant-client-scope", () => ({ useTenantClientScope: () => ({ storeId: "store-1", userId: "owner" }) }));
-mock.module("@/components/product-catalog-provider", () => ({ useProductCatalog: () => ({ search: () => [], refresh: async () => {} }) }));
+mock.module("@/components/product-catalog-provider", () => ({ useProductCatalog: () => ({ products: [], status: "synced", search: () => [], refresh: async () => {} }) }));
 mock.module("@/components/ai-quick-actions/ai-quick-action-button", () => ({ AiQuickActionButton: () => null }));
 mock.module("@/components/ai-quick-actions/ai-quick-action-modal", () => ({ AiQuickActionModal: () => null }));
 mock.module("@/lib/actions/purchases", () => ({ createPurchase: async () => ({ ok: false }), savePurchaseDraft: async () => ({ ok: false }), updatePurchase: async () => ({ ok: false }), cancelPurchase: async () => ({ ok: false }) }));

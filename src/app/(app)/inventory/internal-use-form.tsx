@@ -1,15 +1,15 @@
 "use client";
 
-import { type ReactNode, useMemo, useRef, useState, useTransition } from "react";
+import { type ReactNode, useCallback, useMemo, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Search, Trash2, Check, Loader2, Save } from "lucide-react";
+import { Trash2, Check, Save } from "lucide-react";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
 import { SearchableSelect } from "@/components/combobox";
 import { MobileFormLineCard } from "@/components/mobile-ui";
 import { Button } from "@/components/ui/button";
-import { Input, Textarea } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/input";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
 import { createInternalUse, updateInternalUse } from "@/lib/actions/internal-use";
@@ -25,6 +25,9 @@ import type { PurchaseProductRow } from "@/lib/data/inventory";
 
 import { internalUseReasonLabel } from "@/lib/inventory/internal-use-reason";
 import type { InternalUseIssueRow } from "@/lib/data/internal-use";
+import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
+import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 
 const DEPARTMENTS = [
   ["kitchen", "Kitchen", "Bếp"], ["office", "Office", "Văn phòng"], ["marketing", "Marketing", "Tiếp thị"],
@@ -61,11 +64,8 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
     return { key: item.id, productId: item.productId, sku: item.sku ?? "", productName: item.productName, baseUnit: product?.baseUnit ?? item.unitName, costPrice: Number(item.unitCost) / multiplier, units: [{ name: item.unitName, mult: multiplier }, ...units.filter((u) => u.name !== item.unitName)], unitName: item.unitName, unitMultiplier: multiplier, quantity: Number(item.quantity), unitCost: Number(item.unitCost) };
   }) ?? []);
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<PurchaseProductRow[]>([]);
-  const [searching, setSearching] = useState(false);
   const [toast, setToast] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
-  const tRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const deptOpts: { value: string; label: string }[] = DEPARTMENTS.map(([v, en, vi]) => ({ value: v, label: L ? vi : en }));
   const reasonOpts: { value: string; label: string }[] = REASONS.map(([v, en, vi]) => ({ value: v, label: L ? vi : en }));
@@ -82,17 +82,14 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
     ]));
   }, [catalog.products, warehouse]);
 
-  function onSearch(val: string) {
-    setQ(val);
-    if (tRef.current) clearTimeout(tRef.current);
-    if (!val.trim()) { setResults([]); return; }
-    setSearching(true);
-    tRef.current = setTimeout(() => {
-      const rows = catalog.search(val, { stockManagedOnly: true, limit: 30 })
-        .map(catalogItemToPurchaseProduct);
-      setResults(rows); setSearching(false);
-    }, 250);
-  }
+  const browseProducts = useMemo(
+    () => catalog.products.filter((product) => product.isStockManaged).slice(0, 60),
+    [catalog.products],
+  );
+  const searchProducts = useCallback(
+    (query: string) => catalog.search(query, { stockManagedOnly: true, limit: 60 }),
+    [catalog],
+  );
 
   function addItem(p: PurchaseProductRow) {
     const cost = Number(p.costPrice);
@@ -105,7 +102,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
       }
       return [{ key: `${p.id}-${Date.now()}`, productId: p.id, sku: p.sku, productName: p.name, baseUnit: p.baseUnit, costPrice: cost, units, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, unitCost: cost }, ...ls];
     });
-    setQ(""); setResults([]);
+    setQ("");
   }
 
   async function applyAiPreview(preview: AiActionPreview, applyMode: AiQuickActionApplyMode) {
@@ -196,28 +193,33 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
       <section className="flex-1 min-w-0 min-h-[420px] lg:min-h-0 flex flex-col p-3 sm:p-4">
             <div className="relative mb-3">
               <div className="flex gap-2">
-                <div className="min-w-0 flex-1">
-              <Input
-                value={q}
-                onChange={(e) => onSearch(e.target.value)}
-                placeholder={t("internalUse.searchProduct")}
-                leftIcon={<Search />}
-                size="lg"
-                    className="h-11 bg-surface"
-              />
-                </div>
+                <ProductSearchPicker
+                  query={q}
+                  onQueryChange={setQ}
+                  browseItems={browseProducts}
+                  loadItems={searchProducts}
+                  itemKey={(product) => product.id}
+                  onSelect={(product) => addItem(catalogItemToPurchaseProduct(product))}
+                  placeholder={t("internalUse.searchProduct")}
+                  emptyMessage={t("common.noResults")}
+                  loadingMessage={t("common.loading")}
+                  unavailableMessage={t("common.error")}
+                  closeLabel={t("common.close")}
+                  catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
+                  className="flex-1"
+                  renderItem={(product) => {
+                    const stock = warehouse ? getCatalogWarehouseStock(product, warehouse.id) : Number(product.warehouseStock.reduce((sum, row) => sum + Number(row.quantity), 0));
+                    return (
+                      <ProductSearchResultLayout
+                        leading={<ProductSearchThumbnail product={product} />}
+                        summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {formatNumber(stock)} {product.baseUnit}</div></>}
+                        controls={<span className="text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.costPrice ?? 0))}/{product.baseUnit}</span>}
+                      />
+                    );
+                  }}
+                />
                 <AiQuickActionButton onClick={() => setAiQuickOpen(true)} label={t("aiQuick.internalUse.open")} className="h-11 w-12" />
               </div>
-              {(results.length > 0 || searching) && q.trim() && (
-                <div className="absolute left-0 right-14 z-30 mt-2 overflow-hidden rounded-card border border-border-soft bg-surface shadow-e2">
-                  {searching ? <div className="px-4 py-4 text-center text-sm text-slate-400"><Loader2 className="w-4 h-4 animate-spin inline" /></div>
-                    : results.map((p) => (
-                      <button key={p.id} type="button" onClick={() => addItem(p)} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-surface-2 min-h-11">
-                        <div className="min-w-0 flex-1"><div className="truncate font-semibold">{p.name}</div><div className="font-mono text-xs text-slate-400">{p.sku} · {t("internalUse.cost")} {formatCurrency(Number(p.costPrice))}/{p.baseUnit}</div></div>
-                      </button>
-                    ))}
-                </div>
-              )}
             </div>
 
           <div className="grid grid-cols-2 gap-2 border-b border-border-soft bg-canvas/45 px-4 py-3 text-xs sm:grid-cols-4">

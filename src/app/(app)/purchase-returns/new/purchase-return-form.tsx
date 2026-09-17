@@ -3,10 +3,10 @@
 import { getCatalogWarehouseStock } from "@/lib/product-catalog";
 import { positiveQuantityOrDefault } from "@/lib/quantity";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useEffect, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
@@ -29,6 +29,9 @@ import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPurchaseReturnProduct } from "@/lib/inventory/product-catalog-adapter";
+import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
+import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 
 type Line = {
   key: string;
@@ -67,7 +70,6 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   const [supplierId, setSupplierId] = useState(initial?.supplierId ?? initialPurchase?.supplierId ?? "");
   const [warehouseId] = useState(initial?.warehouseId ?? initialPurchase?.warehouseId ?? options.warehouses[0]?.id ?? "");
   const [search, setSearch] = useState("");
-  const [results, setResults] = useState<PurchaseReturnProductRow[]>([]);
   const [lines, setLines] = useState<Line[]>(() => (initial?.items ?? initialPurchase?.items ?? []).map((item) => {
     const raw = item as unknown as Record<string, unknown>;
     const productId = String(raw.productId ?? "");
@@ -94,26 +96,23 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   const [error, setError] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
 
-  useEffect(() => {
-    const q = search.trim();
-    let cancelled = false;
-    const h = setTimeout(() => {
-      if (!q) {
-        setResults([]);
-        return;
-      }
-      const rows = catalog.search(q, {
+  const selectedProductIds = useMemo(
+    () => new Set(lines.map((line) => line.productId)),
+    [lines],
+  );
+  const browseProducts = useMemo(
+    () => catalog.products
+      .filter((product) => product.isStockManaged && !selectedProductIds.has(product.id))
+      .slice(0, 60),
+    [catalog.products, selectedProductIds],
+  );
+  const searchProducts = useCallback((query: string) => {
+    return catalog.search(query, {
         stockManagedOnly: true,
-        excludeIds: new Set(lines.map((line) => line.productId)),
-        limit: 30,
-      }).map((product) => catalogItemToPurchaseReturnProduct(product, warehouseId));
-      if (!cancelled) setResults(rows);
-    }, q ? 250 : 0);
-    return () => {
-      cancelled = true;
-      clearTimeout(h);
-    };
-  }, [catalog, search, warehouseId, lines]);
+        excludeIds: selectedProductIds,
+        limit: 60,
+      });
+  }, [catalog, selectedProductIds]);
 
   const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.returnUnitCost, 0);
   const afterDiscount = Math.max(0, subtotal - discount);
@@ -232,12 +231,33 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
         <div className="flex-1 min-w-0 min-h-[420px] lg:min-h-0 flex flex-col p-3 sm:p-4">
           <div className="relative mb-3">
             <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
-                <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("purchaseReturns.searchProduct")} leftIcon={<Search />} className="h-11" />
-              </div>
+              <ProductSearchPicker
+                query={search}
+                onQueryChange={setSearch}
+                browseItems={browseProducts}
+                loadItems={searchProducts}
+                itemKey={(product) => product.id}
+                onSelect={(product) => addProduct(catalogItemToPurchaseReturnProduct(product, warehouseId))}
+                placeholder={t("purchaseReturns.searchProduct")}
+                emptyMessage={t("common.noResults")}
+                loadingMessage={t("common.loading")}
+                unavailableMessage={t("common.error")}
+                closeLabel={t("common.close")}
+                catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
+                className="flex-1"
+                renderItem={(product) => {
+                  const stock = getCatalogWarehouseStock(product, warehouseId);
+                  return (
+                    <ProductSearchResultLayout
+                      leading={<ProductSearchThumbnail product={product} />}
+                      summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
+                      controls={<span className="shrink-0 text-sm text-slate-500 tabular-nums">{formatNumber(stock)} {product.baseUnit}</span>}
+                    />
+                  );
+                }}
+              />
               <AiQuickActionButton onClick={() => setAiQuickOpen(true)} label={t("aiQuick.purchase.open")} className="h-11 w-12" />
             </div>
-            {results.length > 0 && <ProductResults rows={results} onPick={addProduct} />}
           </div>
 
           <div className="flex-1 min-h-[320px] overflow-visible bg-surface border border-border rounded-card lg:overflow-auto">
@@ -466,22 +486,6 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
         onClose={() => setAiQuickOpen(false)}
         onApply={applyAiPreview}
       />
-    </div>
-  );
-}
-
-function ProductResults({ rows, onPick }: { rows: PurchaseReturnProductRow[]; onPick: (row: PurchaseReturnProductRow) => void }) {
-  return (
-    <div className="absolute z-20 left-0 right-14 mt-1 max-h-80 overflow-auto bg-surface border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
-      {rows.map((row) => (
-        <button key={row.id} type="button" onClick={() => onPick(row)} className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-medium">{row.name}</span>
-            <span className="block truncate text-xs text-slate-400">{row.sku}</span>
-          </span>
-          <span className="shrink-0 text-xs tabular-nums text-slate-500">{formatNumber(Number(row.totalStock))} {row.baseUnit}</span>
-        </button>
-      ))}
     </div>
   );
 }

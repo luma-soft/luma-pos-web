@@ -1,10 +1,10 @@
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { MobileFormLineCard } from "@/components/mobile-ui";
@@ -33,6 +33,9 @@ import {
   purchaseLineTotal,
   purchaseUnitCostFromTotal,
 } from "@/lib/purchases/line-calculations";
+import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
+import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 
 type PUnit = { unitName: string; multiplier: number };
 type Line = {
@@ -353,23 +356,23 @@ export function PurchaseForm({
     if (typeof payload.note === "string" && (applyMode === "replace" || !note)) setNote(payload.note);
   }
 
-  // Tìm trong Product Catalog chung; online/offline dùng cùng một interface.
-  const [results, setResults] = useState<PurchaseProductRow[]>([]);
-  useEffect(() => {
-    const q = search.trim();
-    let cancelled = false;
-    const h = setTimeout(() => {
-      if (cancelled) return;
-      if (!q) { setResults([]); return; }
-      const rows = catalog.search(q, {
+  const selectedProductIds = useMemo(
+    () => new Set(lines.map((line) => line.productId)),
+    [lines],
+  );
+  const browseProducts = useMemo(
+    () => catalog.products
+      .filter((product) => product.isStockManaged && !selectedProductIds.has(product.id))
+      .slice(0, 60),
+    [catalog.products, selectedProductIds],
+  );
+  const searchProducts = useCallback((query: string) => {
+    return catalog.search(query, {
         stockManagedOnly: true,
-        excludeIds: new Set(lines.map((line) => line.productId)),
-        limit: 30,
-      }).map(catalogItemToPurchaseProduct);
-      if (!cancelled) setResults(rows);
-    }, q ? 250 : 0);
-    return () => { cancelled = true; clearTimeout(h); };
-  }, [catalog, search, lines]);
+        excludeIds: selectedProductIds,
+        limit: 60,
+      });
+  }, [catalog, selectedProductIds]);
 
   const subtotal = lines.reduce((s, l) => s + purchaseLineTotal(l), 0);
   const afterDiscount = Math.max(0, subtotal - discount);
@@ -482,9 +485,29 @@ export function PurchaseForm({
         <div className="flex-1 min-w-0 min-h-[420px] lg:min-h-0 flex flex-col p-3 sm:p-4">
           <div className="relative mb-3">
             <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("purchases.searchProduct")} leftIcon={<Search />} className="h-11" />
-              </div>
+              <ProductSearchPicker
+                query={search}
+                onQueryChange={setSearch}
+                browseItems={browseProducts}
+                loadItems={searchProducts}
+                itemKey={(product) => product.id}
+                onSelect={(product) => addProduct(catalogItemToPurchaseProduct(product))}
+                keepOpenOnSelect
+                placeholder={t("purchases.searchProduct")}
+                emptyMessage={t("common.noResults")}
+                loadingMessage={t("common.loading")}
+                unavailableMessage={t("common.error")}
+                closeLabel={t("common.close")}
+                catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
+                className="flex-1"
+                renderItem={(product) => (
+                  <ProductSearchResultLayout
+                    leading={<ProductSearchThumbnail product={product} />}
+                    summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {product.baseUnit}</div></>}
+                    controls={<span className="shrink-0 text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.costPrice ?? 0))}/{product.baseUnit}</span>}
+                  />
+                )}
+              />
               {mode === "create" && (
                 <AiQuickActionButton
                   onClick={() => setAiQuickOpen(true)}
@@ -493,19 +516,6 @@ export function PurchaseForm({
                 />
               )}
             </div>
-            {results.length > 0 && (
-              <div className="absolute z-20 left-0 right-14 mt-1 max-h-80 overflow-auto bg-surface border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
-                {results.map((p) => (
-                  <Button key={p.id} type="button" variant="ghost" block onClick={() => addProduct(p)} className="h-auto justify-between rounded-none px-3 py-2 text-left min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
-                    <Text as="span" className="min-w-0 text-current">
-                      <Text as="span" weight="medium" text={p.name} />
-                      <Text as="span" variant="muted" size="xs" className="ml-1" text={p.sku} />
-                    </Text>
-                    <Text as="span" variant="muted" size="xs" className="shrink-0 tabular-nums" text={`${formatCurrency(Number(p.costPrice))} đ/${p.baseUnit}`} />
-                  </Button>
-                ))}
-              </div>
-            )}
           </div>
           {aiPendingLines.length > 0 && (
             <div className="mb-3 rounded-card border border-warn/25 bg-warn-soft p-3 text-warn">
