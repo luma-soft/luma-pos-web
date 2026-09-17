@@ -270,6 +270,12 @@ export async function getOrders(storeId: string, filters: OrderListFilters = {})
         where ${orderItems.orderId} = ${orders.id}
           and ${orderItems.storeId} = ${storeId}
       )`,
+      productNames: sql<string>`coalesce((
+        select string_agg(${orderItems.productName}, ', ' order by ${orderItems.id})
+        from ${orderItems}
+        where ${orderItems.orderId} = ${orders.id}
+          and ${orderItems.storeId} = ${storeId}
+      ), '')`,
       paymentMethod: sql<string | null>`(
         select ${payments.method} from ${payments}
         where ${payments.orderId} = ${orders.id}
