@@ -225,6 +225,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                           <div onClick={(event) => event.stopPropagation()}>
                             <QuantityInput
                               size="sm"
+                              className="w-[8.25rem]"
                               min={0}
                               value={line.quantity}
                               onChange={(quantity) => upd(line.key, { quantity })}

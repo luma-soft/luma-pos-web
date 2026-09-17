@@ -243,6 +243,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                         <div onClick={(event) => event.stopPropagation()}>
                           <QuantityInput
                             size="sm"
+                            className="w-[8.25rem]"
                             min={0}
                             value={lines.find((line) => line.product.id === product.id)?.actualQty ?? 0}
                             onChange={(quantity) => setQty(product.id, quantity)}

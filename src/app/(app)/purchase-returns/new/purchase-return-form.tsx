@@ -265,6 +265,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                         <div onClick={(event) => event.stopPropagation()}>
                           <QuantityInput
                             size="sm"
+                            className="w-[8.25rem]"
                             min={0}
                             max={totalStock(line)}
                             value={line.quantity}

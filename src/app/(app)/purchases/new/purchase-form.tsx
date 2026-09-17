@@ -517,6 +517,7 @@ export function PurchaseForm({
                       <div onClick={(event) => event.stopPropagation()}>
                         <QuantityInput
                           size="sm"
+                          className="w-[8.25rem]"
                           min={0}
                           value={lines.find((line) => line.productId === product.id)?.quantity ?? 0}
                           onChange={(quantity) => patch(product.id, { quantity })}
