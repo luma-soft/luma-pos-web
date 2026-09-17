@@ -60,11 +60,11 @@ export function TableOrder({
 
   const defaultWarehouseId = catalog.snapshot?.warehouses.find((warehouse) => warehouse.isDefault)?.id ?? null;
   const browseProducts = useMemo(
-    () => catalog.products.slice(0, 60).map((product) => catalogItemToPosProduct(product, catalog.products, defaultWarehouseId)),
+    () => catalog.products.map((product) => catalogItemToPosProduct(product, catalog.products, defaultWarehouseId)),
     [catalog.products, defaultWarehouseId],
   );
   const searchProducts = useCallback(
-    (query: string) => catalog.search(query, { limit: 60 }).map((product) => catalogItemToPosProduct(product, catalog.products, defaultWarehouseId)),
+    (query: string) => catalog.search(query, { limit: catalog.products.length }).map((product) => catalogItemToPosProduct(product, catalog.products, defaultWarehouseId)),
     [catalog, defaultWarehouseId],
   );
 
@@ -180,6 +180,7 @@ export function TableOrder({
             loadingMessage={t("common.loading")}
             unavailableMessage={t("common.error")}
             closeLabel={t("common.close")}
+            loadMoreLabel={t("common.loadMore")}
             catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
             className="mb-3 w-full max-w-md"
             renderItem={(product, { selected }) => {

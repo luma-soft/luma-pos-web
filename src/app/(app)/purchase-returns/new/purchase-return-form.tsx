@@ -101,16 +101,14 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
     [lines],
   );
   const browseProducts = useMemo(
-    () => catalog.products
-      .filter((product) => product.isStockManaged)
-      .slice(0, 60),
+    () => catalog.products.filter((product) => product.isStockManaged),
     [catalog.products],
   );
   const searchProducts = useCallback((query: string) => {
     return catalog.search(query, {
-        stockManagedOnly: true,
-        limit: 60,
-      });
+      stockManagedOnly: true,
+      limit: catalog.products.length,
+    });
   }, [catalog]);
 
   const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.returnUnitCost, 0);
@@ -243,6 +241,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                 loadingMessage={t("common.loading")}
                 unavailableMessage={t("common.error")}
                 closeLabel={t("common.close")}
+                loadMoreLabel={t("common.loadMore")}
                 catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                 className="flex-1"
                 renderItem={(product, { selected }) => {

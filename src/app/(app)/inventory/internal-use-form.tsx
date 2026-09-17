@@ -83,11 +83,11 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
   }, [catalog.products, warehouse]);
 
   const browseProducts = useMemo(
-    () => catalog.products.filter((product) => product.isStockManaged).slice(0, 60),
+    () => catalog.products.filter((product) => product.isStockManaged),
     [catalog.products],
   );
   const searchProducts = useCallback(
-    (query: string) => catalog.search(query, { stockManagedOnly: true, limit: 60 }),
+    (query: string) => catalog.search(query, { stockManagedOnly: true, limit: catalog.products.length }),
     [catalog],
   );
 
@@ -206,6 +206,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                   loadingMessage={t("common.loading")}
                   unavailableMessage={t("common.error")}
                   closeLabel={t("common.close")}
+                  loadMoreLabel={t("common.loadMore")}
                   catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                   className="flex-1"
                   renderItem={(product, { selected }) => {

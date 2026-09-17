@@ -361,16 +361,14 @@ export function PurchaseForm({
     [lines],
   );
   const browseProducts = useMemo(
-    () => catalog.products
-      .filter((product) => product.isStockManaged)
-      .slice(0, 60),
+    () => catalog.products.filter((product) => product.isStockManaged),
     [catalog.products],
   );
   const searchProducts = useCallback((query: string) => {
     return catalog.search(query, {
-        stockManagedOnly: true,
-        limit: 60,
-      });
+      stockManagedOnly: true,
+      limit: catalog.products.length,
+    });
   }, [catalog]);
 
   const subtotal = lines.reduce((s, l) => s + purchaseLineTotal(l), 0);
@@ -498,6 +496,7 @@ export function PurchaseForm({
                 loadingMessage={t("common.loading")}
                 unavailableMessage={t("common.error")}
                 closeLabel={t("common.close")}
+                loadMoreLabel={t("common.loadMore")}
                 catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                 className="flex-1"
                 renderItem={(product, { selected }) => (

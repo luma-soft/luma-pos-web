@@ -1,4 +1,4 @@
-export type PricingSort = "updated" | "name" | "sku" | "cost" | "retail" | "stock";
+export type PricingSort = "recent_sales" | "updated" | "name" | "sku" | "cost" | "retail" | "stock";
 
 export const pricingProjectionPolicy = {
   isVariantParent: false,
@@ -8,7 +8,7 @@ export const pricingProjectionPolicy = {
 
 export type PricingSortSpec = readonly [
   {
-    key: "updatedAt" | "name" | "sku" | "costPrice" | "effectivePrice" | "stock";
+    key: "recentSales" | "updatedAt" | "name" | "sku" | "costPrice" | "effectivePrice" | "stock";
     direction: "asc" | "desc";
   },
   { key: "id"; direction: "asc" },
@@ -17,6 +17,8 @@ export type PricingSortSpec = readonly [
 export function pricingSortSpec(sort: PricingSort): PricingSortSpec {
   const primary = (() => {
     switch (sort) {
+      case "recent_sales":
+        return { key: "recentSales", direction: "desc" } as const;
       case "name":
         return { key: "name", direction: "asc" } as const;
       case "sku":
@@ -35,7 +37,8 @@ export function pricingSortSpec(sort: PricingSort): PricingSortSpec {
 }
 
 export function parsePricingSort(value: string | undefined): PricingSort {
-  return value === "name" ||
+  return value === "recent_sales" ||
+    value === "name" ||
     value === "sku" ||
     value === "cost" ||
     value === "retail" ||

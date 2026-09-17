@@ -908,7 +908,7 @@ export function PosClient({
   );
   const loadPosSearchResults = useCallback(async (query: string): Promise<PosSearchUnitResult<PosProduct>[]> => {
       const costPriceBookIds = data.priceBooks.filter((book) => book.costBased).map((book) => book.id);
-      const cachedResults = () => productCatalog.search(query, { limit: 40 }).map((product) =>
+      const cachedResults = () => productCatalog.search(query, { limit: productCatalog.products.length }).map((product) =>
         catalogItemToPosProduct(product, productCatalog.products, data.warehouse?.id ?? null, costPriceBookIds)
       );
       let products: PosProduct[];
@@ -2112,6 +2112,7 @@ export function PosClient({
               loadingMessage={t("common.loading")}
               unavailableMessage={t("common.error")}
               closeLabel={t("common.close")}
+              loadMoreLabel={t("common.loadMore")}
               className="flex-1"
               inputClassName="h-[50px]"
               renderItem={(result) => {

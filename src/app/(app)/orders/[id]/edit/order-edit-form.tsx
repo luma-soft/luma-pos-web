@@ -54,7 +54,7 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
   const [error, setError] = useState("");
   const [productQuery, setProductQuery] = useState("");
   const searchProducts = useCallback(
-    (query: string) => catalog.search(query, { limit: 60 }),
+    (query: string) => catalog.search(query, { limit: catalog.products.length }),
     [catalog],
   );
 
@@ -188,7 +188,7 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
           <ProductSearchPicker
             query={productQuery}
             onQueryChange={setProductQuery}
-            browseItems={catalog.products.slice(0, 60)}
+            browseItems={catalog.products}
             loadItems={searchProducts}
             itemKey={(product) => product.id}
             onSelect={addProduct}
@@ -198,6 +198,7 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
             loadingMessage={t("common.loading")}
             unavailableMessage={t("common.error")}
             closeLabel={t("common.close")}
+            loadMoreLabel={t("common.loadMore")}
             catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
             inputClassName="border-dashed bg-transparent"
             renderItem={(product, { selected }) => {

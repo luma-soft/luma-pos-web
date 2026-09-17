@@ -37,6 +37,8 @@ export type ProductSearchPickerProps<T> = {
   catalogStatus?: ProductSearchPickerStatus;
   debounceMs?: number;
   resultLimit?: number;
+  pageSize?: number;
+  loadMoreLabel?: string;
   keepOpenOnSelect?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -68,7 +70,9 @@ export function ProductSearchPicker<T>({
   closeLabel = "Đóng tìm kiếm sản phẩm",
   catalogStatus = "ready",
   debounceMs = PRODUCT_SEARCH_DEBOUNCE_MS,
-  resultLimit = 60,
+  resultLimit = Number.MAX_SAFE_INTEGER,
+  pageSize = 30,
+  loadMoreLabel = "Tải thêm",
   keepOpenOnSelect = false,
   open: controlledOpen,
   onOpenChange,
@@ -84,14 +88,26 @@ export function ProductSearchPicker<T>({
   const [searching, setSearching] = useState(false);
   const [failed, setFailed] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const paginationKey = `${pageSize}:${query}`;
+  const [pagination, setPagination] = useState({ key: paginationKey, count: pageSize });
   const rootRef = useRef<HTMLDivElement>(null);
   const requestGateRef = useRef(new ProductSearchRequestGate());
   const listboxId = useId();
 
-  const visibleItems = useMemo(
+  const availableItems = useMemo(
     () => (query.trim() ? items : browseItems).slice(0, resultLimit),
     [browseItems, items, query, resultLimit],
   );
+  const visibleCount = pagination.key === paginationKey ? pagination.count : pageSize;
+  const visibleItems = useMemo(
+    () => availableItems.slice(0, visibleCount),
+    [availableItems, visibleCount],
+  );
+  const canLoadMore = visibleItems.length < availableItems.length;
+
+  function loadNextPage() {
+    setPagination({ key: paginationKey, count: visibleCount + pageSize });
+  }
 
   function setOpen(next: boolean) {
     if (controlledOpen == null) setInternalOpen(next);
@@ -231,6 +247,12 @@ export function ProductSearchPicker<T>({
           id={listboxId}
           role="listbox"
           aria-busy={showLoading}
+          onScroll={(event) => {
+            const target = event.currentTarget;
+            if (canLoadMore && target.scrollHeight - target.scrollTop - target.clientHeight < 120) {
+              loadNextPage();
+            }
+          }}
           className={cn(
             "absolute inset-x-0 top-full z-[60] mt-1 max-h-[min(64dvh,520px)] overflow-auto rounded-xl border border-border bg-surface shadow-e2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
             surfaceClassName,
@@ -268,6 +290,18 @@ export function ProductSearchPicker<T>({
                   </div>
                 );
               })}
+              {canLoadMore && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    loadNextPage();
+                  }}
+                  className="mx-auto my-2 block min-h-10 rounded-lg px-4 text-sm font-semibold text-primary-700 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-950/40"
+                >
+                  {loadMoreLabel}
+                </button>
+              )}
             </div>
           )}
         </div>

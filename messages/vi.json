@@ -27,7 +27,8 @@
     "primaryNavigation": "Điều hướng chính",
     "decreaseProductQuantity": "Giảm số lượng {product}",
     "productQuantity": "Số lượng {product}",
-    "increaseProductQuantity": "Tăng số lượng {product}"
+    "increaseProductQuantity": "Tăng số lượng {product}",
+    "loadMore": "Tải thêm"
   },
   "mediaMetadata": {
     "title": "Thông tin tệp",

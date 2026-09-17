@@ -5,6 +5,8 @@ import {
   catalogSyncState,
   categories,
   productComboItems,
+  orderItems,
+  orders,
   productPrices,
   products,
   productUnits,
@@ -23,6 +25,7 @@ import {
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
+import { sortByRecentProductSale } from "@/lib/data/recent-product-sales";
 
 export async function getProductCatalogRevision(storeId: string): Promise<string> {
   const [state] = await db
@@ -50,7 +53,7 @@ async function buildProductCatalogSnapshot(
 ): Promise<ProductCatalogSnapshot> {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const revisionBefore = await getProductCatalogRevision(storeId);
-  const [productRows, warehouseRows, books] = await Promise.all([
+  const [productRows, recentSaleRows, warehouseRows, books] = await Promise.all([
     db
       .select({
         id: products.id,
@@ -130,7 +133,18 @@ async function buildProductCatalogSnapshot(
       .leftJoin(brands, eq(products.brandId, brands.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(and(eq(products.storeId, storeId), eq(products.isActive, true)))
-      .orderBy(asc(products.name)),
+      .orderBy(asc(products.name), asc(products.id)),
+    db
+      .select({
+        productId: orderItems.productId,
+        parentProductId: products.parentProductId,
+        lastSoldAt: sql<Date>`max(${orders.createdAt})`,
+      })
+      .from(orderItems)
+      .innerJoin(orders, eq(orders.id, orderItems.orderId))
+      .innerJoin(products, eq(products.id, orderItems.productId))
+      .where(and(eq(orders.storeId, storeId), eq(orders.status, "completed")))
+      .groupBy(orderItems.productId, products.parentProductId),
     db
       .select({
         id: warehouses.id,
@@ -148,13 +162,25 @@ async function buildProductCatalogSnapshot(
     return buildProductCatalogSnapshot(storeId, userId, role, attempt + 1);
   }
 
+  const lastSoldAtByProduct = new Map<string, Date | string>();
+  for (const sale of recentSaleRows) {
+    const candidates = [sale.productId, sale.parentProductId].filter(Boolean) as string[];
+    for (const productId of candidates) {
+      const current = lastSoldAtByProduct.get(productId);
+      if (!current || new Date(sale.lastSoldAt).getTime() > new Date(current).getTime()) {
+        lastSoldAtByProduct.set(productId, sale.lastSoldAt);
+      }
+    }
+  }
+  const orderedProductRows = sortByRecentProductSale(productRows, lastSoldAtByProduct);
+
   return {
     schemaVersion: PRODUCT_CATALOG_SCHEMA_VERSION,
     userId,
     scopeId: `${storeId}:${userId}:${role}`,
     revision: revisionAfter,
     savedAt: Date.now(),
-    products: productRows.map((product) => ({
+    products: orderedProductRows.map((product) => ({
       ...product,
       costPrice: canViewPurchasePrices(role) ? product.costPrice : null,
       lastPurchasePrice: canViewPurchasePrices(role) ? product.lastPurchasePrice : null,
@@ -179,6 +205,9 @@ async function buildProductCatalogSnapshot(
         minLevel: String(stock.minLevel ?? 0),
       })),
       updatedAt: product.updatedAt.toISOString(),
+      lastSoldAt: lastSoldAtByProduct.get(product.id)
+        ? new Date(lastSoldAtByProduct.get(product.id)!).toISOString()
+        : null,
       imageUpdatedAt: product.imageUpdatedAt.toISOString(),
     })),
     warehouses: warehouseRows,

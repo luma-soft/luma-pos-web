@@ -79,13 +79,13 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
   );
 
   const browseProducts = useMemo(
-    () => products.slice(0, 60),
+    () => products,
     [products],
   );
   const searchProducts = useCallback((query: string) => {
     return catalog.search(query, {
       stockManagedOnly: true,
-      limit: 60,
+      limit: catalog.products.length,
     }).map((product) => toProductOption(product, warehouseId));
   }, [catalog, warehouseId]);
 
@@ -223,6 +223,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                   loadingMessage={t("common.loading")}
                   unavailableMessage={t("common.error")}
                   closeLabel={t("common.close")}
+                  loadMoreLabel={t("common.loadMore")}
                   catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                   className="flex-1"
                   inputClassName="h-12 bg-canvas text-base"

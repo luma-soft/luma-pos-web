@@ -28,6 +28,7 @@ import {
 } from "@/lib/pricing/pricing-policy";
 import { pricingStockCondition } from "@/lib/data/pricing-stock";
 import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
+import { recentProductSaleOrder } from "@/lib/data/recent-product-sales";
 import {
   productCompatibilityImageUrls,
   productManagedImageDescriptors,
@@ -341,6 +342,7 @@ function pricingOrderBy(
   totalStock: SQL | typeof products.totalStock,
 ): SQL[] {
   const [primarySpec] = pricingSortSpec(sort);
+  if (primarySpec.key === "recentSales") return [...recentProductSaleOrder()];
   const primary = (() => {
     switch (primarySpec.key) {
       case "name":

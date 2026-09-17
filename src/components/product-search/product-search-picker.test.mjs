@@ -29,4 +29,12 @@ describe("ProductSearchPicker", () => {
     expect(source).toContain("selected: boolean");
     expect(source).toContain("selected: isItemSelected?.(item) ?? false");
   });
+
+  test("progressively reveals large result sets", async () => {
+    const source = await Bun.file(new URL("./product-search-picker.tsx", import.meta.url)).text();
+    expect(source).toContain("visibleCount");
+    expect(source).toContain("canLoadMore");
+    expect(source).toContain("loadMoreLabel");
+    expect(source).toContain("onScroll=");
+  });
 });

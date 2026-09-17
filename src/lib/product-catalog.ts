@@ -1,6 +1,6 @@
 import { normalizeSearch, matchesSearchTokens } from "@/lib/normalize";
 
-export const PRODUCT_CATALOG_SCHEMA_VERSION = 7;
+export const PRODUCT_CATALOG_SCHEMA_VERSION = 8;
 
 export type CatalogUnit = {
   unitName: string;
@@ -54,6 +54,7 @@ export type ProductCatalogItem = {
   prices: Record<string, string | null>;
   warehouseStock: CatalogWarehouseStock[];
   updatedAt: string;
+  lastSoldAt: string | null;
 };
 
 export type ProductCatalogWarehouse = {
