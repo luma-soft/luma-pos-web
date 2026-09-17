@@ -12,6 +12,7 @@ import { CameraPickerModal, type CameraPickerProduct } from "@/components/pos/ca
 import {
   CAMERA_QUOTE_CARD_SKUS,
   CAMERA_QUOTE_DETAIL_MATERIAL_SKUS,
+  CAMERA_QUOTE_DEFAULT_CARD_SKU,
   CAMERA_QUOTE_INSTALL_SKUS,
   CAMERA_QUOTE_MATERIAL_SKUS,
 } from "@/lib/data/camera-quote-constants";
@@ -108,7 +109,7 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
 
   function addCamera(cameraId: string) {
     if (!cameraId) return;
-    const card = cards.find((item) => item.sku === "MEM-IMOU-64GB") ?? cards[0];
+    const card = cards.find((item) => item.sku === CAMERA_QUOTE_DEFAULT_CARD_SKU) ?? cards[0];
     const installation = installations.find((item) => item.sku === "SVC-CAM-INSTALL-200") ?? installations[0];
     const material = defaultMaterial();
     if (!card || !installation || !material) return;

@@ -28,6 +28,7 @@ import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-acti
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import { CustomerCreateDialog, type CustomerCreateResult } from "@/components/partners/customer-create-dialog";
 import { CameraQuotePanel, type CameraQuotePackage } from "@/components/pos/camera-quote-panel";
+import { CAMERA_QUOTE_DEFAULT_CARD_SKU } from "@/lib/data/camera-quote-constants";
 import { FreeLinePriceControl } from "@/components/pos/free-line-price-control";
 import {
   buildPosUnitOptions,
@@ -853,7 +854,7 @@ export function PosClient({
   useEffect(() => {
     if (!initialContext?.cameraQuote || !active.cameraQuote || active.cameraPackages?.length || !active.cameraInitialId) return;
     const camera = productById.get(active.cameraInitialId);
-    const card = searchableProducts.find((product) => product.sku === "MEM-IMOU-64GB");
+    const card = searchableProducts.find((product) => product.sku === CAMERA_QUOTE_DEFAULT_CARD_SKU);
     const installation = searchableProducts.find((product) => product.sku === "SVC-CAM-INSTALL-200");
     const material = searchableProducts.find((product) => product.sku === "MAT-CAM-BASIC-50");
     if (!camera || !card || !installation || !material) return;
