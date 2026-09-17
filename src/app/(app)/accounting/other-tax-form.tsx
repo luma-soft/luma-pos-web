@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { NumberInput } from "@/components/ui/number-input";
 import { createOtherTaxObligation } from "@/lib/actions/accounting";
 
 export function OtherTaxForm() {
@@ -24,8 +25,8 @@ export function OtherTaxForm() {
       <label className="space-y-1 text-sm font-medium"><span>Loại thuế</span><Select name="taxType" defaultValue="excise" options={[{ value: "excise", label: "Thuế tiêu thụ đặc biệt" }, { value: "resource", label: "Thuế tài nguyên" }, { value: "environment", label: "Thuế bảo vệ môi trường" }, { value: "import_export", label: "Thuế xuất/nhập khẩu" }, { value: "land", label: "Thuế sử dụng đất" }, { value: "other", label: "Thuế khác" }]} /></label>
       <label className="space-y-1 text-sm font-medium sm:col-span-2"><span>Diễn giải</span><input required name="description" className="h-11 w-full rounded-xl border border-border bg-surface px-3" /></label>
       <label className="space-y-1 text-sm font-medium"><span>Chứng từ</span><input name="reference" className="h-11 w-full rounded-xl border border-border bg-surface px-3" /></label>
-      <label className="space-y-1 text-sm font-medium"><span>Số phải nộp</span><input required type="number" min="0" name="payableAmount" className="h-11 w-full rounded-xl border border-border bg-surface px-3" /></label>
-      <label className="space-y-1 text-sm font-medium"><span>Đã nộp</span><input required type="number" min="0" defaultValue="0" name="paidAmount" className="h-11 w-full rounded-xl border border-border bg-surface px-3" /></label>
+      <label className="space-y-1 text-sm font-medium"><span>Số phải nộp</span><NumberInput required min={0} name="payableAmount" thousandSeparator={false} className="h-11 w-full" /></label>
+      <label className="space-y-1 text-sm font-medium"><span>Đã nộp</span><NumberInput required min={0} defaultValue={0} name="paidAmount" thousandSeparator={false} className="h-11 w-full" /></label>
       <label className="space-y-1 text-sm font-medium"><span>Hạn nộp</span><input type="date" name="dueOn" className="h-11 w-full rounded-xl border border-border bg-surface px-3" /></label>
       {message && <div className="text-sm font-medium text-er sm:col-span-2 lg:col-span-4">{message}</div>}
       <div className="flex justify-end gap-2 sm:col-span-2 lg:col-span-4"><Button type="button" variant="outline" onClick={() => setOpen(false)}>Hủy</Button><Button type="submit" disabled={pending}>{pending ? "Đang lưu…" : "Lưu"}</Button></div>
