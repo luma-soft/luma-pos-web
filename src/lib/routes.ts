@@ -32,6 +32,15 @@ export const Routes = {
   EInvoices: "/einvoices",
   Products: "/products",
   ProductNew: "/inventory?tab=products&productModal=create",
+  productCreateForReturn: (returnTo: string, productKind: "product" | "service" | "combo" = "product") => {
+    const params = new URLSearchParams({
+      tab: "products",
+      productModal: "create",
+      productKind,
+      returnTo,
+    });
+    return `/inventory?${params.toString()}` as const;
+  },
   Categories: "/products/categories",
   Pricing: "/pricing",
   Inventory: "/inventory",

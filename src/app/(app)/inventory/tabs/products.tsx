@@ -39,7 +39,7 @@ const STATUSES = ["active", "inactive", "all"] as const;
 type Status = (typeof STATUSES)[number];
 const VIEWS = ["grouped", "flat"] as const;
 type View = (typeof VIEWS)[number];
-const PRODUCT_MODAL_KEYS = ["productModal", "productId", "copyFrom", "copyGroup", "sameTypeAs", "productKind", "onlineListing", "onlineProductId", "shopeeProductId"] as const;
+const PRODUCT_MODAL_KEYS = ["productModal", "productId", "copyFrom", "copyGroup", "sameTypeAs", "productKind", "returnTo", "onlineListing", "onlineProductId", "shopeeProductId"] as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function ProductsTab({ searchParams }: { searchParams: SP }) {
@@ -183,7 +183,8 @@ export async function ProductEditorModal({
   const priceBookPrices = templateProduct
     ? Object.fromEntries(Object.entries(priceOverridesByBook).map(([bookId, prices]) => [bookId, prices[templateProduct.id]]))
     : {};
-  const closeHref = closeHrefOverride ?? productModalHref(searchParams, {});
+  const returnTo = safeReturnHref(searchParams.returnTo);
+  const closeHref = returnTo ?? closeHrefOverride ?? productModalHref(searchParams, {});
   const effectiveCancelNavigation = cancelNavigation ?? closeNavigation ?? "replace";
   const mode = modal === "edit" || modal === "groupEdit" ? "edit" : "create";
   const requestedKind = ["product", "service", "combo"].includes(searchParams.productKind ?? "")
@@ -220,10 +221,22 @@ export async function ProductEditorModal({
           closeHref={closeHref}
           closeNavigation={closeNavigation}
           cancelNavigation={effectiveCancelNavigation}
+          createdProductReturnTo={mode === "create" ? returnTo ?? undefined : undefined}
           creationKind={seedProduct?.productKind ?? requestedKind}
         />
     </ProductModalFrame>
   );
+}
+
+function safeReturnHref(value: string | undefined) {
+  const candidate = value?.trim();
+  if (!candidate || !candidate.startsWith("/") || candidate.startsWith("//")) return null;
+  try {
+    const url = new URL(candidate, "http://luma.local");
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return null;
+  }
 }
 
 function productModalHref(params: SP, patch: Record<string, string>) {

@@ -12,7 +12,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type ProductKind = "product" | "service" | "combo";
+export type ProductKind = "product" | "service" | "combo";
+
+type ProductCreateMenuItem = {
+  kind: ProductKind;
+  label: string;
+  hint: string;
+  href?: string;
+};
 
 const icons: Record<ProductKind, LucideIcon> = {
   product: PackagePlus,
@@ -23,14 +30,11 @@ const icons: Record<ProductKind, LucideIcon> = {
 export function ProductCreateMenu({
   label,
   items,
+  onSelect,
 }: {
   label: string;
-  items: Array<{
-    kind: ProductKind;
-    label: string;
-    hint: string;
-    href: string;
-  }>;
+  items: ProductCreateMenuItem[];
+  onSelect?: (kind: ProductKind) => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -87,7 +91,11 @@ export function ProductCreateMenu({
                 role="menuitem"
                 onClick={() => {
                   setOpen(false);
-                  router.push(item.href, { scroll: false });
+                  if (onSelect) {
+                    onSelect(item.kind);
+                  } else if (item.href) {
+                    router.push(item.href, { scroll: false });
+                  }
                 }}
                 className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
               >

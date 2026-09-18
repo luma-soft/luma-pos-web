@@ -113,11 +113,14 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
   const baseInitialContext = initialContextFromParams(params);
   const bulkProductIds = csvUuids(params.productIds);
   const aiProductIds = csvUuids(params.aiProducts);
+  const createdProductId = one(params.createdProductId);
+  const validCreatedProductId = createdProductId && UUID_RE.test(createdProductId) ? createdProductId : null;
   const includeProductIds = [
     ...(sourceInvoice?.items?.map((item) => item.productId) ?? []),
     ...(baseInitialContext?.items?.map((item) => item.productId) ?? []),
     ...bulkProductIds,
     ...aiProductIds,
+    ...(validCreatedProductId ? [validCreatedProductId] : []),
   ];
   const [data, settings, t, orderPrintTemplate, quotePrintTemplate, bookingPrintTemplate, returnPrintTemplate] = await Promise.all([
     getPosData(context.storeId, {
@@ -192,6 +195,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
           returnPrintTemplate={returnPrintTemplate}
           initialSourceInvoice={sourceInvoice}
           initialContext={initialContext}
+          createdProductId={validCreatedProductId}
           posPrefs={settings.prefs.pos}
           taxPrefs={settings.prefs.tax}
         />

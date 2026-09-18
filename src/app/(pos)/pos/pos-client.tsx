@@ -38,6 +38,7 @@ import {
 } from "@/components/pos/pos-mobile-layout";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductCreateMenu, type ProductKind } from "@/app/(app)/inventory/tabs/product-create-menu";
 import type { PaperSize, PrintTemplate } from "@/lib/print/template-shared";
 import type { StorePrefs } from "@/lib/schemas/settings";
 import type { AiActionPreview } from "@/lib/ai/actions";
@@ -445,6 +446,7 @@ export function PosClient({
   returnPrintTemplate,
   initialSourceInvoice,
   initialContext,
+  createdProductId,
   posPrefs,
   taxPrefs,
 }: {
@@ -456,6 +458,7 @@ export function PosClient({
   returnPrintTemplate: PrintTemplate;
   initialSourceInvoice?: PosSourceInvoice | null;
   initialContext?: PosInitialContext | null;
+  createdProductId?: string | null;
   posPrefs: StorePrefs["pos"];
   taxPrefs: StorePrefs["tax"];
 }) {
@@ -548,6 +551,7 @@ export function PosClient({
   const [renameDraftValue, setRenameDraftValue] = useState("");
   const [draftKindPickerId, setDraftKindPickerId] = useState<string | null>(null);
   const [draftKindSelection, setDraftKindSelection] = useState<SwitchablePosDraftKind>("invoice");
+  const createdProductHandledRef = useRef<string | null>(null);
 
   // nhiều hóa đơn cùng lúc (tab). id đầu cố định để khớp SSR.
   const [invoices, setInvoices] = useState<PosDraft[]>(() => [
@@ -560,6 +564,7 @@ export function PosClient({
   ]);
   const [activeId, setActiveId] = useState(initialSourceInvoice || initialContext ? SOURCE_INV_ID : FIRST_INV_ID);
   const hydratedScopeRef = useRef<string | null>(null);
+  const [draftHydrated, setDraftHydrated] = useState(Boolean(initialSourceInvoice || initialContext));
   const latestDraftStateRef = useRef({ invoices, activeId });
   useEffect(() => {
     latestDraftStateRef.current = { invoices, activeId };
@@ -570,12 +575,15 @@ export function PosClient({
     if (initialSourceInvoice || initialContext) return;
     // Route refresh must not rehydrate an older saved snapshot over a live cart.
     if (hydratedScopeRef.current === storageScope) return;
+    let cancelled = false;
     const params = new URLSearchParams(window.location.search);
     if (params.get("aiDraft") === "1") {
       hydratedScopeRef.current = storageScope;
-      return;
+      queueMicrotask(() => {
+        if (!cancelled) setDraftHydrated(true);
+      });
+      return () => { cancelled = true; };
     }
-    let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
       // Legacy unscoped drafts cannot be assigned to a tenant safely.
@@ -601,6 +609,7 @@ export function PosClient({
         setActiveId(savedActive && refreshed.some((i) => i.id === savedActive) ? savedActive : refreshed[0].id);
       }
       hydratedScopeRef.current = storageScope;
+      setDraftHydrated(true);
     });
     return () => { cancelled = true; };
   }, [data.products, defaultDraftTaxRate, initialContext, initialSourceInvoice, storageScope]);
@@ -1192,7 +1201,7 @@ export function PosClient({
     };
   }
 
-  function addToCart(p: PosProduct, selectedUnitName = p.baseUnit) {
+  const addToCart = useCallback((p: PosProduct, selectedUnitName = p.baseUnit) => {
     if (!canAddCatalogProducts) return;
     if (p.isVariantParent) {
       setVariantParent(p);
@@ -1218,7 +1227,7 @@ export function PosClient({
         (line) => ({ ...line, quantity: line.quantity + 1 }),
       );
     });
-  }
+  }, [canAddCatalogProducts, data.priceBooks, priceBook, setCart, t]);
 
   const addQuantityToCart = useCallback((p: PosProduct, quantity: number) => {
     if (!canAddCatalogProducts) return;
@@ -1339,6 +1348,32 @@ export function PosClient({
     }
     addToCart(p, unitName ?? p.baseUnit);
   }
+
+  function openProductCreator(productKind: ProductKind) {
+    const params = new URLSearchParams(window.location.search);
+    params.delete("createdProductId");
+    const query = params.toString();
+    const returnTo = `${window.location.pathname}${query ? `?${query}` : ""}`;
+    router.push(Routes.productCreateForReturn(returnTo, productKind), { scroll: false });
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!createdProductId || createdProductHandledRef.current === createdProductId) return;
+    if (!draftHydrated) return;
+    const product = flattenProducts(data.products).find((item) => item.id === createdProductId);
+    if (!product) return;
+    createdProductHandledRef.current = createdProductId;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      addToCart(product);
+      const params = new URLSearchParams(window.location.search);
+      params.delete("createdProductId");
+      const query = params.toString();
+      window.history.replaceState(null, "", query ? `/pos?${query}` : "/pos");
+    });
+    return () => { cancelled = true; };
+  }, [addToCart, createdProductId, data.products, draftHydrated]);
 
   /** Di chuyển dòng `from` đến vị trí của dòng `to` (kéo thả sắp xếp). */
   function moveLine(from: string, to: string) {
@@ -2243,6 +2278,15 @@ export function PosClient({
                   />
                 );
               }}
+            />
+            <ProductCreateMenu
+              label={t("pos.addProduct")}
+              onSelect={openProductCreator}
+              items={[
+                { kind: "product", label: t("products.kind.labels.product"), hint: t("products.kind.hints.product") },
+                { kind: "service", label: t("products.kind.labels.service"), hint: t("products.kind.hints.service") },
+                { kind: "combo", label: t("products.kind.labels.combo"), hint: t("products.kind.hints.combo") },
+              ]}
             />
             <AiQuickActionButton
               onClick={() => setAiQuickOpen(true)}

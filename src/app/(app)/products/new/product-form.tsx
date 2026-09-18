@@ -151,6 +151,7 @@ export interface NewProductFormProps {
   closeHref?: string;
   closeNavigation?: "push" | "replace";
   cancelNavigation?: "back" | "push" | "replace";
+  createdProductReturnTo?: string;
   aiPreview?: boolean;
   creationKind?: "product" | "service" | "combo";
 }
@@ -174,6 +175,7 @@ export function NewProductForm({
   closeHref,
   closeNavigation = "push",
   cancelNavigation,
+  createdProductReturnTo,
   aiPreview = false,
   creationKind = "product",
 }: NewProductFormProps) {
@@ -189,6 +191,12 @@ export function NewProductForm({
   const navigateAfterModal = (href: string) => {
     if (closeNavigation === "replace") router.replace(href);
     else router.push(href);
+  };
+  const createdProductHref = (id: string) => {
+    if (!createdProductReturnTo) return null;
+    const url = new URL(createdProductReturnTo, window.location.origin);
+    url.searchParams.set("createdProductId", id);
+    return `${url.pathname}${url.search}${url.hash}`;
   };
 
   const [requestId] = useState(() => crypto.randomUUID());
@@ -314,7 +322,11 @@ export function NewProductForm({
         navigateAfterModal(sameTypeHref(result.data.createdProductId ?? result.data.id));
         return;
       }
-      navigateAfterModal(submitIntent === "sameType" ? sameTypeHref(result.data.id) : isModal ? doneHref : Routes.product(result.data.id));
+      navigateAfterModal(
+        submitIntent === "sameType"
+          ? sameTypeHref(result.data.id)
+          : createdProductHref(result.data.id) ?? (isModal ? doneHref : Routes.product(result.data.id)),
+      );
       return;
     }
     if (isEdit && productId) {
@@ -401,9 +413,7 @@ export function NewProductForm({
         router.refresh();
         return;
       }
-      navigateAfterModal(
-        doneHref,
-      );
+      navigateAfterModal(createdProductHref(res.data.id) ?? doneHref);
       return;
     }
     form.setError("root", { message: res.error });

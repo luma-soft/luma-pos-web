@@ -37,6 +37,7 @@ import { ProductSearchPicker } from "@/components/product-search/product-search-
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
+import { ProductCreateMenu, type ProductKind } from "@/app/(app)/inventory/tabs/product-create-menu";
 
 type PUnit = { unitName: string; multiplier: number };
 type Line = {
@@ -387,6 +388,13 @@ export function PurchaseForm({
     // Keep the query and result popover open so users can add several products
     // from one search. Selected products are excluded by the catalog query.
   }
+  function openProductCreator(productKind: ProductKind) {
+    const params = new URLSearchParams(window.location.search);
+    params.delete("createdProductId");
+    const query = params.toString();
+    const returnTo = `${window.location.pathname}${query ? `?${query}` : ""}`;
+    router.push(Routes.productCreateForReturn(returnTo, productKind), { scroll: false });
+  }
   function patch(id: string, p: Partial<Line>) {
     setLines((ls) => p.quantity == null
       ? ls.map((l) => (l.productId === id ? { ...l, ...p } : l))
@@ -528,6 +536,15 @@ export function PurchaseForm({
                   />
                 )}
               />
+              {mode !== "edit" && <ProductCreateMenu
+                label={t("purchases.addProduct")}
+                onSelect={openProductCreator}
+                items={[
+                  { kind: "product", label: t("products.kind.labels.product"), hint: t("products.kind.hints.product") },
+                  { kind: "service", label: t("products.kind.labels.service"), hint: t("products.kind.hints.service") },
+                  { kind: "combo", label: t("products.kind.labels.combo"), hint: t("products.kind.hints.combo") },
+                ]}
+              />}
               {mode === "create" && (
                 <AiQuickActionButton
                   onClick={() => setAiQuickOpen(true)}

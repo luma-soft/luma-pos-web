@@ -1365,6 +1365,7 @@
     "subtotal": "Subtotal",
     "total": "Total",
     "checkout": "Checkout",
+    "addProduct": "Add product",
     "tileCalc": {
       "title": "Tile calculator",
       "width": "Width (m)",

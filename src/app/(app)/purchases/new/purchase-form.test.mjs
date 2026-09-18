@@ -135,6 +135,13 @@ describe("purchase draft actions", () => {
     expect(button(html, "purchases.complete")).not.toContain('disabled=""');
     expect(html).toContain("purchases.draftHint");
   });
+  test("new purchase exposes the create-product action but edit does not", () => {
+    const createHtml = renderForm();
+    const editHtml = renderForm({ mode: "edit", purchaseId });
+
+    expect(button(createHtml, "purchases.addProduct")).toBeDefined();
+    expect(button(editHtml, "purchases.addProduct")).toBeUndefined();
+  });
   test("receive action keeps a concise label without repeating the total", () => {
     const html = renderForm({ initialValues: initialValues(0) });
     const receiveButton = button(html, "purchases.complete");

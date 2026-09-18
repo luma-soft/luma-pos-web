@@ -26,12 +26,17 @@ export default async function NewPurchasePage({ searchParams }: Props) {
   const sp = await searchParams;
   const productId = typeof sp.productId === "string" && UUID_RE.test(sp.productId) ? sp.productId : null;
   const productIds = csvUuids(sp.productIds);
+  const createdProductId = typeof sp.createdProductId === "string" && UUID_RE.test(sp.createdProductId) ? sp.createdProductId : null;
   const copyFrom = typeof sp.copyFrom === "string" && UUID_RE.test(sp.copyFrom) ? sp.copyFrom : null;
   const aiPreview = sp.source === "ai-preview";
   const source = copyFrom ? await getPurchase(context.storeId, copyFrom).catch(() => null) : null;
   if (copyFrom && (!source || source.status === "cancelled" || source.status === "returned")) notFound();
 
-  const seedProductIds = source?.items.map((i) => i.productId) ?? (productIds.length > 0 ? productIds : (productId ? [productId] : []));
+  const seedProductIds = source?.items.map((i) => i.productId) ?? [
+    ...productIds,
+    ...(productId ? [productId] : []),
+    ...(createdProductId ? [createdProductId] : []),
+  ].filter((id, index, values) => values.indexOf(id) === index);
   const [options, initialProducts] = await Promise.all([
     getPurchaseFormOptions(context.storeId),
     seedProductIds.length > 0
