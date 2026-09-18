@@ -81,3 +81,18 @@ test("snapshot persists the tax default used by its drafts", () => {
   const loaded = loadPosDraftSnapshot(storage, "shop:user");
   assert.equal(loaded?.taxDefaultRate, 8);
 });
+
+test("snapshot rehydrates the changed draft kind", () => {
+  const storage = new MemoryStorage();
+  const draft = {
+    id: "one",
+    kind: "booking",
+    cart: [{ productId: "router", quantity: 2 }],
+  };
+
+  assert.equal(savePosDraftSnapshot(storage, "shop:user", [draft], "one"), true);
+  const loaded = loadPosDraftSnapshot(storage, "shop:user");
+
+  assert.equal(loaded?.drafts[0]?.kind, "booking");
+  assert.deepEqual(loaded?.drafts[0]?.cart, draft.cart);
+});

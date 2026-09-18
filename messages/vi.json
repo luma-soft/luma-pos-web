@@ -1505,7 +1505,24 @@
       "saveName": "Lưu tên",
       "deleteTitle": "Xóa?",
       "deleteDescriptionWithItems": "Bạn có chắc muốn xóa “{name}” cùng {count} sản phẩm trong đơn? Thao tác này không thể hoàn tác.",
-      "keep": "Giữ lại"
+      "keep": "Giữ lại",
+      "changeType": "Đổi loại phiếu",
+      "changeTypeTitle": "Đổi loại phiếu",
+      "changeTypeDescription": "Chọn loại phiếu mới cho draft đang soạn.",
+      "changeTypeCurrent": "Loại hiện tại:",
+      "changeTypeConfirm": "Xác nhận đổi",
+      "changeTypeConfirmTitle": "Xác nhận đổi loại phiếu",
+      "changeTypeConfirmDescription": "Phiếu đang có {count} sản phẩm. Đổi từ {from} sang {to} sẽ xóa thông tin thanh toán đã nhập và thay đổi nghiệp vụ tồn kho khi lưu phiếu.",
+      "kind": {
+        "invoice": "Hóa đơn / Bán hàng",
+        "quote": "Báo giá",
+        "booking": "Đặt hàng"
+      },
+      "kindDescription": {
+        "invoice": "Thanh toán và trừ tồn kho khi hoàn tất.",
+        "quote": "Lưu báo giá, chưa trừ tồn kho.",
+        "booking": "Lưu đặt hàng và giữ tồn kho theo luồng đặt hàng."
+      }
     },
     "modes": {
       "sale": "Bán mới",

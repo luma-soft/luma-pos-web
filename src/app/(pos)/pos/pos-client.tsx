@@ -59,6 +59,13 @@ import {
   reconcilePosDraftTaxDefaults,
   savePosDraftSnapshot,
 } from "@/lib/pos/draft-storage";
+import {
+  canSwitchPosDraftKind,
+  isSwitchablePosDraftKind,
+  switchPosDraftKind,
+  SWITCHABLE_POS_DRAFT_KINDS,
+  type SwitchablePosDraftKind,
+} from "@/lib/pos/draft-kind-switch";
 import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
 import { buildExpectedPosPricing, countPosPricingConflicts, requestPosOrder } from "@/lib/pos/checkout-pricing";
 import { resolvePosCartUnit } from "@/lib/pos/cart-unit";
@@ -539,6 +546,8 @@ export function PosClient({
   const [editKey, setEditKey] = useState<string | null>(null); // dòng đang mở popup sửa giá
   const [renameDraftId, setRenameDraftId] = useState<string | null>(null);
   const [renameDraftValue, setRenameDraftValue] = useState("");
+  const [draftKindPickerId, setDraftKindPickerId] = useState<string | null>(null);
+  const [draftKindSelection, setDraftKindSelection] = useState<SwitchablePosDraftKind>("invoice");
 
   // nhiều hóa đơn cùng lúc (tab). id đầu cố định để khớp SSR.
   const [invoices, setInvoices] = useState<PosDraft[]>(() => [
@@ -788,6 +797,52 @@ export function PosClient({
     setInvoices((list) => list.map((inv) => inv.id === renameDraftId ? { ...inv, displayName: name.slice(0, 60) } : inv));
     setRenameDraftId(null);
     setRenameDraftValue("");
+  }
+
+  function canChangeDraftKind(inv: PosDraft) {
+    return canSwitchPosDraftKind({
+      kind: inv.kind,
+      hasSource: inv.source != null,
+      isCameraQuote: inv.cameraQuote === true,
+      isHeld: inv.heldAt != null,
+    });
+  }
+
+  function openDraftKindPicker(inv: PosDraft) {
+    if (!canChangeDraftKind(inv) || !isSwitchablePosDraftKind(inv.kind)) return;
+    setDraftKindSelection(inv.kind);
+    setDraftKindPickerId(inv.id);
+  }
+
+  async function applyDraftKindChange() {
+    const draft = invoices.find((inv) => inv.id === draftKindPickerId);
+    const nextKind = draftKindSelection;
+    if (!draft || !canChangeDraftKind(draft) || draft.kind === nextKind) {
+      setDraftKindPickerId(null);
+      return;
+    }
+
+    setDraftKindPickerId(null);
+    if (draft.cart.length > 0) {
+      const approved = await confirm({
+        title: t("pos.draftActions.changeTypeConfirmTitle"),
+        description: t("pos.draftActions.changeTypeConfirmDescription", {
+          from: t(`pos.draftActions.kind.${draft.kind}`),
+          to: t(`pos.draftActions.kind.${nextKind}`),
+          count: formatNumber(draft.cart.reduce((sum, line) => sum + line.quantity, 0)),
+        }),
+        cancelLabel: t("common.cancel"),
+        confirmLabel: t("pos.draftActions.changeTypeConfirm"),
+        variant: "warning",
+      });
+      if (!approved) return;
+    }
+
+    setInvoices((list) => list.map((inv) => {
+      if (inv.id !== draft.id || !canChangeDraftKind(inv)) return inv;
+      return switchPosDraftKind(inv, nextKind);
+    }));
+    setError("");
   }
 
   async function requestDeleteDraft(inv: PosDraft, index: number) {
@@ -1641,6 +1696,15 @@ export function PosClient({
     : isCopyMode
       ? sourceKind === "quote" ? t("pos.invoiceEdit.createQuoteCopy") : sourceKind === "booking" ? t("pos.invoiceEdit.createBookingCopy") : t("pos.invoiceEdit.createCopy")
       : null;
+  const primaryActionLabel = sourcePrimaryLabel
+    ? sourcePrimaryLabel
+    : isQuoteDraft
+      ? t("pos.saveQuote")
+      : isBookingDraft
+        ? t("pos.placeBooking")
+        : isReturnDraft
+          ? t("returns.submit")
+          : t("pos.checkout");
 
   // Tabs hóa đơn — đặt cạnh thanh tìm kiếm (giống KiotViet).
   const invoiceTabs = (
@@ -1678,6 +1742,13 @@ export function PosClient({
                 className="-my-2 -mr-1 grid h-11 w-11 place-items-center rounded text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 dark:hover:bg-slate-700"
                 items={[
                   { key: "rename", label: t("pos.draftActions.rename"), icon: Pencil, onSelect: () => openRenameDraft(inv, idx) },
+                  {
+                    key: "change-type",
+                    label: t("pos.draftActions.changeType"),
+                    icon: RefreshCw,
+                    disabled: !canChangeDraftKind(inv),
+                    onSelect: () => openDraftKindPicker(inv),
+                  },
                   { key: "delete", label: t("pos.draftActions.delete"), icon: Trash2, onSelect: () => void requestDeleteDraft(inv, idx) },
                 ]}
               />
@@ -1981,6 +2052,10 @@ export function PosClient({
     </div>
   );
 
+  const draftKindPickerDraft = draftKindPickerId == null
+    ? null
+    : invoices.find((inv) => inv.id === draftKindPickerId) ?? null;
+
   return (
     <div
       className="relative flex h-full min-h-0 overflow-hidden"
@@ -2019,7 +2094,7 @@ export function PosClient({
           className={cn("fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 flex h-12 items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 font-semibold text-white shadow-e2 disabled:bg-primary-200 disabled:text-primary-700/60 disabled:shadow-none lg:hidden", keyboardInset > 0 && "hidden")}
         >
           <ShoppingCart className="h-4 w-4" />
-          {t("pos.checkout")} ({cart.reduce((sum, line) => sum + line.quantity, 0)}) · {formatCurrency(total)}
+          {primaryActionLabel} ({cart.reduce((sum, line) => sum + line.quantity, 0)}) · {formatCurrency(total)}
         </button>
         <div className="mb-3 space-y-2">
           {invoiceTabs}
@@ -2453,15 +2528,7 @@ export function PosClient({
               className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
             >
               {submittingMode !== null && <Loader2 className="w-4 h-4 animate-spin" />}
-              {sourcePrimaryLabel
-                ? sourcePrimaryLabel
-                  : isQuoteDraft
-                    ? t("pos.saveQuote")
-                    : isBookingDraft
-                      ? t("pos.placeBooking")
-                      : isReturnDraft
-                        ? t("returns.submit")
-                      : t("pos.checkout")} · {formatCurrency(total)}
+                {primaryActionLabel} · {formatCurrency(total)}
             </button>
           </div>
           {isEditMode && (
@@ -2538,6 +2605,75 @@ export function PosClient({
           </div>
         </>,
         document.body
+      )}
+
+      {draftKindPickerDraft && (
+        <RowPreviewModal
+          open
+          onClose={() => setDraftKindPickerId(null)}
+          title={t("pos.draftActions.changeTypeTitle")}
+          subtitle={t("pos.draftActions.changeTypeDescription")}
+          size="md"
+          closeLabel={t("common.close")}
+          footer={(
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setDraftKindPickerId(null)}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                type="button"
+                disabled={draftKindSelection === draftKindPickerDraft.kind}
+                onClick={() => void applyDraftKindChange()}
+              >
+                {t("pos.draftActions.changeTypeConfirm")}
+              </Button>
+            </div>
+          )}
+        >
+          <div className="space-y-3">
+            <div className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm">
+              <span className="text-slate-500">{t("pos.draftActions.changeTypeCurrent")}</span>{" "}
+              <span className="font-semibold">{t(`pos.draftActions.kind.${draftKindPickerDraft.kind}`)}</span>
+            </div>
+            <div
+              role="listbox"
+              aria-label={t("pos.draftActions.changeTypeTitle")}
+              className="grid gap-2"
+            >
+              {SWITCHABLE_POS_DRAFT_KINDS.map((kind) => {
+                const selected = draftKindSelection === kind;
+                const ItemIcon = kind === "invoice" ? ShoppingCart : kind === "quote" ? FileText : ClipboardList;
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    onClick={() => setDraftKindSelection(kind)}
+                    className={cn(
+                      "flex min-h-12 items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors",
+                      selected
+                        ? "border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
+                        : "border-border hover:border-primary-300 hover:bg-surface-2",
+                    )}
+                  >
+                    <span className={cn(
+                      "grid h-9 w-9 shrink-0 place-items-center rounded-lg",
+                      selected ? "bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300" : "bg-surface-2 text-slate-500",
+                    )}>
+                      <ItemIcon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold">{t(`pos.draftActions.kind.${kind}`)}</span>
+                      <span className="block text-xs text-slate-500">{t(`pos.draftActions.kindDescription.${kind}`)}</span>
+                    </span>
+                    {selected && <CheckCircle2 className="h-5 w-5 shrink-0 text-primary-600" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </RowPreviewModal>
       )}
 
       <RowPreviewModal

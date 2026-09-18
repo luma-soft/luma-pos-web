@@ -1505,7 +1505,24 @@
       "saveName": "Save name",
       "deleteTitle": "Delete?",
       "deleteDescriptionWithItems": "Are you sure you want to delete “{name}” with {count} items? This action cannot be undone.",
-      "keep": "Keep draft"
+      "keep": "Keep draft",
+      "changeType": "Change document type",
+      "changeTypeTitle": "Change document type",
+      "changeTypeDescription": "Choose a new type for this local draft.",
+      "changeTypeCurrent": "Current type:",
+      "changeTypeConfirm": "Confirm change",
+      "changeTypeConfirmTitle": "Confirm document type change",
+      "changeTypeConfirmDescription": "This draft has {count} products. Changing from {from} to {to} clears entered payment details and changes stock behavior when the draft is saved.",
+      "kind": {
+        "invoice": "Invoice / Sale",
+        "quote": "Quote",
+        "booking": "Booking"
+      },
+      "kindDescription": {
+        "invoice": "Collect payment and consume stock when completed.",
+        "quote": "Save a quote without consuming stock.",
+        "booking": "Save a booking and reserve stock through the booking flow."
+      }
     },
     "modes": {
       "sale": "New sale",
