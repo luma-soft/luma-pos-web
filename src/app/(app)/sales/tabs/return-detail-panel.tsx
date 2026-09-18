@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
 import type { getReturn } from "@/lib/data/returns";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button-variants";
+import { buttonVariants, modalActionSizeClassName } from "@/components/ui/button-variants";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { getPrintTemplatesForDoc } from "@/lib/print/template";
@@ -158,7 +158,8 @@ export async function ReturnDetailFooter({ ret }: { ret: ReturnDetail }) {
         label={t("returns.print")}
         className={cn(
           buttonVariants({ variant: "outline", size: "sm" }),
-          "h-9 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
+          modalActionSizeClassName,
+          "min-w-11 lg:min-w-0",
         )}
       />
     </div>

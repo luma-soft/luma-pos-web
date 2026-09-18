@@ -89,6 +89,7 @@
   --surface-2:    oklch(0.975 0.004 95);   /* #F7F6F3 */
   --border:       oklch(0.94 0.003 90);    /* warm hairline */
   --border-soft:  oklch(0.965 0.003 90);   /* soft dividers */
+  --control-radius: 0.5rem;                /* shared radius for actionable controls */
   /* muted semantic pastels (text + soft bg) */
   --ok:   oklch(0.52 0.13 150);  --ok-soft:   oklch(0.97 0.03 150);
   --warn: oklch(0.55 0.13 70);   --warn-soft: oklch(0.97 0.04 80);
@@ -170,6 +171,16 @@ html {
 :where(a, button, summary):focus-visible {
   outline: 2px solid var(--primary-500);
   outline-offset: 2px;
+}
+
+/* Legacy action controls used several pill/card radii directly in JSX. Keep
+   status badges and switches untouched, while bringing clickable text controls
+   back to the shared 8px radius until each one is moved to Button. */
+:where(button, a[class~="inline-flex"], a[class~="grid"]):not([role="switch"]):not([data-button-radius="pill"])[class~="rounded-full"],
+:where(button, a[class~="inline-flex"], a[class~="grid"]):not([role="switch"]):not([data-button-radius="pill"])[class~="rounded-xl"],
+:where(button, a[class~="inline-flex"], a[class~="grid"]):not([role="switch"]):not([data-button-radius="pill"])[class~="rounded-2xl"],
+:where(button, a[class~="inline-flex"], a[class~="grid"]):not([role="switch"]):not([data-button-radius="pill"])[class~="rounded-card"] {
+  border-radius: var(--control-radius);
 }
 
 /* Use one, stronger inner border colour for every native form field. Individual

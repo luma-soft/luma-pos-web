@@ -45,7 +45,7 @@ async function PurchaseReturnsContent({ searchParams }: { searchParams: SP }) {
             search={<ListSearchInput name="q" defaultValue={searchParams.q ?? ""} placeholder={t("purchaseReturns.searchPlaceholder")} />}
             filter={<PurchaseReturnsFilter suppliers={options.suppliers} values={searchParams} resultCount={total} />}
           />
-          <Link href={Routes.PurchaseReturnNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary-600 text-primary-600 bg-surface hover:bg-primary-50 text-sm font-semibold transition active:scale-[0.98] ml-auto shrink-0 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+          <Link href={Routes.PurchaseReturnNew} className="ml-auto inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border border-primary-600 bg-surface px-4 text-sm font-semibold text-primary-600 transition hover:bg-primary-50 active:scale-[0.98]">
             <Plus className="w-4 h-4" />
             {t("purchaseReturns.createNew")}
           </Link>

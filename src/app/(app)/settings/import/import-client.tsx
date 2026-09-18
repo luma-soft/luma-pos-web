@@ -155,7 +155,7 @@ export function ImportClient() {
         backHref="/settings"
         backLabel={t("common.back")}
         title={t("import.title")}
-        actions={<Button type="button" variant="outline" size="sm" onClick={downloadTemplate} className="min-h-11 rounded-full whitespace-nowrap">
+        actions={<Button type="button" variant="outline" size="sm" onClick={downloadTemplate} className="min-h-11 rounded-lg whitespace-nowrap">
           <Download className="w-3.5 h-3.5" />{t("import.template")}
         </Button>}
       />
@@ -167,7 +167,7 @@ export function ImportClient() {
       {/* Step 1 — upload */}
       <div className="bg-surface border border-border rounded-card p-5 mb-4">
         <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,text/csv" onChange={onFile} className="hidden" />
-        <Button type="button" variant="outline" onClick={() => fileRef.current?.click()} className="h-auto w-full flex-col border-2 border-dashed rounded-xl py-8 hover:border-primary-400 min-h-11">
+        <Button type="button" variant="outline" onClick={() => fileRef.current?.click()} className="h-auto w-full flex-col rounded-lg border-2 border-dashed py-8 hover:border-primary-400 min-h-11">
           <Upload className="w-7 h-7 text-slate-400" />
           <Text as="span" weight="semibold" className="text-current" text={fileName || t("import.choose")} />
           <Text as="span" variant="muted" className="text-[11px]" text={t("import.csvOnly")} />
@@ -228,10 +228,10 @@ export function ImportClient() {
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-4">
             {err && <p className="text-xs text-er flex-1">{err}</p>}
-            <Button type="button" variant="outline" disabled={pending} onClick={() => run(true)} className="sm:ml-auto rounded-full">
+            <Button type="button" variant="outline" disabled={pending} onClick={() => run(true)} className="sm:ml-auto rounded-lg">
               {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}{t("import.dryRun")}
             </Button>
-            <Button type="button" disabled={pending} onClick={() => run(false)} className="rounded-full">
+            <Button type="button" disabled={pending} onClick={() => run(false)} className="rounded-lg">
               {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}{t("import.commit")}
             </Button>
           </div>
@@ -267,7 +267,7 @@ export function ImportClient() {
             </div>
           )}
           {summary.applied && (
-            <Link href="/products" className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white min-w-11">{t("import.viewProducts")}</Link>
+            <Link href="/products" className="mt-3 inline-flex h-11 min-w-11 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white">{t("import.viewProducts")}</Link>
           )}
         </div>
       )}

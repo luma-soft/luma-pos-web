@@ -289,8 +289,8 @@ function Card({ title, vi, action, children }: { title: string; vi: string; acti
 const FL = "text-[9px] font-bold uppercase tracking-wide text-slate-500";
 const FI = "min-h-11 w-full px-[11px] py-[9px] bg-canvas border-[1.5px] border-border rounded-[10px] text-[13px] focus:border-primary-500 focus:outline-none lg:min-h-0";
 const ROW = "flex min-h-11 items-center justify-between gap-3 px-3.5 py-2.5 bg-canvas rounded-[10px] border border-border-soft min-w-11";
-const btnS = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border border-border-soft text-xs font-semibold hover:bg-surface-2 transition lg:min-h-0 lg:min-w-0";
-const btnF = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold hover:brightness-110 transition lg:min-h-0 lg:min-w-0";
+const btnS = "inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-border-soft px-3 text-xs font-semibold transition hover:bg-surface-2";
+const btnF = "inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white transition hover:brightness-110";
 const searchableTouch = "[&>button]:h-11 lg:[&>button]:h-10";
 
 async function readSettingsStaff() {

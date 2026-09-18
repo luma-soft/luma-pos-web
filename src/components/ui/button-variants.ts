@@ -1,5 +1,8 @@
 import { cva, type VariantProps } from "class-variance-authority";
 
+// Detail-modal action buttons use the product modal as the shared geometry reference.
+export const modalActionSizeClassName = "h-11 lg:h-10";
+
 export const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-px disabled:opacity-50 disabled:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
@@ -21,11 +24,13 @@ export const buttonVariants = cva(
           "bg-emerald-600 text-white hover:bg-emerald-700",
       },
       size: {
-        sm: "h-11 px-3 text-xs lg:h-8",
-        default: "h-11 px-4 py-2 text-sm lg:h-10",
+        // Keep compact and regular text buttons on the same 44px control rail.
+        // The smaller size only reduces typography and horizontal padding.
+        sm: "h-11 px-3 text-xs",
+        default: "h-11 px-4 py-2 text-sm",
         lg: "h-12 px-6 text-base",
-        icon: "h-11 w-11 lg:h-10 lg:w-10",
-        iconSm: "h-11 w-11 lg:h-8 lg:w-8",
+        icon: "h-11 w-11",
+        iconSm: "h-11 w-11 lg:h-10 lg:w-10",
       },
       block: {
         true: "w-full",

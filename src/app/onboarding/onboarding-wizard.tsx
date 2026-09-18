@@ -87,11 +87,11 @@ export function OnboardingWizard({ initial }: { initial: StoreSettings }) {
       </div>
 
       <div className="px-6 pb-6 flex items-center gap-2">
-        {step > 0 && <button onClick={() => setStep((s) => s - 1)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-border text-sm font-semibold hover:bg-surface-2"><ArrowLeft className="w-4 h-4" />{L ? "Quay lại" : "Back"}</button>}
+        {step > 0 && <button onClick={() => setStep((s) => s - 1)} className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-border px-4 text-sm font-semibold hover:bg-surface-2"><ArrowLeft className="w-4 h-4" />{L ? "Quay lại" : "Back"}</button>}
         <div className="flex-1" />
         {step < 2
-          ? <button onClick={() => setStep((s) => s + 1)} className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-primary-600 text-white text-sm font-semibold">{L ? "Tiếp" : "Next"}<ArrowRight className="w-4 h-4" /></button>
-          : <button disabled={pending} onClick={finish} className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-primary-600 text-white text-sm font-semibold disabled:opacity-50">{pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}{L ? "Vào Dashboard" : "Go to Dashboard"}</button>}
+          ? <button onClick={() => setStep((s) => s + 1)} className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-5 text-sm font-semibold text-white">{L ? "Tiếp" : "Next"}<ArrowRight className="w-4 h-4" /></button>
+          : <button disabled={pending} onClick={finish} className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-5 text-sm font-semibold text-white disabled:opacity-50">{pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}{L ? "Vào Dashboard" : "Go to Dashboard"}</button>}
       </div>
     </div>
   );

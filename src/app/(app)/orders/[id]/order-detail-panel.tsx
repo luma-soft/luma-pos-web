@@ -12,7 +12,7 @@ import type { ShareablePrintDocType } from "@/lib/print/share-document";
 import { OrderStatusBadge, PaymentStatusBadge } from "../status-badges";
 import { OrderActions, PaymentForm, SendOrderZaloButton } from "./order-actions";
 import { SharePrintDocButton } from "./share-print-doc-button";
-import { buttonVariants } from "@/components/ui/button-variants";
+import { buttonVariants, modalActionSizeClassName } from "@/components/ui/button-variants";
 import { OrderDetailActionGroup } from "@/components/order-detail-action-group";
 import { OrderProductLink } from "@/components/order-product-link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
@@ -327,7 +327,7 @@ export async function OrderDetailPanel({
         </OrderDetailActionGroup>
         <OrderDetailActionGroup label={t("common.actions")} alignEnd>
           {isQuote && !order.hasCreatedOrder && (
-            <Link href={posSourceHref("copy", "invoice")} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-11 lg:h-9")}>
+            <Link href={posSourceHref("copy", "invoice")} className={cn(buttonVariants({ variant: "default", size: "sm" }), modalActionSizeClassName)}>
               {t("quotes.convert")}
             </Link>
           )}
@@ -337,25 +337,25 @@ export async function OrderDetailPanel({
             baseHref={`${Routes.order(order.id)}/print`}
             templates={printTemplates}
             label={t("print.printBtn")}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 lg:h-9")}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}
           />
           {(order.status === "completed" || order.status === "quote" || order.status === "confirmed") && order.returns.length === 0 && (
-            <Link href={posSourceHref("edit")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 bg-white dark:bg-surface lg:h-9")}>
+            <Link href={posSourceHref("edit")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName, "bg-white dark:bg-surface")}>
               {isQuote ? t("quotes.edit") : isBooking ? t("bookings.edit") : t("orderEdit.action")}
             </Link>
           )}
           {!cancelled && (
-            <Link href={posSourceHref("copy")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 lg:h-9")}>
+            <Link href={posSourceHref("copy")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}>
               {t("pos.modes.copyShort")}
             </Link>
           )}
           {order.status === "completed" && (
-            <Link href={posSourceHref("return")} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 lg:h-9")}>
+            <Link href={posSourceHref("return")} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}>
               {t("returns.action")}
             </Link>
           )}
           {showOpenAction && (
-            <Link href={openInListHref} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-11 lg:h-9")}>
+            <Link href={openInListHref} className={cn(buttonVariants({ variant: "default", size: "sm" }), modalActionSizeClassName)}>
               Mở phiếu
             </Link>
           )}

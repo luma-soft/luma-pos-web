@@ -10,6 +10,7 @@ import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { MoneyInput } from "@/components/ui/money-input";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Routes } from "@/lib/routes";
+import { modalActionSizeClassName } from "@/components/ui/button-variants";
 
 export function OrderActions({ orderId }: { orderId: string }) {
   const t = useTranslations();
@@ -36,7 +37,7 @@ export function OrderActions({ orderId }: { orderId: string }) {
     <button
       onClick={onCancel}
       disabled={busy}
-      className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-red-200 dark:border-red-900 text-er hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+      className={cn("inline-flex min-w-11 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-medium text-er hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40 disabled:opacity-50 lg:min-w-0", modalActionSizeClassName)}
     >
       {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
       {t("orders.detail.cancel")}
@@ -64,7 +65,7 @@ export function SendOrderZaloButton({ orderId }: { orderId: string }) {
       <button
         onClick={send}
         disabled={busy}
-        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-border hover:bg-surface-2 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+        className={cn("inline-flex min-w-11 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium hover:bg-surface-2 disabled:opacity-50 lg:min-w-0", modalActionSizeClassName)}
       >
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
         {t("zalo.send")}

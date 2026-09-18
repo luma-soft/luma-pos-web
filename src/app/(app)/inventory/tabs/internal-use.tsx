@@ -39,11 +39,11 @@ export async function InternalUseTab({ searchParams }: { searchParams: SP }) {
           search={<ListSearchInput name="q" defaultValue={searchParams.q ?? ""} placeholder="Theo mã xuất dùng nội bộ" />}
           filter={<InventoryFilterDrawer title={t("internalUse.filterTitle")} values={searchParams} fields={["status", "reason", "department", "time"]} resultCount={total} resultLabel={t("internalUse.filterUnit")} countEndpoint="/api/inventory/internal-use/count" reasons={[{ value: "materials", label: "Vật tư" }, { value: "damaged", label: "Hư hỏng" }, { value: "internal", label: "Sử dụng nội bộ" }]} departments={departments} />}
         />
-        <Link href={Routes.InternalUseNew} className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98] min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+        <Link href={Routes.InternalUseNew} className="ml-auto inline-flex h-11 shrink-0 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98]">
           <Plus className="h-4 w-4" />
           Xuất nội bộ
         </Link>
-        <a href={`/api/inventory/internal-use/export?${new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => typeof entry[1] === "string"))}`} download className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-surface-2 active:scale-[0.98] dark:text-slate-200 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+        <a href={`/api/inventory/internal-use/export?${new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => typeof entry[1] === "string"))}`} download className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium text-slate-700 transition hover:bg-surface-2 active:scale-[0.98] dark:text-slate-200">
           <FileDown className="h-4 w-4" />
           Xuất file
         </a>

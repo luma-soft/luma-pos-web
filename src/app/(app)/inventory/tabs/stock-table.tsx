@@ -8,6 +8,7 @@ import { PackagePlus } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+import { modalActionSizeClassName } from "@/components/ui/button-variants";
 import type { StockFilter } from "@/lib/data/inventory";
 
 type StockRow = {
@@ -168,7 +169,7 @@ function ExpandedStock({ row }: { row: StockRow }) {
             href={Routes.product(row.id)}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-primary-600 bg-primary-600 px-3 text-sm font-semibold text-white transition-colors hover:border-primary-700 hover:bg-primary-700 lg:min-h-10 min-w-11 lg:min-w-0"
+            className={`inline-flex ${modalActionSizeClassName} min-w-11 shrink-0 items-center justify-center rounded-lg border border-primary-600 bg-primary-600 px-3 text-sm font-semibold text-white transition-colors hover:border-primary-700 hover:bg-primary-700 lg:min-w-0`}
           >
             {t("inventory.expand.openProduct" as never)}
           </Link>
@@ -241,7 +242,7 @@ function ActionLink({
       href={href}
       target={target}
       rel={target ? "noreferrer" : undefined}
-      className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-surface-2 dark:text-slate-200 lg:min-h-10 min-w-11 lg:min-w-0"
+      className={`inline-flex ${modalActionSizeClassName} min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-surface-2 dark:text-slate-200 lg:min-w-0`}
     >
       <Icon className="h-4 w-4" />
       {label}

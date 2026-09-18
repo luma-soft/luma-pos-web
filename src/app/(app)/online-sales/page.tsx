@@ -59,13 +59,13 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href={tabHref("inbox")} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+          <Link href={tabHref("inbox")} className="inline-flex h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold hover:bg-surface-2">
             <Inbox className="h-4 w-4" /> {L ? "Inbox" : "Inbox"}
           </Link>
-          <Link href="/settings?tab=shopee" className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+          <Link href="/settings?tab=shopee" className="inline-flex h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold hover:bg-surface-2">
             <Store className="h-4 w-4" /> {L ? "Developer apps" : "Developer apps"}
           </Link>
-          <Link href={tabHref("channels")} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+          <Link href={tabHref("channels")} className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
             <ShoppingBag className="h-4 w-4" /> {L ? "Thêm kênh" : "Add channel"}
           </Link>
         </div>
@@ -107,7 +107,7 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
                 <h2 className="text-sm font-extrabold">{L ? "Kênh bán hàng" : "Sales channels"}</h2>
                 <p className="text-xs text-slate-500">{L ? "Kết nối gian hàng và cấu hình chính sách đồng bộ theo từng sàn." : "Connect shops and configure sync policy per marketplace."}</p>
               </div>
-              <Link href={tabHref("channels")} className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs font-bold hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+              <Link href={tabHref("channels")} className="inline-flex h-11 items-center gap-2 rounded-lg border border-border px-3 text-xs font-bold hover:bg-surface-2">
                 <Layers3 className="h-3.5 w-3.5" /> {L ? "Quản lý kênh" : "Manage channels"}
               </Link>
             </div>
@@ -215,7 +215,7 @@ function ShopPolicyForm({
         ))}
       </div>
       <div className="flex items-start justify-end">
-        <button className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">{L ? "Lưu" : "Save"}</button>
+        <button className="h-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">{L ? "Lưu" : "Save"}</button>
       </div>
     </form>
   );
@@ -301,15 +301,15 @@ function ProviderCard({ provider, shop, L }: { provider: (typeof PROVIDERS)[numb
               "use server";
               await disconnectShopeeShop(shop.id);
             }}>
-              <button className="w-full rounded-full border border-border px-3 py-2 text-xs font-bold hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">{L ? "Ngắt kết nối" : "Disconnect"}</button>
+              <button className="h-11 w-full rounded-lg border border-border px-3 text-xs font-bold hover:bg-surface-2">{L ? "Ngắt kết nối" : "Disconnect"}</button>
             </form>
           ) : (
-            <Link href="/api/shopee/connect" className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary-600 px-3 py-2 text-xs font-bold text-white hover:brightness-110 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+            <Link href="/api/shopee/connect" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-xs font-bold text-white hover:brightness-110">
               <ExternalLink className="h-3.5 w-3.5" /> {L ? "Kết nối" : "Connect"}
             </Link>
           )
         ) : (
-          <button disabled className="w-full rounded-full border border-border px-3 py-2 text-xs font-bold text-slate-400 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">{L ? "Sắp ra mắt" : "Coming soon"}</button>
+          <button disabled className="h-11 w-full rounded-lg border border-border px-3 text-xs font-bold text-slate-400">{L ? "Sắp ra mắt" : "Coming soon"}</button>
         )}
       </div>
     </div>
@@ -401,7 +401,7 @@ function OnlineOrdersSection({ rows, L }: { rows: Awaited<ReturnType<typeof getS
             {L ? "Đơn Shopee được map về đơn LumaPOS để xử lý chung với POS." : "Shopee orders map into LumaPOS orders for a shared handling flow."}
           </p>
         </div>
-        <Link href={`${Routes.Sales}?tab=orders&source=shopee`} className="inline-flex min-h-11 items-center rounded-full border border-border px-3 text-xs font-bold hover:bg-surface-2 min-w-11">
+        <Link href={`${Routes.Sales}?tab=orders&source=shopee`} className="inline-flex h-11 items-center rounded-lg border border-border px-3 text-xs font-bold hover:bg-surface-2">
           {L ? "Xem trong Đơn hàng" : "View in Orders"}
         </Link>
       </div>
@@ -504,7 +504,7 @@ function InboxSection({ threads, L }: { threads: Awaited<ReturnType<typeof getSh
             await sendMarketplaceMessage({ threadId: thread.id, body: String(formData.get("body") ?? "") });
           }} className="flex gap-2 border-t border-border-soft px-4 py-3">
             <input name="body" className="flex-1 rounded-lg border border-border bg-canvas px-3 py-2 text-sm outline-none focus:border-primary-500 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" placeholder={L ? "Nhập phản hồi..." : "Type a reply..."} />
-            <button className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+            <button className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
               <Send className="h-4 w-4" /> {L ? "Gửi" : "Send"}
             </button>
           </form>

@@ -106,7 +106,7 @@ function SalesPrimaryAction({
       aria-label={action.label}
       className={cn(
         buttonVariants({ size: "default" }),
-        "min-w-11 shrink-0 rounded-full px-3.5 font-semibold lg:min-w-0",
+        "min-w-11 shrink-0 rounded-lg px-3.5 font-semibold lg:min-w-0",
       )}
     >
       <Icon className="size-4" />

@@ -13,6 +13,7 @@ import type { getPurchase, getPurchases } from "@/lib/data/inventory";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
+import { modalActionSizeClassName } from "@/components/ui/button-variants";
 
 type PurchaseRow = Awaited<ReturnType<typeof getPurchases>>["rows"][number] | NonNullable<Awaited<ReturnType<typeof getPurchase>>>;
 
@@ -242,9 +243,9 @@ function PurchaseDetailFooter({ purchase, printTemplates }: { purchase: Purchase
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        {canChange && <PurchaseCancelButton purchaseId={purchase.id} compact className="min-h-11 lg:min-h-8" />}
+        {canChange && <PurchaseCancelButton purchaseId={purchase.id} compact />}
         {canChange && (
-          <Link href={Routes.purchaseCopy(purchase.id)} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-slate-600 hover:bg-surface-2 lg:min-h-8 min-w-11 lg:min-w-0">
+          <Link href={Routes.purchaseCopy(purchase.id)} target="_blank" rel="noreferrer" className={`inline-flex ${modalActionSizeClassName} min-w-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-slate-600 hover:bg-surface-2 lg:min-w-0`}>
             <Copy className="h-3.5 w-3.5" />
             {t("purchases.copy")}
           </Link>
@@ -252,13 +253,13 @@ function PurchaseDetailFooter({ purchase, printTemplates }: { purchase: Purchase
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {(purchase.status === "received" || purchase.status === "returned") && (
-          <Link href={`${Routes.PurchaseReturns}/new?purchaseOrderId=${encodeURIComponent(purchase.id)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-primary-200 px-3 text-xs font-semibold text-primary-600 hover:bg-primary-50 lg:min-h-8 min-w-11 lg:min-w-0">
+          <Link href={`${Routes.PurchaseReturns}/new?purchaseOrderId=${encodeURIComponent(purchase.id)}`} target="_blank" rel="noreferrer" className={`inline-flex ${modalActionSizeClassName} min-w-11 items-center gap-1.5 rounded-lg border border-primary-200 px-3 text-xs font-semibold text-primary-600 hover:bg-primary-50 lg:min-w-0`}>
             Trả hàng NCC
           </Link>
         )}
-        <PrintTemplateMenu baseHref={printHref} templates={printTemplates} label={t("print.printBtn")} className="min-h-11 min-w-11 rounded-lg border border-border px-3 text-xs font-semibold text-primary-600 hover:bg-surface-2 lg:min-h-8 lg:min-w-0" />
+        <PrintTemplateMenu baseHref={printHref} templates={printTemplates} label={t("print.printBtn")} className={`${modalActionSizeClassName} min-w-11 rounded-lg border border-border px-3 text-xs font-semibold text-primary-600 hover:bg-surface-2 lg:min-w-0`} />
         {canChange && (
-          <Link href={Routes.purchaseEdit(purchase.id)} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white hover:brightness-110 lg:min-h-8 min-w-11 lg:min-w-0">
+          <Link href={Routes.purchaseEdit(purchase.id)} target="_blank" rel="noreferrer" className={`inline-flex ${modalActionSizeClassName} min-w-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white hover:brightness-110 lg:min-w-0`}>
             <FilePenLine className="h-3.5 w-3.5" />
             {t("purchases.edit")}
           </Link>

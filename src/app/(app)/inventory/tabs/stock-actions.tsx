@@ -43,17 +43,17 @@ export function StockActionMenu() {
     <div ref={root} className="relative ml-auto flex items-center gap-2">
       <Link
         href={`${Routes.Inventory}?tab=stock#stock-history`}
-        className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-primary-700 shadow-e1 transition hover:bg-surface-2 dark:text-primary-300 lg:min-h-10 lg:min-w-0"
+        className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-primary-700 shadow-e1 transition hover:bg-surface-2 dark:text-primary-300"
       >
         <History className="h-4 w-4" />
         {t("inventory.actions.history")}
       </Link>
-      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-slate-700 shadow-e1 transition hover:bg-surface-2 dark:text-slate-200 lg:min-h-10 lg:min-w-0">
+      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-slate-700 shadow-e1 transition hover:bg-surface-2 dark:text-slate-200">
         <ClipboardCheck className="h-4 w-4 text-primary-600" />
         {t("inventory.actions.warehouseActions")}
         <ChevronDown className={cn("h-4 w-4 text-slate-400 transition", open && "rotate-180")} />
       </button>
-      <Link href={Routes.PurchaseNew} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white transition hover:bg-primary-700 active:scale-[0.98] lg:min-h-10 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0">
+      <Link href={Routes.PurchaseNew} className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white transition hover:bg-primary-700 active:scale-[0.98]">
         <Plus className="h-4 w-4" />{t("purchases.createNew")}
       </Link>
       {open && (

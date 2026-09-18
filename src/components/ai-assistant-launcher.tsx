@@ -159,7 +159,7 @@ export function AiAssistantLauncher({ surface = "web" }: { surface?: AssistantSu
       }}
       style={fabPosition ? { left: fabPosition.x, top: fabPosition.y, right: "auto", bottom: "auto" } : undefined}
       className={cn(
-        "fixed z-[45] h-13 w-13 lg:h-14 lg:w-14 rounded-[18px] bg-primary-600 text-white shadow-e2 grid place-items-center touch-none cursor-grab select-none active:cursor-grabbing",
+        "fixed z-[45] h-13 w-13 lg:h-14 lg:w-14 rounded-lg bg-primary-600 text-white shadow-e2 grid place-items-center touch-none cursor-grab select-none active:cursor-grabbing",
         "hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         !fabPosition && (isPos
           ? "left-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] lg:left-auto lg:right-5 lg:bottom-5"

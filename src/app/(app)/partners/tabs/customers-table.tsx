@@ -268,11 +268,11 @@ function CustomerRows({
           <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <CustomerSearch filters={filters} pageSize={data.pageSize} onOpenFilters={onOpenFilters} />
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <button type="button" onClick={() => setCreateOpen(true)} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-10 shrink-0 rounded-lg min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")}>
+              <button type="button" onClick={() => setCreateOpen(true)} className={cn(buttonVariants({ variant: "default", size: "default" }), "shrink-0")}>
                 <Plus className="h-4 w-4" />
                 {t("customers.createNew")}
               </button>
-              <Link href="/settings/import" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-10 shrink-0 rounded-lg min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")}>
+              <Link href="/settings/import" className={cn(buttonVariants({ variant: "outline", size: "default" }), "shrink-0")}>
                 <FileInput className="h-4 w-4" />
                 {t("customers.actions.importFile")}
               </Link>
@@ -856,7 +856,7 @@ function MoneyRangeFilter({
 
 function RadioPill({ name, value, checked, label }: { name: string; value: string; checked: boolean; label: string }) {
   return (
-    <label className={cn("inline-flex h-9 min-h-11 min-w-11 cursor-pointer items-center rounded-full border px-4 text-sm font-semibold lg:min-h-0 lg:min-w-0", checked ? "border-primary-600 bg-primary-600 text-white" : "border-border bg-surface text-slate-600 hover:bg-surface-2")}>
+    <label className={cn("inline-flex h-11 min-w-11 cursor-pointer items-center rounded-lg border px-4 text-sm font-semibold", checked ? "border-primary-600 bg-primary-600 text-white" : "border-border bg-surface text-slate-600 hover:bg-surface-2")}>
       <input type="radio" name={name} value={value} defaultChecked={checked} className="sr-only" />
       {label}
     </label>

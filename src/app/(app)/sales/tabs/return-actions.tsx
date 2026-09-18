@@ -7,6 +7,7 @@ import { Loader2, Pencil, X, XCircle } from "lucide-react";
 import { cancelReturn, updateReturnMetadata } from "@/lib/actions/returns";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { Button } from "@/components/ui/button";
+import { modalActionSizeClassName } from "@/components/ui/button-variants";
 import { Select } from "@/components/ui/select";
 
 const REASONS = ["defective", "wrong_item", "changed_mind", "other"] as const;
@@ -65,11 +66,11 @@ export function ReturnActions({
 
   return (
     <>
-      <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(true)} disabled={Boolean(busy)}>
+      <Button type="button" variant="outline" size="sm" className={modalActionSizeClassName} onClick={() => setEditOpen(true)} disabled={Boolean(busy)}>
         <Pencil className="h-4 w-4" />
         {t("returns.edit")}
       </Button>
-      <Button type="button" variant="destructive" size="sm" onClick={onCancel} disabled={Boolean(busy)}>
+      <Button type="button" variant="destructive" size="sm" className={modalActionSizeClassName} onClick={onCancel} disabled={Boolean(busy)}>
         {busy === "cancel" ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
         {t("returns.cancel")}
       </Button>
@@ -99,8 +100,8 @@ export function ReturnActions({
               </label>
             </div>
             <div className="flex justify-end gap-2 border-t border-border-soft px-4 py-3">
-              <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(false)} disabled={Boolean(busy)}>{t("common.cancel")}</Button>
-              <Button type="button" size="sm" onClick={saveEdit} disabled={Boolean(busy)}>
+              <Button type="button" variant="outline" size="sm" className={modalActionSizeClassName} onClick={() => setEditOpen(false)} disabled={Boolean(busy)}>{t("common.cancel")}</Button>
+              <Button type="button" size="sm" className={modalActionSizeClassName} onClick={saveEdit} disabled={Boolean(busy)}>
                 {busy === "edit" && <Loader2 className="h-4 w-4 animate-spin" />}
                 {t("common.save")}
               </Button>

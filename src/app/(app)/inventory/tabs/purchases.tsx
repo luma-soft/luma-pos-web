@@ -54,7 +54,7 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
             search={<ListSearchInput name="q" defaultValue={params.q ?? ""} placeholder={t("purchases.searchPlaceholder")} />}
             filter={<InventoryFilterDrawer title="Bộ lọc phiếu nhập" values={params} resultCount={total} resultLabel="phiếu nhập" countEndpoint="/api/inventory/purchases/count" fields={["status", "supplier", "time", "debt"]} suppliers={options.suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
           />
-          <Link href={Routes.PurchaseNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"><Plus className="w-4 h-4" />{t("purchases.createNew")}</Link>
+          <Link href={Routes.PurchaseNew} className="ml-auto inline-flex h-11 shrink-0 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98]"><Plus className="w-4 h-4" />{t("purchases.createNew")}</Link>
         </InstantFilterForm>
       </div>
 

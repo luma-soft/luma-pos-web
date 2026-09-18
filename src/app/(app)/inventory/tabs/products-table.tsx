@@ -51,6 +51,7 @@ import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { deleteProduct, setProductActive } from "@/lib/actions/products";
 import { setCameraMaterial } from "@/lib/actions/products";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { modalActionSizeClassName } from "@/components/ui/button-variants";
 import { positionFloatingMenu } from "@/lib/floating-menu-position";
 import type { ProductListResult } from "@/lib/data/products";
 import {
@@ -2103,7 +2104,7 @@ function ActionButton({
 }
 
 const actionClassName =
-  "inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 lg:h-10 min-w-11 lg:min-w-0";
+  `inline-flex ${modalActionSizeClassName} shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 min-w-11 lg:min-w-0`;
 
 function StatusBadge({ product }: { product: ProductRow }) {
   const t = useTranslations();
