@@ -14,10 +14,16 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 function csvUuids(value: string | string[] | undefined) {
   const raw = Array.isArray(value) ? value[0] : value;
   if (!raw) return [];
+  const seen = new Set<string>();
   return raw
     .split(",")
     .map((item) => item.trim())
     .filter((item) => UUID_RE.test(item))
+    .filter((item) => {
+      if (seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    })
     .slice(0, 100);
 }
 
@@ -43,13 +49,18 @@ export default async function NewPurchasePage({ searchParams }: Props) {
       ? getPurchaseProductRowsByIds(context.storeId, seedProductIds, { includeInactive: Boolean(source) })
       : Promise.resolve([]),
   ]);
+  const productsById = new Map(initialProducts.map((product) => [product.id, product]));
+  const orderedInitialProducts = seedProductIds.flatMap((id) => {
+    const product = productsById.get(id);
+    return product ? [product] : [];
+  });
 
   if (source) {
     return (
       <PurchaseForm
         canEditCompanyPrices={context.role === "owner" || context.role === "manager"}
         options={options}
-        initialProducts={initialProducts}
+        initialProducts={orderedInitialProducts}
         mode="copy"
         purchaseCode={source.code}
         initialValues={{
@@ -72,5 +83,5 @@ export default async function NewPurchasePage({ searchParams }: Props) {
     );
   }
 
-  return <PurchaseForm options={options} initialProducts={initialProducts} aiPreview={aiPreview} canEditCompanyPrices={context.role === "owner" || context.role === "manager"} />;
+  return <PurchaseForm options={options} initialProducts={orderedInitialProducts} aiPreview={aiPreview} canEditCompanyPrices={context.role === "owner" || context.role === "manager"} />;
 }

@@ -20,6 +20,8 @@ test("bulk product actions route every selected product into purchase and POS dr
   expect(routes).toContain("posForProducts");
   expect(purchasePage).toContain("sp.productIds");
   expect(purchasePage).toContain("getPurchaseProductRowsByIds");
+  expect(purchasePage).toContain("const seen = new Set<string>()");
+  expect(purchasePage).toContain("const orderedInitialProducts = seedProductIds.flatMap");
   expect(posPage).toContain("params.productIds");
   expect(posPage).toContain("bulkItems");
 });
