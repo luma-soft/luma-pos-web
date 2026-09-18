@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Search, Check, ImageIcon, Plus, Loader2, X } from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
+import { positionFloatingMenu } from "@/lib/floating-menu-position";
 
 export interface ComboOption {
   value: string;
@@ -19,6 +21,16 @@ export interface ComboOption {
 }
 /** Alias ngữ nghĩa — cùng kiểu với ComboOption. */
 export type SearchableOption = ComboOption;
+
+function findScrollBoundary(element: HTMLElement | null) {
+  let parent = element?.parentElement ?? null;
+  while (parent) {
+    const styles = window.getComputedStyle(parent);
+    if (/(auto|scroll|overlay)/.test(`${styles.overflow} ${styles.overflowY}`)) return parent;
+    parent = parent.parentElement;
+  }
+  return null;
+}
 
 /**
  * SearchableSelect — picker chọn 1 mục từ danh sách, có ô tìm kiếm.
@@ -50,14 +62,28 @@ export function SearchableSelect({
   const [q, setQ] = useState("");
   const [creating, setCreating] = useState(false);
   const [active, setActive] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.value === value);
   const searchable = showSearch ?? options.length > 8;
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const syncViewport = () => setIsDesktop(mediaQuery.matches);
+    syncViewport();
+    mediaQuery.addEventListener("change", syncViewport);
+    return () => mediaQuery.removeEventListener("change", syncViewport);
+  }, []);
+
+  useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onDoc = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!ref.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false);
+    };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
@@ -71,6 +97,51 @@ export function SearchableSelect({
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- reset highlighted index when query/open changes
   useEffect(() => { setActive(0); }, [nq, open]);
+
+  useLayoutEffect(() => {
+    if (!open || !isDesktop) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- discard the desktop portal position when it closes or switches to the mobile sheet
+      setMenuStyle(null);
+      return;
+    }
+
+    const updateMenuPosition = () => {
+      const trigger = ref.current?.getBoundingClientRect();
+      const menu = menuRef.current;
+      if (!trigger || !menu) return;
+
+      const boundary = findScrollBoundary(ref.current)?.getBoundingClientRect();
+      const width = Math.min(trigger.width, Math.max(0, window.innerWidth - 16));
+      const position = positionFloatingMenu({
+        trigger,
+        menu: { width, height: menu.scrollHeight },
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          top: boundary?.top,
+          bottom: boundary?.bottom,
+        },
+        preferredSide: "bottom",
+        gap: 4,
+      });
+      setMenuStyle({
+        position: "fixed",
+        left: position.left,
+        top: position.top,
+        width,
+        maxHeight: position.maxHeight,
+        visibility: "visible",
+      });
+    };
+
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [allowClear, filtered.length, isDesktop, onAction, onCreate, open, q, searchable]);
 
   async function create() {
     if (!onCreate || !q.trim() || creating) return;
@@ -92,6 +163,127 @@ export function SearchableSelect({
       else if (onCreate && q.trim() && !exact) create();
     }
   }
+
+  const menuSurface = (
+    <div
+      ref={menuRef}
+      style={isDesktop ? (menuStyle ?? { position: "fixed", left: 0, top: 0, visibility: "hidden" }) : undefined}
+      className={isDesktop
+        ? "z-[120] min-w-0 rounded-xl border border-border bg-surface shadow-e2 overflow-hidden flex flex-col"
+        : "fixed inset-x-0 bottom-0 z-50 max-h-[min(80dvh,640px)] rounded-t-2xl bg-surface border border-border shadow-e2 overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)] animate-[slideUp_180ms_ease]"}
+    >
+      {/* mobile header: tay nắm + tiêu đề + đóng */}
+      <div className="lg:hidden">
+        <div className="flex justify-center pt-2"><span className="h-1 w-9 rounded-full bg-border" /></div>
+        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border-soft">
+          <Text as="span" weight="semibold" truncate text={placeholder ?? t("search")} />
+          <Button type="button" variant="ghost" size="iconSm" onClick={() => setOpen(false)}>
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+      </div>
+      {searchable && (
+        <div className="border-b border-border-soft">
+          <Input
+            autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown}
+            placeholder={placeholder ?? t("search")}
+            leftIcon={<Search />}
+            className="h-11 rounded-none border-0 bg-transparent focus:ring-0 focus:border-transparent"
+          />
+        </div>
+      )}
+      <div ref={listRef} className="min-h-0 flex-1 overflow-auto py-1 max-h-[60dvh] lg:max-h-64" onKeyDown={onKeyDown}>
+        {onAction && actionLabel && (
+          <Button
+            type="button"
+            variant="ghost"
+            block
+            onClick={() => { onAction(); setOpen(false); setQ(""); }}
+            className="justify-start rounded-none px-3 py-3 lg:py-1.5 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40"
+          >
+            {actionIcon ?? <Plus className="w-4 h-4" />}
+            <Text as="span" weight="medium" className="text-current" text={actionLabel} />
+          </Button>
+        )}
+        {allowClear && (
+          <Button
+            type="button"
+            variant="ghost"
+            block
+            onClick={() => { onChange(""); setOpen(false); }}
+            className="justify-start rounded-none px-3 py-3 lg:py-1.5 text-slate-400"
+            text={t("clear")}
+          />
+        )}
+        {onCreate && q.trim() && !exact && (
+          <Button
+            type="button"
+            variant="ghost"
+            block
+            onClick={create}
+            disabled={creating}
+            className="justify-start rounded-none px-3 py-3 lg:py-1.5 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40"
+          >
+            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            <Text as="span" weight="medium" className="text-current" text={`${t("add")} “${q.trim()}”`} />
+          </Button>
+        )}
+        {filtered.length === 0 && !(onCreate && q.trim()) ? (
+          <Text as="div" variant="muted" className="px-3 py-3 text-center" text={t("noResults")} />
+        ) : filtered.slice(0, 200).map((o, i) => (
+          <Button
+            key={o.value}
+            type="button"
+            variant="ghost"
+            block
+            onMouseEnter={() => setActive(i)}
+            onClick={() => pick(o.value)}
+            className={cn(
+              "h-auto min-h-12 min-w-11 justify-between rounded-none px-3 text-left",
+              o.imageUrl ? "min-h-16 py-2.5" : "min-h-12 py-2",
+              i === active && "bg-surface-2",
+              o.value === value && "bg-primary-50 dark:bg-primary-950/40"
+            )}
+          >
+            <span className="flex min-w-0 flex-1 items-center gap-3">
+              {o.imageUrl !== undefined && (
+                <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-border-soft bg-surface-2">
+                  {o.imageUrl ? (
+                    <Image
+                      src={o.imageUrl}
+                      alt=""
+                      width={44}
+                      height={44}
+                      unoptimized
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <ImageIcon className="h-5 w-5 text-slate-300" />
+                  )}
+                </span>
+              )}
+              <span className="min-w-0 flex-1">
+                <Text as="span" truncate className="block min-w-0 font-medium text-current">
+                  {o.label}{o.hint && <Text as="span" variant="muted" size="xs" className="ml-1 font-normal" text={o.hint} />}
+                </Text>
+                {o.description && (
+                  <Text
+                    as="span"
+                    variant="muted"
+                    size="xs"
+                    truncate
+                    className="mt-1 block"
+                    text={o.description}
+                  />
+                )}
+              </span>
+            </span>
+            {o.value === value && <Check className="w-4 h-4 text-primary-600 shrink-0" />}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div ref={ref} className={cn("relative", className)}>
@@ -117,121 +309,8 @@ export function SearchableSelect({
 
       {open && (
         <>
-          {/* mobile: nền mờ đóng sheet */}
-          <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setOpen(false)} />
-          {/* mobile: bottom-sheet · desktop: dropdown */}
-          <div className="fixed inset-x-0 bottom-0 z-50 max-h-[min(80dvh,640px)] rounded-t-2xl bg-surface border border-border shadow-e2 overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)] animate-[slideUp_180ms_ease] lg:absolute lg:inset-x-0 lg:bottom-auto lg:top-full lg:mt-1 lg:max-h-none lg:rounded-xl lg:pb-0 lg:animate-[fadeIn_120ms_ease]">
-            {/* mobile header: tay nắm + tiêu đề + đóng */}
-            <div className="lg:hidden">
-              <div className="flex justify-center pt-2"><span className="h-1 w-9 rounded-full bg-border" /></div>
-              <div className="flex items-center justify-between px-3 py-1.5 border-b border-border-soft">
-                <Text as="span" weight="semibold" truncate text={placeholder ?? t("search")} />
-                <Button type="button" variant="ghost" size="iconSm" onClick={() => setOpen(false)}>
-                  <X className="w-5 h-5" />
-                </Button>
-              </div>
-            </div>
-            {searchable && (
-              <div className="border-b border-border-soft">
-                <Input
-                  autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown}
-                  placeholder={placeholder ?? t("search")}
-                  leftIcon={<Search />}
-                  className="h-11 rounded-none border-0 bg-transparent focus:ring-0 focus:border-transparent"
-                />
-              </div>
-            )}
-            <div ref={listRef} className="overflow-auto py-1 max-h-[60dvh] lg:max-h-64" onKeyDown={onKeyDown}>
-              {onAction && actionLabel && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  block
-                  onClick={() => { onAction(); setOpen(false); setQ(""); }}
-                  className="justify-start rounded-none px-3 py-3 lg:py-1.5 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40"
-                >
-                  {actionIcon ?? <Plus className="w-4 h-4" />}
-                  <Text as="span" weight="medium" className="text-current" text={actionLabel} />
-                </Button>
-              )}
-              {allowClear && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  block
-                  onClick={() => { onChange(""); setOpen(false); }}
-                  className="justify-start rounded-none px-3 py-3 lg:py-1.5 text-slate-400"
-                  text={t("clear")}
-                />
-              )}
-              {onCreate && q.trim() && !exact && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  block
-                  onClick={create}
-                  disabled={creating}
-                  className="justify-start rounded-none px-3 py-3 lg:py-1.5 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40"
-                >
-                  {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  <Text as="span" weight="medium" className="text-current" text={`${t("add")} “${q.trim()}”`} />
-                </Button>
-              )}
-              {filtered.length === 0 && !(onCreate && q.trim()) ? (
-                <Text as="div" variant="muted" className="px-3 py-3 text-center" text={t("noResults")} />
-              ) : filtered.slice(0, 200).map((o, i) => (
-                <Button
-                  key={o.value}
-                  type="button"
-                  variant="ghost"
-                  block
-                  onMouseEnter={() => setActive(i)}
-                  onClick={() => pick(o.value)}
-                  className={cn(
-                    "h-auto min-h-12 min-w-11 justify-between rounded-none px-3 text-left",
-                    o.imageUrl ? "min-h-16 py-2.5" : "min-h-12 py-2",
-                    i === active && "bg-surface-2",
-                    o.value === value && "bg-primary-50 dark:bg-primary-950/40"
-                  )}
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-3">
-                    {o.imageUrl !== undefined && (
-                      <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-border-soft bg-surface-2">
-                        {o.imageUrl ? (
-                          <Image
-                            src={o.imageUrl}
-                            alt=""
-                            width={44}
-                            height={44}
-                            unoptimized
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <ImageIcon className="h-5 w-5 text-slate-300" />
-                        )}
-                      </span>
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <Text as="span" truncate className="block min-w-0 font-medium text-current">
-                        {o.label}{o.hint && <Text as="span" variant="muted" size="xs" className="ml-1 font-normal" text={o.hint} />}
-                      </Text>
-                      {o.description && (
-                        <Text
-                          as="span"
-                          variant="muted"
-                          size="xs"
-                          truncate
-                          className="mt-1 block"
-                          text={o.description}
-                        />
-                      )}
-                    </span>
-                  </span>
-                  {o.value === value && <Check className="w-4 h-4 text-primary-600 shrink-0" />}
-                </Button>
-              ))}
-            </div>
-          </div>
+          {!isDesktop && <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setOpen(false)} />}
+          {isDesktop && typeof document !== "undefined" ? createPortal(menuSurface, document.body) : menuSurface}
         </>
       )}
     </div>

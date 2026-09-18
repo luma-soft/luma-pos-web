@@ -30,4 +30,13 @@ describe("positionFloatingMenu", () => {
       gap: 8,
     }).maxHeight, 294);
   });
+
+  test("respects an inner scroll boundary used by modal content", () => {
+    assert.deepEqual(positionFloatingMenu({
+      trigger: { left: 300, right: 500, top: 700, bottom: 740 },
+      menu: { width: 240, height: 260 },
+      viewport: { width: 1200, height: 1100, top: 180, bottom: 985 },
+      gap: 8,
+    }), { left: 260, top: 432, maxHeight: 504 });
+  });
 });

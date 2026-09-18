@@ -13,6 +13,9 @@ export interface FloatingMenuSize {
 export interface FloatingMenuViewport {
   width: number;
   height: number;
+  /** Optional inner viewport bounds for menus inside a scrollable surface. */
+  top?: number;
+  bottom?: number;
 }
 
 export type FloatingMenuSide = "auto" | "top" | "bottom";
@@ -32,10 +35,12 @@ export function positionFloatingMenu({
   margin?: number;
   gap?: number;
 }) {
-  const availableAbove = Math.max(0, trigger.top - margin - gap);
+  const viewportTop = viewport.top ?? 0;
+  const viewportBottom = viewport.bottom ?? viewport.height;
+  const availableAbove = Math.max(0, trigger.top - viewportTop - margin - gap);
   const availableBelow = Math.max(
     0,
-    viewport.height - trigger.bottom - margin - gap,
+    viewportBottom - trigger.bottom - margin - gap,
   );
   const placeAbove =
     preferredSide === "top"
