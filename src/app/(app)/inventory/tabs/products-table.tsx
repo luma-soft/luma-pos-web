@@ -564,8 +564,10 @@ export function ProductUnitSelector({
   value: string;
   onChange: (unitName: string) => void;
 }) {
-  if (units.length === 0) {
-    return <span className="text-slate-500">{baseUnit}</span>;
+  const options = buildProductUnitOptions(baseUnit, units);
+
+  if (options.length <= 1) {
+    return <span className="text-slate-500">{options[0]?.label ?? baseUnit}</span>;
   }
 
   return (
@@ -577,7 +579,7 @@ export function ProductUnitSelector({
     >
       <Select
         value={value}
-        options={buildProductUnitOptions(baseUnit, units)}
+        options={options}
         onValueChange={onChange}
         aria-label={`Đơn vị tính ${productName}`}
         size="sm"
@@ -630,6 +632,7 @@ export function ProductMobileRow({
 }) {
   const t = useTranslations();
   const projected = unitProjection(product, selectedUnitName);
+  const unitOptions = buildProductUnitOptions(product.baseUnit, product.unitDefinitions);
   const selectedUnit = selectedUnitDefinition(product, selectedUnitName);
   const hasRetailOverride =
     selectedUnit?.priceOverride !== null
@@ -689,7 +692,7 @@ export function ProductMobileRow({
             </>}
           </div>
         </button>
-        {!group && product.unitDefinitions.length > 0 && (
+        {!group && unitOptions.length > 1 && (
           <div className="px-3 pb-3">
             <ProductUnitSelector
               productName={product.name}
