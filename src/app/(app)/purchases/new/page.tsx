@@ -11,16 +11,27 @@ interface Props {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function csvUuids(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => UUID_RE.test(item))
+    .slice(0, 100);
+}
+
 export default async function NewPurchasePage({ searchParams }: Props) {
   const context = await requireStoreContext();
   const sp = await searchParams;
   const productId = typeof sp.productId === "string" && UUID_RE.test(sp.productId) ? sp.productId : null;
+  const productIds = csvUuids(sp.productIds);
   const copyFrom = typeof sp.copyFrom === "string" && UUID_RE.test(sp.copyFrom) ? sp.copyFrom : null;
   const aiPreview = sp.source === "ai-preview";
   const source = copyFrom ? await getPurchase(context.storeId, copyFrom).catch(() => null) : null;
   if (copyFrom && (!source || source.status === "cancelled" || source.status === "returned")) notFound();
 
-  const seedProductIds = source?.items.map((i) => i.productId) ?? (productId ? [productId] : []);
+  const seedProductIds = source?.items.map((i) => i.productId) ?? (productIds.length > 0 ? productIds : (productId ? [productId] : []));
   const [options, initialProducts] = await Promise.all([
     getPurchaseFormOptions(context.storeId),
     seedProductIds.length > 0

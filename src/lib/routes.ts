@@ -77,6 +77,17 @@ export const Routes = {
   purchaseEdit: (id: string) => `/purchases/${id}/edit` as const,
   purchaseCopy: (id: string) => `/purchases/new?copyFrom=${id}` as const,
   purchaseNewForProduct: (id: string) => `/purchases/new?productId=${id}` as const,
+  purchaseNewForProducts: (ids: readonly string[]) => {
+    const params = new URLSearchParams({ productIds: ids.join(",") });
+    return `/purchases/new?${params.toString()}` as const;
+  },
+  posForProducts: (
+    kind: "invoice" | "booking" | "return_quick" | "quote",
+    ids: readonly string[],
+  ) => {
+    const params = new URLSearchParams({ draft: kind, productIds: ids.join(",") });
+    return `/pos?${params.toString()}` as const;
+  },
   purchaseReturn: (id: string) => `/purchase-returns/${id}` as const,
   customer: (id: string) => `/customers/${id}` as const,
   supplier: (id: string) => `/suppliers/${id}` as const,

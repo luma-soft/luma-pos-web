@@ -79,11 +79,8 @@ async function sourceInvoiceFromParams(storeId: string, params: PosSearchParams)
 }
 
 function initialContextFromParams(params: PosSearchParams): PosInitialContext | null {
-  if (one(params.draft) === "return_quick") {
-    return { kind: "return_quick", projectId: "", projectName: "" };
-  }
   const kind = one(params.draft);
-  if (kind !== "quote" && kind !== "invoice") return null;
+  if (kind !== "quote" && kind !== "invoice" && kind !== "booking" && kind !== "return_quick") return null;
   const projectId = one(params.projectId);
   const customerId = one(params.customerId);
   const projectName = one(params.projectName)?.trim() || (kind === "quote" ? "Báo giá" : "Hóa đơn");
@@ -113,11 +110,13 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
   const params = await searchParams;
   const context = await requireStoreContext();
   const sourceInvoice = await sourceInvoiceFromParams(context.storeId, params);
-  const initialContext = initialContextFromParams(params);
+  const baseInitialContext = initialContextFromParams(params);
+  const bulkProductIds = csvUuids(params.productIds);
   const aiProductIds = csvUuids(params.aiProducts);
   const includeProductIds = [
     ...(sourceInvoice?.items?.map((item) => item.productId) ?? []),
-    ...(initialContext?.items?.map((item) => item.productId) ?? []),
+    ...(baseInitialContext?.items?.map((item) => item.productId) ?? []),
+    ...bulkProductIds,
     ...aiProductIds,
   ];
   const [data, settings, t, orderPrintTemplate, quotePrintTemplate, bookingPrintTemplate, returnPrintTemplate] = await Promise.all([
@@ -134,6 +133,21 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
     getPrintTemplate(context.storeId, "booking"),
     getPrintTemplate(context.storeId, "return"),
   ]);
+  const bulkItems = bulkProductIds.flatMap((productId) => {
+    const product = data.products.find((candidate) => candidate.id === productId);
+    return product?.baseUnit
+      ? [{ productId, unitName: product.baseUnit, quantity: 1 }]
+      : [];
+  });
+  const initialContext = baseInitialContext && bulkItems.length > 0
+    ? {
+        ...baseInitialContext,
+        items: [
+          ...(baseInitialContext.items ?? []),
+          ...bulkItems.filter((item) => !(baseInitialContext.items ?? []).some((existing) => existing.productId === item.productId)),
+        ],
+      }
+    : baseInitialContext;
   return (
     <div className="h-full flex flex-col">
       <header className="flex h-[58px] shrink-0 items-center justify-between border-b border-border bg-surface px-4 lg:hidden">

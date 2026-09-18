@@ -12,7 +12,18 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Ban, Barcode, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
+import {
+  Ban,
+  Barcode,
+  ClipboardList,
+  FileText,
+  Loader2,
+  MoreHorizontal,
+  PackagePlus,
+  RotateCcw,
+  ShoppingCart,
+  Trash2,
+} from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import {
@@ -207,6 +218,16 @@ export function ProductBulkActions() {
     router.push(`${Routes.productLabels(ids[0])}?${params.toString()}`, { scroll: false });
   }
 
+  function openPurchase() {
+    setOpen(false);
+    router.push(Routes.purchaseNewForProducts(ids));
+  }
+
+  function openPos(kind: "invoice" | "booking" | "return_quick" | "quote") {
+    setOpen(false);
+    router.push(Routes.posForProducts(kind, ids));
+  }
+
   return (
     <div ref={rootRef} className="relative shrink-0">
       <button
@@ -234,6 +255,47 @@ export function ProductBulkActions() {
       </button>
       {open && (
         <div className="absolute right-0 top-full z-50 mt-2 min-w-56 rounded-xl border border-border bg-surface p-1 shadow-xl">
+          <button
+            type="button"
+            onClick={openPurchase}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+          >
+            <PackagePlus className="h-4 w-4 text-primary-600" />
+            {t("products.actions.purchase")}
+          </button>
+          <button
+            type="button"
+            onClick={() => openPos("invoice")}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+          >
+            <ShoppingCart className="h-4 w-4 text-primary-600" />
+            {t("nav.pos")}
+          </button>
+          <button
+            type="button"
+            onClick={() => openPos("booking")}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+          >
+            <ClipboardList className="h-4 w-4 text-primary-600" />
+            {t("nav.bookings")}
+          </button>
+          <button
+            type="button"
+            onClick={() => openPos("return_quick")}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+          >
+            <RotateCcw className="h-4 w-4 text-primary-600" />
+            {t("nav.returns")}
+          </button>
+          <button
+            type="button"
+            onClick={() => openPos("quote")}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+          >
+            <FileText className="h-4 w-4 text-primary-600" />
+            {t("nav.quotes")}
+          </button>
+          <div className="my-1 border-t border-border-soft" />
           <button
             type="button"
             onClick={printLabels}
