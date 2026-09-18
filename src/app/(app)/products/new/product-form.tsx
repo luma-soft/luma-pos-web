@@ -507,6 +507,7 @@ export function NewProductForm({
         ) : (
           <FormActions
             loading={form.formState.isSubmitting}
+            submitIntent={submitIntent}
             showDirectSale={!groupManaging && (!hasVariants || groupAdding)}
             registerDirectSale={form.register("directSale")}
             onCancel={close}
@@ -587,6 +588,7 @@ export function NewProductForm({
         <footer className="shrink-0 border-t border-border bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:pb-3">
           <FormActions
             loading={form.formState.isSubmitting}
+            submitIntent={submitIntent}
             showDirectSale={!groupManaging && (!hasVariants || groupAdding)}
             registerDirectSale={form.register("directSale")}
             onCancel={close}
@@ -606,6 +608,7 @@ export function NewProductForm({
 
 function FormActions({
   loading,
+  submitIntent,
   registerDirectSale,
   onCancel,
   onIntent,
@@ -615,6 +618,7 @@ function FormActions({
   align = "header",
 }: {
   loading: boolean;
+  submitIntent: "save" | "sameType";
   registerDirectSale: UseFormRegisterReturn<"directSale">;
   onCancel: () => void;
   onIntent: (intent: "save" | "sameType") => void;
@@ -653,14 +657,16 @@ function FormActions({
         <Button
           type="submit"
           variant="secondary"
-          disabled={loading}
+          loading={loading && submitIntent === "sameType"}
+          disabled={loading && submitIntent !== "sameType"}
           onClick={() => onIntent("sameType")}
           tx={createVariantAfterSave ? "products.saveAndCreateVariant" : isEdit ? "products.saveAndCreateSameType" : "products.saveAndCreate"}
           className={align === "footer" ? "order-3 col-span-2 w-full sm:order-none sm:w-auto" : undefined}
         />
         <Button
           type="submit"
-          loading={loading}
+          loading={loading && submitIntent === "save"}
+          disabled={loading && submitIntent !== "save"}
           onClick={() => onIntent("save")}
           tx="common.save"
           className={align === "footer" ? "order-2 w-full sm:order-none sm:w-auto" : undefined}

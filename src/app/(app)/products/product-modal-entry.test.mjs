@@ -81,3 +81,14 @@ test("save and create another continues from the product that was just created",
   );
   expect(variantSave).not.toMatch(/resetForNextProduct\(\);\s*router\.refresh\(\)/);
 });
+
+test("save actions show loading only on the submitted action", () => {
+  const formActions = productForm.slice(
+    productForm.indexOf("function FormActions"),
+    productForm.indexOf("function InfoTab"),
+  );
+
+  expect(productForm.match(/submitIntent={submitIntent}/g)?.length).toBe(2);
+  expect(formActions).toContain('loading={loading && submitIntent === "sameType"}');
+  expect(formActions).toContain('loading={loading && submitIntent === "save"}');
+});
