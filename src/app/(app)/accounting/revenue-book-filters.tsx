@@ -29,7 +29,7 @@ export function RevenueBookFilters() {
           defaultValue={searchParams.get("q") ?? ""}
           placeholder="Tìm mã giao dịch, khách hàng"
           aria-label="Tìm giao dịch trong sổ"
-          className="h-11 w-full rounded-xl border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+          className="h-11 w-full rounded-xl border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 lg:h-10"
         />
       </form>
       <Select

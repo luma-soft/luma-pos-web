@@ -76,6 +76,9 @@ export const createProductSchema = z.object({
   supplierIds: z.array(z.string()).default([]), // nhiều NCC; phần tử đầu = NCC chính
   imageUrls: z.array(z.string()).max(10).default([]),
   imageMediaIds: imageMediaIdsSchema.default([]),
+  // Internal copy metadata: media may still be targeted at the source product
+  // until the new product is created and its relation is attached.
+  imageSourceProductIds: z.array(z.uuid()).max(10).default([]),
 
   // Pricing
   costPrice: z.number().min(0).default(0),

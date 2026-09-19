@@ -217,7 +217,7 @@ export function LumaWebPicker({
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder={searchPlaceholder}
-                  className="min-h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                  className="h-11 min-h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 lg:h-10 lg:min-h-0"
                 />
               </div>
             </div>
@@ -597,7 +597,7 @@ export function LumaEntityPicker({
               }}
               placeholder={placeholder}
               aria-label={`Tìm ${label.toLocaleLowerCase("vi")}`}
-              className="min-h-10 w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 min-h-11 lg:min-h-0 min-h-11 lg:min-h-0"
+              className="h-11 min-h-11 w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 lg:h-10 lg:min-h-0"
             />
           </div>
           <div id={listboxId} role="listbox" className="min-h-0 overflow-y-auto py-1">

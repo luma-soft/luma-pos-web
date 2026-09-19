@@ -1,7 +1,8 @@
 import { cva, type VariantProps } from "class-variance-authority";
 
 // Detail-modal action buttons use the product modal as the shared geometry reference.
-export const modalActionSizeClassName = "h-11 lg:h-10";
+export const controlHeightClassName = "h-11 lg:h-10";
+export const modalActionSizeClassName = controlHeightClassName;
 
 export const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-px disabled:opacity-50 disabled:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",

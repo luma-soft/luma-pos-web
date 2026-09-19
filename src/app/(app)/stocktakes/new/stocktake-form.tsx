@@ -233,7 +233,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                   closeLabel={t("common.close")}
                   catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                   className="flex-1"
-                  inputClassName="h-12 bg-canvas text-base"
+                  inputClassName="bg-canvas text-base"
                   renderItem={(product, { selected }) => (
                     <ProductSearchResultLayout
                       selected={selected}

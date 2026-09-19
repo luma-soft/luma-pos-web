@@ -77,6 +77,22 @@ test("a simple product without identifying attributes needs an explicit combinat
   assert.deepEqual(draft.attributes, []);
 });
 
+test("copy seeds both external and managed images for the new product form", () => {
+  const managedUrl = "https://media.example.test/stores/store/products/2026/09/media/original.jpg";
+  const source = {
+    ...base,
+    id: "source-product",
+    imageUrls: [managedUrl, "https://example.test/external.png"],
+    imageMedia: [{ mediaId: "media-image", url: managedUrl, path: "products/original.jpg" }],
+  } as unknown as ProductDetail;
+
+  const draft = productToFormInitialValues(source, "copy");
+
+  assert.deepEqual(draft.imageUrls, source.imageUrls);
+  assert.deepEqual(draft.imageMediaIds, ["media-image"]);
+  assert.deepEqual(draft.imageSourceProductIds, ["source-product"]);
+});
+
 test("ambiguous imported selections are not silently assigned to the same combination", () => {
   const ambiguous = { ...grouped, variantGroup: { ...grouped.variantGroup!, members: [e, { ...f, specs: e.specs }] } } as unknown as ProductDetail;
   const draft = productToFormInitialValues(ambiguous, "groupEdit");

@@ -425,7 +425,7 @@ function ShopeeCategoryDialog({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               autoFocus
-              className="h-12 w-full rounded-lg border border-border bg-canvas pl-10 pr-3 text-sm focus:border-primary-500 focus:outline-none"
+              className="h-11 w-full rounded-lg border border-border bg-canvas pl-10 pr-3 text-sm focus:border-primary-500 focus:outline-none lg:h-10"
               placeholder={L ? "Tìm kiếm" : "Search"}
             />
           </div>
@@ -1033,7 +1033,7 @@ function ProductSearchInListing({
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         placeholder={selectedProduct ? selectedProduct.name : (L ? "Tìm theo tên, SKU hoặc barcode..." : "Search by name, SKU, or barcode...")}
-        className="h-10 w-full rounded-lg border border-border bg-canvas pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none min-h-11 lg:min-h-0"
+        className="h-11 w-full rounded-lg border border-border bg-canvas pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none lg:h-10"
       />
       {selectedProduct && !query && <div className="text-xs text-slate-500">{selectedProduct.sku} · {selectedProduct.categoryName ?? (L ? "Chưa có danh mục" : "No category")}</div>}
       {(query || isPending) && (

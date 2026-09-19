@@ -83,5 +83,5 @@ export default async function NewPurchasePage({ searchParams }: Props) {
     );
   }
 
-  return <PurchaseForm options={options} initialProducts={orderedInitialProducts} aiPreview={aiPreview} canEditCompanyPrices={context.role === "owner" || context.role === "manager"} />;
+  return <PurchaseForm options={options} initialProducts={orderedInitialProducts} createdProductId={createdProductId ?? undefined} aiPreview={aiPreview} canEditCompanyPrices={context.role === "owner" || context.role === "manager"} />;
 }

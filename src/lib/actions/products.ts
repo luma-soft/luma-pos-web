@@ -1199,6 +1199,7 @@ export async function createProduct(
             storeId,
             productId,
             imageUrls: v.imageUrls,
+            allowedSourceProductIds: v.imageSourceProductIds,
             publicMedia,
           });
         return replaceProductMediaInTransaction(tx, {
@@ -1206,6 +1207,7 @@ export async function createProduct(
           productId,
           imageMediaIds,
           imageUrls: v.imageUrls,
+          allowedSourceProductIds: v.imageSourceProductIds,
           publicMedia,
         });
       }

@@ -104,7 +104,7 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
             <input
               value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder={t("portal.searchPlaceholder")}
-              className="w-full pl-9 pr-3 py-2.5 text-sm rounded-card border border-slate-300 bg-white"
+              className="h-11 w-full pl-9 pr-3 py-2 text-sm rounded-card border border-slate-300 bg-white lg:h-10"
             />
           </div>
           <div className="bg-white border border-slate-200 rounded-card divide-y divide-slate-100 overflow-hidden">

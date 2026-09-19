@@ -95,6 +95,7 @@ function blankProductValues(
     brandId: "",
     imageUrls: [],
     imageMediaIds: [],
+    imageSourceProductIds: [],
     costPrice: 0,
     retailPrice: 0,
     initialStock: 0,

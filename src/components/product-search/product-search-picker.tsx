@@ -11,6 +11,7 @@ import {
 } from "react";
 import { Loader2, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { controlHeightClassName } from "@/components/ui/button-variants";
 import {
   PRODUCT_SEARCH_DEBOUNCE_MS,
   ProductSearchRequestGate,
@@ -228,7 +229,8 @@ export function ProductSearchPicker<T>({
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         className={cn(
-          "h-11 w-full rounded-xl border border-border bg-surface py-3 pl-10 pr-10 text-sm outline-none transition-colors placeholder:text-slate-400 focus:border-primary-600",
+          controlHeightClassName,
+          "w-full rounded-xl border border-border bg-surface py-2 pl-10 pr-10 text-sm outline-none transition-colors placeholder:text-slate-400 focus:border-primary-600",
           inputClassName,
         )}
       />

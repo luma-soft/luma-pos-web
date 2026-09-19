@@ -267,7 +267,7 @@ export function BrandPriceListClient({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Tìm tên hoặc mã..."
-                className="w-full border border-slate-300 py-2.5 pl-9 pr-3 text-base outline-none focus:border-slate-500 sm:w-64 sm:text-sm min-h-11 lg:min-h-0 min-h-11 lg:min-h-0"
+                className="h-11 w-full border border-slate-300 py-2.5 pl-9 pr-3 text-base outline-none focus:border-slate-500 sm:w-64 sm:text-sm lg:h-10"
               />
             </label>
           </div>

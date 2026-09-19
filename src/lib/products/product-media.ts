@@ -42,11 +42,13 @@ export async function resolveLegacyProductImageIdsInTransaction(
     storeId: string;
     productId: string;
     imageUrls: readonly string[];
+    allowedSourceProductIds?: readonly string[];
     publicMedia: PublicMediaConfig;
   },
 ): Promise<string[]> {
   const storeId = canonicalizeUuidCoordinate(input.storeId);
   const productId = canonicalizeUuidCoordinate(input.productId);
+  const allowedSourceProductIds = (input.allowedSourceProductIds ?? []).map(canonicalizeUuidCoordinate);
   const ids: string[] = [];
   const seen = new Set<string>();
   for (const url of input.imageUrls) {
@@ -72,7 +74,7 @@ export async function resolveLegacyProductImageIdsInTransaction(
       ),
       productMediaEligibilitySql(mediaObjects, {
         storeId,
-        targetIds: [storeId, productId],
+        targetIds: [storeId, productId, ...allowedSourceProductIds],
         publicMedia: input.publicMedia,
       }),
     ));

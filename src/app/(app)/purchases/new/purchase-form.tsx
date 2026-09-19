@@ -201,6 +201,7 @@ export function PurchaseForm({
   purchaseId,
   purchaseCode,
   purchaseStatus,
+  createdProductId,
   aiPreview = false,
 }: {
   options: PurchaseFormOptions;
@@ -210,6 +211,7 @@ export function PurchaseForm({
   purchaseId?: string;
   purchaseCode?: string;
   purchaseStatus?: "draft" | "received";
+  createdProductId?: string;
   aiPreview?: boolean;
   canEditCompanyPrices?: boolean;
 }) {
@@ -242,7 +244,29 @@ export function PurchaseForm({
   const [aiPendingLines, setAiPendingLines] = useState<AiPendingLine[]>([]);
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
   const aiPreviewHydratedRef = useRef(false);
+  const createdProductRefreshRef = useRef<string | null>(null);
   const selectedSupplier = options.suppliers.find((supplier) => supplier.id === supplierId);
+
+  useEffect(() => {
+    if (mode !== "create" || !createdProductId) return;
+
+    if (createdProductRefreshRef.current !== createdProductId) {
+      createdProductRefreshRef.current = createdProductId;
+      void catalog.refresh();
+    }
+
+    // The server page includes this product in initialProducts, which seeds
+    // the initial line state above. Only remove the hand-off query after that
+    // authoritative row is present, then the next search can use the refreshed
+    // catalog without re-entering the creation flow.
+    if (!initialProducts.some((product) => product.id === createdProductId)) return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("createdProductId")) return;
+    params.delete("createdProductId");
+    const query = params.toString();
+    router.replace(`${window.location.pathname}${query ? `?${query}` : ""}`, { scroll: false });
+  }, [catalog, createdProductId, initialProducts, mode, router]);
 
   useEffect(() => {
     if (mode !== "create" || !aiPreview) return;
@@ -516,7 +540,6 @@ export function PurchaseForm({
                 closeLabel={t("common.close")}
                 catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                 className="flex-1"
-                inputClassName="h-11 py-2 lg:h-10"
                 renderItem={(product, { selected }) => (
                   <ProductSearchResultLayout
                     selected={selected}

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { controlHeightClassName } from "@/components/ui/button-variants";
 
 export type ProductKind = "product" | "service" | "combo";
 
@@ -74,8 +75,8 @@ export function ProductCreateMenu({
         className={cn(
           "rounded-lg shadow-e2 active:scale-[0.98] lg:shadow-[0_1px_2px_rgba(0,0,0,0.06)]",
           showLabel
-            ? "h-12 w-auto px-4 lg:h-10 lg:px-4"
-            : "h-11 w-11 px-0 lg:h-10 lg:w-10 lg:px-0",
+            ? `${controlHeightClassName} w-auto px-4`
+            : `${controlHeightClassName} w-11 px-0 lg:w-10`,
         )}
       >
         <PackagePlus className="h-4 w-4" />

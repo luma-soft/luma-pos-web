@@ -77,6 +77,13 @@ describe("purchase freight", () => {
     expect(copy.props.initialValues.shippingFee).toBe(20000);
   });
 
+  test("returning from product creation passes the created product back to the form", async () => {
+    const page = await NewPurchasePage({ searchParams: Promise.resolve({ createdProductId: productId }) });
+    expect(page.props.createdProductId).toBe(productId);
+    expect(page.props.initialProducts.map((product) => product.id)).toEqual([productId]);
+    expect(renderToStaticMarkup(page)).toContain("Ống nhựa");
+  });
+
   test("detail explains the freight included in the purchase total", async () => {
     const html = renderToStaticMarkup(createElement(ConfirmDialogProvider, null, await PurchaseDetailPage({ params: Promise.resolve({ id: purchaseId }) })));
     expect(html).toContain("Phí vận chuyển");

@@ -2224,7 +2224,6 @@ export function PosClient({
               unavailableMessage={t("common.error")}
               closeLabel={t("common.close")}
               className="flex-1"
-              inputClassName="h-11 py-2 lg:h-10"
               renderItem={(result) => {
                 const p = result.product;
                 const resultUnit = result.unitName;

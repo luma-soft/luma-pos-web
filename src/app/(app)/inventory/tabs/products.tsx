@@ -192,7 +192,7 @@ export async function ProductEditorModal({
     ? searchParams.productKind as "product" | "service" | "combo"
     : "product";
   const initialValues = templateProduct
-    ? productToFormInitialValues(templateProduct, seedMode, priceBookPrices, publicMedia)
+    ? productToFormInitialValues(templateProduct, seedMode, priceBookPrices)
     : undefined;
 
   return (
@@ -212,7 +212,7 @@ export async function ProductEditorModal({
           initialValues={initialValues}
           variantGroup={seedProduct?.variantGroup}
           variantTemplateName={seedMode === "groupAdd" ? templateProduct?.name : undefined}
-          initialManagedImages={mode === "edit" || seedMode === "groupAdd" ? templateProduct?.imageMedia : undefined}
+          initialManagedImages={mode === "edit" || seedMode === "copy" || seedMode === "groupCopy" || seedMode === "groupAdd" ? templateProduct?.imageMedia : undefined}
           categories={options.categories}
           brands={options.brands}
           suppliers={options.suppliers}

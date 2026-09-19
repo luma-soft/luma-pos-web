@@ -6,6 +6,7 @@ import {
 } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { controlHeightClassName } from "@/components/ui/button-variants";
 
 type ListSearchInputProps = InputHTMLAttributes<HTMLInputElement> & {
   wrapperClassName?: string;
@@ -25,9 +26,10 @@ export const ListSearchInput = forwardRef<HTMLInputElement, ListSearchInputProps
           aria-label={ariaLabel ?? (typeof placeholder === "string" ? placeholder : undefined)}
           placeholder={placeholder}
           className={cn(
+            controlHeightClassName,
             "min-h-11 w-full rounded-xl border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100",
             className,
-            "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-w-0",
+            "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-0 lg:min-w-0",
           )}
           {...props}
         />
@@ -65,7 +67,8 @@ export const FilterTriggerButton = forwardRef<HTMLButtonElement, FilterTriggerBu
         aria-label={ariaLabel ?? label}
         aria-pressed={ariaPressed ?? active}
         className={cn(
-          "relative inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+          controlHeightClassName,
+          "relative inline-flex shrink-0 items-center gap-2 rounded-lg border px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
           active
             ? "border-primary-600 bg-primary-50 text-primary-700 shadow-sm ring-1 ring-primary-200 hover:bg-primary-100 dark:bg-primary-950/50 dark:text-primary-200 dark:ring-primary-800"
             : "border-primary-600 bg-surface text-primary-700 hover:bg-primary-50",

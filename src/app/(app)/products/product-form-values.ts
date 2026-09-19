@@ -1,6 +1,4 @@
 import type { ProductDetail } from "@/lib/data/products";
-import { parseProductImagePublicUrl } from "@/lib/images/product-image-coordinate";
-import type { PublicMediaConfig } from "@/lib/media/config";
 import type { CreateProductInput } from "./new/schema";
 import { buildVariantCombinations, normalizeVariantAttributes, variantCombinationBudget } from "@/lib/products/variant-model";
 
@@ -34,7 +32,6 @@ export function productToFormInitialValues(
   product: ProductDetail,
   mode: ProductSeedMode = "edit",
   priceBookPrices: Record<string, string | number | null | undefined> = {},
-  publicMedia?: PublicMediaConfig,
 ): Partial<CreateProductInput> {
   const isCopy = mode === "copy" || mode === "groupCopy";
   const clearsIdentity = isCopy || mode === "groupAdd" || mode === "sameType";
@@ -44,6 +41,11 @@ export function productToFormInitialValues(
     ([name]) => !name.startsWith("__"),
   );
   const imageMedia = product.imageMedia ?? [];
+  const imageSourceProductIds = isCopy
+    ? [product.id, product.parentProductId, product.relatedProductId].filter(
+        (id): id is string => Boolean(id),
+      )
+    : [];
   const shared: Partial<CreateProductInput> = {
     productKind: product.productKind,
     categoryId: product.categoryId ?? "",
@@ -139,8 +141,9 @@ export function productToFormInitialValues(
       sku: clearsIdentity ? "" : product.sku,
       barcode: clearsIdentity ? "" : product.barcode ?? "",
       name: addingOne ? product.name : group?.name ?? product.name,
-      imageUrls: isCopy ? [] : product.imageUrls ?? [],
-      imageMediaIds: isCopy ? [] : imageMedia.map((image) => image.mediaId),
+      imageUrls: product.imageUrls ?? [],
+      imageMediaIds: imageMedia.map((image) => image.mediaId),
+      imageSourceProductIds,
       ...(addingOne ? {
         variantTemplateProductId: product.id,
         variantAddValues: Object.fromEntries(attributes.map((attribute) => ["attributeId" in attribute ? attribute.attributeId : "", ""])),
@@ -186,16 +189,9 @@ export function productToFormInitialValues(
     sku: isCopy ? "" : product.sku,
     barcode: isCopy ? "" : (product.barcode ?? ""),
     name: product.name,
-    imageUrls: isCopy
-      ? (product.imageUrls ?? []).filter(
-          (url) =>
-            (!publicMedia || !parseProductImagePublicUrl(url, publicMedia))
-            && !imageMedia.some((image) => image.url === url),
-        )
-      : product.imageUrls ?? [],
-    imageMediaIds: mode === "edit"
-      ? imageMedia.map((image) => image.mediaId)
-      : [],
+    imageUrls: product.imageUrls ?? [],
+    imageMediaIds: imageMedia.map((image) => image.mediaId),
+    imageSourceProductIds,
     location: product.location ?? "",
     description: product.description ?? "",
     invoiceNote: orderNote,

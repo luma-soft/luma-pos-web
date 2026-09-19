@@ -30,17 +30,27 @@ export async function saveProductVariantGroup(input: CreateProductInput): Promis
             .where(and(eq(products.storeId, gate.storeId), inArray(products.id, mediaIds))) : [];
           for (const record of records) {
             const imageUrls = record.imageUrls ?? [];
+            const allowedSourceProductIds = [
+              ...v.imageSourceProductIds,
+              ...(v.variantOperation === "add" && v.variantTemplateProductId
+                ? [v.variantTemplateProductId]
+                : []),
+            ];
             const imageMediaIds = JSON.stringify(imageUrls) === JSON.stringify(v.imageUrls) && v.imageMediaIds.length
-              ? v.imageMediaIds : await resolveLegacyProductImageIdsInTransaction(tx, { storeId: gate.storeId, productId: record.id, imageUrls, publicMedia });
+              ? v.imageMediaIds : await resolveLegacyProductImageIdsInTransaction(tx, {
+                storeId: gate.storeId,
+                productId: record.id,
+                imageUrls,
+                allowedSourceProductIds,
+                publicMedia,
+              });
             await replaceProductMediaInTransaction(tx, {
               storeId: gate.storeId,
               productId: record.id,
               imageMediaIds,
               imageUrls,
               publicMedia,
-              allowedSourceProductIds: v.variantOperation === "add" && v.variantTemplateProductId
-                ? [v.variantTemplateProductId]
-                : [],
+              allowedSourceProductIds,
             });
           }
         }

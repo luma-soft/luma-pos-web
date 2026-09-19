@@ -3,6 +3,8 @@
 import { Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { controlHeightClassName } from "@/components/ui/button-variants";
+import { cn } from "@/lib/utils";
 
 export function CameraMaterialSearch({ value, placeholder }: { value: string; placeholder: string }) {
   const router = useRouter();
@@ -33,7 +35,7 @@ export function CameraMaterialSearch({ value, placeholder }: { value: string; pl
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm transition focus:border-primary-500 focus:outline-none min-h-11 lg:min-h-0"
+        className={cn(controlHeightClassName, "w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm transition focus:border-primary-500 focus:outline-none")}
         autoComplete="off"
       />
     </div>
