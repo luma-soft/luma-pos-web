@@ -8,6 +8,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 export type ProductKind = "product" | "service" | "combo";
@@ -29,10 +30,12 @@ export function ProductCreateMenu({
   label,
   items,
   onSelect,
+  showLabel = true,
 }: {
   label: string;
   items: ProductCreateMenuItem[];
   onSelect?: (kind: ProductKind) => void;
+  showLabel?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -68,10 +71,15 @@ export function ProductCreateMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? "product-create-menu" : undefined}
-        className="h-12 w-auto rounded-lg px-4 shadow-e2 active:scale-[0.98] lg:h-10 lg:px-4 lg:shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+        className={cn(
+          "rounded-lg shadow-e2 active:scale-[0.98] lg:shadow-[0_1px_2px_rgba(0,0,0,0.06)]",
+          showLabel
+            ? "h-12 w-auto px-4 lg:h-10 lg:px-4"
+            : "h-11 w-11 px-0 lg:h-10 lg:w-10 lg:px-0",
+        )}
       >
         <PackagePlus className="h-4 w-4" />
-        <span>{label}</span>
+        {showLabel && <span>{label}</span>}
       </Button>
       {open && (
         <div id="product-create-menu" role="menu" className="absolute bottom-full right-0 z-50 mb-2 w-72 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-e2 sm:bottom-auto sm:top-full sm:mb-0 sm:mt-2 sm:w-80">

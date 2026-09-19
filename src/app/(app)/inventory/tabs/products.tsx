@@ -117,6 +117,7 @@ async function ProductsToolbar({
       />
       <ProductCreateMenu
         label={t("products.createNew")}
+        showLabel
         items={[
           {
             kind: "product",

@@ -2224,7 +2224,7 @@ export function PosClient({
               unavailableMessage={t("common.error")}
               closeLabel={t("common.close")}
               className="flex-1"
-              inputClassName="h-[50px]"
+              inputClassName="h-11 py-2 lg:h-10"
               renderItem={(result) => {
                 const p = result.product;
                 const resultUnit = result.unitName;
@@ -2281,6 +2281,7 @@ export function PosClient({
             />
             <ProductCreateMenu
               label={t("pos.addProduct")}
+              showLabel={false}
               onSelect={openProductCreator}
               items={[
                 { kind: "product", label: t("products.kind.labels.product"), hint: t("products.kind.hints.product") },
@@ -2291,7 +2292,7 @@ export function PosClient({
             <AiQuickActionButton
               onClick={() => setAiQuickOpen(true)}
               label={t("aiQuick.pos.open")}
-              className="h-[50px] w-12"
+              className="h-11 w-11 lg:h-10 lg:w-10 lg:min-h-0 lg:min-w-0"
             />
           </div>}
         </div>

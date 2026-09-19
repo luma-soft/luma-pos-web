@@ -516,6 +516,7 @@ export function PurchaseForm({
                 closeLabel={t("common.close")}
                 catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                 className="flex-1"
+                inputClassName="h-11 py-2 lg:h-10"
                 renderItem={(product, { selected }) => (
                   <ProductSearchResultLayout
                     selected={selected}
@@ -538,6 +539,7 @@ export function PurchaseForm({
               />
               {mode !== "edit" && <ProductCreateMenu
                 label={t("purchases.addProduct")}
+                showLabel={false}
                 onSelect={openProductCreator}
                 items={[
                   { kind: "product", label: t("products.kind.labels.product"), hint: t("products.kind.hints.product") },
@@ -549,7 +551,7 @@ export function PurchaseForm({
                 <AiQuickActionButton
                   onClick={() => setAiQuickOpen(true)}
                   label={t("aiQuick.purchase.open")}
-                  className="h-11 w-12"
+                  className="h-11 w-11 lg:h-10 lg:w-10 lg:min-h-0 lg:min-w-0"
                 />
               )}
             </div>
