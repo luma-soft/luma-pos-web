@@ -278,16 +278,36 @@ export async function getPosData(storeId: string, options?: {
   };
 }
 
-export async function getMobilePosData(storeId: string, role: Role) {
+export async function getMobilePosData(
+  storeId: string,
+  role: Role,
+  options?: { includeProductIds?: readonly string[] },
+) {
   // Reuse the POS dataset so mobile gets the same POS projection,
   // manager-only price books, stock reservations, and product image data.
+  const includeProductIds = [...new Set(options?.includeProductIds ?? [])]
+    .map((id) => id.trim())
+    .filter(Boolean);
   const [data, prefs] = await Promise.all([
-    getPosData(storeId, { role, sort: "recent_sales" }),
+    getPosData(storeId, {
+      role,
+      sort: "recent_sales",
+      includeProductIds,
+    }),
     getRawStorePrefs(storeId),
   ]);
+  const products = data.products.slice(0, 30);
+  const seenProductIds = new Set(products.map((product) => product.id));
+  for (const product of data.products) {
+    if (!includeProductIds.includes(product.id) || seenProductIds.has(product.id)) {
+      continue;
+    }
+    products.push(product);
+    seenProductIds.add(product.id);
+  }
   return {
     ...data,
-    products: data.products.slice(0, 30),
+    products,
     customers: data.customers.slice(0, 100),
     projects: data.projects.slice(0, 100),
     taxPrefs: prefs.tax,
