@@ -340,7 +340,7 @@ export async function OrderDetailPanel({
             className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}
           />
           {(order.status === "completed" || order.status === "quote" || order.status === "confirmed") && order.returns.length === 0 && (
-            <Link href={posSourceHref("edit")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName, "bg-white dark:bg-surface")}>
+            <Link href={posSourceHref("edit")} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName, "bg-white dark:bg-surface")}>
               {isQuote ? t("quotes.edit") : isBooking ? t("bookings.edit") : t("orderEdit.action")}
             </Link>
           )}

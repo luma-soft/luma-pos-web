@@ -22,6 +22,7 @@ import {
   payments,
   priceBooks,
   products,
+  productUnits,
   profiles,
   returnItems,
   returns,
@@ -390,6 +391,21 @@ export async function getOrder(storeId: string, id: string) {
         productImageUpdatedAt: products.imageUpdatedAt,
         productVariantName: products.variantName,
         productSpecs: products.specs,
+        productBaseUnit: products.baseUnit,
+        productUnits: sql<Array<{
+          unitName: string;
+          multiplier: string;
+          priceOverride: string | null;
+        }>>`coalesce((
+          select json_agg(json_build_object(
+            'unitName', ${productUnits.unitName},
+            'multiplier', ${productUnits.multiplier},
+            'priceOverride', ${productUnits.priceOverride}
+          ) order by ${productUnits.sortOrder}, ${productUnits.id})
+          from ${productUnits}
+          where ${productUnits.storeId} = ${storeId}
+            and ${productUnits.productId} = ${orderItems.productId}
+        ), '[]'::json)`,
       })
       .from(orderItems)
       .leftJoin(

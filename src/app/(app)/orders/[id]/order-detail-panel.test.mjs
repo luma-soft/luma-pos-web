@@ -85,4 +85,14 @@ describe("order detail customer navigation", () => {
       expect(html).not.toContain("detailCustomerId=");
     });
   }
+
+  test("edit action opens the POS editor in a new tab", async () => {
+    const html = await renderPanel();
+    const editLink = (html.match(/<a\b[^>]*>[\s\S]*?<\/a>/g) ?? [])
+      .find((link) => link.includes("sourceMode=edit"));
+
+    expect(editLink).toBeDefined();
+    expect(editLink).toContain('target="_blank"');
+    expect(editLink).toContain('rel="noopener noreferrer"');
+  });
 });
