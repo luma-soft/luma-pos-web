@@ -1409,6 +1409,7 @@
     "sepay": {
       "title": "Quét VietQR để thanh toán",
       "paymentMethod": "Chuyển khoản",
+      "preparing": "Đang chuẩn bị mã QR...",
       "invoice": "Hóa đơn {code}",
       "scanHint": "Mở app ngân hàng và quét mã",
       "qrAlt": "Mã thanh toán VietQR",

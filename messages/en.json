@@ -1409,6 +1409,7 @@
     "sepay": {
       "title": "Scan VietQR to pay",
       "paymentMethod": "Bank transfer",
+      "preparing": "Preparing QR code...",
       "invoice": "Invoice {code}",
       "scanHint": "Open your banking app and scan",
       "qrAlt": "VietQR payment code",

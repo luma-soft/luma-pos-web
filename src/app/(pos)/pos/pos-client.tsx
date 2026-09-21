@@ -484,6 +484,9 @@ export function PosClient({
   const [refreshingPricing, setRefreshingPricing] = useState(false);
   const [pricingRoutePending, startPricingRefresh] = useTransition();
   const [sepayCheckout, setSepayCheckout] = useState<SepayCheckout | null>(null);
+  const [sepayCheckoutLoading, setSepayCheckoutLoading] = useState(false);
+  const [sepayCheckoutAmount, setSepayCheckoutAmount] = useState(0);
+  const sepaySetupAttemptRef = useRef(0);
   // kéo thả: sắp xếp dòng trong giỏ + thả SP từ danh sách vào giỏ
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
@@ -1481,7 +1484,11 @@ export function PosClient({
     return line.returnSoldQuantity == null ? normalized : Math.min(normalized, line.returnSoldQuantity);
   }
 
-  async function submitOrder(mode: "sale" | "quote" | "booking", selectedPayMethod = payMethod) {
+  async function submitOrder(
+    mode: "sale" | "quote" | "booking",
+    selectedPayMethod = payMethod,
+    sepaySetupAttempt?: number,
+  ) {
     if (cart.length === 0 || !data.warehouse || submitting || refreshingPricing || pricingRoutePending) return;
     if (cart.some((line) => !Number.isFinite(basePriceFor(line.product, line.priceBook ?? priceBook, data.priceBooks)))) {
       setError(t("pricing.errors.priceUnavailable"));
@@ -1585,6 +1592,9 @@ export function PosClient({
             paymentQr,
           });
           closeInvoice(activeId);
+          if (sepaySetupAttempt != null && sepaySetupAttempt !== sepaySetupAttemptRef.current) {
+            return;
+          }
           setSepayCheckout({ ...paymentJson.data, orderId: res.data.id, orderCode: res.data.code, printJob });
           return;
         }
@@ -1616,13 +1626,26 @@ export function PosClient({
     }
   }
 
+  async function startSepayCheckout() {
+    if (submitting || sepayCheckout || sepayCheckoutLoading) return;
+    const attempt = ++sepaySetupAttemptRef.current;
+    setSepayCheckout(null);
+    setSepayCheckoutAmount(Math.min(Math.max(0, paidInput ?? total), total));
+    setSepayCheckoutLoading(true);
+    try {
+      await submitOrder("sale", "bank_transfer", attempt);
+    } finally {
+      if (sepaySetupAttemptRef.current === attempt) {
+        setSepayCheckoutLoading(false);
+      }
+    }
+  }
+
   async function selectPayMethod(method: PayMethod) {
-    if (submitting || sepayCheckout) return;
+    if (submitting || sepayCheckout || sepayCheckoutLoading) return;
     setPayMethod(method);
     if (method === "bank_transfer" && isInvoiceDraft) {
-      // Creating the pending draft here gives the QR a real invoice reference
-      // before the cashier leaves the payment-method control.
-      await submitOrder("sale", method);
+      await startSepayCheckout();
     }
   }
 
@@ -1738,7 +1761,14 @@ export function PosClient({
     setOfflineSaved(true);
     setTimeout(() => setOfflineSaved(false), 3500);
   }
-  const submitActiveDraft = () => isReturnDraft ? submitReturn() : submitOrder(isQuoteDraft ? "quote" : isBookingDraft ? "booking" : "sale");
+  const submitActiveDraft = () => {
+    if (!isReturnDraft && isInvoiceDraft && payMethod === "bank_transfer") {
+      return startSepayCheckout();
+    }
+    return isReturnDraft
+      ? submitReturn()
+      : submitOrder(isQuoteDraft ? "quote" : isBookingDraft ? "booking" : "sale");
+  };
 
   /** Mở in phiếu tạm theo khổ đã chọn. */
   const doPrint = (size: PaperSize) => {
@@ -2608,7 +2638,7 @@ export function PosClient({
               </button>
             </div>
             <button
-              disabled={(isReturnDraft ? !hasReturnQuantity : cart.length === 0) || submitting || refreshingPricing || pricingRoutePending || !data.warehouse || !!sepayCheckout}
+              disabled={(isReturnDraft ? !hasReturnQuantity : cart.length === 0) || submitting || refreshingPricing || pricingRoutePending || !data.warehouse || !!sepayCheckout || sepayCheckoutLoading}
               onClick={submitActiveDraft}
               className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
             >
@@ -2643,11 +2673,15 @@ export function PosClient({
         onCreated={applyCreatedCustomer}
         createAction={createPosCustomer}
       />
-      {sepayCheckout && (
+      {(sepayCheckout || sepayCheckoutLoading) && (
         <SepayCheckoutModal
           checkout={sepayCheckout}
+          amount={sepayCheckout?.amount ?? sepayCheckoutAmount}
+          loading={sepayCheckoutLoading}
           onManualConfirm={confirmSepayPaymentManually}
           onClose={() => {
+            if (sepayCheckoutLoading) sepaySetupAttemptRef.current += 1;
+            setSepayCheckoutLoading(false);
             setSepayCheckout(null);
           }}
         />
@@ -2845,21 +2879,25 @@ export function PosClient({
 
 function SepayCheckoutModal({
   checkout,
+  amount,
+  loading,
   onManualConfirm,
   onClose,
 }: {
-  checkout: SepayCheckout;
+  checkout: SepayCheckout | null;
+  amount: number;
+  loading: boolean;
   onManualConfirm: () => Promise<string | null>;
   onClose: () => void;
 }) {
   const t = useTranslations();
-  const confirmed = ["confirmed", "reconciled", "manual_confirmed"].includes(checkout.status);
-  const manuallyConfirmed = checkout.status === "manual_confirmed";
+  const confirmed = checkout != null && ["confirmed", "reconciled", "manual_confirmed"].includes(checkout.status);
+  const manuallyConfirmed = checkout?.status === "manual_confirmed";
   const [manualConfirming, setManualConfirming] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
 
   async function confirmManually() {
-    if (manualConfirming || confirmed) return;
+    if (!checkout || manualConfirming || confirmed) return;
     setManualConfirming(true);
     setManualError(null);
     const error = await onManualConfirm();
@@ -2880,7 +2918,9 @@ function SepayCheckoutModal({
           <div>
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary-600">{t("pos.sepay.paymentMethod")}</div>
             <div id="pos-sepay-title" className="text-base font-bold">{t("pos.sepay.title")}</div>
-            <div className="mt-1 text-xs text-slate-500">{t("pos.sepay.invoice", { code: checkout.orderCode })}</div>
+            <div className="mt-1 text-xs text-slate-500">
+              {loading ? t("pos.sepay.preparing") : checkout ? t("pos.sepay.invoice", { code: checkout.orderCode }) : null}
+            </div>
           </div>
           <button type="button" onClick={onClose} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-600 lg:h-8 lg:w-8">
             <X className="h-4 w-4" />
@@ -2891,11 +2931,18 @@ function SepayCheckoutModal({
             <div className="rounded-2xl border border-primary-100 bg-primary-50/60 p-3 dark:border-primary-900/50 dark:bg-primary-950/20">
               <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-primary-700 dark:text-primary-300">
                 <span>{t("pos.sepay.scanHint")}</span>
-                <span className="rounded-full bg-white px-2 py-1 text-[11px] tabular-nums text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">{formatCurrency(checkout.amount)}</span>
+                <span className="rounded-full bg-white px-2 py-1 text-[11px] tabular-nums text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">{formatCurrency(amount)}</span>
               </div>
               <div className="mx-auto grid max-w-[260px] place-items-center rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={checkout.qrImageUrl} alt={t("pos.sepay.qrAlt")} className="aspect-square w-full object-contain" />
+                {checkout ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={checkout.qrImageUrl} alt={t("pos.sepay.qrAlt")} className="aspect-square w-full object-contain" />
+                ) : (
+                  <div className="flex aspect-square w-full flex-col items-center justify-center gap-3 text-sm text-slate-500">
+                    <Loader2 className="h-7 w-7 animate-spin text-primary-600" />
+                    <span>{t("pos.sepay.preparing")}</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className={cn(
@@ -2903,37 +2950,45 @@ function SepayCheckoutModal({
               confirmed ? "bg-ok-soft text-ok" : "bg-in-soft text-in"
             )}>
               {confirmed ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <Loader2 className="h-4 w-4 shrink-0 animate-spin" />}
-              <span>{manuallyConfirmed ? t("pos.sepay.manualConfirmed") : confirmed ? t("pos.sepay.confirmed") : t("pos.sepay.waiting")}</span>
+              <span>{loading ? t("pos.sepay.preparing") : manuallyConfirmed ? t("pos.sepay.manualConfirmed") : confirmed ? t("pos.sepay.confirmed") : t("pos.sepay.waiting")}</span>
             </div>
           </div>
 
           <div className="space-y-3">
-            <div className="rounded-xl border border-border bg-canvas p-3 text-xs">
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{t("pos.sepay.transferDetails")}</div>
-              <div className="flex justify-between gap-3 border-t border-border/70 py-2"><span className="text-slate-500">{t("pos.sepay.bank")}</span><span className="text-right font-semibold">{checkout.bankAccount.gateway ?? checkout.bankAccount.bankCode}</span></div>
-              <div className="flex justify-between gap-3 border-t border-border/70 py-2"><span className="text-slate-500">{t("pos.sepay.account")}</span><span className="text-right font-mono font-semibold">{checkout.bankAccount.accountNumber}</span></div>
-              <div className="flex justify-between gap-3 border-t border-border/70 py-2"><span className="text-slate-500">{t("pos.sepay.name")}</span><span className="text-right font-semibold">{checkout.bankAccount.accountName}</span></div>
-              <div className="flex justify-between gap-3 border-t border-border/70 py-2"><span className="text-slate-500">{t("pos.sepay.reference")}</span><span className="text-right font-mono font-semibold">{checkout.reference}</span></div>
-            </div>
-            {!confirmed && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
-                <div className="flex gap-2 text-xs leading-5 text-amber-900 dark:text-amber-100">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{t("pos.sepay.manualConfirmHint")}</span>
+            {checkout ? (
+              <>
+                <div className="rounded-xl border border-border bg-canvas p-3 text-xs">
+                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{t("pos.sepay.transferDetails")}</div>
+                  <div className="flex justify-between gap-3 border-t border-border/70 py-2"><span className="text-slate-500">{t("pos.sepay.bank")}</span><span className="text-right font-semibold">{checkout.bankAccount.gateway ?? checkout.bankAccount.bankCode}</span></div>
+                  <div className="flex justify-between gap-3 border-t border-border/70 py-2"><span className="text-slate-500">{t("pos.sepay.account")}</span><span className="text-right font-mono font-semibold">{checkout.bankAccount.accountNumber}</span></div>
+                  <div className="flex justify-between gap-3 border-t border-border/70 py-2"><span className="text-slate-500">{t("pos.sepay.name")}</span><span className="text-right font-semibold">{checkout.bankAccount.accountName}</span></div>
+                  <div className="flex justify-between gap-3 border-t border-border/70 py-2"><span className="text-slate-500">{t("pos.sepay.reference")}</span><span className="text-right font-mono font-semibold">{checkout.reference}</span></div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void confirmManually()}
-                  disabled={manualConfirming}
-                  className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
-                >
-                  {manualConfirming && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {manualConfirming ? t("pos.sepay.manualConfirming") : t("pos.sepay.manualConfirm")}
-                </button>
-                {manualError && <div className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">{manualError}</div>}
+                {!confirmed && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
+                    <div className="flex gap-2 text-xs leading-5 text-amber-900 dark:text-amber-100">
+                      <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{t("pos.sepay.manualConfirmHint")}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void confirmManually()}
+                      disabled={manualConfirming}
+                      className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                    >
+                      {manualConfirming && <Loader2 className="h-4 w-4 animate-spin" />}
+                      {manualConfirming ? t("pos.sepay.manualConfirming") : t("pos.sepay.manualConfirm")}
+                    </button>
+                    {manualError && <div className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">{manualError}</div>}
+                  </div>
+                )}
+                {!confirmed && <div className="text-xs leading-5 text-slate-500">{t("pos.sepay.checkingHint")}</div>}
+              </>
+            ) : (
+              <div className="flex min-h-32 items-center justify-center rounded-xl border border-border bg-canvas p-4 text-center text-sm text-slate-500">
+                {t("pos.sepay.preparing")}
               </div>
             )}
-            {!confirmed && <div className="text-xs leading-5 text-slate-500">{t("pos.sepay.checkingHint")}</div>}
           </div>
 
           <button className={cn(
