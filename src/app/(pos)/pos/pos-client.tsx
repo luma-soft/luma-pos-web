@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil } from "lucide-react";
+import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ShieldCheck } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import { Combobox } from "@/components/combobox";
@@ -1481,7 +1481,7 @@ export function PosClient({
     return line.returnSoldQuantity == null ? normalized : Math.min(normalized, line.returnSoldQuantity);
   }
 
-  async function submitOrder(mode: "sale" | "quote" | "booking") {
+  async function submitOrder(mode: "sale" | "quote" | "booking", selectedPayMethod = payMethod) {
     if (cart.length === 0 || !data.warehouse || submitting || refreshingPricing || pricingRoutePending) return;
     if (cart.some((line) => !Number.isFinite(basePriceFor(line.product, line.priceBook ?? priceBook, data.priceBooks)))) {
       setError(t("pricing.errors.priceUnavailable"));
@@ -1489,11 +1489,13 @@ export function PosClient({
     }
     const submitMode = sourceInvoice ? sourceInvoice.kind === "quote" ? "quote" : sourceInvoice.kind === "booking" ? "booking" : mode : mode;
     const isCheckoutMode = submitMode === "sale";
-    if (submitMode === "sale" && payMethod === "credit" && !customerId) {
+    const selectedPaid = selectedPayMethod === "credit" ? 0 : (paidInput ?? total);
+    const selectedPayableAmount = Math.min(Math.max(0, selectedPaid), total);
+    if (submitMode === "sale" && selectedPayMethod === "credit" && !customerId) {
       setError(t("pos.errors.creditNeedsCustomer"));
       return;
     }
-    if (submitMode === "sale" && payMethod === "bank_transfer" && payableAmount <= 0) {
+    if (submitMode === "sale" && selectedPayMethod === "bank_transfer" && selectedPayableAmount <= 0) {
       setError(t("pos.sepay.invalidAmount"));
       return;
     }
@@ -1520,7 +1522,11 @@ export function PosClient({
       priceBookId: priceBook || null,
       items: cart.map(buildPosOrderItemPayload),
       expectedPricing: buildExpectedPosPricing(cart, (line) => effPrice(line).price),
-      payment: { method: isCheckoutMode ? payMethod : "credit", amount: isCheckoutMode && payMethod !== "bank_transfer" ? paid : 0 },
+      paymentPending: isCheckoutMode && selectedPayMethod === "bank_transfer",
+      payment: {
+        method: isCheckoutMode && selectedPayMethod === "bank_transfer" ? "credit" : isCheckoutMode ? selectedPayMethod : "credit",
+        amount: isCheckoutMode && selectedPayMethod !== "bank_transfer" ? paid : 0,
+      },
     };
     setSubmittingMode(submitMode);
     setError("");
@@ -1528,7 +1534,7 @@ export function PosClient({
 
     // offline → xếp hàng chờ đồng bộ
     if (typeof navigator !== "undefined" && !navigator.onLine) {
-      if (payMethod === "bank_transfer") {
+      if (selectedPayMethod === "bank_transfer") {
         setSubmittingMode(null);
         setError(t("pos.sepay.onlineRequired"));
         return;
@@ -1540,13 +1546,13 @@ export function PosClient({
     if (res.kind === "created") {
       try {
         void productCatalog.refresh();
-        if (submitMode === "sale" && payMethod === "bank_transfer") {
+        if (submitMode === "sale" && selectedPayMethod === "bank_transfer") {
           const paymentRes = await fetch("/api/payments/sepay", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               orderId: res.data.id,
-              amount: payableAmount,
+              amount: selectedPayableAmount,
               note: res.data.code,
             }),
           });
@@ -1593,20 +1599,53 @@ export function PosClient({
       } catch {
         // The server already created the order. Never enqueue it again after a payment/print error.
         setSubmittingMode(null);
-        setError(t(payMethod === "bank_transfer" ? "pos.sepay.createFailed" : "errors.serverError"));
+        setError(t(selectedPayMethod === "bank_transfer" ? "pos.sepay.createFailed" : "errors.serverError"));
       }
     } else if (res.kind === "rejected") {
       setSubmittingMode(null);
       setError(t(res.error));
       if (res.error === "pos.errors.pricingChanged") setPricingConflictId(activeId);
     } else {
-      if (payMethod === "bank_transfer") {
+      if (selectedPayMethod === "bank_transfer") {
         setSubmittingMode(null);
         setError(t("pos.sepay.createFailed"));
         return;
       }
       // mất mạng giữa chừng → xếp hàng offline
       await queueOffline(payload);
+    }
+  }
+
+  async function selectPayMethod(method: PayMethod) {
+    if (submitting || sepayCheckout) return;
+    setPayMethod(method);
+    if (method === "bank_transfer" && isInvoiceDraft) {
+      // Creating the pending draft here gives the QR a real invoice reference
+      // before the cashier leaves the payment-method control.
+      await submitOrder("sale", method);
+    }
+  }
+
+  async function confirmSepayPaymentManually() {
+    const checkout = sepayCheckout;
+    if (!checkout || ["confirmed", "reconciled", "manual_confirmed"].includes(checkout.status)) return null;
+    try {
+      const response = await fetch(`/api/payments/sepay/${checkout.paymentId}/confirm`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ reason: "pos_manual_confirmation" }),
+      });
+      const result = await response.json() as { ok: boolean; data?: unknown; error?: string };
+      if (!result.ok) return result.error ? t(result.error) : t("pos.sepay.confirmFailed");
+      setSepayCheckout((current) => current?.paymentId === checkout.paymentId
+        ? { ...current, status: "manual_confirmed" }
+        : current
+      );
+      setPrintJob(checkout.printJob);
+      setPrintSize(printDefaultSize);
+      return null;
+    } catch {
+      return t("pos.sepay.confirmFailed");
     }
   }
 
@@ -2453,7 +2492,8 @@ export function PosClient({
                 {(["cash", "bank_transfer", "credit"] as PayMethod[]).map((m) => (
                   <button
                     key={m}
-                    onClick={() => setPayMethod(m)}
+                    type="button"
+                    onClick={() => void selectPayMethod(m)}
                     className={cn(
                       "py-1.5 rounded-lg text-xs font-medium border",
                       payMethod === m
@@ -2476,7 +2516,8 @@ export function PosClient({
                 {(["cash", "bank_transfer", "credit"] as PayMethod[]).map((m) => (
                   <button
                     key={m}
-                    onClick={() => setPayMethod(m)}
+                    type="button"
+                    onClick={() => void selectPayMethod(m)}
                     className={cn(
                       "py-1.5 rounded-lg text-xs font-medium border",
                       payMethod === m
@@ -2605,6 +2646,7 @@ export function PosClient({
       {sepayCheckout && (
         <SepayCheckoutModal
           checkout={sepayCheckout}
+          onManualConfirm={confirmSepayPaymentManually}
           onClose={() => {
             setSepayCheckout(null);
           }}
@@ -2801,9 +2843,30 @@ export function PosClient({
   );
 }
 
-function SepayCheckoutModal({ checkout, onClose }: { checkout: SepayCheckout; onClose: () => void }) {
+function SepayCheckoutModal({
+  checkout,
+  onManualConfirm,
+  onClose,
+}: {
+  checkout: SepayCheckout;
+  onManualConfirm: () => Promise<string | null>;
+  onClose: () => void;
+}) {
   const t = useTranslations();
   const confirmed = ["confirmed", "reconciled", "manual_confirmed"].includes(checkout.status);
+  const manuallyConfirmed = checkout.status === "manual_confirmed";
+  const [manualConfirming, setManualConfirming] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+
+  async function confirmManually() {
+    if (manualConfirming || confirmed) return;
+    setManualConfirming(true);
+    setManualError(null);
+    const error = await onManualConfirm();
+    if (error) setManualError(error);
+    setManualConfirming(false);
+  }
+
   return (
     <>
       <div className="fixed inset-0 z-[90] bg-slate-950/45" />
@@ -2811,36 +2874,72 @@ function SepayCheckoutModal({ checkout, onClose }: { checkout: SepayCheckout; on
         role="dialog"
         aria-modal="true"
         aria-labelledby="pos-sepay-title"
-        className="fixed inset-x-3 top-1/2 z-[100] mx-auto max-w-md -translate-y-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-e2 sm:inset-x-0"
+        className="fixed inset-x-3 top-1/2 z-[100] mx-auto max-h-[min(92dvh,720px)] max-w-xl -translate-y-1/2 overflow-auto rounded-2xl border border-border bg-surface shadow-e2 sm:inset-x-0"
       >
-        <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3.5 sm:px-5">
           <div>
-            <div id="pos-sepay-title" className="text-sm font-bold">{t("pos.sepay.title")}</div>
-            <div className="mt-0.5 text-xs text-slate-500">{checkout.orderCode} · {formatCurrency(checkout.amount)}</div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary-600">{t("pos.sepay.paymentMethod")}</div>
+            <div id="pos-sepay-title" className="text-base font-bold">{t("pos.sepay.title")}</div>
+            <div className="mt-1 text-xs text-slate-500">{t("pos.sepay.invoice", { code: checkout.orderCode })}</div>
           </div>
           <button type="button" onClick={onClose} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-600 lg:h-8 lg:w-8">
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="space-y-4 p-4">
-          <div className="mx-auto grid w-56 place-items-center rounded-xl border border-border bg-white p-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={checkout.qrImageUrl} alt={t("pos.sepay.qrAlt")} className="h-52 w-52 object-contain" />
+        <div className="grid gap-5 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] sm:p-5">
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-primary-100 bg-primary-50/60 p-3 dark:border-primary-900/50 dark:bg-primary-950/20">
+              <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-primary-700 dark:text-primary-300">
+                <span>{t("pos.sepay.scanHint")}</span>
+                <span className="rounded-full bg-white px-2 py-1 text-[11px] tabular-nums text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">{formatCurrency(checkout.amount)}</span>
+              </div>
+              <div className="mx-auto grid max-w-[260px] place-items-center rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={checkout.qrImageUrl} alt={t("pos.sepay.qrAlt")} className="aspect-square w-full object-contain" />
+              </div>
+            </div>
+            <div className={cn(
+              "flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold",
+              confirmed ? "bg-ok-soft text-ok" : "bg-in-soft text-in"
+            )}>
+              {confirmed ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <Loader2 className="h-4 w-4 shrink-0 animate-spin" />}
+              <span>{manuallyConfirmed ? t("pos.sepay.manualConfirmed") : confirmed ? t("pos.sepay.confirmed") : t("pos.sepay.waiting")}</span>
+            </div>
           </div>
-          <div className="rounded-xl border border-border bg-canvas p-3 text-xs">
-            <div className="flex justify-between gap-3 py-1"><span className="text-slate-500">{t("pos.sepay.bank")}</span><span className="font-semibold text-right">{checkout.bankAccount.gateway ?? checkout.bankAccount.bankCode}</span></div>
-            <div className="flex justify-between gap-3 py-1"><span className="text-slate-500">{t("pos.sepay.account")}</span><span className="font-mono font-semibold text-right">{checkout.bankAccount.accountNumber}</span></div>
-            <div className="flex justify-between gap-3 py-1"><span className="text-slate-500">{t("pos.sepay.name")}</span><span className="font-semibold text-right">{checkout.bankAccount.accountName}</span></div>
-            <div className="flex justify-between gap-3 py-1"><span className="text-slate-500">{t("pos.sepay.reference")}</span><span className="font-mono font-semibold text-right">{checkout.reference}</span></div>
+
+          <div className="space-y-3">
+            <div className="rounded-xl border border-border bg-canvas p-3 text-xs">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{t("pos.sepay.transferDetails")}</div>
+              <div className="flex justify-between gap-3 border-t border-border/70 py-2"><span className="text-slate-500">{t("pos.sepay.bank")}</span><span className="text-right font-semibold">{checkout.bankAccount.gateway ?? checkout.bankAccount.bankCode}</span></div>
+              <div className="flex justify-between gap-3 border-t border-border/70 py-2"><span className="text-slate-500">{t("pos.sepay.account")}</span><span className="text-right font-mono font-semibold">{checkout.bankAccount.accountNumber}</span></div>
+              <div className="flex justify-between gap-3 border-t border-border/70 py-2"><span className="text-slate-500">{t("pos.sepay.name")}</span><span className="text-right font-semibold">{checkout.bankAccount.accountName}</span></div>
+              <div className="flex justify-between gap-3 border-t border-border/70 py-2"><span className="text-slate-500">{t("pos.sepay.reference")}</span><span className="text-right font-mono font-semibold">{checkout.reference}</span></div>
+            </div>
+            {!confirmed && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
+                <div className="flex gap-2 text-xs leading-5 text-amber-900 dark:text-amber-100">
+                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{t("pos.sepay.manualConfirmHint")}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void confirmManually()}
+                  disabled={manualConfirming}
+                  className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                >
+                  {manualConfirming && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {manualConfirming ? t("pos.sepay.manualConfirming") : t("pos.sepay.manualConfirm")}
+                </button>
+                {manualError && <div className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">{manualError}</div>}
+              </div>
+            )}
+            {!confirmed && <div className="text-xs leading-5 text-slate-500">{t("pos.sepay.checkingHint")}</div>}
           </div>
-          <div className={cn(
-            "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold",
-            confirmed ? "bg-ok-soft text-ok" : "bg-in-soft text-in"
-          )}>
-            {confirmed ? <CheckCircle2 className="h-4 w-4" /> : <Loader2 className="h-4 w-4 animate-spin" />}
-            <span>{confirmed ? t("pos.sepay.confirmed") : t("pos.sepay.waiting")}</span>
-          </div>
-          <button type="button" onClick={onClose} className="min-h-11 w-full rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2">
+
+          <button className={cn(
+            "sm:col-span-2 min-h-11 w-full rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2",
+            confirmed ? "bg-surface-2" : "bg-surface"
+          )} type="button" onClick={onClose}>
             {t("pos.sepay.viewOrder")}
           </button>
         </div>
