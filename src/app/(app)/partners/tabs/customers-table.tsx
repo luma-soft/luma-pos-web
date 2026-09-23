@@ -25,9 +25,18 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Pagination } from "@/components/pagination";
-import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } from "@/components/data-table";
+import {
+  DataTableShell,
+  RowPreviewModal,
+  stopRowToggle,
+  type DataTableColumn,
+} from "@/components/data-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
-import { FilterTriggerButton, ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
+import {
+  FilterTriggerButton,
+  ListSearchFilterBar,
+  ListSearchInput,
+} from "@/components/list-search-filter";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { CustomerCreateDialog } from "@/components/partners/customer-create-dialog";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -64,22 +73,45 @@ type OrderPreview = {
   tax: string | number;
   shippingFee: string | number;
   items: Array<{
-    id: string; productName: string; unitName: string; quantity: string | number;
-    unitPrice: string | number; discount: string | number; total: string | number;
+    id: string;
+    productName: string;
+    unitName: string;
+    quantity: string | number;
+    unitPrice: string | number;
+    discount: string | number;
+    total: string | number;
     preDiscountUnitPrice?: string | number | null;
     lineDiscountMode?: "pct" | "vnd" | null;
     lineDiscountValue?: string | number | null;
     priceBookName?: string | null;
   }>;
-  payments: Array<{ id: string; createdAt: string; method: string; amount: string | number; note: string | null }>;
+  payments: Array<{
+    id: string;
+    createdAt: string;
+    method: string;
+    amount: string | number;
+    note: string | null;
+  }>;
 };
 
-async function loadOrderPreview(orderId: string, signal: AbortSignal): Promise<OrderPreview> {
-  const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}/preview`, { cache: "no-store", signal });
+async function loadOrderPreview(
+  orderId: string,
+  signal: AbortSignal,
+): Promise<OrderPreview> {
+  const response = await fetch(
+    `/api/orders/${encodeURIComponent(orderId)}/preview`,
+    { cache: "no-store", signal },
+  );
   const payload = await response.json();
   if (!response.ok || !payload.ok) throw new Error("errors.serverError");
   const order = payload.data.order as OrderPreview;
-  return { ...order, items: order.items.map((item) => ({ ...item, ...readOrderLinePricing(item) })) };
+  return {
+    ...order,
+    items: order.items.map((item) => ({
+      ...item,
+      ...readOrderLinePricing(item),
+    })),
+  };
 }
 
 function useOrderPreview() {
@@ -89,7 +121,11 @@ function useOrderPreview() {
   return {
     openOrderPreview: setOrderId,
     closeOrderPreview: () => setOrderId(null),
-    preview: state && { loading: state.loading, order: state.data, error: state.error ? t(state.error as never) : undefined },
+    preview: state && {
+      loading: state.loading,
+      order: state.data,
+      error: state.error ? t(state.error as never) : undefined,
+    },
   };
 }
 
@@ -127,7 +163,15 @@ export function CustomersTable({
   return (
     <div className="min-w-0">
       <section className="min-w-0">
-        <CustomerRows data={data} filters={filters} returnPrintTemplates={returnPrintTemplates} aiPreview={aiPreview} initialDetailId={initialDetailId} initialDetailCustomer={initialDetailCustomer} onOpenFilters={() => setFilterOpen(true)} />
+        <CustomerRows
+          data={data}
+          filters={filters}
+          returnPrintTemplates={returnPrintTemplates}
+          aiPreview={aiPreview}
+          initialDetailId={initialDetailId}
+          initialDetailCustomer={initialDetailCustomer}
+          onOpenFilters={() => setFilterOpen(true)}
+        />
 
         <Pagination
           page={data.page}
@@ -139,14 +183,23 @@ export function CustomersTable({
       </section>
 
       {filterOpen && (
-        <div className="fixed inset-0 z-[80] bg-slate-950/40" onMouseDown={() => setFilterOpen(false)}>
+        <div
+          className="fixed inset-0 z-[80] bg-slate-950/40"
+          onMouseDown={() => setFilterOpen(false)}
+        >
           <div
             className="ml-auto flex h-full w-full max-w-md flex-col overflow-auto bg-surface p-4 shadow-2xl"
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-bold">{t("customers.filters.title")}</h2>
-              <button type="button" onClick={() => setFilterOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-surface-2 hover:text-slate-700 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+              <h2 className="text-base font-bold">
+                {t("customers.filters.title")}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setFilterOpen(false)}
+                className="rounded-lg p-2 text-slate-400 hover:bg-surface-2 hover:text-slate-700 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -171,7 +224,7 @@ function CustomerSearch({
 
   return (
     <ListSearchFilterBar
-      search={(
+      search={
         <InstantFilterForm action={Routes.Partners}>
           <input type="hidden" name="tab" value="customers" />
           <input type="hidden" name="size" value={pageSize} />
@@ -182,15 +235,15 @@ function CustomerSearch({
             placeholder={t("customers.searchPlaceholder")}
           />
         </InstantFilterForm>
-      )}
-      filter={(
+      }
+      filter={
         <FilterTriggerButton
           onClick={onOpenFilters}
           label={t("suppliers.filter.button")}
           active={FILTER_KEYS.some((key) => Boolean(filters[key]))}
           hideLabelOnSmallScreens
         />
-      )}
+      }
     />
   );
 }
@@ -216,33 +269,104 @@ function CustomerRows({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [createOpen, setCreateOpen] = useState(aiPreview);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(initialDetailId);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
+    initialDetailId,
+  );
   const [detailTab, setDetailTab] = useState<CustomerExpandTab>("info");
-  const selectedCustomer = data.rows.find((customer) => customer.id === selectedCustomerId)
-    ?? (initialDetailCustomer?.id === selectedCustomerId ? initialDetailCustomer : null);
+  const selectedCustomer =
+    data.rows.find((customer) => customer.id === selectedCustomerId) ??
+    (initialDetailCustomer?.id === selectedCustomerId
+      ? initialDetailCustomer
+      : null);
   function closeCustomer() {
     setSelectedCustomerId(null);
     if (searchParams.has("detailCustomerId")) {
       const next = new URLSearchParams(searchParams.toString());
       next.delete("detailCustomerId");
-      router.replace(`${Routes.Partners}?${next.toString()}`, { scroll: false });
+      router.replace(`${Routes.Partners}?${next.toString()}`, {
+        scroll: false,
+      });
     }
   }
   const columns: DataTableColumn<CustomerRow>[] = [
     {
       key: "select",
-      label: <Checkbox className="h-4 w-4" aria-label={t("customers.selectAll")} />,
+      label: (
+        <Checkbox className="h-4 w-4" aria-label={t("customers.selectAll")} />
+      ),
       required: true,
       width: "44px",
       align: "center",
-      render: (customer) => <Checkbox className="h-4 w-4" aria-label={customer.name} onClick={stopRowToggle} />,
+      render: (customer) => (
+        <Checkbox
+          className="h-4 w-4"
+          aria-label={customer.name}
+          onClick={stopRowToggle}
+        />
+      ),
     },
-    { key: "code", label: t("customers.cols.code"), defaultVisible: true, width: "130px", render: (customer) => <span className="font-medium">{customer.code ?? "—"}</span> },
-    { key: "name", label: t("customers.cols.name"), required: true, render: (customer) => <PartnerDetailLink kind="customer" partnerId={customer.id} name={customer.name} className="font-semibold" /> },
-    { key: "phone", label: t("customers.cols.phone"), defaultVisible: true, width: "130px", render: (customer) => <span className="text-slate-600 dark:text-slate-300">{customer.phone ?? "—"}</span> },
-    { key: "debt", label: t("customers.cols.debtCurrent"), defaultVisible: true, align: "right", width: "150px", cellClassName: (customer) => Number(customer.currentDebt) > 0 ? "font-semibold text-er" : "font-semibold text-slate-400", render: (customer) => formatCurrency(Number(customer.currentDebt)) },
-    { key: "grossSales", label: t("customers.cols.totalGrossSales"), defaultVisible: true, align: "right", width: "170px", render: (customer) => formatCurrency(Number(customer.grossSales)) },
-    { key: "netSales", label: t("customers.cols.totalSalesNet"), defaultVisible: true, align: "right", width: "190px", render: (customer) => formatCurrency(Number(customer.totalSpent)) },
+    {
+      key: "code",
+      label: t("customers.cols.code"),
+      defaultVisible: true,
+      width: "130px",
+      render: (customer) => (
+        <span className="font-medium">{customer.code ?? "—"}</span>
+      ),
+    },
+    {
+      key: "name",
+      label: t("customers.cols.name"),
+      required: true,
+      width: "200px",
+      render: (customer) => (
+        <PartnerDetailLink
+          kind="customer"
+          partnerId={customer.id}
+          name={customer.name}
+          className="font-semibold"
+        />
+      ),
+    },
+    {
+      key: "phone",
+      label: t("customers.cols.phone"),
+      defaultVisible: true,
+      width: "130px",
+      render: (customer) => (
+        <span className="text-slate-600 dark:text-slate-300">
+          {customer.phone ?? "—"}
+        </span>
+      ),
+    },
+    {
+      key: "debt",
+      label: t("customers.cols.debtCurrent"),
+      defaultVisible: true,
+      align: "right",
+      width: "150px",
+      cellClassName: (customer) =>
+        Number(customer.currentDebt) > 0
+          ? "font-semibold text-er"
+          : "font-semibold text-slate-400",
+      render: (customer) => formatCurrency(Number(customer.currentDebt)),
+    },
+    {
+      key: "grossSales",
+      label: t("customers.cols.totalGrossSales"),
+      defaultVisible: true,
+      align: "right",
+      width: "170px",
+      render: (customer) => formatCurrency(Number(customer.grossSales)),
+    },
+    {
+      key: "netSales",
+      label: t("customers.cols.totalSalesNet"),
+      defaultVisible: true,
+      align: "right",
+      width: "290px",
+      render: (customer) => formatCurrency(Number(customer.totalSpent)),
+    },
   ];
 
   return (
@@ -253,32 +377,49 @@ function CustomerRows({
         columns={columns}
         getRowId={(customer) => customer.id}
         minWidth="980px"
-        empty={(
+        empty={
           <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
             <User className="mx-auto mb-3 h-10 w-10 opacity-60" />
             <p className="font-medium">{t("customers.empty")}</p>
           </div>
-        )}
+        }
         summaryCells={[
           { key: "debt", content: formatCurrency(data.totalDebt) },
           { key: "grossSales", content: formatCurrency(data.totalGrossSales) },
           { key: "netSales", content: formatCurrency(data.totalNetSales) },
         ]}
-        toolbar={(
+        toolbar={
           <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <CustomerSearch filters={filters} pageSize={data.pageSize} onOpenFilters={onOpenFilters} />
+            <CustomerSearch
+              filters={filters}
+              pageSize={data.pageSize}
+              onOpenFilters={onOpenFilters}
+            />
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <button type="button" onClick={() => setCreateOpen(true)} className={cn(buttonVariants({ variant: "default", size: "default" }), "shrink-0")}>
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                className={cn(
+                  buttonVariants({ variant: "default", size: "default" }),
+                  "shrink-0",
+                )}
+              >
                 <Plus className="h-4 w-4" />
                 {t("customers.createNew")}
               </button>
-              <Link href="/settings/import" className={cn(buttonVariants({ variant: "outline", size: "default" }), "shrink-0")}>
+              <Link
+                href="/settings/import"
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "default" }),
+                  "shrink-0",
+                )}
+              >
                 <FileInput className="h-4 w-4" />
                 {t("customers.actions.importFile")}
               </Link>
             </div>
           </div>
-        )}
+        }
         onRowClick={(customer) => {
           setSelectedCustomerId(customer.id);
           setDetailTab("info");
@@ -287,17 +428,40 @@ function CustomerRows({
           <article className="w-full p-3 text-left min-h-11">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="truncate font-semibold"><PartnerDetailLink kind="customer" partnerId={customer.id} name={customer.name} /></div>
-                <button type="button" onClick={() => {
-                  setSelectedCustomerId(customer.id);
-                  setDetailTab("info");
-                }} className="inline-flex min-h-11 min-w-11 items-center text-xs text-slate-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{customer.code ?? t("customers.expand.profile")} · {customer.phone ?? "—"}</button>
+                <div className="truncate font-semibold">
+                  <PartnerDetailLink
+                    kind="customer"
+                    partnerId={customer.id}
+                    name={customer.name}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCustomerId(customer.id);
+                    setDetailTab("info");
+                  }}
+                  className="inline-flex min-h-11 min-w-11 items-center text-xs text-slate-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  {customer.code ?? t("customers.expand.profile")} ·{" "}
+                  {customer.phone ?? "—"}
+                </button>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-              <Metric label={t("customers.cols.debt")} value={formatCurrency(Number(customer.currentDebt))} tone={Number(customer.currentDebt) > 0 ? "danger" : "muted"} />
-              <Metric label={t("customers.cols.totalGrossSales")} value={formatCurrency(Number(customer.grossSales))} />
-              <Metric label={t("customers.cols.totalSalesNet")} value={formatCurrency(Number(customer.totalSpent))} />
+              <Metric
+                label={t("customers.cols.debt")}
+                value={formatCurrency(Number(customer.currentDebt))}
+                tone={Number(customer.currentDebt) > 0 ? "danger" : "muted"}
+              />
+              <Metric
+                label={t("customers.cols.totalGrossSales")}
+                value={formatCurrency(Number(customer.grossSales))}
+              />
+              <Metric
+                label={t("customers.cols.totalSalesNet")}
+                value={formatCurrency(Number(customer.totalSpent))}
+              />
             </div>
           </article>
         )}
@@ -315,12 +479,33 @@ function CustomerRows({
         open={Boolean(selectedCustomerId)}
         onClose={closeCustomer}
         title={selectedCustomer?.name ?? t("customers.expand.profile")}
-        subtitle={selectedCustomer ? [selectedCustomer.code, selectedCustomer.phone].filter(Boolean).join(" · ") : undefined}
+        subtitle={
+          selectedCustomer
+            ? [selectedCustomer.code, selectedCustomer.phone]
+                .filter(Boolean)
+                .join(" · ")
+            : undefined
+        }
         closeLabel={t("common.close")}
         bodyClassName="flex flex-col !overflow-hidden"
-        footer={selectedCustomer && <CustomerDetailFooter customer={selectedCustomer} tab={detailTab} />}
+        footer={
+          selectedCustomer && (
+            <CustomerDetailFooter customer={selectedCustomer} tab={detailTab} />
+          )
+        }
       >
-        {selectedCustomer ? <CustomerDetail customer={selectedCustomer} tab={detailTab} returnPrintTemplates={returnPrintTemplates} onTabChange={setDetailTab} /> : <div className="p-8 text-center text-sm text-slate-500">{t("errors.notFound")}</div>}
+        {selectedCustomer ? (
+          <CustomerDetail
+            customer={selectedCustomer}
+            tab={detailTab}
+            returnPrintTemplates={returnPrintTemplates}
+            onTabChange={setDetailTab}
+          />
+        ) : (
+          <div className="p-8 text-center text-sm text-slate-500">
+            {t("errors.notFound")}
+          </div>
+        )}
       </RowPreviewModal>
     </>
   );
@@ -349,7 +534,9 @@ function CustomerDetail({
             onClick={() => onTabChange(key)}
             className={cn(
               "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center border-b-2 px-2 transition-colors lg:min-h-0 lg:min-w-0 lg:pb-2",
-              tab === key ? "border-primary-600 text-primary-600" : "border-transparent hover:text-slate-800 dark:hover:text-slate-200",
+              tab === key
+                ? "border-primary-600 text-primary-600"
+                : "border-transparent hover:text-slate-800 dark:hover:text-slate-200",
             )}
           >
             {t(`customers.expand.tabs.${key}`)}
@@ -359,7 +546,12 @@ function CustomerDetail({
 
       <div className="min-h-0 flex-1 overflow-hidden pt-4">
         {tab === "info" && <CustomerInfoPanel customer={customer} />}
-        {tab === "sales" && <CustomerSalesPanel customer={customer} returnPrintTemplates={returnPrintTemplates} />}
+        {tab === "sales" && (
+          <CustomerSalesPanel
+            customer={customer}
+            returnPrintTemplates={returnPrintTemplates}
+          />
+        )}
         {tab === "debt" && <CustomerDebtPanel customer={customer} />}
       </div>
     </div>
@@ -381,99 +573,195 @@ function CustomerInfoPanel({ customer }: { customer: CustomerRow }) {
             <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
                 <h3 className="truncate text-lg font-bold text-slate-900 dark:text-slate-100">
-                  {customer.name} <span className="text-sm font-medium text-slate-500">{customer.code}</span>
+                  {customer.name}{" "}
+                  <span className="text-sm font-medium text-slate-500">
+                    {customer.code}
+                  </span>
                 </h3>
                 <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600 dark:text-slate-300">
-                  <span>{t("customers.expand.createdBy")}: <b>{customer.createdByName ?? t("customers.emptyValue")}</b></span>
+                  <span>
+                    {t("customers.expand.createdBy")}:{" "}
+                    <b>{customer.createdByName ?? t("customers.emptyValue")}</b>
+                  </span>
                   <span className="hidden h-4 w-px bg-border-soft sm:inline-block" />
-                  <span>{t("customers.expand.createdAt")}: <b>{formatDate(customer.createdAt)}</b></span>
+                  <span>
+                    {t("customers.expand.createdAt")}:{" "}
+                    <b>{formatDate(customer.createdAt)}</b>
+                  </span>
                   <span className="hidden h-4 w-px bg-border-soft sm:inline-block" />
-                  <span>{t("customers.expand.group")}: <b>{customer.customerGroupName ?? t(`customers.types.${customer.type}`)}</b></span>
+                  <span>
+                    {t("customers.expand.group")}:{" "}
+                    <b>
+                      {customer.customerGroupName ??
+                        t(`customers.types.${customer.type}`)}
+                    </b>
+                  </span>
                 </div>
               </div>
-              <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("customers.expand.profile")}</div>
+              <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                {t("customers.expand.profile")}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-3">
-              <InfoField label={t("customers.cols.phone")} value={customer.phone} />
-              <InfoField label={t("customers.expand.birthday")} value={customer.birthday ? formatDate(customer.birthday) : null} />
-              <InfoField label={t("customers.expand.gender")} value={customer.gender} />
+              <InfoField
+                label={t("customers.cols.phone")}
+                value={customer.phone}
+              />
+              <InfoField
+                label={t("customers.expand.birthday")}
+                value={customer.birthday ? formatDate(customer.birthday) : null}
+              />
+              <InfoField
+                label={t("customers.expand.gender")}
+                value={customer.gender}
+              />
               <InfoField label="Email" value={customer.email} />
               <InfoField label="Facebook" value={customer.facebook} />
-              <InfoField label={t("customers.fields.address")} value={customer.address} />
+              <InfoField
+                label={t("customers.fields.address")}
+                value={customer.address}
+              />
             </div>
           </div>
         </div>
 
         <div className="border-t border-border-soft pt-4">
-          <h4 className="mb-3 text-sm font-bold text-primary-600">{t("customers.expand.invoiceInfo")}</h4>
+          <h4 className="mb-3 text-sm font-bold text-primary-600">
+            {t("customers.expand.invoiceInfo")}
+          </h4>
           <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
-            <InfoField label={t("customers.fields.taxCode")} value={customer.taxCode} />
-            <InfoField label={t("customers.fields.note")} value={customer.note} icon={Pencil} />
+            <InfoField
+              label={t("customers.fields.taxCode")}
+              value={customer.taxCode}
+            />
+            <InfoField
+              label={t("customers.fields.note")}
+              value={customer.note}
+              icon={Pencil}
+            />
           </div>
         </div>
       </div>
-
     </div>
   );
 }
 
-function CustomerSalesPanel({ customer, returnPrintTemplates }: { customer: CustomerRow; returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[] }) {
+function CustomerSalesPanel({
+  customer,
+  returnPrintTemplates,
+}: {
+  customer: CustomerRow;
+  returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
+}) {
   const t = useTranslations();
   const { preview, openOrderPreview, closeOrderPreview } = useOrderPreview();
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       {customer.salesHistory.length === 0 ? (
-        <div className="min-h-0 flex-1 overflow-auto"><EmptyPanel message={t("customers.expand.emptySales")} /></div>
+        <div className="min-h-0 flex-1 overflow-auto">
+          <EmptyPanel message={t("customers.expand.emptySales")} />
+        </div>
       ) : (
         <>
-        <div className="min-h-0 flex-1 divide-y divide-border-soft overflow-auto lg:hidden" data-mobile-audit="customer-sales">
-          {customer.salesHistory.map((row) => (
-            <article key={`${row.kind}-${row.id}`} className="space-y-2 border border-border-soft p-3 first:rounded-t-card last:rounded-b-card">
-              <div className="flex items-start justify-between gap-3">
-                {row.kind === "order" && row.orderId ? (
-                  <button type="button" onClick={() => openOrderPreview(row.orderId!)} className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{row.code}</button>
-                ) : (
-                  <PrintTemplateMenu baseHref={`/returns/${row.id}/print`} templates={returnPrintTemplates} label={row.code} className="min-h-11 min-w-11 font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" />
-                )}
-                <OrderStatusBadge status={row.status} />
-              </div>
-              <div className="text-xs text-slate-500">{formatDate(row.createdAt)} · {row.sellerName ?? t("customers.emptyValue")}</div>
-              <div className="text-right text-sm font-semibold tabular-nums">{formatCurrency(Number(row.total))}</div>
-            </article>
-          ))}
-        </div>
-        <div className="hidden min-h-0 flex-1 overscroll-contain overflow-auto lg:block">
-          <table className="w-full min-w-[860px] text-sm">
-            <thead className="sticky top-0 z-10">
-              <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
-                <th className="px-3 py-3">{t("customers.expand.salesCols.code")}</th>
-                <th className="px-3 py-3">{t("customers.expand.salesCols.time")}</th>
-                <th className="px-3 py-3">{t("customers.expand.salesCols.seller")}</th>
-                <th className="px-3 py-3 text-right">{t("customers.expand.salesCols.total")}</th>
-                <th className="px-3 py-3">{t("customers.expand.salesCols.status")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-soft">
-              {customer.salesHistory.map((row) => (
-                <tr key={`${row.kind}-${row.id}`}>
-                  <td className="px-3 py-3 font-semibold">
-                    {row.kind === "order" && row.orderId ? (
-                      <button type="button" onClick={() => openOrderPreview(row.orderId!)} className="text-primary-600 hover:underline">{row.code}</button>
-                    ) : (
-                      <PrintTemplateMenu baseHref={`/returns/${row.id}/print`} templates={returnPrintTemplates} label={row.code} className="text-primary-600 hover:underline" />
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-slate-700 dark:text-slate-200">{formatDate(row.createdAt)}</td>
-                  <td className="px-3 py-3">{row.sellerName ?? t("customers.emptyValue")}</td>
-                  <td className="px-3 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(row.total))}</td>
-                  <td className="px-3 py-3"><OrderStatusBadge status={row.status} /></td>
+          <div
+            className="min-h-0 flex-1 divide-y divide-border-soft overflow-auto lg:hidden"
+            data-mobile-audit="customer-sales"
+          >
+            {customer.salesHistory.map((row) => (
+              <article
+                key={`${row.kind}-${row.id}`}
+                className="space-y-2 border border-border-soft p-3 first:rounded-t-card last:rounded-b-card"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  {row.kind === "order" && row.orderId ? (
+                    <button
+                      type="button"
+                      onClick={() => openOrderPreview(row.orderId!)}
+                      className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    >
+                      {row.code}
+                    </button>
+                  ) : (
+                    <PrintTemplateMenu
+                      baseHref={`/returns/${row.id}/print`}
+                      templates={returnPrintTemplates}
+                      label={row.code}
+                      className="min-h-11 min-w-11 font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    />
+                  )}
+                  <OrderStatusBadge status={row.status} />
+                </div>
+                <div className="text-xs text-slate-500">
+                  {formatDate(row.createdAt)} ·{" "}
+                  {row.sellerName ?? t("customers.emptyValue")}
+                </div>
+                <div className="text-right text-sm font-semibold tabular-nums">
+                  {formatCurrency(Number(row.total))}
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="hidden min-h-0 flex-1 overscroll-contain overflow-auto lg:block">
+            <table className="w-full min-w-[860px] text-sm">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
+                  <th className="px-3 py-3">
+                    {t("customers.expand.salesCols.code")}
+                  </th>
+                  <th className="px-3 py-3">
+                    {t("customers.expand.salesCols.time")}
+                  </th>
+                  <th className="px-3 py-3">
+                    {t("customers.expand.salesCols.seller")}
+                  </th>
+                  <th className="px-3 py-3 text-right">
+                    {t("customers.expand.salesCols.total")}
+                  </th>
+                  <th className="px-3 py-3">
+                    {t("customers.expand.salesCols.status")}
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-border-soft">
+                {customer.salesHistory.map((row) => (
+                  <tr key={`${row.kind}-${row.id}`}>
+                    <td className="px-3 py-3 font-semibold">
+                      {row.kind === "order" && row.orderId ? (
+                        <button
+                          type="button"
+                          onClick={() => openOrderPreview(row.orderId!)}
+                          className="text-primary-600 hover:underline"
+                        >
+                          {row.code}
+                        </button>
+                      ) : (
+                        <PrintTemplateMenu
+                          baseHref={`/returns/${row.id}/print`}
+                          templates={returnPrintTemplates}
+                          label={row.code}
+                          className="text-primary-600 hover:underline"
+                        />
+                      )}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-slate-700 dark:text-slate-200">
+                      {formatDate(row.createdAt)}
+                    </td>
+                    <td className="px-3 py-3">
+                      {row.sellerName ?? t("customers.emptyValue")}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums font-semibold">
+                      {formatCurrency(Number(row.total))}
+                    </td>
+                    <td className="px-3 py-3">
+                      <OrderStatusBadge status={row.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 
@@ -487,7 +775,10 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
   const [filter, setFilter] = useState(DEFAULT_PARTNER_DEBT_FILTER);
   const { preview, openOrderPreview, closeOrderPreview } = useOrderPreview();
   const rows = useMemo(
-    () => customer.debtLedger.filter((row) => matchesPartnerDebtFilter(row, filter)),
+    () =>
+      customer.debtLedger.filter((row) =>
+        matchesPartnerDebtFilter(row, filter),
+      ),
     [customer.debtLedger, filter],
   );
 
@@ -496,62 +787,128 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
       <PartnerDebtFilterControl value={filter} onChange={setFilter} />
 
       {rows.length === 0 ? (
-        <div className="min-h-0 flex-1 overflow-auto"><EmptyPanel message={t("customers.expand.emptyDebt")} /></div>
+        <div className="min-h-0 flex-1 overflow-auto">
+          <EmptyPanel message={t("customers.expand.emptyDebt")} />
+        </div>
       ) : (
         <>
-        <div className="min-h-0 flex-1 divide-y divide-border-soft overflow-auto lg:hidden" data-mobile-audit="customer-debt">
-          {rows.map((row) => (
-            <article key={`${row.kind}-${row.id}`} className="space-y-2 border border-border-soft p-3 first:rounded-t-card last:rounded-b-card">
-              <div className="flex items-start justify-between gap-3">
-                {row.orderId ? (
-                  <button type="button" onClick={() => openOrderPreview(row.orderId!)} className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{row.code}</button>
-                ) : (
-                  <span className="font-semibold text-primary-600">{row.code}</span>
-                )}
-                <span className={cn("shrink-0 font-semibold tabular-nums", row.value < 0 ? "text-ok" : "text-slate-900 dark:text-slate-100")}>{formatCurrency(row.value)}</span>
-              </div>
-              <div className="text-xs text-slate-500">{formatDate(row.createdAt)} · {row.typeLabel}</div>
-              <div className="flex items-center justify-between gap-3 border-t border-border-soft pt-2 text-xs">
-                <span className="text-slate-500">{t("customers.expand.debtCols.balance")}</span>
-                <span className={cn("font-semibold tabular-nums", row.balance > 0 ? "text-er" : "text-slate-500")}>{formatCurrency(row.balance)}</span>
-              </div>
-            </article>
-          ))}
-        </div>
-        <div className="hidden min-h-0 flex-1 overscroll-contain overflow-auto lg:block">
-          <table className="w-full min-w-[900px] text-sm">
-            <thead className="sticky top-0 z-10">
-              <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
-                <th className="px-3 py-3">{t("customers.expand.debtCols.code")}</th>
-                <th className="px-3 py-3">{t("customers.expand.debtCols.time")}</th>
-                <th className="px-3 py-3">{t("customers.expand.debtCols.type")}</th>
-                <th className="px-3 py-3 text-right">{t("customers.expand.debtCols.value")}</th>
-                <th className="px-3 py-3 text-right">{t("customers.expand.debtCols.balance")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-soft">
-              {rows.map((row) => (
-                <tr key={`${row.kind}-${row.id}`}>
-                  <td className="px-3 py-3 font-semibold">
-                    {row.orderId ? (
-                      <button type="button" onClick={() => openOrderPreview(row.orderId!)} className="text-primary-600 hover:underline">{row.code}</button>
-                    ) : (
-                      <span className="text-primary-600">{row.code}</span>
+          <div
+            className="min-h-0 flex-1 divide-y divide-border-soft overflow-auto lg:hidden"
+            data-mobile-audit="customer-debt"
+          >
+            {rows.map((row) => (
+              <article
+                key={`${row.kind}-${row.id}`}
+                className="space-y-2 border border-border-soft p-3 first:rounded-t-card last:rounded-b-card"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  {row.orderId ? (
+                    <button
+                      type="button"
+                      onClick={() => openOrderPreview(row.orderId!)}
+                      className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    >
+                      {row.code}
+                    </button>
+                  ) : (
+                    <span className="font-semibold text-primary-600">
+                      {row.code}
+                    </span>
+                  )}
+                  <span
+                    className={cn(
+                      "shrink-0 font-semibold tabular-nums",
+                      row.value < 0
+                        ? "text-ok"
+                        : "text-slate-900 dark:text-slate-100",
                     )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap">{formatDate(row.createdAt)}</td>
-                  <td className="px-3 py-3">{row.typeLabel}</td>
-                  <td className={cn("px-3 py-3 text-right tabular-nums font-semibold", row.value < 0 ? "text-ok" : "text-slate-900 dark:text-slate-100")}>
+                  >
                     {formatCurrency(row.value)}
-                  </td>
-                  <td className={cn("px-3 py-3 text-right tabular-nums font-semibold", row.balance > 0 ? "text-er" : "text-slate-500")}>
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500">
+                  {formatDate(row.createdAt)} · {row.typeLabel}
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-border-soft pt-2 text-xs">
+                  <span className="text-slate-500">
+                    {t("customers.expand.debtCols.balance")}
+                  </span>
+                  <span
+                    className={cn(
+                      "font-semibold tabular-nums",
+                      row.balance > 0 ? "text-er" : "text-slate-500",
+                    )}
+                  >
                     {formatCurrency(row.balance)}
-                  </td>
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="hidden min-h-0 flex-1 overscroll-contain overflow-auto lg:block">
+            <table className="w-full min-w-[900px] text-sm">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
+                  <th className="px-3 py-3">
+                    {t("customers.expand.debtCols.code")}
+                  </th>
+                  <th className="px-3 py-3">
+                    {t("customers.expand.debtCols.time")}
+                  </th>
+                  <th className="px-3 py-3">
+                    {t("customers.expand.debtCols.type")}
+                  </th>
+                  <th className="px-3 py-3 text-right">
+                    {t("customers.expand.debtCols.value")}
+                  </th>
+                  <th className="px-3 py-3 text-right">
+                    {t("customers.expand.debtCols.balance")}
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-border-soft">
+                {rows.map((row) => (
+                  <tr key={`${row.kind}-${row.id}`}>
+                    <td className="px-3 py-3 font-semibold">
+                      {row.orderId ? (
+                        <button
+                          type="button"
+                          onClick={() => openOrderPreview(row.orderId!)}
+                          className="text-primary-600 hover:underline"
+                        >
+                          {row.code}
+                        </button>
+                      ) : (
+                        <span className="text-primary-600">{row.code}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {formatDate(row.createdAt)}
+                    </td>
+                    <td className="px-3 py-3">{row.typeLabel}</td>
+                    <td
+                      className={cn(
+                        "px-3 py-3 text-right tabular-nums font-semibold",
+                        row.value < 0
+                          ? "text-ok"
+                          : "text-slate-900 dark:text-slate-100",
+                      )}
+                    >
+                      {formatCurrency(row.value)}
+                    </td>
+                    <td
+                      className={cn(
+                        "px-3 py-3 text-right tabular-nums font-semibold",
+                        row.balance > 0 ? "text-er" : "text-slate-500",
+                      )}
+                    >
+                      {formatCurrency(row.balance)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 
@@ -577,39 +934,96 @@ function OrderPreviewDialog({
       open={Boolean(preview)}
       onClose={onClose}
       title={order ? order.code : t("orders.title")}
-      subtitle={order ? <><PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} /> · {formatDate(order.createdAt)}</> : undefined}
-      footer={order && (
-        <div className="flex justify-end">
-          <OrderDetailLink orderId={order.id} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110 lg:min-h-10 min-w-11 lg:min-w-0">
-            <ExternalLink className="h-4 w-4" />
-            Mở phiếu
-          </OrderDetailLink>
-        </div>
-      )}
+      subtitle={
+        order ? (
+          <>
+            <PartnerDetailLink
+              kind="customer"
+              partnerId={order.customerId}
+              name={order.customerName ?? t("orders.walkIn")}
+            />{" "}
+            · {formatDate(order.createdAt)}
+          </>
+        ) : undefined
+      }
+      footer={
+        order && (
+          <div className="flex justify-end">
+            <OrderDetailLink
+              orderId={order.id}
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110 lg:min-h-10 min-w-11 lg:min-w-0"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Mở phiếu
+            </OrderDetailLink>
+          </div>
+        )
+      }
     >
       {preview?.loading ? (
         <div className="grid min-h-60 place-items-center text-sm font-semibold text-slate-500">
-          <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Đang tải...</span>
+          <span className="inline-flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" /> Đang tải...
+          </span>
         </div>
       ) : preview?.error ? (
-        <div className="rounded-card border border-dashed border-border px-4 py-10 text-center text-sm font-medium text-er">{preview.error}</div>
+        <div className="rounded-card border border-dashed border-border px-4 py-10 text-center text-sm font-medium text-er">
+          {preview.error}
+        </div>
       ) : order ? (
         <div className="space-y-5">
           <div className="grid gap-3 text-sm md:grid-cols-3">
-            <InfoField label={t("orders.cols.customer")} value={<PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} />} />
-            <InfoField label={t("orders.cols.date")} value={formatDate(order.createdAt)} />
+            <InfoField
+              label={t("orders.cols.customer")}
+              value={
+                <PartnerDetailLink
+                  kind="customer"
+                  partnerId={order.customerId}
+                  name={order.customerName ?? t("orders.walkIn")}
+                />
+              }
+            />
+            <InfoField
+              label={t("orders.cols.date")}
+              value={formatDate(order.createdAt)}
+            />
             <InfoField label={t("orders.cols.status")} value={order.status} />
           </div>
-          <div className="divide-y divide-border-soft overflow-hidden rounded-lg border border-border lg:hidden" data-mobile-audit="customer-order-preview">
+          <div
+            className="divide-y divide-border-soft overflow-hidden rounded-lg border border-border lg:hidden"
+            data-mobile-audit="customer-order-preview"
+          >
             {order.items.map((item) => (
               <article key={item.id} className="space-y-2 p-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 break-words font-medium">{item.productName}<div className="mt-0.5 text-xs text-slate-400">{item.unitName}{item.priceBookName && ` · ${item.priceBookName}`}</div></div>
-                  <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.total))}</div>
+                  <div className="min-w-0 break-words font-medium">
+                    {item.productName}
+                    <div className="mt-0.5 text-xs text-slate-400">
+                      {item.unitName}
+                      {item.priceBookName && ` · ${item.priceBookName}`}
+                    </div>
+                  </div>
+                  <div className="shrink-0 font-semibold tabular-nums">
+                    {formatCurrency(Number(item.total))}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
-                  <span>{Number(item.quantity).toLocaleString("vi-VN")} × {formatCurrency(Number(item.unitPrice))}</span>
-                  <span className="text-right">{t("orders.cols.discount")}: {Number(item.discount) > 0 ? <>{item.lineDiscountMode === "pct" && `${Number(item.lineDiscountValue).toLocaleString("vi-VN")}% · `}{formatCurrency(Number(item.discount))}</> : "—"}</span>
+                  <span>
+                    {Number(item.quantity).toLocaleString("vi-VN")} ×{" "}
+                    {formatCurrency(Number(item.unitPrice))}
+                  </span>
+                  <span className="text-right">
+                    {t("orders.cols.discount")}:{" "}
+                    {Number(item.discount) > 0 ? (
+                      <>
+                        {item.lineDiscountMode === "pct" &&
+                          `${Number(item.lineDiscountValue).toLocaleString("vi-VN")}% · `}
+                        {formatCurrency(Number(item.discount))}
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </span>
                 </div>
               </article>
             ))}
@@ -619,32 +1033,88 @@ function OrderPreviewDialog({
               <thead>
                 <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
                   <th className="px-3 py-3">{t("orders.cols.product")}</th>
-                  <th className="px-3 py-3 text-right">{t("orders.cols.qty")}</th>
-                  <th className="px-3 py-3 text-right">{t("orders.cols.unitPrice")}</th>
-                  <th className="px-3 py-3 text-right">{t("orders.cols.discount")}</th>
-                  <th className="px-3 py-3 text-right">{t("orders.cols.lineTotal")}</th>
+                  <th className="px-3 py-3 text-right">
+                    {t("orders.cols.qty")}
+                  </th>
+                  <th className="px-3 py-3 text-right">
+                    {t("orders.cols.unitPrice")}
+                  </th>
+                  <th className="px-3 py-3 text-right">
+                    {t("orders.cols.discount")}
+                  </th>
+                  <th className="px-3 py-3 text-right">
+                    {t("orders.cols.lineTotal")}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-soft">
                 {order.items.map((item) => (
                   <tr key={item.id}>
-                    <td className="px-3 py-3 font-medium">{item.productName}<div className="text-xs text-slate-400">{item.unitName}{item.priceBookName && ` · ${item.priceBookName}`}</div></td>
-                    <td className="px-3 py-3 text-right tabular-nums">{Number(item.quantity).toLocaleString("vi-VN")}</td>
-                    <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.unitPrice))}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-slate-500">{Number(item.discount) > 0 ? <>{item.lineDiscountMode === "pct" && <div>{Number(item.lineDiscountValue).toLocaleString("vi-VN")}%</div>}{formatCurrency(Number(item.discount))}</> : "—"}</td>
-                    <td className="px-3 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(item.total))}</td>
+                    <td className="px-3 py-3 font-medium">
+                      {item.productName}
+                      <div className="text-xs text-slate-400">
+                        {item.unitName}
+                        {item.priceBookName && ` · ${item.priceBookName}`}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums">
+                      {Number(item.quantity).toLocaleString("vi-VN")}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums">
+                      {formatCurrency(Number(item.unitPrice))}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums text-slate-500">
+                      {Number(item.discount) > 0 ? (
+                        <>
+                          {item.lineDiscountMode === "pct" && (
+                            <div>
+                              {Number(item.lineDiscountValue).toLocaleString(
+                                "vi-VN",
+                              )}
+                              %
+                            </div>
+                          )}
+                          {formatCurrency(Number(item.discount))}
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums font-semibold">
+                      {formatCurrency(Number(item.total))}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <div className="ml-auto max-w-sm space-y-2 text-sm">
-            <PreviewLine label={t("pos.subtotal")} value={formatCurrency(Number(order.subtotal))} />
-            <PreviewLine label={t("pos.discount")} value={formatCurrency(Number(order.discount))} />
-            <PreviewLine label={t("pos.tax")} value={formatCurrency(Number(order.tax))} />
-            <PreviewLine label={t("pos.shipping")} value={formatCurrency(Number(order.shippingFee))} />
-            <PreviewLine label={t("pos.total")} value={formatCurrency(total)} strong />
-            <PreviewLine label={t("orders.detail.remaining")} value={formatCurrency(Math.max(0, total - paid))} strong />
+            <PreviewLine
+              label={t("pos.subtotal")}
+              value={formatCurrency(Number(order.subtotal))}
+            />
+            <PreviewLine
+              label={t("pos.discount")}
+              value={formatCurrency(Number(order.discount))}
+            />
+            <PreviewLine
+              label={t("pos.tax")}
+              value={formatCurrency(Number(order.tax))}
+            />
+            <PreviewLine
+              label={t("pos.shipping")}
+              value={formatCurrency(Number(order.shippingFee))}
+            />
+            <PreviewLine
+              label={t("pos.total")}
+              value={formatCurrency(total)}
+              strong
+            />
+            <PreviewLine
+              label={t("orders.detail.remaining")}
+              value={formatCurrency(Math.max(0, total - paid))}
+              strong
+            />
           </div>
         </div>
       ) : null}
@@ -652,7 +1122,15 @@ function OrderPreviewDialog({
   );
 }
 
-function PreviewLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function PreviewLine({
+  label,
+  value,
+  strong,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
   return (
     <div className="flex justify-between gap-3">
       <span className="text-slate-500">{label}</span>
@@ -661,14 +1139,24 @@ function PreviewLine({ label, value, strong }: { label: string; value: string; s
   );
 }
 
-function CustomerDetailFooter({ customer, tab }: { customer: CustomerRow; tab: CustomerExpandTab }) {
+function CustomerDetailFooter({
+  customer,
+  tab,
+}: {
+  customer: CustomerRow;
+  tab: CustomerExpandTab;
+}) {
   const t = useTranslations();
 
   if (tab === "info") return <CustomerActionBar customer={customer} />;
   if (tab === "sales") {
     return (
       <div className="flex justify-start">
-        <ActionButton icon={Download} label={t("customers.actions.exportFile")} disabled />
+        <ActionButton
+          icon={Download}
+          label={t("customers.actions.exportFile")}
+          disabled
+        />
       </div>
     );
   }
@@ -676,18 +1164,30 @@ function CustomerDetailFooter({ customer, tab }: { customer: CustomerRow; tab: C
   return (
     <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
       <div className="flex flex-wrap gap-2">
-        <ActionButton icon={FileDown} label={t("customers.actions.exportDebtFile")} onClick={() => exportCustomerDebtCsv(customer)} />
-        <ActionButton icon={Download} label={t("customers.actions.exportFile")} onClick={() => exportCustomerDebtCsv(customer)} />
+        <ActionButton
+          icon={FileDown}
+          label={t("customers.actions.exportDebtFile")}
+          onClick={() => exportCustomerDebtCsv(customer)}
+        />
+        <ActionButton
+          icon={Download}
+          label={t("customers.actions.exportFile")}
+          onClick={() => exportCustomerDebtCsv(customer)}
+        />
       </div>
       <div className="flex flex-wrap gap-2 xl:justify-end">
-        <CustomerReceivableActions customerId={customer.id} currentDebt={Number(customer.currentDebt)} />
+        <CustomerReceivableActions
+          customerId={customer.id}
+          currentDebt={Number(customer.currentDebt)}
+        />
       </div>
     </div>
   );
 }
 
 function exportCustomerDebtCsv(customer: CustomerRow) {
-  const quote = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+  const quote = (value: unknown) =>
+    `"${String(value ?? "").replaceAll('"', '""')}"`;
   const rows = [
     ["Mã phiếu", "Thời gian", "Loại", "Giá trị", "Dư nợ khách hàng"],
     ...customer.debtLedger.map((row) => [
@@ -698,7 +1198,10 @@ function exportCustomerDebtCsv(customer: CustomerRow) {
       row.balance,
     ]),
   ];
-  const blob = new Blob([`\ufeff${rows.map((row) => row.map(quote).join(",")).join("\n")}`], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob(
+    [`\ufeff${rows.map((row) => row.map(quote).join(",")).join("\n")}`],
+    { type: "text/csv;charset=utf-8" },
+  );
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -734,23 +1237,36 @@ function CustomerActionBar({ customer }: { customer: CustomerRow }) {
     <div>
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap gap-2">
-          <ActionButton icon={Trash2} label={t("common.delete")} tone="danger" disabled title={t("customers.actions.deleteDisabled")} />
+          <ActionButton
+            icon={Trash2}
+            label={t("common.delete")}
+            tone="danger"
+            disabled
+            title={t("customers.actions.deleteDisabled")}
+          />
         </div>
         <div className="flex flex-wrap gap-2 xl:justify-end">
-          <CustomerEdit customer={{
-            id: customer.id,
-            name: customer.name,
-            phone: customer.phone,
-            email: customer.email,
-            zaloUserId: customer.zaloUserId,
-            address: customer.address,
-            type: customer.type,
-            taxCode: customer.taxCode,
-            debtLimit: customer.debtLimit,
-            note: customer.note,
-          }} />
+          <CustomerEdit
+            customer={{
+              id: customer.id,
+              name: customer.name,
+              phone: customer.phone,
+              email: customer.email,
+              zaloUserId: customer.zaloUserId,
+              address: customer.address,
+              type: customer.type,
+              taxCode: customer.taxCode,
+              debtLimit: customer.debtLimit,
+              note: customer.note,
+            }}
+          />
           {customer.isActive && (
-            <ActionButton icon={Ban} label={t("customers.actions.stop")} onClick={stopCustomer} disabled={pending} />
+            <ActionButton
+              icon={Ban}
+              label={t("customers.actions.stop")}
+              onClick={stopCustomer}
+              disabled={pending}
+            />
           )}
         </div>
       </div>
@@ -759,7 +1275,13 @@ function CustomerActionBar({ customer }: { customer: CustomerRow }) {
   );
 }
 
-function CustomerFilterForm({ filters, pageSize }: { filters: CustomerFilters; pageSize: number }) {
+function CustomerFilterForm({
+  filters,
+  pageSize,
+}: {
+  filters: CustomerFilters;
+  pageSize: number;
+}) {
   const t = useTranslations();
   const clearHref = `${Routes.Partners}?tab=customers${filters.q ? `&q=${encodeURIComponent(filters.q)}` : ""}&size=${pageSize}`;
 
@@ -769,32 +1291,89 @@ function CustomerFilterForm({ filters, pageSize }: { filters: CustomerFilters; p
       <input type="hidden" name="size" value={pageSize} />
       {filters.q && <input type="hidden" name="q" value={filters.q} />}
 
-      <DateRangeFilter title={t("customers.filters.createdAt")} fromName="createdFrom" toName="createdTo" fromValue={filters.createdFrom} toValue={filters.createdTo} />
+      <DateRangeFilter
+        title={t("customers.filters.createdAt")}
+        fromName="createdFrom"
+        toName="createdTo"
+        fromValue={filters.createdFrom}
+        toValue={filters.createdTo}
+      />
 
       <div>
-        <h3 className="mb-3 text-sm font-bold">{t("customers.filters.customerType")}</h3>
+        <h3 className="mb-3 text-sm font-bold">
+          {t("customers.filters.customerType")}
+        </h3>
         <div className="flex flex-wrap gap-2">
-          <RadioPill name="type" value="" checked={!filters.type} label={t("customers.tabs.all")} />
+          <RadioPill
+            name="type"
+            value=""
+            checked={!filters.type}
+            label={t("customers.tabs.all")}
+          />
           {CUSTOMER_TYPES.map((type) => (
-            <RadioPill key={type} name="type" value={type} checked={filters.type === type} label={t(`customers.types.${type}`)} />
+            <RadioPill
+              key={type}
+              name="type"
+              value={type}
+              checked={filters.type === type}
+              label={t(`customers.types.${type}`)}
+            />
           ))}
         </div>
       </div>
 
       <div>
-        <h3 className="mb-3 text-sm font-bold">{t("customers.filters.debtStatus")}</h3>
+        <h3 className="mb-3 text-sm font-bold">
+          {t("customers.filters.debtStatus")}
+        </h3>
         <div className="flex flex-wrap gap-2">
-          <RadioPill name="owing" value="" checked={!filters.owing} label={t("customers.tabs.all")} />
-          <RadioPill name="owing" value="1" checked={Boolean(filters.owing)} label={t("customers.tabs.owing")} />
+          <RadioPill
+            name="owing"
+            value=""
+            checked={!filters.owing}
+            label={t("customers.tabs.all")}
+          />
+          <RadioPill
+            name="owing"
+            value="1"
+            checked={Boolean(filters.owing)}
+            label={t("customers.tabs.owing")}
+          />
         </div>
       </div>
 
-      <DateRangeFilter title={t("customers.filters.lastTransaction")} fromName="lastTxFrom" toName="lastTxTo" fromValue={filters.lastTxFrom} toValue={filters.lastTxTo} />
-      <MoneyRangeFilter title={t("customers.filters.totalSales")} fromName="totalFrom" toName="totalTo" fromValue={filters.totalFrom} toValue={filters.totalTo} />
-      <MoneyRangeFilter title={t("customers.filters.currentDebt")} fromName="debtFrom" toName="debtTo" fromValue={filters.debtFrom} toValue={filters.debtTo} />
+      <DateRangeFilter
+        title={t("customers.filters.lastTransaction")}
+        fromName="lastTxFrom"
+        toName="lastTxTo"
+        fromValue={filters.lastTxFrom}
+        toValue={filters.lastTxTo}
+      />
+      <MoneyRangeFilter
+        title={t("customers.filters.totalSales")}
+        fromName="totalFrom"
+        toName="totalTo"
+        fromValue={filters.totalFrom}
+        toValue={filters.totalTo}
+      />
+      <MoneyRangeFilter
+        title={t("customers.filters.currentDebt")}
+        fromName="debtFrom"
+        toName="debtTo"
+        fromValue={filters.debtFrom}
+        toValue={filters.debtTo}
+      />
 
       <div className="flex gap-2 border-t border-border-soft pt-4">
-        <Link href={clearHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-10 rounded-lg min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")}>{t("customers.filters.clear")}</Link>
+        <Link
+          href={clearHref}
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "h-10 rounded-lg min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
+          )}
+        >
+          {t("customers.filters.clear")}
+        </Link>
       </div>
     </InstantFilterForm>
   );
@@ -821,8 +1400,20 @@ function DateRangeFilter({
       <div className="grid grid-cols-[auto_1fr] gap-2">
         <CalendarDays className="mt-2.5 h-4 w-4 text-primary-600" />
         <div className="grid gap-2">
-          <DateInput type="date" name={fromName} defaultValue={fromValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" aria-label={t("customers.filters.from")} />
-          <DateInput type="date" name={toName} defaultValue={toValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" aria-label={t("customers.filters.to")} />
+          <DateInput
+            type="date"
+            name={fromName}
+            defaultValue={fromValue ?? ""}
+            className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
+            aria-label={t("customers.filters.from")}
+          />
+          <DateInput
+            type="date"
+            name={toName}
+            defaultValue={toValue ?? ""}
+            className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
+            aria-label={t("customers.filters.to")}
+          />
         </div>
       </div>
     </div>
@@ -847,42 +1438,100 @@ function MoneyRangeFilter({
     <div>
       <h3 className="mb-3 text-sm font-bold">{title}</h3>
       <div className="grid grid-cols-2 gap-2">
-        <MoneyInput name={fromName} min={-Number.MAX_SAFE_INTEGER} defaultValue={fromValue ?? ""} placeholder={t("customers.filters.fromValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
-        <MoneyInput name={toName} min={-Number.MAX_SAFE_INTEGER} defaultValue={toValue ?? ""} placeholder={t("customers.filters.toValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
+        <MoneyInput
+          name={fromName}
+          min={-Number.MAX_SAFE_INTEGER}
+          defaultValue={fromValue ?? ""}
+          placeholder={t("customers.filters.fromValue")}
+          className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
+        />
+        <MoneyInput
+          name={toName}
+          min={-Number.MAX_SAFE_INTEGER}
+          defaultValue={toValue ?? ""}
+          placeholder={t("customers.filters.toValue")}
+          className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
+        />
       </div>
     </div>
   );
 }
 
-function RadioPill({ name, value, checked, label }: { name: string; value: string; checked: boolean; label: string }) {
+function RadioPill({
+  name,
+  value,
+  checked,
+  label,
+}: {
+  name: string;
+  value: string;
+  checked: boolean;
+  label: string;
+}) {
   return (
-    <label className={cn("inline-flex h-11 min-w-11 cursor-pointer items-center rounded-lg border px-4 text-sm font-semibold", checked ? "border-primary-600 bg-primary-600 text-white" : "border-border bg-surface text-slate-600 hover:bg-surface-2")}>
-      <input type="radio" name={name} value={value} defaultChecked={checked} className="sr-only" />
+    <label
+      className={cn(
+        "inline-flex h-11 min-w-11 cursor-pointer items-center rounded-lg border px-4 text-sm font-semibold",
+        checked
+          ? "border-primary-600 bg-primary-600 text-white"
+          : "border-border bg-surface text-slate-600 hover:bg-surface-2",
+      )}
+    >
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        defaultChecked={checked}
+        className="sr-only"
+      />
       {label}
     </label>
   );
 }
 
-function HiddenFilterInputs({ filters, includeQ = true }: { filters: CustomerFilters; includeQ?: boolean }) {
+function HiddenFilterInputs({
+  filters,
+  includeQ = true,
+}: {
+  filters: CustomerFilters;
+  includeQ?: boolean;
+}) {
   return (
     <>
-      {includeQ && filters.q && <input type="hidden" name="q" value={filters.q} />}
+      {includeQ && filters.q && (
+        <input type="hidden" name="q" value={filters.q} />
+      )}
       {filters.type && <input type="hidden" name="type" value={filters.type} />}
       {filters.owing && <input type="hidden" name="owing" value="1" />}
       {FILTER_KEYS.map((key) => {
         const value = filters[key];
-        return typeof value === "string" && value ? <input key={key} type="hidden" name={key} value={value} /> : null;
+        return typeof value === "string" && value ? (
+          <input key={key} type="hidden" name={key} value={value} />
+        ) : null;
       })}
     </>
   );
 }
 
-function InfoField({ label, value, icon: Icon }: { label: string; value?: React.ReactNode; icon?: LucideIcon }) {
+function InfoField({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value?: React.ReactNode;
+  icon?: LucideIcon;
+}) {
   const t = useTranslations();
   return (
     <div className="border-b border-border-soft pb-2">
       <div className="text-xs font-medium text-slate-500">{label}</div>
-      <div className={cn("mt-1 flex min-h-6 items-center gap-2 text-sm font-medium", value ? "text-slate-900 dark:text-slate-100" : "text-slate-400")}>
+      <div
+        className={cn(
+          "mt-1 flex min-h-6 items-center gap-2 text-sm font-medium",
+          value ? "text-slate-900 dark:text-slate-100" : "text-slate-400",
+        )}
+      >
         {Icon && <Icon className="h-4 w-4 text-slate-500" />}
         {value || t("customers.emptyValue")}
       </div>
@@ -890,11 +1539,28 @@ function InfoField({ label, value, icon: Icon }: { label: string; value?: React.
   );
 }
 
-function Metric({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "danger" | "muted" }) {
+function Metric({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "danger" | "muted";
+}) {
   return (
     <span>
       <span className="block text-slate-400">{label}</span>
-      <span className={cn("mt-0.5 block truncate font-semibold tabular-nums", tone === "danger" ? "text-er" : tone === "muted" ? "text-slate-500" : "text-slate-900 dark:text-slate-100")}>
+      <span
+        className={cn(
+          "mt-0.5 block truncate font-semibold tabular-nums",
+          tone === "danger"
+            ? "text-er"
+            : tone === "muted"
+              ? "text-slate-500"
+              : "text-slate-900 dark:text-slate-100",
+        )}
+      >
         {value}
       </span>
     </span>
@@ -932,9 +1598,12 @@ function ActionButton({
       title={title ?? label}
       className={cn(
         actionClassName,
-        tone === "primary" && "border-primary-600 bg-primary-600 text-white hover:border-primary-700 hover:bg-primary-700",
-        tone === "danger" && "border-transparent bg-transparent text-slate-600 hover:bg-red-50 hover:text-er dark:text-slate-300 dark:hover:bg-red-950/30",
-        tone === "neutral" && "border-border bg-surface text-slate-700 hover:bg-surface-2 dark:text-slate-200",
+        tone === "primary" &&
+          "border-primary-600 bg-primary-600 text-white hover:border-primary-700 hover:bg-primary-700",
+        tone === "danger" &&
+          "border-transparent bg-transparent text-slate-600 hover:bg-red-50 hover:text-er dark:text-slate-300 dark:hover:bg-red-950/30",
+        tone === "neutral" &&
+          "border-border bg-surface text-slate-700 hover:bg-surface-2 dark:text-slate-200",
       )}
     >
       <Icon className="h-4 w-4" />
