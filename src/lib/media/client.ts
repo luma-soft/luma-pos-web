@@ -6,6 +6,7 @@ import {
 } from "./schemas";
 
 const MEDIA_UPLOADS_ENDPOINT = "/api/mobile/media/uploads";
+const MEDIA_UPLOAD_RETRY_DELAYS_MS = [250, 750] as const;
 
 export type ManagedMediaUploadRequest = {
   purpose: MediaPurpose;
@@ -218,6 +219,15 @@ function retryFrom(stage: ManagedMediaUploadStage): ManagedMediaRetryFrom {
   return stage === "complete" ? "complete" : "intent";
 }
 
+function isRetryableUploadStatus(statusCode: number): boolean {
+  return statusCode === 401
+    || statusCode === 403
+    || statusCode === 408
+    || statusCode === 425
+    || statusCode === 429
+    || statusCode >= 500;
+}
+
 function uploadError(input: {
   stage: ManagedMediaUploadStage;
   code: string;
@@ -258,30 +268,48 @@ async function fetchStage(
   signal?: AbortSignal,
   mediaId?: string,
 ): Promise<Response> {
-  throwIfCancelled(stage, signal, mediaId);
-  try {
-    const response = await fetcher(input, init);
+  for (let attempt = 0; ; attempt += 1) {
     throwIfCancelled(stage, signal, mediaId);
-    return response;
-  } catch (error) {
-    if (error instanceof ManagedMediaUploadError) throw error;
-    if (isAbortFailure(error, signal)) {
+    try {
+      const response = await fetcher(input, init);
+      throwIfCancelled(stage, signal, mediaId);
+      if (
+        attempt < MEDIA_UPLOAD_RETRY_DELAYS_MS.length
+        && isRetryableUploadStatus(response.status)
+      ) {
+        await discardResponseBody(response);
+        await new Promise((resolve) => {
+          setTimeout(resolve, MEDIA_UPLOAD_RETRY_DELAYS_MS[attempt]);
+        });
+        continue;
+      }
+      return response;
+    } catch (error) {
+      if (error instanceof ManagedMediaUploadError) throw error;
+      if (isAbortFailure(error, signal)) {
+        throw uploadError({
+          stage,
+          code: "media.uploadCancelled",
+          mediaId,
+          cancelled: true,
+        });
+      }
+      if (attempt < MEDIA_UPLOAD_RETRY_DELAYS_MS.length) {
+        await new Promise((resolve) => {
+          setTimeout(resolve, MEDIA_UPLOAD_RETRY_DELAYS_MS[attempt]);
+        });
+        continue;
+      }
       throw uploadError({
         stage,
-        code: "media.uploadCancelled",
+        code: stage === "intent"
+          ? "media.intentNetworkFailed"
+          : stage === "upload"
+            ? "media.uploadNetworkFailed"
+            : "media.completionNetworkFailed",
         mediaId,
-        cancelled: true,
       });
     }
-    throw uploadError({
-      stage,
-      code: stage === "intent"
-        ? "media.intentNetworkFailed"
-        : stage === "upload"
-          ? "media.uploadNetworkFailed"
-          : "media.completionNetworkFailed",
-      mediaId,
-    });
   }
 }
 
