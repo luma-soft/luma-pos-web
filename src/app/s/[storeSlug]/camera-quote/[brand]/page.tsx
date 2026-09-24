@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { CameraBrandPriceList } from "@/components/camera-quote/camera-brand-price-list";
 import { getHikvisionQuoteProducts, HIKVISION_QUOTE_SKUS } from "@/lib/data/hikvision-quote";
+import { getStoreSettings } from "@/lib/data/settings";
 import { resolvePublicStoreBySlug } from "@/lib/tenancy/public-store";
 import { HikvisionQuoteClient } from "@/app/camera-quote/hikvision/hikvision-quote-client";
 
@@ -12,8 +13,8 @@ export default async function StoreBrandCameraQuotePage({ params }: { params: Pr
   if (!store) notFound();
 
   if (brand === "hikvision") {
-    const products = await getHikvisionQuoteProducts(store.id);
-    return <main className="min-h-dvh bg-slate-100 px-4 py-8 sm:px-6 sm:py-12"><HikvisionQuoteClient backLabel="Quay lại" catalogReady={products.length === HIKVISION_QUOTE_SKUS.length} products={products} /></main>;
+    const [products, settings] = await Promise.all([getHikvisionQuoteProducts(store.id), getStoreSettings(store.id)]);
+    return <main className="min-h-dvh bg-slate-100 px-4 py-8 sm:px-6 sm:py-12"><HikvisionQuoteClient backLabel="Quay lại" catalogReady={products.length === HIKVISION_QUOTE_SKUS.length} priceOverrides={settings.prefs.cameraQuote.priceOverrides} products={products} /></main>;
   }
   const brandName = brands[brand as keyof typeof brands];
   if (!brandName) notFound();

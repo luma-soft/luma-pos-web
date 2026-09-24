@@ -1,13 +1,26 @@
 import { getRole } from "@/lib/actions/common";
 import { getCameraQuoteFormOptions, type CameraQuoteProductOption } from "@/lib/data/camera-quotes";
+import { getStoreSettings } from "@/lib/data/settings";
 import { createClient } from "@/lib/supabase/server";
 import { CameraPriceListClient } from "@/app/(app)/camera-price-list/camera-price-list-client";
 import { estimateStorageDays } from "@/lib/camera-storage-estimate";
+import {
+  cameraQuoteInstallationProfile,
+  cameraQuotePrice,
+  cameraQuoteProfileProducts,
+  resolveCameraQuoteDefaults,
+} from "@/lib/camera-quote-settings";
 
 type CameraBrand = "EZVIZ" | "IMOU";
 
 export async function CameraBrandPriceList({ brand, storeId }: { brand: CameraBrand; storeId: string }) {
-  const [options, supabase] = await Promise.all([getCameraQuoteFormOptions(storeId), createClient()]);
+  const [options, store, supabase] = await Promise.all([
+    getCameraQuoteFormOptions(storeId),
+    getStoreSettings(storeId),
+    createClient(),
+  ]);
+  const quoteSettings = store.prefs.cameraQuote;
+  const quoteDefaults = resolveCameraQuoteDefaults(options, quoteSettings);
   const { data: { user } } = await supabase.auth.getUser();
   let canEdit = false;
   if (user) {
@@ -19,12 +32,9 @@ export async function CameraBrandPriceList({ brand, storeId }: { brand: CameraBr
     }
   }
 
-  const installationPrice = options.installations[0]?.retailPrice ?? 0;
-  const materialPrice = options.materials[0]?.retailPrice ?? 0;
-  const basePrice = installationPrice + materialPrice;
   // Older/imported card records may have prices but no structured specs. Keep
   // those cards in the quote by deriving capacity from their name/SKU.
-  const memoryOptions = options.cards.filter((card) => {
+  const memoryOptions = quoteDefaults.cards.filter((card) => {
     const capacity = memoryCardLabel(card);
     return ["32GB", "64GB", "128GB", "512GB"].includes(capacity ?? "");
   });
@@ -33,6 +43,16 @@ export async function CameraBrandPriceList({ brand, storeId }: { brand: CameraBr
     .map((camera) => {
       const maxStorageGb = cameraMaxStorageGb(camera.specs);
       const megapixels = cameraMegapixels(camera.specs);
+      const profile = cameraQuoteInstallationProfile(camera.name, camera.specs);
+      const profileProducts = cameraQuoteProfileProducts(quoteDefaults, profile);
+      const cameraPrice = cameraQuotePrice(camera.id, camera.retailPrice, quoteSettings);
+      const installationPrice = profileProducts.installation
+        ? cameraQuotePrice(profileProducts.installation.id, profileProducts.installation.retailPrice, quoteSettings)
+        : 0;
+      const materialPrice = profileProducts.material
+        ? cameraQuotePrice(profileProducts.material.id, profileProducts.material.retailPrice, quoteSettings)
+        : 0;
+      const installationLocation: "Trong nhà" | "Ngoài trời" = profile === "indoor" ? "Trong nhà" : "Ngoài trời";
       const compatibleCards = memoryOptions.filter((card) => {
         const capacityGb = memoryCardCapacityGb(card.specs);
         return maxStorageGb === null || capacityGb === null || capacityGb <= maxStorageGb;
@@ -45,17 +65,17 @@ export async function CameraBrandPriceList({ brand, storeId }: { brand: CameraBr
         description: camera.description ?? "Thiết bị camera chính hãng, phù hợp nhu cầu giám sát.",
         imageUrl: camera.imageUrl,
         specs: camera.specs,
-        installationLocation: cameraInstallationLocation(camera.name, camera.specs),
+        installationLocation,
         suitableFor: guidance.suitableFor,
         variants: compatibleCards.map((card) => ({
           id: `${camera.id}:${card.id}`,
           cameraId: camera.id,
           cardId: card.id,
-          cameraPrice: camera.retailPrice,
-          cardPrice: card.retailPrice,
+          cameraPrice,
+          cardPrice: cameraQuotePrice(card.id, card.retailPrice, quoteSettings),
           installationPrice,
           materialPrice,
-          price: camera.retailPrice + card.retailPrice + basePrice,
+          price: cameraPrice + cameraQuotePrice(card.id, card.retailPrice, quoteSettings) + installationPrice + materialPrice,
           storageEstimate: estimateStorageDays(memoryCardCapacityGb(card.specs), megapixels),
         })),
       };
@@ -72,25 +92,25 @@ export async function CameraBrandPriceList({ brand, storeId }: { brand: CameraBr
 }
 
 function isOutdoorCamera(name: string, specs: Record<string, string[]>) {
-  const specificationText = Object.values(specs).flat().join(" ");
-  return /\bIP(?:65|66|67)\b/i.test(specificationText) || /\b(?:H3|H8|H9|H80|F32|K7)/i.test(name);
+  return cameraQuoteInstallationProfile(name, specs) !== "indoor";
 }
 
-function cameraInstallationLocation(name: string, specs: Record<string, string[]>): "Trong nhà" | "Ngoài trời" {
-  return isOutdoorCamera(name, specs) ? "Ngoài trời" : "Trong nhà";
+function specValue(specs: Record<string, string[]>, label: string) {
+  const expected = label.trim().toLocaleLowerCase("vi");
+  return Object.entries(specs).find(([key]) => key.trim().toLocaleLowerCase("vi") === expected)?.[1]?.join(" ") ?? "";
 }
 
 function memoryCardCapacityGb(specs: Record<string, string[]>) {
-  return storageCapacityGb(specs["Dung lượng"]?.join(" ") ?? "");
+  return storageCapacityGb(specValue(specs, "Dung lượng"));
 }
 
 function memoryCardLabel(card: Pick<CameraQuoteProductOption, "name" | "specs">) {
-  return card.specs["Dung lượng"]?.[0]
+  return specValue(card.specs, "Dung lượng").match(/\b(32|64|128|512)\s*GB\b/i)?.[0]?.replace(/\s+/g, "").toUpperCase()
     ?? card.name.match(/\b(32|64|128|512)\s*GB\b/i)?.[0]?.replace(/\s+/g, "").toUpperCase();
 }
 
 function cameraMaxStorageGb(specs: Record<string, string[]>) {
-  return storageCapacityGb(specs["Nguồn / lưu trữ"]?.join(" ") ?? "");
+  return storageCapacityGb(specValue(specs, "Nguồn / lưu trữ"));
 }
 
 function storageCapacityGb(value: string) {
@@ -99,7 +119,7 @@ function storageCapacityGb(value: string) {
 }
 
 function cameraMegapixels(specs: Record<string, string[]>) {
-  const megapixels = (specs["Độ phân giải"]?.join(" ").match(/\d+\s*MP/gi) ?? [])
+  const megapixels = (specValue(specs, "Độ phân giải").match(/\d+\s*MP/gi) ?? [])
     .map((value) => Number.parseInt(value, 10));
   return megapixels.length ? megapixels.reduce((total, value) => total + value, 0) : 2;
 }

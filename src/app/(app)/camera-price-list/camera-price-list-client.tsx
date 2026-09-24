@@ -7,6 +7,7 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { LumaActionMenu } from "@/components/ui/action-menu";
 import {
   cameraQuoteCopyLayout,
+  deliverCameraQuoteImage,
   type CameraQuoteCopyMode,
 } from "@/lib/camera-quote-copy";
 import { formatCurrency } from "@/lib/utils";
@@ -94,6 +95,31 @@ async function loadProductImage(url: string | null) {
   const response = await fetch(url);
   if (!response.ok) throw new Error("Không tải được ảnh sản phẩm.");
   return createImageBitmap(await response.blob());
+}
+
+type MobileImageBridge = {
+  postMessage(message: string): void;
+};
+
+function getMobileImageBridge(): MobileImageBridge | undefined {
+  if (typeof window === "undefined") return undefined;
+  return (window as Window & { LumaMobileImage?: MobileImageBridge })
+    .LumaMobileImage;
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Không đọc được ảnh báo giá."));
+      }
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Không đọc được ảnh báo giá."));
+    reader.readAsDataURL(blob);
+  });
 }
 
 export function CameraPriceListClient({
@@ -202,21 +228,19 @@ export function CameraPriceListClient({
       link.click();
       URL.revokeObjectURL(link.href);
     };
-    if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
-      try {
-        await navigator.clipboard.write([
-          new ClipboardItem({ "image/png": blob }),
-        ]);
-        setNotice(copiedMessage);
-        return;
-      } catch {
-        downloadImage();
-        setNotice(downloadedMessage);
-        return;
-      }
-    }
-    downloadImage();
-    setNotice(downloadedMessage);
+    const result = await deliverCameraQuoteImage({
+      blob,
+      fileName: downloadName,
+      clipboard: navigator.clipboard,
+      clipboardItem:
+        typeof ClipboardItem === "undefined"
+          ? undefined
+          : (value) => new ClipboardItem({ "image/png": value }),
+      mobileBridge: getMobileImageBridge(),
+      toDataUrl: blobToDataUrl,
+      download: downloadImage,
+    });
+    setNotice(result === "copied" ? copiedMessage : downloadedMessage);
   }
 
   async function copySpecsImage(item: Model, index: number) {

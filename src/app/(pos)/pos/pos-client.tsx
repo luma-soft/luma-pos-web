@@ -28,7 +28,19 @@ import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-acti
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import { CustomerCreateDialog, type CustomerCreateResult } from "@/components/partners/customer-create-dialog";
 import { CameraQuotePanel, type CameraQuotePackage } from "@/components/pos/camera-quote-panel";
-import { CAMERA_QUOTE_DEFAULT_CARD_SKU } from "@/lib/data/camera-quote-constants";
+import {
+  CAMERA_QUOTE_CARD_SKUS,
+  CAMERA_QUOTE_DETAIL_MATERIAL_SKUS,
+  CAMERA_QUOTE_INSTALL_SKUS,
+  CAMERA_QUOTE_MATERIAL_SKUS,
+} from "@/lib/data/camera-quote-constants";
+import {
+  cameraQuoteInstallationProfile,
+  cameraQuotePrice,
+  cameraQuoteProfileProducts,
+  resolveCameraQuoteDefaults,
+  type CameraQuoteSettings,
+} from "@/lib/camera-quote-settings";
 import { FreeLinePriceControl } from "@/components/pos/free-line-price-control";
 import {
   buildPosUnitOptions,
@@ -448,6 +460,7 @@ export function PosClient({
   createdProductId,
   posPrefs,
   taxPrefs,
+  cameraQuoteSettings,
 }: {
   storageScope: string;
   data: PosData;
@@ -460,6 +473,7 @@ export function PosClient({
   createdProductId?: string | null;
   posPrefs: StorePrefs["pos"];
   taxPrefs: StorePrefs["tax"];
+  cameraQuoteSettings: CameraQuoteSettings;
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -909,6 +923,18 @@ export function PosClient({
   );
   const searchableProducts = useMemo(() => flattenProducts(data.products), [data.products]);
   const productById = useMemo(() => new Map(searchableProducts.map((product) => [product.id, product])), [searchableProducts]);
+  const cameraQuoteProductGroups = useMemo(() => ({
+    cards: CAMERA_QUOTE_CARD_SKUS.flatMap((sku) => searchableProducts.filter((product) => product.sku === sku)),
+    installations: CAMERA_QUOTE_INSTALL_SKUS.flatMap((sku) => searchableProducts.filter((product) => product.sku === sku)),
+    materials: searchableProducts.filter((product) => new Set<string>([
+      ...CAMERA_QUOTE_MATERIAL_SKUS,
+      ...CAMERA_QUOTE_DETAIL_MATERIAL_SKUS,
+    ]).has(product.sku ?? "")),
+  }), [searchableProducts]);
+  const cameraQuoteDefaults = useMemo(
+    () => resolveCameraQuoteDefaults(cameraQuoteProductGroups, cameraQuoteSettings),
+    [cameraQuoteProductGroups, cameraQuoteSettings],
+  );
   const cameraPackages = active.cameraPackages ?? [];
 
   const cameraPackagesToCart = useCallback((packages: CameraQuotePackage[]) => {
@@ -922,18 +948,19 @@ export function PosClient({
       return packageItems.flatMap((item, itemIndex) => {
         const product = productById.get(item.productId);
         if (!product) return [];
+        const baseUnitPrice = unitPriceFor(product, null, priceBook, data.priceBooks);
         return [{
           key: `camera-${pkg.key}-${itemIndex}`,
           product,
           unitName: product.baseUnit,
           unitMultiplier: 1,
-          unitPrice: unitPriceFor(product, null, priceBook, data.priceBooks),
+          unitPrice: cameraQuotePrice(item.productId, baseUnitPrice, cameraQuoteSettings),
           quantity: item.quantity,
           note: t("pos.cameraQuote.packageNote", { n: String(packageIndex + 1).padStart(2, "0") }),
         }];
       });
     });
-  }, [productById, priceBook, t, data.priceBooks]);
+  }, [cameraQuoteSettings, productById, priceBook, t, data.priceBooks]);
 
   function setCameraPackages(packages: CameraQuotePackage[]) {
     const nextCart = cameraPackagesToCart(packages);
@@ -947,9 +974,11 @@ export function PosClient({
   useEffect(() => {
     if (!initialContext?.cameraQuote || !active.cameraQuote || active.cameraPackages?.length || !active.cameraInitialId) return;
     const camera = productById.get(active.cameraInitialId);
-    const card = searchableProducts.find((product) => product.sku === CAMERA_QUOTE_DEFAULT_CARD_SKU);
-    const installation = searchableProducts.find((product) => product.sku === "SVC-CAM-INSTALL-200");
-    const material = searchableProducts.find((product) => product.sku === "MAT-CAM-BASIC-50");
+    const profile = camera ? cameraQuoteInstallationProfile(camera.name, {}) : "indoor";
+    const profileProducts = cameraQuoteProfileProducts(cameraQuoteDefaults, profile);
+    const card = cameraQuoteDefaults.defaultCard;
+    const installation = profileProducts.installation;
+    const material = profileProducts.material;
     if (!camera || !card || !installation || !material) return;
     const packages: CameraQuotePackage[] = [{
       key: `camera-package-${Date.now()}`,
@@ -964,7 +993,7 @@ export function PosClient({
       if (!cancelled) patchActive({ cameraPackages: packages, cart: cameraPackagesToCart(packages), cameraInitialId: undefined });
     });
     return () => { cancelled = true; };
-  }, [active.cameraInitialId, active.cameraPackages?.length, active.cameraQuote, initialContext?.cameraQuote, productById, searchableProducts, patchActive, cameraPackagesToCart]);
+  }, [active.cameraInitialId, active.cameraPackages?.length, active.cameraQuote, initialContext?.cameraQuote, productById, cameraQuoteDefaults, patchActive, cameraPackagesToCart]);
 
   // ===== offline (Mức A) =====
   const [online, setOnline] = useState(true);
@@ -2341,6 +2370,7 @@ export function PosClient({
               products={searchableProducts}
               packages={cameraPackages}
               priceBook={priceBook}
+              cameraQuoteSettings={cameraQuoteSettings}
               onChange={setCameraPackages}
             />
           )}

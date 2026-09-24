@@ -64,7 +64,7 @@ function storageSize(size: SystemSize, cameraType: CameraType, days: StorageDays
   return "6";
 }
 
-export function HikvisionQuoteClient({ backLabel, catalogReady, products }: { backLabel: string; catalogReady: boolean; products: HikvisionQuoteProduct[] }) {
+export function HikvisionQuoteClient({ backLabel, catalogReady, priceOverrides, products }: { backLabel: string; catalogReady: boolean; priceOverrides: Record<string, number>; products: HikvisionQuoteProduct[] }) {
   const t = useTranslations("cameraQuotePage.hikvision");
   const [systemSize, setSystemSize] = useState<SystemSize>("4");
   const [cameraType, setCameraType] = useState<CameraType>("bullet4");
@@ -99,7 +99,7 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, products }: { ba
   const lineItems = useMemo(() => {
     const fromProduct = (label: string, sku: string, quantity = 1): QuoteLineItem => {
       const item = product(sku);
-      const unitPrice = temporaryPrices[sku] ?? item?.retailPrice ?? 0;
+      const unitPrice = temporaryPrices[sku] ?? (item ? priceOverrides[item.id] : undefined) ?? item?.retailPrice ?? 0;
       return { id: sku, sku, label, model: item?.name ?? sku, quantity, unitPrice, total: unitPrice * quantity, unavailable: !item };
     };
     const items = [
@@ -118,7 +118,7 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, products }: { ba
     if (includeMonitor) items.push(fromProduct(t("items.monitor"), SKU.monitor));
     if (includeSurge) items.push(fromProduct(t("items.surge"), SKU.surge, cameraCount));
     return items;
-  }, [cableMeters, cameraCount, cameraType, includeMonitor, includeRack, includeSurge, includeUps, poeMethod, product, selectedStorage, systemSize, t, temporaryPrices]);
+  }, [cableMeters, cameraCount, cameraType, includeMonitor, includeRack, includeSurge, includeUps, poeMethod, priceOverrides, product, selectedStorage, systemSize, t, temporaryPrices]);
 
   const hasUnavailableItem = lineItems.some((item) => item.unavailable);
   const total = lineItems.reduce((sum, item) => sum + item.total, 0);

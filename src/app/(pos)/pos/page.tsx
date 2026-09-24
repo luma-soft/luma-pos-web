@@ -198,6 +198,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
           createdProductId={validCreatedProductId}
           posPrefs={settings.prefs.pos}
           taxPrefs={settings.prefs.tax}
+          cameraQuoteSettings={settings.prefs.cameraQuote}
         />
       </div>
     </div>

@@ -5,6 +5,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { paymentBankAccounts, storeSettings } from "@/db/schema";
 import { getPaymentBankAccounts, getStaff } from "@/lib/data/settings";
+import { getCameraQuoteFormOptions } from "@/lib/data/camera-quotes";
 import { getAiUsageStatus } from "@/lib/ai/usage";
 import {
   aiSettingsInputSchema,
@@ -14,6 +15,7 @@ import {
   storePrefsPatchSchema,
   mobileNotificationSettingsPatchSchema,
   zaloSettingsInputSchema,
+  cameraQuotePrefsSchema,
   parseStorePrefs,
   type AiSettingsInput,
   type PaymentBankAccountInput,
@@ -121,10 +123,15 @@ function changedSettingsFields(before: unknown, after: unknown, prefix = ""): st
 
 // Preferences can contain credentials and connection strings. Only changed field
 // names and explicit non-secret integration switches belong in the activity feed.
-function preferenceActivitySummary(prefs: StorePrefs, section?: "ai" | "zalo" | "shopee") {
+function preferenceActivitySummary(prefs: StorePrefs, section?: "ai" | "zalo" | "shopee" | "cameraQuote") {
   if (section === "ai") return { provider: prefs.ai.provider, textModel: prefs.ai.textModel, visionModel: prefs.ai.visionModel, monthlyUsageLimit: prefs.ai.monthlyUsageLimit };
   if (section === "zalo") return { enabled: prefs.zalo.enabled, deliveryMode: prefs.zalo.deliveryMode };
   if (section === "shopee") return { enabled: prefs.shopee.enabled, environment: prefs.shopee.environment, syncInventory: prefs.shopee.syncInventory, syncOrders: prefs.shopee.syncOrders, syncMessages: prefs.shopee.syncMessages };
+  if (section === "cameraQuote") return {
+    memoryCardCount: prefs.cameraQuote.memoryCardProductIds?.length ?? 0,
+    defaultMemoryCardProductId: prefs.cameraQuote.defaultMemoryCardProductId,
+    priceOverrideCount: Object.keys(prefs.cameraQuote.priceOverrides).length,
+  };
   return {};
 }
 
@@ -133,7 +140,7 @@ async function persistSettingsWithActivity<T>(
   actorId: string,
   action: string,
   mutate: (current: StorePrefs) => { next: StorePrefs; value: T },
-  section?: "ai" | "zalo" | "shopee",
+  section?: "ai" | "zalo" | "shopee" | "cameraQuote",
 ) {
   return db.transaction(async (tx) => {
     const persisted = await persistStorePrefsMutation(tx, storeId, mutate);
@@ -202,6 +209,73 @@ export async function updateStorePrefsForUser(
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("updateStorePrefs failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function updateCameraQuoteSettings(input: StorePrefs["cameraQuote"]): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  return persistCameraQuoteSettings(gate.storeId, gate.userId, input);
+}
+
+export async function updateCameraQuoteSettingsForUser(
+  userId: string,
+  input: StorePrefs["cameraQuote"],
+): Promise<ActionResult> {
+  let context;
+  try {
+    context = await resolveStoreContextForUser(userId);
+  } catch {
+    return { ok: false, error: "errors.unauthorized" };
+  }
+  if (!context) return { ok: false, error: "errors.unauthorized" };
+  return persistCameraQuoteSettings(context.storeId, userId, input);
+}
+
+async function persistCameraQuoteSettings(
+  storeId: string,
+  actorId: string,
+  input: StorePrefs["cameraQuote"],
+): Promise<ActionResult> {
+  const parsed = cameraQuotePrefsSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+
+  try {
+    const options = await getCameraQuoteFormOptions(storeId, false, false);
+    const cameraIds = new Set(options.cameras.map((product) => product.id));
+    const cardIds = new Set(options.cards.map((product) => product.id));
+    const installationIds = new Set(options.installations.map((product) => product.id));
+    const materialIds = new Set(options.materials.map((product) => product.id));
+    const quoteProductIds = new Set([...cameraIds, ...cardIds, ...installationIds, ...materialIds]);
+    const value = parsed.data;
+
+    if (
+      (value.memoryCardProductIds !== null && value.memoryCardProductIds.some((id) => !cardIds.has(id)))
+      || (value.defaultMemoryCardProductId !== null && !cardIds.has(value.defaultMemoryCardProductId))
+      || (value.defaultMemoryCardProductId !== null && value.memoryCardProductIds !== null && !value.memoryCardProductIds.includes(value.defaultMemoryCardProductId))
+      || (value.indoorMaterialProductId !== null && !materialIds.has(value.indoorMaterialProductId))
+      || (value.outdoorMaterialProductId !== null && !materialIds.has(value.outdoorMaterialProductId))
+      || (value.ptzMaterialProductId !== null && !materialIds.has(value.ptzMaterialProductId))
+      || (value.indoorInstallationProductId !== null && !installationIds.has(value.indoorInstallationProductId))
+      || (value.outdoorInstallationProductId !== null && !installationIds.has(value.outdoorInstallationProductId))
+      || (value.ptzInstallationProductId !== null && !installationIds.has(value.ptzInstallationProductId))
+      || Object.keys(value.priceOverrides).some((id) => !quoteProductIds.has(id))
+    ) {
+      return { ok: false, error: "errors.invalidData" };
+    }
+
+    await persistSettingsWithActivity(storeId, actorId, "settings.camera_quote.updated", (current) => ({
+      next: { ...current, cameraQuote: value },
+      value: undefined,
+    }), "cameraQuote");
+    revalidatePath(Routes.Settings);
+    revalidatePath(Routes.POS);
+    revalidatePath("/s/[storeSlug]/camera-quote", "page");
+    revalidatePath("/s/[storeSlug]/camera-quote/[brand]", "page");
+    return { ok: true, data: undefined };
+  } catch (e) {
+    console.error("updateCameraQuoteSettings failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
 }

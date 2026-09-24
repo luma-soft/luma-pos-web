@@ -12,10 +12,16 @@ import { CameraPickerModal, type CameraPickerProduct } from "@/components/pos/ca
 import {
   CAMERA_QUOTE_CARD_SKUS,
   CAMERA_QUOTE_DETAIL_MATERIAL_SKUS,
-  CAMERA_QUOTE_DEFAULT_CARD_SKU,
   CAMERA_QUOTE_INSTALL_SKUS,
   CAMERA_QUOTE_MATERIAL_SKUS,
 } from "@/lib/data/camera-quote-constants";
+import {
+  cameraQuoteInstallationProfile,
+  cameraQuotePrice,
+  cameraQuoteProfileProducts,
+  resolveCameraQuoteDefaults,
+  type CameraQuoteSettings,
+} from "@/lib/camera-quote-settings";
 import type { PosProduct } from "@/lib/data/pos";
 import { formatCurrency } from "@/lib/utils";
 
@@ -33,6 +39,7 @@ type Props = {
   products: PosProduct[];
   packages: CameraQuotePackage[];
   priceBook: string;
+  cameraQuoteSettings: CameraQuoteSettings;
   onChange: (packages: CameraQuotePackage[]) => void;
 };
 
@@ -48,8 +55,8 @@ function isCamera(product: PosProduct) {
     name.startsWith("ezviz ") || name.startsWith("imou ");
 }
 
-function label(product: PosProduct) {
-  return `${product.name} · ${formatCurrency(Number(product.retailPrice))}`;
+function label(product: PosProduct, settings: CameraQuoteSettings) {
+  return `${product.name} · ${formatCurrency(cameraQuotePrice(product.id, Number(product.retailPrice), settings))}`;
 }
 
 function unitLabel(product?: PosProduct) {
@@ -62,7 +69,7 @@ function keyFor(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export function CameraQuotePanel({ products, packages, priceBook, onChange }: Props) {
+export function CameraQuotePanel({ products, packages, priceBook, cameraQuoteSettings, onChange }: Props) {
   const t = useTranslations();
   const [pickerOpen, setPickerOpen] = useState(false);
   const bySku = new Map(products.flatMap((product) => [[product.sku ?? "", product]]));
@@ -72,14 +79,14 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
     id: product.id,
     sku: product.sku ?? "",
     name: product.name,
-    retailPrice: Number(product.retailPrice),
+    retailPrice: cameraQuotePrice(product.id, Number(product.retailPrice), cameraQuoteSettings),
     imageUrl: Array.isArray(product.imageUrls) && typeof product.imageUrls[0] === "string" ? product.imageUrls[0] : null,
   }));
-  const cards = CAMERA_QUOTE_CARD_SKUS.flatMap((sku) => {
+  const catalogCards = CAMERA_QUOTE_CARD_SKUS.flatMap((sku) => {
     const product = bySku.get(sku);
     return product ? [product] : [];
   });
-  const installations = CAMERA_QUOTE_INSTALL_SKUS.flatMap((sku) => {
+  const catalogInstallations = CAMERA_QUOTE_INSTALL_SKUS.flatMap((sku) => {
     const product = bySku.get(sku);
     return product ? [product] : [];
   });
@@ -91,6 +98,12 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
     materialSkus.has(product.sku ?? "") ||
     Boolean(product.specs && typeof product.specs === "object" && !Array.isArray(product.specs) && (product.specs as Record<string, unknown>).__cameraQuoteMaterial === true),
   );
+  const quoteDefaults = resolveCameraQuoteDefaults(
+    { cards: catalogCards, installations: catalogInstallations, materials },
+    cameraQuoteSettings,
+  );
+  const cards = quoteDefaults.cards;
+  const installations = catalogInstallations;
   const selectedCameras = packages.reduce<Record<string, number>>((counts, pkg) => {
     counts[pkg.cameraId] = (counts[pkg.cameraId] ?? 0) + pkg.quantity;
     return counts;
@@ -102,16 +115,20 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
     }),
   );
 
-  function defaultMaterial() {
-    const product = materials.find((item) => genericMaterialIds.has(item.id)) ?? materials[0];
+  function defaultMaterial(profile: ReturnType<typeof cameraQuoteInstallationProfile>) {
+    const profileMaterial = cameraQuoteProfileProducts(quoteDefaults, profile).material;
+    const product = profileMaterial ?? materials.find((item) => genericMaterialIds.has(item.id)) ?? materials[0];
     return product ? { productId: product.id, quantity: 1 } : null;
   }
 
   function addCamera(cameraId: string) {
     if (!cameraId) return;
-    const card = cards.find((item) => item.sku === CAMERA_QUOTE_DEFAULT_CARD_SKU) ?? cards[0];
-    const installation = installations.find((item) => item.sku === "SVC-CAM-INSTALL-200") ?? installations[0];
-    const material = defaultMaterial();
+    const camera = byId.get(cameraId);
+    const profile = camera ? cameraQuoteInstallationProfile(camera.name, {}) : "indoor";
+    const profileProducts = cameraQuoteProfileProducts(quoteDefaults, profile);
+    const card = quoteDefaults.defaultCard ?? cards[0];
+    const installation = profileProducts.installation ?? installations[0];
+    const material = defaultMaterial(profile);
     if (!card || !installation || !material) return;
     const existing = packages.find((pkg) =>
       pkg.cameraId === cameraId &&
@@ -155,7 +172,9 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
     const getPrice = (id: string) => {
       if (!id) return 0;
       const product = byId.get(id);
-      return product ? posBasePrice(product, priceBook) ?? Number.NaN : 0;
+      if (!product) return 0;
+      const price = posBasePrice(product, priceBook) ?? Number.NaN;
+      return cameraQuotePrice(id, price, cameraQuoteSettings);
     };
     const base = getPrice(pkg.cameraId) + getPrice(pkg.cardId) + getPrice(pkg.installationId);
     const material = pkg.materialLines.reduce((sum, line) => sum + getPrice(line.productId) * line.quantity, 0);
@@ -195,7 +214,7 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
                         wrapLabel
                         className="min-w-0 flex-1"
                         value={pkg.cameraId}
-                        options={cameras.map((product) => ({ value: product.id, label: label(product) }))}
+                        options={cameras.map((product) => ({ value: product.id, label: label(product, cameraQuoteSettings) }))}
                         onValueChange={(cameraId) => updatePackage(pkg.key, { cameraId })}
                       />
                       <div className="grid h-11 shrink-0 grid-cols-[44px_44px_44px] overflow-hidden rounded-md border border-border bg-surface lg:h-9 lg:grid-cols-[32px_42px_32px]">
@@ -222,14 +241,14 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
                     size="sm"
                     wrapLabel
                     value={pkg.cardId}
-                    options={cards.map((product) => ({ value: product.id, label: label(product) }))}
+                    options={cards.map((product) => ({ value: product.id, label: label(product, cameraQuoteSettings) }))}
                     onValueChange={(cardId) => updatePackage(pkg.key, { cardId })}
                   />
                   <Select
                     size="sm"
                     wrapLabel
                     value={pkg.installationId}
-                    options={installations.map((product) => ({ value: product.id, label: label(product) }))}
+                    options={installations.map((product) => ({ value: product.id, label: label(product, cameraQuoteSettings) }))}
                     onValueChange={(installationId) => updatePackage(pkg.key, { installationId })}
                   />
                 </div>
@@ -245,7 +264,7 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
                         size="sm"
                         wrapLabel
                             value={line.productId}
-                            options={materials.map((item) => ({ value: item.id, label: label(item) }))}
+                            options={materials.map((item) => ({ value: item.id, label: label(item, cameraQuoteSettings) }))}
                             onValueChange={(productId) => updateMaterial(pkg, materialIndex, productId)}
                           />
                           <NumberInput

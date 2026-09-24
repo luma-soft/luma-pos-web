@@ -1,6 +1,7 @@
 import { SettingsClient } from "./settings-client";
 import { PromotionsTab } from "../sales/tabs/promotions";
 import { getStoreSettings } from "@/lib/data/settings";
+import { getCameraQuoteFormOptions } from "@/lib/data/camera-quotes";
 import { requireUser, getRole } from "@/lib/actions/common";
 import { resolveNotificationChannels } from "@/lib/notifications/channels";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const context = await requireStoreContext();
   const storePromise = getStoreSettings(context.storeId);
+  const cameraQuoteOptionsPromise = getCameraQuoteFormOptions(context.storeId, false, false);
   const params = await searchParams;
   let canManage = false;
   let canEditAi = false;
@@ -19,12 +21,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     canEditAi = role === "owner";
   } catch { /* layout handles auth */ }
   const store = await storePromise;
+  const cameraQuoteOptions = await cameraQuoteOptionsPromise;
   return (
     <SettingsClient
       store={store}
       canManage={canManage}
       canEditAi={canEditAi}
       notificationChannels={resolveNotificationChannels()}
+      cameraQuoteOptions={cameraQuoteOptions}
       initialTab={params.tab}
       promotionsContent={<PromotionsTab />}
     />

@@ -12,9 +12,10 @@ import { MobileTopBar, TouchTargetToggle } from "@/components/mobile-ui";
 import { Select } from "@/components/ui/select";
 import { SegmentedTabs } from "@/components/ui/tabs";
 import { NumberInput } from "@/components/ui/number-input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { normalizeSearch } from "@/lib/normalize";
 import { useAppDataQuery } from "@/components/use-app-data-query";
 import {
@@ -33,8 +34,11 @@ import {
   updateStaffRole,
   setStaffActive,
   updateStorePrefs,
+  updateCameraQuoteSettings,
 } from "@/lib/actions/settings";
 import type { PaymentBankAccountRow, StoreSettings, StaffRow } from "@/lib/data/settings";
+import type { CameraQuoteFormOptions } from "@/lib/data/camera-quotes";
+import { cameraQuotePrice, resolveCameraQuoteDefaults } from "@/lib/camera-quote-settings";
 import {
   AI_PROVIDERS,
   AI_TEXT_MODELS,
@@ -226,7 +230,7 @@ function formatAiTestMessage(message: string, L: boolean) {
   return map[message] ? (L ? map[message][1] : map[message][0]) : message;
 }
 
-type SectionId = "store" | "staff" | "pos" | "hardware" | "payments" | "print" | "promotions" | "tax" | "notifications" | "zalo" | "shopee" | "ai";
+type SectionId = "store" | "staff" | "pos" | "cameraQuote" | "hardware" | "payments" | "print" | "promotions" | "tax" | "notifications" | "zalo" | "shopee" | "ai";
 
 const NAV: { group: [string, string]; items: { id: SectionId; ico: string; en: string; vi: string; badge?: string }[] }[] = [
   { group: ["Store", "Cửa hàng"], items: [
@@ -235,6 +239,7 @@ const NAV: { group: [string, string]; items: { id: SectionId; ico: string; en: s
   ] },
   { group: ["Operations", "Vận hành"], items: [
     { id: "pos", ico: "🛒", en: "POS Page", vi: "Trang bán hàng POS" },
+    { id: "cameraQuote", ico: "📷", en: "Camera Quotes", vi: "Báo giá camera" },
     { id: "hardware", ico: "🖨️", en: "Hardware", vi: "Thiết bị phần cứng" },
     { id: "payments", ico: "💳", en: "Payments", vi: "Thanh toán" },
     { id: "print", ico: "📄", en: "Print Templates", vi: "Mẫu in", badge: "15.1" },
@@ -256,6 +261,7 @@ const SEC_META: Record<SectionId, { en: string; vi: string; subEn: string; subVi
   store: { en: "Store Profile", vi: "Thông tin cửa hàng", subEn: "Business identity, currency & locale", subVi: "Thông tin doanh nghiệp, tiền tệ & ngôn ngữ" },
   staff: { en: "Staff & RBAC", vi: "Nhân viên & Phân quyền", subEn: "Members and role-based access control", subVi: "Nhân viên và phân quyền theo vai trò" },
   pos: { en: "POS Page", vi: "Trang bán hàng POS", subEn: "Show or hide optional selling controls", subVi: "Ẩn/hiện các trường tùy chọn khi bán hàng" },
+  cameraQuote: { en: "Camera Quotes", vi: "Báo giá camera", subEn: "Default camera, memory card, material, and installation prices", subVi: "Giá mặc định camera, thẻ nhớ, vật tư và công lắp đặt" },
   hardware: { en: "Hardware Devices", vi: "Thiết bị phần cứng", subEn: "Printer, scanner, drawer, scale, reader", subVi: "Máy in, quét mã, ngăn kéo, cân, đọc thẻ" },
   payments: { en: "Payment Methods", vi: "Phương thức thanh toán", subEn: "Vietnamese payment ecosystem", subVi: "Hệ sinh thái thanh toán Việt Nam" },
   print: { en: "Print Templates", vi: "Mẫu in", subEn: "Receipt & document template designer", subVi: "Thiết kế mẫu hóa đơn & chứng từ" },
@@ -318,6 +324,7 @@ export function SettingsClient({
   notificationChannels,
   initialTab,
   promotionsContent,
+  cameraQuoteOptions,
 }: {
   store: StoreSettings;
   canManage: boolean;
@@ -325,6 +332,7 @@ export function SettingsClient({
   notificationChannels: { id: string; configured: boolean }[];
   initialTab?: string;
   promotionsContent: React.ReactNode;
+  cameraQuoteOptions: CameraQuoteFormOptions;
 }) {
   const locale = useLocale();
   const tSettings = useTranslations("settings");
@@ -412,6 +420,7 @@ export function SettingsClient({
         {active === "store" && <StoreSection L={L} locale={locale} store={store} canManage={canManage} />}
         {active === "staff" && (staff ? <StaffSection L={L} staff={staff} canManage={canManage} /> : <LazySectionState L={L} loading={Boolean(lazyLoading.staff)} error={lazyError.staff} />)}
         {active === "pos" && <PosSettingsSection L={L} prefs={store.prefs.pos} canManage={canManage} />}
+        {active === "cameraQuote" && <CameraQuoteSettingsSection L={L} prefs={store.prefs.cameraQuote} options={cameraQuoteOptions} canManage={canManage} />}
         {active === "hardware" && <HardwareSection L={L} prefs={store.prefs.hardware} canManage={canManage} />}
         {active === "payments" && <PaymentsSection L={L} prefs={store.prefs.payments} canManage={canManage} bankAccounts={bankAccounts ?? []} accountsLoading={Boolean(lazyLoading.payments)} accountsError={lazyError.payments} />}
         {active === "print" && <PrintSection L={L} />}
@@ -585,6 +594,256 @@ function PosSettingsSection({ L, prefs, canManage }: { L: boolean; prefs: StoreP
         <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} />
       </div>
     </Card>
+  );
+}
+
+type CameraQuoteProductField =
+  | "indoorMaterialProductId"
+  | "outdoorMaterialProductId"
+  | "ptzMaterialProductId"
+  | "indoorInstallationProductId"
+  | "outdoorInstallationProductId"
+  | "ptzInstallationProductId";
+
+function materializeCameraQuotePrefs(
+  prefs: StorePrefs["cameraQuote"],
+  options: CameraQuoteFormOptions,
+): StorePrefs["cameraQuote"] {
+  const defaults = resolveCameraQuoteDefaults(options, prefs);
+  return {
+    ...prefs,
+    memoryCardProductIds: defaults.cards.map((product) => product.id),
+    defaultMemoryCardProductId: defaults.defaultCard?.id ?? null,
+    indoorMaterialProductId: defaults.indoorMaterial?.id ?? null,
+    outdoorMaterialProductId: defaults.outdoorMaterial?.id ?? null,
+    ptzMaterialProductId: defaults.ptzMaterial?.id ?? null,
+    indoorInstallationProductId: defaults.indoorInstallation?.id ?? null,
+    outdoorInstallationProductId: defaults.outdoorInstallation?.id ?? null,
+    ptzInstallationProductId: defaults.ptzInstallation?.id ?? null,
+  };
+}
+
+function CameraQuoteSettingsSection({
+  L,
+  prefs,
+  options,
+  canManage,
+}: {
+  L: boolean;
+  prefs: StorePrefs["cameraQuote"];
+  options: CameraQuoteFormOptions;
+  canManage: boolean;
+}) {
+  const [form, setForm] = useState(() => materializeCameraQuotePrefs(prefs, options));
+  const [query, setQuery] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, start] = useTransition();
+  const productById = useMemo(
+    () => new Map([...options.cameras, ...options.cards, ...options.installations, ...options.materials].map((product) => [product.id, product])),
+    [options],
+  );
+  const selectedCardIds = new Set(form.memoryCardProductIds ?? []);
+  const selectedCards = options.cards.filter((product) => selectedCardIds.has(product.id));
+  const defaultCardOptions = selectedCards.map((product) => ({
+    value: product.id,
+    label: `${product.name} · ${formatCurrency(cameraQuotePrice(product.id, product.retailPrice, form))}`,
+  }));
+  const visibleCameras = options.cameras.filter((product) =>
+    `${product.name} ${product.sku}`.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi")),
+  );
+
+  function markChanged(next: StorePrefs["cameraQuote"]) {
+    setForm(next);
+    setDirty(true);
+    setSaved(false);
+    setError("");
+  }
+
+  function setPriceOverride(productId: string, value: number | null, retailPrice: number) {
+    const priceOverrides = { ...form.priceOverrides };
+    if (value === null || value === retailPrice) delete priceOverrides[productId];
+    else priceOverrides[productId] = Math.max(0, Math.round(value));
+    markChanged({ ...form, priceOverrides });
+  }
+
+  function toggleCard(productId: string, checked: boolean) {
+    const next = new Set(form.memoryCardProductIds ?? []);
+    if (checked) next.add(productId);
+    else next.delete(productId);
+    const memoryCardProductIds = [...next];
+    const defaultMemoryCardProductId = memoryCardProductIds.includes(form.defaultMemoryCardProductId ?? "")
+      ? form.defaultMemoryCardProductId
+      : memoryCardProductIds[0] ?? null;
+    markChanged({ ...form, memoryCardProductIds, defaultMemoryCardProductId });
+  }
+
+  function setProduct(field: CameraQuoteProductField, value: string) {
+    markChanged({ ...form, [field]: value || null });
+  }
+
+  function save() {
+    start(async () => {
+      const result = await updateCameraQuoteSettings(form);
+      if (!result.ok) {
+        setError(L ? "Không thể lưu cấu hình báo giá." : "Could not save camera quote settings.");
+        return;
+      }
+      setDirty(false);
+      setSaved(true);
+    });
+  }
+
+  const profileRows: Array<{
+    id: "indoor" | "outdoor" | "ptz";
+    label: string;
+    materialField: CameraQuoteProductField;
+    installationField: CameraQuoteProductField;
+  }> = [
+    { id: "indoor", label: L ? "Trong nhà" : "Indoor", materialField: "indoorMaterialProductId", installationField: "indoorInstallationProductId" },
+    { id: "outdoor", label: L ? "Ngoài trời cố định" : "Outdoor fixed", materialField: "outdoorMaterialProductId", installationField: "outdoorInstallationProductId" },
+    { id: "ptz", label: L ? "Ngoài trời xoay / PTZ" : "Outdoor PTZ", materialField: "ptzMaterialProductId", installationField: "ptzInstallationProductId" },
+  ];
+
+  return (
+    <>
+      <Card
+        title={L ? "Cấu hình mặc định báo giá camera" : "Camera quote defaults"}
+        vi={L ? "Áp dụng cho báo giá mới; từng báo giá vẫn có thể sửa riêng." : "Applied to new quotes; each quote can still be edited independently."}
+      >
+        <div className="p-4.5 flex flex-col gap-4">
+          <div className="rounded-[10px] border border-primary-200 bg-primary-50 px-3.5 py-3 text-[11px] leading-5 text-primary-800 dark:border-primary-900 dark:bg-primary-950/30 dark:text-primary-200">
+            {L
+              ? "Giá mặc định lấy từ giá bán sản phẩm. Chỉ các dòng có giá báo giá riêng mới ghi đè giá sản phẩm. Thay đổi tại đây không làm đổi các báo giá đã lưu."
+              : "Defaults use the product retail price. Only rows with an explicit quote price override the catalog price. Changes here do not rewrite saved quotes."}
+          </div>
+
+          <Card title={L ? "Camera đang có" : "Available cameras"} vi={L ? "Giá báo giá tùy chọn theo từng model" : "Optional quote price per model"}>
+            <div className="p-3.5">
+              <input
+                className={FI}
+                value={query}
+                disabled={!canManage}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={L ? "Tìm theo tên hoặc SKU" : "Search by name or SKU"}
+              />
+              <div className="mt-3 max-h-96 overflow-auto rounded-lg border border-border-soft">
+                <div className="grid min-w-[640px] grid-cols-[minmax(0,1fr)_130px_150px] gap-2 border-b border-border-soft bg-canvas px-3 py-2 text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                  <span>{L ? "Sản phẩm" : "Product"}</span>
+                  <span>{L ? "Giá hiện tại" : "Retail price"}</span>
+                  <span>{L ? "Giá báo giá" : "Quote price"}</span>
+                </div>
+                {visibleCameras.map((product) => (
+                  <div key={product.id} className="grid min-w-[640px] grid-cols-[minmax(0,1fr)_130px_150px] items-center gap-2 border-b border-border-soft px-3 py-2.5 last:border-0">
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold">{product.name}</div>
+                      <div className="text-[10px] text-slate-400">{product.sku}</div>
+                    </div>
+                    <span className="text-right text-xs tabular-nums text-slate-500">{formatCurrency(product.retailPrice)}</span>
+                    <MoneyInput
+                      value={cameraQuotePrice(product.id, product.retailPrice, form)}
+                      disabled={!canManage}
+                      className="h-9 text-xs"
+                      onChange={(value) => setPriceOverride(product.id, value, product.retailPrice)}
+                    />
+                  </div>
+                ))}
+                {visibleCameras.length === 0 && <div className="p-6 text-center text-xs text-slate-400">{L ? "Không tìm thấy camera." : "No cameras found."}</div>}
+              </div>
+            </div>
+          </Card>
+
+          <Card title={L ? "Thẻ nhớ" : "Memory cards"} vi={L ? "Chọn các gói hiển thị và giá mặc định" : "Choose visible packages and default pricing"}>
+            <div className="p-3.5 flex flex-col gap-3">
+              <div className="grid gap-2">
+                {options.cards.map((product) => (
+                  <div key={product.id} className={cn(ROW, "grid grid-cols-[auto_minmax(0,1fr)_130px] items-center")}>
+                    <Checkbox checked={selectedCardIds.has(product.id)} disabled={!canManage} onChange={(event) => toggleCard(product.id, event.currentTarget.checked)} aria-label={product.name} />
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold">{product.name}</div>
+                      <div className="text-[10px] text-slate-400">{product.sku}</div>
+                    </div>
+                    <MoneyInput
+                      value={cameraQuotePrice(product.id, product.retailPrice, form)}
+                      disabled={!canManage || !selectedCardIds.has(product.id)}
+                      className="h-9 text-xs"
+                      onChange={(value) => setPriceOverride(product.id, value, product.retailPrice)}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="max-w-xl">
+                <span className={FL}>{L ? "Thẻ nhớ mặc định" : "Default memory card"}</span>
+                <SearchableSelect
+                  value={form.defaultMemoryCardProductId ?? ""}
+                  options={defaultCardOptions}
+                  allowClear
+                  disabled={!canManage || selectedCards.length === 0}
+                  onChange={(value) => markChanged({ ...form, defaultMemoryCardProductId: value || null })}
+                  className={searchableTouch}
+                />
+              </div>
+            </div>
+          </Card>
+
+          <Card title={L ? "Vật tư và công lắp đặt" : "Materials and installation"} vi={L ? "Cấu hình theo vị trí lắp đặt" : "Configure by installation profile"}>
+            <div className="divide-y divide-border-soft">
+              {profileRows.map((profile) => {
+                const materialId = form[profile.materialField];
+                const installationId = form[profile.installationField];
+                const material = materialId ? productById.get(materialId) : undefined;
+                const installation = installationId ? productById.get(installationId) : undefined;
+                return (
+                  <div key={profile.id} className="grid gap-3 p-3.5 md:grid-cols-[150px_minmax(0,1fr)_130px_minmax(0,1fr)_130px] md:items-end">
+                    <div>
+                      <div className="text-xs font-bold">{profile.label}</div>
+                      {profile.id === "ptz" && <div className="mt-1 text-[10px] text-slate-400">{L ? "Dùng riêng cho camera xoay/PTZ" : "Used for PTZ cameras"}</div>}
+                    </div>
+                    <div className="min-w-0">
+                      <span className={FL}>{L ? "Vật tư" : "Material"}</span>
+                      <SearchableSelect
+                        value={materialId ?? ""}
+                        options={options.materials.map((product) => ({ value: product.id, label: product.name, hint: product.sku }))}
+                        allowClear={false}
+                        disabled={!canManage}
+                        onChange={(value) => setProduct(profile.materialField, value)}
+                        className={searchableTouch}
+                      />
+                    </div>
+                    <MoneyInput
+                      value={material ? cameraQuotePrice(material.id, material.retailPrice, form) : null}
+                      disabled={!canManage || !material}
+                      className="h-10 text-xs"
+                      onChange={(value) => material && setPriceOverride(material.id, value, material.retailPrice)}
+                    />
+                    <div className="min-w-0">
+                      <span className={FL}>{L ? "Công lắp đặt" : "Installation"}</span>
+                      <SearchableSelect
+                        value={installationId ?? ""}
+                        options={options.installations.map((product) => ({ value: product.id, label: product.name, hint: product.sku }))}
+                        allowClear={false}
+                        disabled={!canManage}
+                        onChange={(value) => setProduct(profile.installationField, value)}
+                        className={searchableTouch}
+                      />
+                    </div>
+                    <MoneyInput
+                      value={installation ? cameraQuotePrice(installation.id, installation.retailPrice, form) : null}
+                      disabled={!canManage || !installation}
+                      className="h-10 text-xs"
+                      onChange={(value) => installation && setPriceOverride(installation.id, value, installation.retailPrice)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} error={error} onSave={save} />
+        </div>
+      </Card>
+    </>
   );
 }
 

@@ -30,6 +30,7 @@ export const HIKVISION_QUOTE_SKUS = [
 ] as const;
 
 export type HikvisionQuoteProduct = {
+  id: string;
   sku: string;
   name: string;
   brand: string | null;
@@ -40,6 +41,7 @@ export type HikvisionQuoteProduct = {
 export async function getHikvisionQuoteProducts(storeId: string): Promise<HikvisionQuoteProduct[]> {
   const rows = await db
     .select({
+      id: products.id,
       sku: products.sku,
       name: products.name,
       brand: brands.name,

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { brands, categories, customers, products, warehouses } from "@/db/schema";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
@@ -42,7 +42,8 @@ export type CameraQuoteProductOption = {
   specs: Record<string, string[]>;
 };
 
-export async function getCameraQuoteFormOptions(storeId: string, includePrivate = false) {
+export async function getCameraQuoteFormOptions(storeId: string, includePrivate = false, includeImages = true) {
+  const imageUrls = includeImages ? productCompatibilityImageUrls(storeId) : sql<string[]>`'[]'::json`;
   const [cameraRows, utilityRows, customerRows, warehouseRows] = await Promise.all([
     db
       .select({
@@ -53,13 +54,13 @@ export async function getCameraQuoteFormOptions(storeId: string, includePrivate 
         brand: brands.name,
         retailPrice: products.retailPrice,
         description: products.description,
-        imageUrls: productCompatibilityImageUrls(storeId),
+        imageUrls,
         specs: products.specs,
       })
       .from(products)
       .innerJoin(categories, eq(products.categoryId, categories.id))
       .leftJoin(brands, eq(products.brandId, brands.id))
-      .where(and(eq(products.storeId, storeId), eq(categories.name, "Camera giám sát")))
+      .where(and(eq(products.storeId, storeId), eq(products.isActive, true), eq(categories.name, "Camera giám sát")))
       .orderBy(asc(products.name)),
     db
       .select({
@@ -70,12 +71,12 @@ export async function getCameraQuoteFormOptions(storeId: string, includePrivate 
         brand: brands.name,
         retailPrice: products.retailPrice,
         description: products.description,
-        imageUrls: productCompatibilityImageUrls(storeId),
+        imageUrls,
         specs: products.specs,
       })
       .from(products)
       .leftJoin(brands, eq(products.brandId, brands.id))
-      .where(and(eq(products.storeId, storeId), inArray(products.sku, [...requiredSkus, ...optionalMaterialSkus]))),
+      .where(and(eq(products.storeId, storeId), eq(products.isActive, true), inArray(products.sku, [...requiredSkus, ...optionalMaterialSkus]))),
     includePrivate ? db
       .select({
         id: customers.id,
