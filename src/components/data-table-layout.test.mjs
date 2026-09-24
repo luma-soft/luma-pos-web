@@ -53,6 +53,23 @@ describe("data table utility column", () => {
     for (const row of bodyRows) expect(row.match(/<td\b/g)).toHaveLength(2);
   });
 
+  test("keeps the floating-menu gutter aligned between the last header and values", () => {
+    const html = renderTable({
+      columns: [
+        { key: "product", label: "Sản phẩm", required: true, render: (row) => row.name },
+        { key: "price", label: "Tổng bán trừ trả hàng", align: "right", render: (row) => row.price },
+      ],
+      summaryCells: [{ key: "price", content: "summary" }],
+    });
+    const header = html.match(/<thead>[\s\S]*?<\/thead>/)[0];
+    const valueCell = html.match(/<tbody>[\s\S]*?<td[^>]*>300000<\/td>/)[0];
+    const summaryCell = html.match(/<tbody>[\s\S]*?<td[^>]*>summary<\/td>/)[0];
+    expect(header).toContain("text-right");
+    expect(header).toContain("pr-14");
+    expect(valueCell).toContain("pr-14");
+    expect(summaryCell).toContain("pr-14");
+  });
+
   test("preserves expansion controls and the detail span without a column menu", () => {
     const html = renderTable({
       showColumnMenu: false,

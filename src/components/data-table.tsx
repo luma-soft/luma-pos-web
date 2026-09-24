@@ -322,6 +322,7 @@ export function DataTableShell<T>({
   const visibleColumns = columns.filter((column) => column.required || visibleKeys.has(column.key));
   // Only actual row expansion needs a body column. Header controls float above it.
   const hasUtilityColumn = Boolean(renderExpanded);
+  const hasFloatingColumnMenu = showColumnMenu && !hasUtilityColumn;
   const displayRows = useMemo(() => {
     if (!sort) return rows;
     const column = columns.find((item) => item.key === sort.key);
@@ -491,7 +492,7 @@ export function DataTableShell<T>({
                           column.align === "right" && "text-right",
                           column.align === "center" && "text-center",
                           column.headerClassName,
-                          showColumnMenu && !hasUtilityColumn && index === visibleColumns.length - 1 && "pr-14",
+                          hasFloatingColumnMenu && index === visibleColumns.length - 1 && "pr-14",
                         )}
                       >
                         {sortable ? (
@@ -553,9 +554,9 @@ export function DataTableShell<T>({
               <tbody>
                 {summaryCells && (
                   <tr className="border-t border-border-soft bg-surface text-right font-bold tabular-nums">
-                    {visibleColumns.map((column) => {
+                    {visibleColumns.map((column, index) => {
                       const cell = summaryCells.find((item) => item.key === column.key);
-                      return <td key={column.key} className={cn("px-3 py-3", cell?.className)}>{cell?.content}</td>;
+                      return <td key={column.key} className={cn("px-3 py-3", hasFloatingColumnMenu && index === visibleColumns.length - 1 && "pr-14", cell?.className)}>{cell?.content}</td>;
                     })}
                     {hasUtilityColumn && <td className="sticky right-0 z-10 bg-surface px-3 py-3" />}
                   </tr>
@@ -579,7 +580,7 @@ export function DataTableShell<T>({
                           else if (expandable || detailOpenable) setExpanded(expanded ? null : id);
                         }}
                       >
-                        {visibleColumns.map((column) => {
+                        {visibleColumns.map((column, index) => {
                           const cellClassName = typeof column.cellClassName === "function" ? column.cellClassName(row) : column.cellClassName;
                           return (
                             <td
@@ -589,6 +590,7 @@ export function DataTableShell<T>({
                                 column.wrap ? "whitespace-normal break-words" : "truncate",
                                 column.align === "right" && "text-right tabular-nums",
                                 column.align === "center" && "text-center",
+                                hasFloatingColumnMenu && index === visibleColumns.length - 1 && "pr-14",
                                 cellClassName,
                               )}
                             >
