@@ -9,6 +9,7 @@ import {
   paymentRefunds,
   paymentWebhookEvents,
   payments,
+  sepayPaymentSessions,
   returns,
   shifts,
   stockLevels,
@@ -458,6 +459,126 @@ export async function createPendingSepayPayment(
     };
     if (known[msg]) return { ok: false, error: known[msg] };
     console.error("createPendingSepayPayment failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+/**
+ * Create only the server-side state needed to receive a VietQR transfer.
+ * No order, order item, stock or cash entry is written here. The session is
+ * attached to a real sale by createOrderForUser after confirmation.
+ */
+export async function createPendingSepayPaymentSession(
+  db: DbLike,
+  input: {
+    storeId: string;
+    bankAccountId: string;
+    amount: number;
+    clientRequestId?: string;
+    note?: string;
+    createdBy?: string | null;
+  },
+): Promise<PaymentActionResult<{ id: string; reference: string; createdAt: Date; expiresAt: Date }>> {
+  const amount = safeAmount(input.amount);
+  if (amount <= 0) return { ok: false, error: "errors.invalidData" };
+
+  try {
+    return await db.transaction(async (tx: DbLike) => {
+      const [bankAccount] = await tx
+        .select({ id: paymentBankAccounts.id })
+        .from(paymentBankAccounts)
+        .where(and(
+          eq(paymentBankAccounts.id, input.bankAccountId),
+          eq(paymentBankAccounts.storeId, input.storeId),
+          eq(paymentBankAccounts.provider, "sepay"),
+          eq(paymentBankAccounts.enabled, true),
+        ))
+        .limit(1);
+      if (!bankAccount) throw new Error("BANK_ACCOUNT_NOT_FOUND");
+
+      const clientRequestId = input.clientRequestId?.trim() || null;
+      if (clientRequestId) {
+        const [existing] = await tx
+          .select()
+          .from(sepayPaymentSessions)
+          .where(and(
+            eq(sepayPaymentSessions.storeId, input.storeId),
+            eq(sepayPaymentSessions.clientRequestId, clientRequestId),
+          ))
+          .limit(1)
+          .for("update");
+        if (existing) {
+          if (
+            Number(existing.amount) !== amount
+            || existing.bankAccountId !== bankAccount.id
+            || !existing.reference
+          ) {
+            throw new Error("REFERENCE_CONFLICT");
+          }
+          return {
+            ok: true,
+            data: {
+              id: existing.id,
+              reference: existing.reference,
+              createdAt: existing.createdAt,
+              expiresAt: existing.expiresAt,
+            },
+          };
+        }
+      }
+
+      const reference = generateSepayPaymentReference();
+      const expiresAt = new Date(Date.now() + SEPAY_PAYMENT_TIMEOUT_MS);
+      const [inserted] = await tx.insert(sepayPaymentSessions).values({
+        storeId: input.storeId,
+        bankAccountId: bankAccount.id,
+        amount: toMoney(amount),
+        reference,
+        clientRequestId,
+        status: "pending",
+        expiresAt,
+        note: input.note?.trim() || null,
+        createdBy: input.createdBy ?? null,
+      }).onConflictDoNothing({
+        target: [sepayPaymentSessions.storeId, sepayPaymentSessions.clientRequestId],
+      }).returning();
+
+      const session = inserted ?? (clientRequestId
+        ? (await tx
+          .select()
+          .from(sepayPaymentSessions)
+          .where(and(
+            eq(sepayPaymentSessions.storeId, input.storeId),
+            eq(sepayPaymentSessions.clientRequestId, clientRequestId),
+          ))
+          .limit(1))[0]
+        : undefined);
+      if (!session) throw new Error("PAYMENT_SESSION_CREATE_FAILED");
+      if (
+        session.bankAccountId !== bankAccount.id
+        || Number(session.amount) !== amount
+        || !session.reference
+      ) {
+        throw new Error("REFERENCE_CONFLICT");
+      }
+      return {
+        ok: true,
+        data: {
+          id: session.id,
+          reference: session.reference,
+          createdAt: session.createdAt,
+          expiresAt: session.expiresAt,
+        },
+      };
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    const known: Record<string, string> = {
+      BANK_ACCOUNT_NOT_FOUND: "payments.errors.bankAccountNotFound",
+      REFERENCE_CONFLICT: "payments.errors.referenceConflict",
+    };
+    if (known[msg]) return { ok: false, error: known[msg] };
+    console.error("createPendingSepayPaymentSession failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
 }
@@ -1009,6 +1130,48 @@ export async function refreshGatewayPaymentFromInquiry(
   }
 }
 
+async function confirmSepayPaymentSessionInTx(
+  tx: DbLike,
+  input: {
+    paymentId: string;
+    providerTransactionId?: string | null;
+    rawMatchedEventId?: string | null;
+    confirmedAt?: Date;
+    source?: ConfirmSource;
+  },
+) {
+  const nextStatus = input.source === "api"
+    ? "reconciled"
+    : input.source === "manual"
+      ? "manual_confirmed"
+      : "confirmed";
+  const [session] = await tx
+    .update(sepayPaymentSessions)
+    .set({
+      status: nextStatus,
+      providerTransactionId: input.providerTransactionId ?? undefined,
+      rawMatchedEventId: input.rawMatchedEventId ?? undefined,
+      confirmedAt: input.confirmedAt ?? new Date(),
+    })
+    .where(and(
+      eq(sepayPaymentSessions.id, input.paymentId),
+      inArray(sepayPaymentSessions.status, ["pending", "expired"]),
+    ))
+    .returning();
+  if (session) return { alreadyConfirmed: false };
+
+  const [current] = await tx
+    .select({ status: sepayPaymentSessions.status })
+    .from(sepayPaymentSessions)
+    .where(eq(sepayPaymentSessions.id, input.paymentId))
+    .limit(1);
+  if (!current) throw new Error("PAYMENT_NOT_FOUND");
+  if (["confirmed", "reconciled", "manual_confirmed", "finalized"].includes(current.status)) {
+    return { alreadyConfirmed: true };
+  }
+  throw new Error("PAYMENT_NOT_CONFIRMABLE");
+}
+
 export async function confirmPaymentFromProvider(
   db: DbLike,
   input: {
@@ -1025,6 +1188,18 @@ export async function confirmPaymentFromProvider(
 ): Promise<PaymentActionResult<{ alreadyConfirmed: boolean } & PaymentNotificationResult>> {
   try {
     return await db.transaction(async (tx: DbLike) => {
+      const [session] = await tx
+        .select({ id: sepayPaymentSessions.id })
+        .from(sepayPaymentSessions)
+        .where(eq(sepayPaymentSessions.id, input.paymentId))
+        .limit(1)
+        .for("update");
+      if (session) {
+        return {
+          ok: true,
+          data: await confirmSepayPaymentSessionInTx(tx, input),
+        };
+      }
       return { ok: true, data: await confirmPaymentInTx(tx, input) };
     });
   } catch (e) {
@@ -1043,6 +1218,29 @@ export async function confirmPaymentFromProvider(
 export async function expirePendingPayment(db: DbLike, paymentId: string, actorId: string | null = null, reason?: string): Promise<PaymentActionResult> {
   try {
     return await db.transaction(async (tx: DbLike) => {
+      const [session] = await tx
+        .select({ status: sepayPaymentSessions.status })
+        .from(sepayPaymentSessions)
+        .where(eq(sepayPaymentSessions.id, paymentId))
+        .limit(1)
+        .for("update");
+      if (session) {
+        if (session.status === "expired") return { ok: true, data: undefined };
+        if (session.status !== "pending") {
+          return { ok: false, error: "payments.errors.notConfirmable" };
+        }
+        const changed = await tx
+          .update(sepayPaymentSessions)
+          .set({ status: "expired" })
+          .where(and(
+            eq(sepayPaymentSessions.id, paymentId),
+            eq(sepayPaymentSessions.status, "pending"),
+          ))
+          .returning({ id: sepayPaymentSessions.id });
+        return changed.length > 0
+          ? { ok: true, data: undefined }
+          : { ok: false, error: "payments.errors.notConfirmable" };
+      }
       const [pending] = await tx
         .select({ orderId: payments.orderId, status: payments.status })
         .from(payments)
@@ -1079,7 +1277,7 @@ export async function getSepayPaymentStatus(
   paymentId: string
 ): Promise<PaymentActionResult<{
   id: string;
-  orderId: string;
+  orderId: string | null;
   status: string;
   amount: number;
   reference: string | null;
@@ -1102,7 +1300,52 @@ export async function getSepayPaymentStatus(
       .from(payments)
       .where(and(eq(payments.id, paymentId), eq(payments.provider, "sepay")))
       .limit(1);
-    if (!payment) return { ok: false, error: "errors.invalidData" };
+    if (!payment) {
+      const [session] = await db
+        .select({
+          id: sepayPaymentSessions.id,
+          orderId: sepayPaymentSessions.orderId,
+          status: sepayPaymentSessions.status,
+          amount: sepayPaymentSessions.amount,
+          reference: sepayPaymentSessions.reference,
+          confirmedAt: sepayPaymentSessions.confirmedAt,
+          providerTransactionId: sepayPaymentSessions.providerTransactionId,
+          createdAt: sepayPaymentSessions.createdAt,
+          expiresAt: sepayPaymentSessions.expiresAt,
+        })
+        .from(sepayPaymentSessions)
+        .where(eq(sepayPaymentSessions.id, paymentId))
+        .limit(1);
+      if (!session) return { ok: false, error: "errors.invalidData" };
+      let status = session.status;
+      const expiresAt = session.expiresAt ?? new Date(
+        session.createdAt.getTime() + SEPAY_PAYMENT_TIMEOUT_MS,
+      );
+      if (status === "pending" && expiresAt.getTime() <= Date.now()) {
+        const [changed] = await db
+          .update(sepayPaymentSessions)
+          .set({ status: "expired" })
+          .where(and(
+            eq(sepayPaymentSessions.id, paymentId),
+            eq(sepayPaymentSessions.status, "pending"),
+          ))
+          .returning({ id: sepayPaymentSessions.id });
+        if (changed) status = "expired";
+      }
+      return {
+        ok: true,
+        data: {
+          id: session.id,
+          orderId: session.orderId,
+          status,
+          amount: Number(session.amount),
+          reference: session.reference,
+          confirmedAt: session.confirmedAt,
+          providerTransactionId: session.providerTransactionId,
+          expiresAt,
+        },
+      };
+    }
     let status = payment.status;
     const expiresAt = new Date(
       payment.createdAt.getTime() + SEPAY_PAYMENT_TIMEOUT_MS,
@@ -1556,6 +1799,9 @@ export async function matchSepayWebhookEvent(
         });
         return { ok: true, data: { matched: true } };
       }
+      if (event.matchStatus === "matched" && event.matchReason === "payment_session_matched") {
+        return { ok: true, data: { matched: true } };
+      }
       if (
         event.matchStatus === "unmatched"
         && event.matchReason === "payment_already_confirmed"
@@ -1605,6 +1851,58 @@ export async function matchSepayWebhookEvent(
             notificationCreated: notification?.created,
           },
         };
+      }
+
+      // A QR can be paid before the cashier submits the invoice. Match the
+      // transfer to the temporary session and leave order creation to the POS
+      // confirmation step.
+      const [session] = await tx
+        .select()
+        .from(sepayPaymentSessions)
+        .where(and(
+          eq(sepayPaymentSessions.storeId, event.storeId),
+          eq(sepayPaymentSessions.status, "pending"),
+          eq(sepayPaymentSessions.reference, reference),
+          eq(sepayPaymentSessions.bankAccountId, bankAccount.id),
+        ))
+        .limit(1)
+        .for("update");
+      if (session) {
+        if (Number(session.amount) !== Number(event.transferAmount)) {
+          const notification = await createSepayExceptionInTx(tx, event, "amount_mismatch");
+          await tx.update(paymentWebhookEvents).set({
+            bankAccountId: bankAccount.id,
+            matchStatus: "wrong_amount",
+            matchReason: "amount_mismatch",
+            updatedAt: new Date(),
+          }).where(eq(paymentWebhookEvents.id, event.id));
+          return {
+            ok: true,
+            data: {
+              matched: false,
+              reason: "amount_mismatch",
+              notificationEventId: notification?.eventId,
+              notificationCreated: notification?.created,
+            },
+          };
+        }
+
+        await tx.update(sepayPaymentSessions).set({
+          status: "confirmed",
+          providerTransactionId: event.providerEventId,
+          rawMatchedEventId: event.id,
+          confirmedAt: event.transactionDate ?? new Date(),
+        }).where(and(
+          eq(sepayPaymentSessions.id, session.id),
+          eq(sepayPaymentSessions.status, "pending"),
+        ));
+        await tx.update(paymentWebhookEvents).set({
+          bankAccountId: bankAccount.id,
+          matchStatus: "matched",
+          matchReason: "payment_session_matched",
+          updatedAt: new Date(),
+        }).where(eq(paymentWebhookEvents.id, event.id));
+        return { ok: true, data: { matched: true } };
       }
 
       const [payment] = await tx

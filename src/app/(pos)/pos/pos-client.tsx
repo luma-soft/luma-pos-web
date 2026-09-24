@@ -148,7 +148,7 @@ type PosPrintJob = {
 };
 type SepayCheckout = {
   paymentId: string;
-  orderId: string;
+  orderId: string | null;
   orderCode: string;
   reference: string;
   amount: number;
@@ -161,7 +161,6 @@ type SepayCheckout = {
     subAccount: string | null;
     accountName: string;
   };
-  printJob: PosPrintJob;
 };
 type PosCustomer = PosData["customers"][number];
 export type PosSourceInvoice = {
@@ -486,7 +485,30 @@ export function PosClient({
   const [sepayCheckout, setSepayCheckout] = useState<SepayCheckout | null>(null);
   const [sepayCheckoutLoading, setSepayCheckoutLoading] = useState(false);
   const [sepayCheckoutAmount, setSepayCheckoutAmount] = useState(0);
+  const [sepayFinalizing, setSepayFinalizing] = useState(false);
   const sepaySetupAttemptRef = useRef(0);
+  const sepayFinalizingRef = useRef<string | null>(null);
+  const submitOrderRef = useRef<(
+    mode: "sale" | "quote" | "booking",
+    selectedPayMethod?: PayMethod,
+    paymentSessionId?: string,
+  ) => Promise<void>>(async () => undefined);
+  const finalizeSepayCheckout = useCallback(async (checkout: SepayCheckout) => {
+    if (
+      sepayFinalizingRef.current === checkout.paymentId
+      || !["confirmed", "reconciled", "manual_confirmed"].includes(checkout.status)
+    ) return;
+    sepayFinalizingRef.current = checkout.paymentId;
+    setSepayFinalizing(true);
+    try {
+      await submitOrderRef.current("sale", "bank_transfer", checkout.paymentId);
+    } finally {
+      if (sepayFinalizingRef.current === checkout.paymentId) {
+        sepayFinalizingRef.current = null;
+        setSepayFinalizing(false);
+      }
+    }
+  }, []);
   // kéo thả: sắp xếp dòng trong giỏ + thả SP từ danh sách vào giỏ
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
@@ -665,8 +687,12 @@ export function PosClient({
         );
         if (["confirmed", "reconciled", "manual_confirmed"].includes(result.data.status)) {
           window.clearInterval(id);
-          setPrintJob(sepayCheckout.printJob);
-          setPrintSize(printDefaultSize);
+          const confirmedCheckout = {
+            ...sepayCheckout,
+            status: result.data.status,
+          };
+          setSepayCheckout(confirmedCheckout);
+          void finalizeSepayCheckout(confirmedCheckout);
         }
       } catch {
         // Polling is best-effort; webhook remains source of truth.
@@ -676,7 +702,7 @@ export function PosClient({
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [sepayCheckout, printDefaultSize]);
+  }, [sepayCheckout, finalizeSepayCheckout]);
 
   const active = invoices.find((i) => i.id === activeId) ?? invoices[0];
   const sourceInvoice = active.source ?? null;
@@ -1484,17 +1510,34 @@ export function PosClient({
     return line.returnSoldQuantity == null ? normalized : Math.min(normalized, line.returnSoldQuantity);
   }
 
+  /** Lưu đơn vào hàng đợi offline + báo người dùng. */
+  async function queueOffline(payload: Parameters<typeof createOrder>[0]) {
+    // localId = clientId của đơn → sync lại dùng đúng clientId, server khử trùng.
+    await enqueueOrder(storageScope, { localId: payload.clientId ?? makeClientId(), payload, savedAt: currentTimestamp() });
+    setSubmittingMode(null);
+    setPending((c) => c + 1);
+    closeInvoice(activeId);
+    setOfflineSaved(true);
+    setTimeout(() => setOfflineSaved(false), 3500);
+  }
+
   async function submitOrder(
     mode: "sale" | "quote" | "booking",
     selectedPayMethod = payMethod,
-    sepaySetupAttempt?: number,
+    paymentSessionId?: string,
   ) {
     if (cart.length === 0 || !data.warehouse || submitting || refreshingPricing || pricingRoutePending) return;
+    const submitMode = sourceInvoice ? sourceInvoice.kind === "quote" ? "quote" : sourceInvoice.kind === "booking" ? "booking" : mode : mode;
+    if (submitMode === "sale" && selectedPayMethod === "bank_transfer" && !paymentSessionId) {
+      // Opening the QR flow is a preview-only action. The real sale is sent
+      // back through this function only with a confirmed session id.
+      await startSepayCheckout();
+      return;
+    }
     if (cart.some((line) => !Number.isFinite(basePriceFor(line.product, line.priceBook ?? priceBook, data.priceBooks)))) {
       setError(t("pricing.errors.priceUnavailable"));
       return;
     }
-    const submitMode = sourceInvoice ? sourceInvoice.kind === "quote" ? "quote" : sourceInvoice.kind === "booking" ? "booking" : mode : mode;
     const isCheckoutMode = submitMode === "sale";
     const selectedPaid = selectedPayMethod === "credit" ? 0 : (paidInput ?? total);
     const selectedPayableAmount = Math.min(Math.max(0, selectedPaid), total);
@@ -1529,10 +1572,15 @@ export function PosClient({
       priceBookId: priceBook || null,
       items: cart.map(buildPosOrderItemPayload),
       expectedPricing: buildExpectedPosPricing(cart, (line) => effPrice(line).price),
-      paymentPending: isCheckoutMode && selectedPayMethod === "bank_transfer",
+      paymentPending: isCheckoutMode && selectedPayMethod === "bank_transfer" && !paymentSessionId,
+      paymentSessionId,
       payment: {
-        method: isCheckoutMode && selectedPayMethod === "bank_transfer" ? "credit" : isCheckoutMode ? selectedPayMethod : "credit",
-        amount: isCheckoutMode && selectedPayMethod !== "bank_transfer" ? paid : 0,
+        method: isCheckoutMode && selectedPayMethod === "bank_transfer"
+          ? paymentSessionId ? "bank_transfer" : "credit"
+          : isCheckoutMode ? selectedPayMethod : "credit",
+        amount: isCheckoutMode && selectedPayMethod === "bank_transfer"
+          ? paymentSessionId ? selectedPayableAmount : 0
+          : isCheckoutMode ? paid : 0,
       },
     };
     setSubmittingMode(submitMode);
@@ -1553,7 +1601,7 @@ export function PosClient({
     if (res.kind === "created") {
       try {
         void productCatalog.refresh();
-        if (submitMode === "sale" && selectedPayMethod === "bank_transfer") {
+        if (submitMode === "sale" && selectedPayMethod === "bank_transfer" && !paymentSessionId) {
           const paymentRes = await fetch("/api/payments/sepay", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -1565,7 +1613,7 @@ export function PosClient({
           });
           const paymentJson = await paymentRes.json() as {
             ok: boolean;
-            data?: Omit<SepayCheckout, "orderId" | "orderCode" | "printJob">;
+            data?: Omit<SepayCheckout, "orderId" | "orderCode">;
             error?: string;
           };
           setSubmittingMode(null);
@@ -1592,10 +1640,9 @@ export function PosClient({
             paymentQr,
           });
           closeInvoice(activeId);
-          if (sepaySetupAttempt != null && sepaySetupAttempt !== sepaySetupAttemptRef.current) {
-            return;
-          }
-          setSepayCheckout({ ...paymentJson.data, orderId: res.data.id, orderCode: res.data.code, printJob });
+          setSepayCheckout({ ...paymentJson.data, orderId: res.data.id, orderCode: res.data.code, });
+          setPrintJob(printJob);
+          setPrintSize(printDefaultSize);
           return;
         }
         const printJob = buildPrintJob({
@@ -1604,6 +1651,11 @@ export function PosClient({
           code: res.data.code,
         });
         setSubmittingMode(null);
+        if (paymentSessionId) {
+          setSepayFinalizing(false);
+          setSepayCheckout(null);
+          setSepayCheckoutLoading(false);
+        }
         closeInvoice(activeId);
         startPrint(printJob, submitMode === "quote" ? quotePrintTemplate.paperDefault : submitMode === "booking" ? bookingPrintTemplate.paperDefault : printDefaultSize);
       } catch {
@@ -1626,14 +1678,49 @@ export function PosClient({
     }
   }
 
+  useEffect(() => {
+    submitOrderRef.current = submitOrder;
+  });
+
   async function startSepayCheckout() {
     if (submitting || sepayCheckout || sepayCheckoutLoading) return;
     const attempt = ++sepaySetupAttemptRef.current;
+    const amount = Math.min(Math.max(0, paidInput ?? total), total);
     setSepayCheckout(null);
-    setSepayCheckoutAmount(Math.min(Math.max(0, paidInput ?? total), total));
+    setSepayCheckoutAmount(amount);
     setSepayCheckoutLoading(true);
+    setError("");
     try {
-      await submitOrder("sale", "bank_transfer", attempt);
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setError(t("pos.sepay.onlineRequired"));
+        return;
+      }
+      const response = await fetch("/api/payments/sepay", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          amount,
+          clientRequestId: `web-pos:${activeId}:${attempt}`,
+          note: `POS ${activeId}`,
+        }),
+      });
+      const result = await response.json() as {
+        ok: boolean;
+        data?: Omit<SepayCheckout, "orderId" | "orderCode">;
+        error?: string;
+      };
+      if (sepaySetupAttemptRef.current !== attempt) return;
+      if (!response.ok || !result.ok || !result.data) {
+        setError(result.error ? t(result.error) : t("pos.sepay.createFailed"));
+        return;
+      }
+      setSepayCheckout({
+        ...result.data,
+        orderId: null,
+        orderCode: `#${activeId}`,
+      });
+    } catch {
+      if (sepaySetupAttemptRef.current === attempt) setError(t("pos.sepay.createFailed"));
     } finally {
       if (sepaySetupAttemptRef.current === attempt) {
         setSepayCheckoutLoading(false);
@@ -1660,12 +1747,9 @@ export function PosClient({
       });
       const result = await response.json() as { ok: boolean; data?: unknown; error?: string };
       if (!result.ok) return result.error ? t(result.error) : t("pos.sepay.confirmFailed");
-      setSepayCheckout((current) => current?.paymentId === checkout.paymentId
-        ? { ...current, status: "manual_confirmed" }
-        : current
-      );
-      setPrintJob(checkout.printJob);
-      setPrintSize(printDefaultSize);
+      const confirmedCheckout = { ...checkout, status: "manual_confirmed" };
+      setSepayCheckout((current) => current?.paymentId === checkout.paymentId ? confirmedCheckout : current);
+      void finalizeSepayCheckout(confirmedCheckout);
       return null;
     } catch {
       return t("pos.sepay.confirmFailed");
@@ -1751,16 +1835,6 @@ export function PosClient({
     }
   }
 
-  /** Lưu đơn vào hàng đợi offline + báo người dùng. */
-  async function queueOffline(payload: Parameters<typeof createOrder>[0]) {
-    // localId = clientId của đơn → sync lại dùng đúng clientId, server khử trùng.
-    await enqueueOrder(storageScope, { localId: payload.clientId ?? makeClientId(), payload, savedAt: currentTimestamp() });
-    setSubmittingMode(null);
-    setPending((c) => c + 1);
-    closeInvoice(activeId);
-    setOfflineSaved(true);
-    setTimeout(() => setOfflineSaved(false), 3500);
-  }
   const submitActiveDraft = () => {
     if (!isReturnDraft && isInvoiceDraft && payMethod === "bank_transfer") {
       return startSepayCheckout();
@@ -2680,6 +2754,7 @@ export function PosClient({
           loading={sepayCheckoutLoading}
           onManualConfirm={confirmSepayPaymentManually}
           onClose={() => {
+            if (sepayFinalizing) return;
             if (sepayCheckoutLoading) sepaySetupAttemptRef.current += 1;
             setSepayCheckoutLoading(false);
             setSepayCheckout(null);
@@ -2995,7 +3070,7 @@ function SepayCheckoutModal({
             "sm:col-span-2 min-h-11 w-full rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2",
             confirmed ? "bg-surface-2" : "bg-surface"
           )} type="button" onClick={onClose}>
-            {t("pos.sepay.viewOrder")}
+            {t("pos.sepay.trackLater")}
           </button>
         </div>
       </div>

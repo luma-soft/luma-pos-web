@@ -1426,7 +1426,7 @@
       "manualConfirmed": "Đã xác nhận thủ công",
       "checkingHint": "LumaPOS tự động kiểm tra giao dịch mới.",
       "confirmFailed": "Chưa xác nhận được chuyển khoản. Hãy thử lại.",
-      "viewOrder": "Xem đơn hàng",
+      "trackLater": "Theo dõi sau",
       "onlineRequired": "Thanh toán VietQR cần có kết nối mạng.",
       "createFailed": "Không tạo được thanh toán VietQR.",
       "invalidAmount": "Số tiền thanh toán VietQR phải lớn hơn 0."

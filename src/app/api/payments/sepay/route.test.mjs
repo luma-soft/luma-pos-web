@@ -1,7 +1,9 @@
 import { expect, mock, test } from "bun:test";
 
 let capturedPaymentInput;
+let capturedSessionInput;
 const createdAt = new Date("2026-09-14T03:00:00.000Z");
+const expiresAt = new Date("2026-09-14T03:10:00.000Z");
 
 const account = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -45,6 +47,18 @@ mock.module("@/lib/payments/service", () => ({
       data: { id: "payment-id", reference: "LUMA260914123456A1B2", createdAt },
     };
   },
+  createPendingSepayPaymentSession: async (input) => {
+    capturedSessionInput = input;
+    return {
+      ok: true,
+      data: {
+        id: "session-id",
+        reference: "LUMA260914123456C3D4",
+        createdAt,
+        expiresAt,
+      },
+    };
+  },
 }));
 mock.module("@/lib/payments/service-core", () => ({
   SEPAY_PAYMENT_TIMEOUT_MS: 10 * 60 * 1000,
@@ -71,4 +85,27 @@ test("treats a legacy mobile reference only as an idempotency key", async () => 
   expect(capturedPaymentInput.clientRequestId).toBe("HD-260914-0001");
   expect(capturedPaymentInput.reference).toBeUndefined();
   expect((await response.json()).data.expiresAt).toBe("2026-09-14T03:10:00.000Z");
+});
+
+test("creates a QR session without creating an order", async () => {
+  capturedSessionInput = undefined;
+  capturedPaymentInput = undefined;
+  const response = await POST(new Request("https://haidangshop.com/api/payments/sepay", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      amount: 500000,
+      clientRequestId: "web-pos:inv-1:1",
+    }),
+  }));
+
+  expect(response.status).toBe(200);
+  expect(capturedSessionInput).toMatchObject({
+    storeId: account.storeId,
+    bankAccountId: account.id,
+    amount: 500000,
+    clientRequestId: "web-pos:inv-1:1",
+  });
+  expect(capturedPaymentInput).toBeUndefined();
+  expect((await response.json()).data.paymentId).toBe("session-id");
 });

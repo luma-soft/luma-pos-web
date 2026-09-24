@@ -4,7 +4,11 @@ import { paymentBankAccounts } from "@/db/schema";
 import { getProfileId } from "@/lib/actions/common";
 import { requireMobileSalesAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileError, mobileGate, readJson } from "@/lib/mobile/response";
-import { cancelDraftOrder, createPendingSepayPayment } from "@/lib/payments/service";
+import {
+  cancelDraftOrder,
+  createPendingSepayPayment,
+  createPendingSepayPaymentSession,
+} from "@/lib/payments/service";
 import { SEPAY_PAYMENT_TIMEOUT_MS } from "@/lib/payments/service-core";
 import { buildSepayVietQrImageUrl } from "@/lib/payments/sepay";
 
@@ -22,8 +26,10 @@ export async function POST(request: Request) {
     ? input.clientRequestId.trim()
     : typeof input.reference === "string"
       ? input.reference.trim()
-      : "checkout";
-  if (!orderId || !Number.isFinite(amount) || amount <= 0) return mobileError("errors.invalidData");
+      : orderId
+        ? "checkout"
+        : undefined;
+  if (!Number.isFinite(amount) || amount <= 0) return mobileError("errors.invalidData");
 
   const [account] = requestedBankAccountId
     ? await db
@@ -48,11 +54,48 @@ export async function POST(request: Request) {
       .limit(1);
 
   if (!account) {
-    await cancelDraftOrder(orderId);
+    if (orderId) await cancelDraftOrder(orderId);
     return mobileError("payments.errors.bankAccountNotFound");
   }
 
   const profileId = await getProfileId(gate.userId);
+  if (!orderId) {
+    const result = await createPendingSepayPaymentSession({
+      storeId: gate.storeId,
+      bankAccountId: account.id,
+      amount,
+      clientRequestId,
+      note: typeof input.note === "string" ? input.note : undefined,
+      createdBy: profileId ?? gate.userId,
+    });
+    if (!result.ok) return mobileAction(result);
+
+    return mobileAction({
+      ok: true,
+      data: {
+        paymentId: result.data.id,
+        reference: result.data.reference,
+        amount: Math.round(amount),
+        qrImageUrl: buildSepayVietQrImageUrl({
+          bankCode: account.bankCode,
+          accountNumber: account.accountNumber,
+          amount,
+          reference: result.data.reference,
+        }),
+        bankAccount: {
+          id: account.id,
+          bankCode: account.bankCode,
+          gateway: account.gateway,
+          accountNumber: account.accountNumber,
+          subAccount: account.subAccount,
+          accountName: account.accountName,
+        },
+        status: "pending",
+        expiresAt: result.data.expiresAt.toISOString(),
+      },
+    });
+  }
+
   const result = await createPendingSepayPayment({
     orderId,
     bankAccountId: account.id,

@@ -1426,7 +1426,7 @@
       "manualConfirmed": "Manually confirmed",
       "checkingHint": "LumaPOS is checking for new transactions automatically.",
       "confirmFailed": "The transfer could not be confirmed. Try again.",
-      "viewOrder": "View order",
+      "trackLater": "Check later",
       "onlineRequired": "VietQR payment requires an online connection.",
       "createFailed": "Could not create VietQR payment.",
       "invalidAmount": "VietQR payment amount must be greater than zero."

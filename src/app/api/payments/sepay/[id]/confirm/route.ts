@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { payments } from "@/db/schema";
+import { payments, sepayPaymentSessions } from "@/db/schema";
 import { requireMobileSalesAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileError, mobileGate, readJson } from "@/lib/mobile/response";
 import { confirmPaymentFromProvider } from "@/lib/payments/service";
@@ -27,7 +27,19 @@ export async function POST(
     .from(payments)
     .where(and(eq(payments.id, paymentID), eq(payments.storeId, gate.storeId)))
     .limit(1);
-  if (!payment || payment.provider !== "sepay") return mobileError("errors.invalidData");
+  const [session] = payment
+    ? []
+    : await db
+      .select({ id: sepayPaymentSessions.id })
+      .from(sepayPaymentSessions)
+      .where(and(
+        eq(sepayPaymentSessions.id, paymentID),
+        eq(sepayPaymentSessions.storeId, gate.storeId),
+      ))
+      .limit(1);
+  if ((!payment || payment.provider !== "sepay") && !session) {
+    return mobileError("errors.invalidData");
+  }
 
   const body = await readJson(request);
   const reason = body && typeof body === "object" && typeof (body as Record<string, unknown>).reason === "string"
@@ -41,4 +53,3 @@ export async function POST(
     reason: reason || "mobile_manual_confirmation",
   }));
 }
-

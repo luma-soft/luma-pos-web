@@ -55,6 +55,9 @@ export const createOrderSchema = z.object({
   // Provider-first checkout creates a draft that must not reserve/consume
   // stock until the server confirms the external payment.
   paymentPending: z.boolean().optional().default(false),
+  // A confirmed SePay session is attached atomically when the sale is created.
+  // Merely opening the QR modal never sends this field because no order exists.
+  paymentSessionId: z.uuid().optional(),
   // Optional only for compatibility with older clients and existing offline jobs.
   expectedPricing: checkoutPricingSnapshotSchema.optional(),
   items: z.array(orderItemSchema).min(1, { error: "pos.errors.emptyCart" }),

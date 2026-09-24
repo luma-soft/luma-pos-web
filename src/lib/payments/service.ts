@@ -7,6 +7,7 @@ import {
   attachGatewayIntent as attachGatewayIntentCore,
   createPendingGatewayPayment as createPendingGatewayPaymentCore,
   createPendingSepayPayment as createPendingSepayPaymentCore,
+  createPendingSepayPaymentSession as createPendingSepayPaymentSessionCore,
   expirePendingPayment as expirePendingPaymentCore,
   getPaymentReconciliation as getPaymentReconciliationCore,
   getPaymentReconciliationEvent as getPaymentReconciliationEventCore,
@@ -47,6 +48,10 @@ async function publishNewPaymentNotification<T>(
 
 export async function createPendingSepayPayment(input: Parameters<typeof createPendingSepayPaymentCore>[1]) {
   return createPendingSepayPaymentCore(db, input);
+}
+
+export async function createPendingSepayPaymentSession(input: Parameters<typeof createPendingSepayPaymentSessionCore>[1]) {
+  return createPendingSepayPaymentSessionCore(db, input);
 }
 
 export async function createPendingGatewayPayment(input: Parameters<typeof createPendingGatewayPaymentCore>[1]) {

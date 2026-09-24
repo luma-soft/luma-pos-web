@@ -1197,6 +1197,32 @@ export const payments = pgTable("payments", {
   index("payments_provider_query_idx").on(t.provider, t.status, t.lastProviderCheckedAt),
 ]);
 
+/** Temporary VietQR checkout sessions. These are deliberately independent
+ * from orders so opening the transfer modal never submits the invoice. */
+export const sepayPaymentSessions = pgTable("sepay_payment_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+  bankAccountId: uuid("bank_account_id").notNull().references(() => paymentBankAccounts.id, { onDelete: "restrict" }),
+  status: text("status").notNull().default("pending"),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  reference: text("reference").notNull(),
+  clientRequestId: varchar("client_request_id", { length: 80 }),
+  providerTransactionId: text("provider_transaction_id"),
+  rawMatchedEventId: uuid("raw_matched_event_id"),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  note: text("note"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("sepay_payment_sessions_store_client_unique").on(t.storeId, t.clientRequestId),
+  uniqueIndex("sepay_payment_sessions_store_reference_unique").on(t.storeId, t.reference),
+  index("sepay_payment_sessions_status_idx").on(t.status, t.expiresAt),
+  index("sepay_payment_sessions_bank_account_idx").on(t.bankAccountId, t.status),
+  index("sepay_payment_sessions_order_idx").on(t.orderId),
+]);
+
 // ============= Customer receivables =============
 
 /** One debt-collection receipt may be allocated across several invoices. */

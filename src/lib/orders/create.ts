@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   orders, orderItems, payments, customers, products, stockLevels, stockMovements, einvoices, returns,
+  paymentBankAccounts, sepayPaymentSessions,
 } from "@/db/schema";
 import { createOrderSchema, type CreateOrderInput } from "@/lib/schemas/order";
 import {
@@ -67,12 +68,25 @@ export async function createOrderForUser(
   };
 
   const paymentPending = v.paymentPending === true;
+  const paymentSessionId = v.paymentSessionId?.trim() || null;
   if (
     paymentPending &&
     (v.mode !== "sale" ||
       v.payment.method !== "credit" ||
       v.payment.amount !== 0 ||
       !v.clientId)
+  ) {
+    return { ok: false, error: "errors.invalidData" };
+  }
+  if (
+    paymentSessionId
+    && (
+      v.mode !== "sale"
+      || paymentPending
+      || v.payment.method !== "bank_transfer"
+      || v.payment.amount <= 0
+      || !v.clientId
+    )
   ) {
     return { ok: false, error: "errors.invalidData" };
   }
@@ -121,6 +135,38 @@ export async function createOrderForUser(
       const paid = isQuote || isBooking || v.payment.method === "credit" ? 0 : Math.min(v.payment.amount, total);
       const remaining = total - paid;
       const paymentStatus = paymentPending ? "unpaid" : paid >= total ? "paid" : paid > 0 ? "deposit" : "unpaid";
+
+      let sepaySession: typeof sepayPaymentSessions.$inferSelect | null = null;
+      let sepayBankAccount: typeof paymentBankAccounts.$inferSelect | null = null;
+      if (paymentSessionId) {
+        [sepaySession] = await tx
+          .select()
+          .from(sepayPaymentSessions)
+          .where(and(
+            eq(sepayPaymentSessions.id, paymentSessionId),
+            eq(sepayPaymentSessions.storeId, storeId),
+          ))
+          .limit(1)
+          .for("update");
+        if (
+          !sepaySession
+          || !["confirmed", "reconciled", "manual_confirmed"].includes(sepaySession.status)
+          || Math.abs(Number(sepaySession.amount) - paid) >= 0.005
+          || sepaySession.orderId
+        ) {
+          throw new Error("PAYMENT_SESSION_NOT_CONFIRMABLE");
+        }
+        [sepayBankAccount] = await tx
+          .select()
+          .from(paymentBankAccounts)
+          .where(and(
+            eq(paymentBankAccounts.id, sepaySession.bankAccountId),
+            eq(paymentBankAccounts.storeId, storeId),
+            eq(paymentBankAccounts.provider, "sepay"),
+          ))
+          .limit(1);
+        if (!sepayBankAccount) throw new Error("BANK_ACCOUNT_NOT_FOUND");
+      }
 
       const [sourceOrder] = v.source
         ? await tx.select().from(orders).where(and(eq(orders.storeId, storeId), eq(orders.id, v.source.orderId))).limit(1).for("update")
@@ -270,9 +316,36 @@ export async function createOrderForUser(
           shiftId: currentShift?.id ?? null,
           amount: toMoney(paid),
           method: v.payment.method,
-          reference: v.payment.reference?.trim() || null,
+          ...(sepaySession
+            ? {
+                status: sepaySession.status === "manual_confirmed"
+                  ? "manual_confirmed"
+                  : sepaySession.status === "reconciled"
+                    ? "reconciled"
+                    : "confirmed",
+                provider: "sepay",
+                bankAccountId: sepaySession.bankAccountId,
+                providerTransactionId: sepaySession.providerTransactionId,
+                gateway: sepayBankAccount?.gateway || sepayBankAccount?.bankCode || null,
+                accountNumber: sepayBankAccount?.accountNumber || null,
+                confirmedAt: sepaySession.confirmedAt ?? new Date(),
+                rawMatchedEventId: sepaySession.rawMatchedEventId,
+                clientRequestId: `sepay:session:${sepaySession.id}`,
+                reference: sepaySession.reference,
+                note: sepaySession.note,
+              }
+            : { reference: v.payment.reference?.trim() || null }),
           createdBy: profileId,
         });
+        if (sepaySession) {
+          await tx.update(sepayPaymentSessions).set({
+            status: "finalized",
+            orderId: order.id,
+          }).where(and(
+            eq(sepayPaymentSessions.id, sepaySession.id),
+            eq(sepayPaymentSessions.status, sepaySession.status),
+          ));
+        }
         await recordCashTx(tx, {
           storeId,
           type: "in", fund: fundForMethod(v.payment.method), amount: paid,
@@ -429,6 +502,8 @@ export async function createOrderForUser(
       SOURCE_ALREADY_REPLACED: "orderEdit.errors.notEditable",
       SOURCE_HAS_RETURNS: "orderEdit.errors.hasReturns",
       SOURCE_HAS_EINVOICE: "orderEdit.errors.hasEInvoice",
+      PAYMENT_SESSION_NOT_CONFIRMABLE: "payments.errors.notConfirmable",
+      BANK_ACCOUNT_NOT_FOUND: "payments.errors.bankAccountNotFound",
       INSUFFICIENT_BATCH_STOCK: "pos.errors.insufficientStock",
     };
     const msg = e instanceof Error ? e.message : "";
