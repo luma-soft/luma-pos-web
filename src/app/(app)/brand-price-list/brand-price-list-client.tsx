@@ -7,6 +7,7 @@ import { Copy, Edit3, ExternalLink, ImageOff, Search, X } from "lucide-react";
 import Image from "next/image";
 import { MoneyInput } from "@/components/ui/money-input";
 import type { BrandPriceListProduct } from "@/lib/data/brand-price-lists";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { formatCurrency } from "@/lib/utils";
 
 type Palette = {
@@ -266,6 +267,7 @@ export function BrandPriceListClient({
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                onClick={selectAllInputOnClick}
                 placeholder="Tìm tên hoặc mã..."
                 className="h-11 w-full border border-slate-300 py-2.5 pl-9 pr-3 text-base outline-none focus:border-slate-500 sm:w-64 sm:text-sm lg:h-10"
               />

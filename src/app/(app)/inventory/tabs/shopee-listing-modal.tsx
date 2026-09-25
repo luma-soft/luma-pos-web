@@ -14,6 +14,7 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { categoryEmoji } from "@/lib/category-emoji";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { isProductStockManaged } from "@/lib/product-stock";
 import { useProductCatalog } from "@/components/product-catalog-provider";
@@ -425,6 +426,7 @@ function ShopeeCategoryDialog({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              onClick={selectAllInputOnClick}
               autoFocus
               className="h-11 w-full rounded-lg border border-border bg-canvas pl-10 pr-3 text-sm focus:border-primary-500 focus:outline-none lg:h-10"
               placeholder={legacyTextByFlag(L, "e0e1ae6e892c")}
@@ -1031,6 +1033,7 @@ function ProductSearchInListing({
         type="text"
         value={search}
         onChange={(event) => setSearch(event.target.value)}
+        onClick={selectAllInputOnClick}
         placeholder={selectedProduct ? selectedProduct.name : (legacyTextByFlag(L, "b8d56b1a11bb"))}
         className="h-11 w-full rounded-lg border border-border bg-canvas pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none lg:h-10"
       />

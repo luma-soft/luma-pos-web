@@ -18,6 +18,7 @@ import {
   Search,
 } from "lucide-react";
 import { FloatingMenuPortal } from "@/components/ui/floating-menu-portal";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { isOrderDateRangeValid } from "@/lib/orders/filter-date-range";
 import { cn } from "@/lib/utils";
 
@@ -225,6 +226,7 @@ export function LumaWebPicker({
                   ref={searchRef}
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
+                  onClick={selectAllInputOnClick}
                   placeholder={searchPlaceholder}
                   className="h-11 min-h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 lg:h-10 lg:min-h-0"
                 />
@@ -587,6 +589,7 @@ export function LumaEntityPicker({
               onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 setQuery(event.target.value)
               }
+              onClick={selectAllInputOnClick}
               onKeyDown={(event: ReactKeyboardEvent<HTMLInputElement>) => {
                 if (event.key === "ArrowDown") {
                   event.preventDefault();

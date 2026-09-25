@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Loader2, Search, Trash2 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { createPortalOrder } from "@/lib/actions/portal";
 import { QuantityInput } from "@/components/ui/quantity-input";
 
@@ -103,6 +104,7 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               value={search} onChange={(e) => setSearch(e.target.value)}
+              onClick={selectAllInputOnClick}
               placeholder={t("portal.searchPlaceholder")}
               className="h-11 w-full pl-9 pr-3 py-2 text-sm rounded-card border border-slate-300 bg-white lg:h-10"
             />

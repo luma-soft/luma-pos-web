@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ChevronDown, ClipboardCheck, Filter, History, Plus, Search, X } from "lucide-react";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { Routes } from "@/lib/routes";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
 
@@ -169,7 +170,7 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
               <button type="button" onClick={() => setDrawerOpen(false)} aria-label={t("common.close")} className="grid h-10 w-10 place-items-center rounded-xl text-slate-500 hover:bg-surface-2 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"><X className="h-5 w-5 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" /></button>
             </header>
             <div className="grid gap-2 border-b border-border bg-canvas/60 p-4 sm:grid-cols-[minmax(0,1fr)_160px]">
-              <label className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder={t("inventory.actions.searchMovements")} className="h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 lg:h-10" /></label>
+              <label className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} onClick={selectAllInputOnClick} placeholder={t("inventory.actions.searchMovements")} className="h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 lg:h-10" /></label>
               <div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" /><Select value={type} onValueChange={(value) => { setType(value); setPage(1); }} aria-label={t("inventory.actions.allTypes")} className="pl-9" rootClassName="w-full" options={[{ value: "all", label: t("inventory.actions.allTypes") }, ...types.map((value) => ({ value, label: t(`inventory.moveTypes.${value}` as never) }))]} /></div>
             </div>
             <div className="min-h-0 flex-1 overflow-auto"><MovementList rows={pageRows} /></div>

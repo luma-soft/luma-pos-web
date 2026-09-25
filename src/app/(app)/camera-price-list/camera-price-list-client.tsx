@@ -11,6 +11,7 @@ import {
   type CameraQuoteCopyMode,
 } from "@/lib/camera-quote-copy";
 import { formatCurrency } from "@/lib/utils";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 
 type Variant = {
   id: string;
@@ -629,6 +630,7 @@ export function CameraPriceListClient({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              onClick={selectAllInputOnClick}
               placeholder="Tìm model..."
               className="h-11 w-44 border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-[#078a82] lg:h-10"
             />

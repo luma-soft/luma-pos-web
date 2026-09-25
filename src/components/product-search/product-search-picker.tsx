@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { Loader2, Search, X } from "lucide-react";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { cn } from "@/lib/utils";
 import { controlHeightClassName } from "@/components/ui/button-variants";
 import {
@@ -225,7 +226,10 @@ export function ProductSearchPicker<T>({
           setSearching(false);
           setOpen(true);
         }}
-        onClick={() => setOpen(true)}
+        onClick={(event) => {
+          selectAllInputOnClick(event);
+          setOpen(true);
+        }}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         className={cn(

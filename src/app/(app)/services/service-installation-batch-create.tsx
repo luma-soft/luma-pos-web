@@ -258,6 +258,7 @@ export function ServiceInstallationBatchCreate({
             <h3 id="installation-catalog-title" className="text-sm font-bold">1. Tìm & chọn sản phẩm</h3>
             <div className="relative mt-4">
               <Input
+                type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Tìm sản phẩm theo tên, SKU hoặc model"

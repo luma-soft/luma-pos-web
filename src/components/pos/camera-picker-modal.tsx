@@ -55,7 +55,7 @@ export function CameraPickerModal({ open, cameras, selectedCameras = {}, onClose
           <Button type="button" variant="ghost" size="iconSm" aria-label={t("common.close")} onClick={close}><X className="h-5 w-5" /></Button>
         </div>
         <div className="border-b border-border p-4 sm:px-5">
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("pos.cameraQuote.pickerSearchCamera")} leftIcon={<Search />} />
+          <Input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("pos.cameraQuote.pickerSearchCamera")} leftIcon={<Search />} />
           <div className="mt-3 text-xs font-semibold text-slate-500">{t("pos.cameraQuote.cameraCount", { count: cameras.length })}</div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">

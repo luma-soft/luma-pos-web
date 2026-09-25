@@ -18,6 +18,7 @@ import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { cn, formatCurrency } from "@/lib/utils";
 import { normalizeSearch } from "@/lib/normalize";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { settingsTextByFlag } from "@/lib/i18n/settings-text";
 import { useAppDataQuery } from "@/components/use-app-data-query";
 import {
@@ -1284,6 +1285,7 @@ function CameraQuoteSettingsSection({
                 value={query}
                 disabled={!canManage}
                 onChange={(event) => setQuery(event.target.value)}
+                onClick={selectAllInputOnClick}
                 placeholder={t("wifi.searchPlaceholder")}
               />
               <div className="mt-3">
@@ -2179,6 +2181,7 @@ function BankSelect({ value, onChange, placeholder }: { value: string; onChange:
               className="min-h-11 w-full bg-transparent px-3 py-2.5 text-sm outline-none"
               value={q}
               onChange={(event) => setQ(event.target.value)}
+              onClick={selectAllInputOnClick}
               placeholder={t("bankSearch")}
             />
           </div>

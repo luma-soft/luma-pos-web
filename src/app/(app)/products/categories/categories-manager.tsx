@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Check, ChevronDown, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn } from "@/lib/utils";
 import { createCategoryNode, updateCategory, deleteCategory } from "@/lib/actions/products";
@@ -135,6 +136,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onClick={selectAllInputOnClick}
             placeholder={t("categories.title")}
             aria-label={t("categories.title")}
             className="h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none transition-colors focus:border-primary-500"

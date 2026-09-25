@@ -3,6 +3,7 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { useTranslations } from "next-intl";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { cn } from "@/lib/utils";
 import type { TxValues } from "./_tx";
 import { DateInput } from "./date-input";
@@ -40,12 +41,16 @@ export interface InputProps
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, size, variant, leftIcon, rightIcon, placeholder, placeholderTx, placeholderTxOptions, ...props }, ref) => {
+  ({ className, size, variant, leftIcon, rightIcon, placeholder, placeholderTx, placeholderTxOptions, onClick, type, ...props }, ref) => {
     const t = useTranslations();
     const finalPlaceholder = placeholderTx ? t(placeholderTx, placeholderTxOptions) : placeholder;
+    const handleClick = (event: React.MouseEvent<HTMLInputElement>) => {
+      onClick?.(event);
+      if (type === "search") selectAllInputOnClick(event);
+    };
 
-    if (props.type === "date" || props.type === "datetime-local") {
-      return <DateInput {...props} type={props.type === "date" ? "date" : "datetime-local"} ref={ref} placeholder={finalPlaceholder} className={cn(inputVariants({ size, variant }), className)} />;
+    if (type === "date" || type === "datetime-local") {
+      return <DateInput {...props} type={type === "date" ? "date" : "datetime-local"} onClick={onClick} ref={ref} placeholder={finalPlaceholder} className={cn(inputVariants({ size, variant }), className)} />;
     }
 
     if (leftIcon || rightIcon) {
@@ -58,6 +63,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           )}
           <input
             ref={ref}
+            type={type}
+            onClick={handleClick}
             placeholder={finalPlaceholder}
             className={cn(
               "min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
@@ -80,6 +87,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     return (
       <input
         ref={ref}
+        type={type}
+        onClick={handleClick}
         placeholder={finalPlaceholder}
         className={cn(
           "min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",

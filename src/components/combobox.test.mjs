@@ -20,3 +20,8 @@ test("portaled searchable pickers focus their search input after opening", () =>
     expect(pickerSource).toContain("ref={searchRef}");
   }
 });
+
+test("searchable picker inputs select an existing query on click", () => {
+  expect(source).toContain("onClick={selectAllInputOnClick}");
+  expect(filterPickerSource).toContain("onClick={selectAllInputOnClick}");
+});

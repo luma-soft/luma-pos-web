@@ -3,6 +3,7 @@
 import { Search } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Select } from "@/components/ui/select";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { Routes } from "@/lib/routes";
 
 export function RevenueBookFilters() {
@@ -27,6 +28,7 @@ export function RevenueBookFilters() {
         <input
           name="q"
           defaultValue={searchParams.get("q") ?? ""}
+          onClick={selectAllInputOnClick}
           placeholder="Tìm mã giao dịch, khách hàng"
           aria-label="Tìm giao dịch trong sổ"
           className="h-11 w-full rounded-xl border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 lg:h-10"

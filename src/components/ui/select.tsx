@@ -4,6 +4,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { cn } from "@/lib/utils";
 import { normalizeSearch } from "@/lib/normalize";
 import type { TxValues } from "./_tx";
@@ -314,6 +315,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     type="search"
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
+                    onClick={selectAllInputOnClick}
                     onKeyDown={(event) => {
                       if (event.key !== "Enter" || filteredOptions.length === 0)
                         return;

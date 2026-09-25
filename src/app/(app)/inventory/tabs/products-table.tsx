@@ -18,6 +18,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import {
   Ban,
   Barcode,
@@ -1555,7 +1556,7 @@ function RelatedProductsPanel({ product }: { product: ProductRow }) {
 
   return (
     <>
-    <div className="relative mb-3 max-w-md"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm SKU hoặc thuộc tính" aria-label="Tìm trong các biến thể" className="h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-600 lg:h-10" /></div>
+    <div className="relative mb-3 max-w-md"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} onClick={selectAllInputOnClick} placeholder="Tìm SKU hoặc thuộc tính" aria-label="Tìm trong các biến thể" className="h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-600 lg:h-10" /></div>
     {rows.length === 0 && <EmptyPanel message="Không tìm thấy biến thể." />}
     <div className="space-y-2 lg:hidden" data-mobile-audit="product-related">
       {rows.map((item) => (

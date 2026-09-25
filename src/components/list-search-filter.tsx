@@ -5,6 +5,7 @@ import {
   type ReactNode,
 } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { cn } from "@/lib/utils";
 import { controlHeightClassName } from "@/components/ui/button-variants";
 
@@ -14,7 +15,7 @@ type ListSearchInputProps = InputHTMLAttributes<HTMLInputElement> & {
 
 export const ListSearchInput = forwardRef<HTMLInputElement, ListSearchInputProps>(
   function ListSearchInput(
-    { "aria-label": ariaLabel, className, placeholder, type = "search", wrapperClassName, ...props },
+    { "aria-label": ariaLabel, className, onClick, placeholder, type = "search", wrapperClassName, ...props },
     ref,
   ) {
     return (
@@ -23,6 +24,10 @@ export const ListSearchInput = forwardRef<HTMLInputElement, ListSearchInputProps
         <input
           ref={ref}
           type={type}
+          onClick={(event) => {
+            onClick?.(event);
+            selectAllInputOnClick(event);
+          }}
           aria-label={ariaLabel ?? (typeof placeholder === "string" ? placeholder : undefined)}
           placeholder={placeholder}
           className={cn(

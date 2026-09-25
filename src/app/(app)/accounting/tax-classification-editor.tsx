@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { updateProductTaxActivities } from "@/lib/actions/accounting";
 
 type Product = { id: string; sku: string; name: string; taxActivityId: string | null };
@@ -26,7 +27,7 @@ export function TaxClassificationEditor({ products, activities }: { products: Pr
   return (
     <section className="space-y-3">
       <div className="flex flex-col gap-3 rounded-card border border-border bg-surface p-3 sm:flex-row">
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm tên hoặc SKU" className="h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-primary-500 lg:h-10" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} onClick={selectAllInputOnClick} placeholder="Tìm tên hoặc SKU" className="h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-primary-500 lg:h-10" />
         <Button onClick={save} disabled={pending}><Save className="h-4 w-4" />{pending ? "Đang lưu…" : "Lưu phân loại"}</Button>
       </div>
       {message && <div className="rounded-xl border border-border bg-surface px-4 py-3 text-sm font-medium">{message}</div>}

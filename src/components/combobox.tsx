@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { ChevronDown, Search, Check, ImageIcon, Plus, Loader2, X } from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
+import { selectAllInputOnClick } from "@/lib/input-selection";
 import { normalizeSearch } from "@/lib/normalize";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -195,7 +196,10 @@ export function SearchableSelect({
         <div className="border-b border-border-soft">
           <Input
             ref={searchRef}
-            value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onClick={selectAllInputOnClick}
+            onKeyDown={onKeyDown}
             placeholder={placeholder ?? t("search")}
             leftIcon={<Search />}
             className="h-11 rounded-none border-0 bg-transparent focus:ring-0 focus:border-transparent"
