@@ -1300,19 +1300,28 @@ function CameraQuoteSettingsSection({
     selector: React.ReactNode,
     onChange: (value: number | null) => void,
   ) => (
-    <div className="grid gap-2 p-3">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-bold">{label}</span>
-        <span className="text-xs tabular-nums text-slate-500">{product ? formatCurrency(product.costPrice) : "—"}</span>
+    <div className="grid gap-3 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <span className="min-w-0 text-xs font-bold leading-5">{label}</span>
+        <div className="shrink-0 text-right">
+          <div className={FL}>{L ? "Giá nhập" : "Cost price"}</div>
+          <div className="mt-0.5 text-xs tabular-nums text-slate-500">{product ? formatCurrency(product.costPrice) : "—"}</div>
+        </div>
       </div>
-      {selector}
-      <MoneyInput
-        aria-label={L ? `Giá bán ${label}` : `${label} sale price`}
-        value={product ? cameraQuotePrice(product.id, product.retailPrice, form) : null}
-        disabled={!canManage || !product}
-        className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
-        onChange={onChange}
-      />
+      <div className="grid gap-1.5">
+        <span className={FL}>{L ? "Sản phẩm" : "Product"}</span>
+        {selector}
+      </div>
+      <div className="grid gap-1.5">
+        <span className={FL}>{L ? "Giá bán" : "Sale price"}</span>
+        <MoneyInput
+          aria-label={L ? `Giá bán ${label}` : `${label} sale price`}
+          value={product ? cameraQuotePrice(product.id, product.retailPrice, form) : null}
+          disabled={!canManage || !product}
+          className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+          onChange={onChange}
+        />
+      </div>
     </div>
   );
 
@@ -1350,22 +1359,27 @@ function CameraQuoteSettingsSection({
                   showColumnMenu={false}
                   empty={<div className="p-6 text-center text-xs text-slate-400">{L ? "Không tìm thấy camera." : "No cameras found."}</div>}
                   renderMobileRow={({ row }) => (
-                    <div className="grid gap-2 border-b border-border-soft p-3 last:border-0">
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-semibold">{row.name}</div>
-                        <div className="text-[10px] text-slate-400">{row.sku}</div>
+                    <div className="grid gap-3 border-b border-border-soft p-3 last:border-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold leading-5">{row.name}</div>
+                          <div className="mt-0.5 text-[10px] text-slate-400">{row.sku}</div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div className={FL}>{L ? "Giá nhập" : "Cost price"}</div>
+                          <div className="mt-0.5 text-xs tabular-nums text-slate-500">{formatCurrency(row.costPrice)}</div>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between gap-3 text-xs tabular-nums">
-                        <span className="text-slate-500">{L ? "Giá nhập" : "Cost price"}</span>
-                        <span className="text-right">{formatCurrency(row.costPrice)}</span>
+                      <div className="grid gap-1.5">
+                        <span className={FL}>{L ? "Giá bán" : "Sale price"}</span>
+                        <MoneyInput
+                          aria-label={L ? `Giá bán ${row.name}` : `${row.name} sale price`}
+                          value={cameraQuotePrice(row.id, row.retailPrice, form)}
+                          disabled={!canManage}
+                          className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          onChange={(value) => setPriceOverride(row.id, value, row.retailPrice)}
+                        />
                       </div>
-                      <MoneyInput
-                        aria-label={L ? `Giá bán ${row.name}` : `${row.name} sale price`}
-                        value={cameraQuotePrice(row.id, row.retailPrice, form)}
-                        disabled={!canManage}
-                        className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        onChange={(value) => setPriceOverride(row.id, value, row.retailPrice)}
-                      />
                     </div>
                   )}
                 />
@@ -1389,26 +1403,38 @@ function CameraQuoteSettingsSection({
                   const selectedId = form.memoryCardSelections?.[row.capacity] ?? row.products.find((product) => selectedCardIds.has(product.id))?.id ?? "";
                   const selected = selectedId ? productById.get(selectedId) : undefined;
                   return (
-                    <div className="grid gap-2 border-b border-border-soft p-3 last:border-0">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs font-extrabold text-slate-700">{row.capacity}</span>
-                        <span className="text-xs text-slate-500">{selected ? formatCurrency(selected.costPrice) : "—"}</span>
+                    <div className="grid gap-3 border-b border-border-soft p-3 last:border-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className={FL}>{L ? "Dung lượng" : "Capacity"}</div>
+                          <div className="mt-0.5 text-xs font-extrabold text-slate-700">{row.capacity}</div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div className={FL}>{L ? "Giá nhập" : "Cost price"}</div>
+                          <div className="mt-0.5 text-xs tabular-nums text-slate-500">{selected ? formatCurrency(selected.costPrice) : "—"}</div>
+                        </div>
                       </div>
-                      <SearchableSelect
-                        value={selectedId}
-                        options={row.products.map((product) => ({ value: product.id, label: product.name, hint: product.sku }))}
-                        allowClear={false}
-                        disabled={!canManage}
-                        onChange={(value) => setMemoryCardSelection(row.capacity, value)}
-                        className={searchableTouch}
-                      />
-                      <MoneyInput
-                        aria-label={L ? `Giá bán thẻ ${row.capacity}` : `${row.capacity} card sale price`}
-                        value={selected ? cameraQuotePrice(selected.id, selected.retailPrice, form) : null}
-                        disabled={!canManage || !selected}
-                        className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        onChange={(value) => selected && setPriceOverride(selected.id, value, selected.retailPrice)}
-                      />
+                      <div className="grid gap-1.5">
+                        <span className={FL}>{L ? "Thẻ đang chọn" : "Selected card"}</span>
+                        <SearchableSelect
+                          value={selectedId}
+                          options={row.products.map((product) => ({ value: product.id, label: product.name, hint: product.sku }))}
+                          allowClear={false}
+                          disabled={!canManage}
+                          onChange={(value) => setMemoryCardSelection(row.capacity, value)}
+                          className={searchableTouch}
+                        />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <span className={FL}>{L ? "Giá bán" : "Sale price"}</span>
+                        <MoneyInput
+                          aria-label={L ? `Giá bán thẻ ${row.capacity}` : `${row.capacity} card sale price`}
+                          value={selected ? cameraQuotePrice(selected.id, selected.retailPrice, form) : null}
+                          disabled={!canManage || !selected}
+                          className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          onChange={(value) => selected && setPriceOverride(selected.id, value, selected.retailPrice)}
+                        />
+                      </div>
                     </div>
                   );
                 }}
@@ -1431,46 +1457,58 @@ function CameraQuoteSettingsSection({
                   const material = form[row.materialField] ? productById.get(form[row.materialField]!) : undefined;
                   const installation = form[row.installationField] ? productById.get(form[row.installationField]!) : undefined;
                   return (
-                    <div className="grid gap-2 border-b border-border-soft p-3 last:border-0">
-                      <div className="text-xs font-bold">{row.label}</div>
-                      <SearchableSelect
-                        value={form[row.materialField] ?? ""}
-                        options={options.materials.map((product) => ({ value: product.id, label: product.name, hint: product.sku }))}
-                        allowClear={false}
-                        disabled={!canManage}
-                        onChange={(value) => setProduct(row.materialField, value)}
-                        className={searchableTouch}
-                      />
+                    <div className="grid gap-3 border-b border-border-soft p-3 last:border-0">
+                      <div className="text-xs font-bold leading-5">{row.label}</div>
+                      <div className="grid gap-1.5">
+                        <span className={FL}>{L ? "Vật tư" : "Material"}</span>
+                        <SearchableSelect
+                          value={form[row.materialField] ?? ""}
+                          options={options.materials.map((product) => ({ value: product.id, label: product.name, hint: product.sku }))}
+                          allowClear={false}
+                          disabled={!canManage}
+                          onChange={(value) => setProduct(row.materialField, value)}
+                          className={searchableTouch}
+                        />
+                      </div>
                       <div className="flex items-center justify-between gap-3 text-xs tabular-nums">
-                        <span className="text-slate-500">{L ? "Vật tư · Giá nhập" : "Material · Cost price"}</span>
+                        <span className={FL}>{L ? "Giá nhập vật tư" : "Material cost price"}</span>
                         <span>{material ? formatCurrency(material.costPrice) : "—"}</span>
                       </div>
-                      <MoneyInput
-                        aria-label={L ? `Giá vật tư ${row.label}` : `${row.label} material price`}
-                        value={material ? cameraQuotePrice(material.id, material.retailPrice, form) : null}
-                        disabled={!canManage || !material}
-                        className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        onChange={(value) => material && setPriceOverride(material.id, value, material.retailPrice)}
-                      />
-                      <SearchableSelect
-                        value={form[row.installationField] ?? ""}
-                        options={options.installations.map((product) => ({ value: product.id, label: product.name, hint: product.sku }))}
-                        allowClear={false}
-                        disabled={!canManage}
-                        onChange={(value) => setProduct(row.installationField, value)}
-                        className={searchableTouch}
-                      />
+                      <div className="grid gap-1.5">
+                        <span className={FL}>{L ? "Giá bán vật tư" : "Material sale price"}</span>
+                        <MoneyInput
+                          aria-label={L ? `Giá bán vật tư ${row.label}` : `${row.label} material sale price`}
+                          value={material ? cameraQuotePrice(material.id, material.retailPrice, form) : null}
+                          disabled={!canManage || !material}
+                          className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          onChange={(value) => material && setPriceOverride(material.id, value, material.retailPrice)}
+                        />
+                      </div>
+                      <div className="grid gap-1.5 border-t border-border-soft pt-3">
+                        <span className={FL}>{L ? "Công lắp đặt" : "Installation"}</span>
+                        <SearchableSelect
+                          value={form[row.installationField] ?? ""}
+                          options={options.installations.map((product) => ({ value: product.id, label: product.name, hint: product.sku }))}
+                          allowClear={false}
+                          disabled={!canManage}
+                          onChange={(value) => setProduct(row.installationField, value)}
+                          className={searchableTouch}
+                        />
+                      </div>
                       <div className="flex items-center justify-between gap-3 text-xs tabular-nums">
-                        <span className="text-slate-500">{L ? "Công · Giá nhập" : "Installation · Cost price"}</span>
+                        <span className={FL}>{L ? "Giá nhập công" : "Installation cost price"}</span>
                         <span>{installation ? formatCurrency(installation.costPrice) : "—"}</span>
                       </div>
-                      <MoneyInput
-                        aria-label={L ? `Giá công lắp đặt ${row.label}` : `${row.label} installation price`}
-                        value={installation ? cameraQuotePrice(installation.id, installation.retailPrice, form) : null}
-                        disabled={!canManage || !installation}
-                        className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        onChange={(value) => installation && setPriceOverride(installation.id, value, installation.retailPrice)}
-                      />
+                      <div className="grid gap-1.5">
+                        <span className={FL}>{L ? "Giá bán công" : "Installation sale price"}</span>
+                        <MoneyInput
+                          aria-label={L ? `Giá bán công lắp đặt ${row.label}` : `${row.label} installation sale price`}
+                          value={installation ? cameraQuotePrice(installation.id, installation.retailPrice, form) : null}
+                          disabled={!canManage || !installation}
+                          className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          onChange={(value) => installation && setPriceOverride(installation.id, value, installation.retailPrice)}
+                        />
+                      </div>
                     </div>
                   );
                 }}

@@ -24,3 +24,11 @@ test("memory, installation, and IP quote settings stay in table sections", () =>
   expect(source).toContain('tableId="settings.camera-quote.ip-accessories"');
   expect(source).not.toContain("Thẻ nhớ mặc định");
 });
+
+test("mobile quote rows keep price and picker labels visible", () => {
+  expect(source).toContain('renderMobileRow={({ row }) =>');
+  expect(source).toContain('L ? "Sản phẩm" : "Product"');
+  expect(source).toContain('L ? "Vật tư" : "Material"');
+  expect(source).toContain('L ? "Công lắp đặt" : "Installation"');
+  expect(source).toContain('L ? "Giá bán" : "Sale price"');
+});
