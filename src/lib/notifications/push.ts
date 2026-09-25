@@ -24,6 +24,7 @@ import {
 import { deliverPushDeviceCore } from "@/lib/notifications/push-delivery";
 import { isWithinQuietHours } from "@/lib/notifications/policy";
 import type { StorePrefs } from "@/lib/schemas/settings";
+import { catalogText } from "@/lib/i18n/catalog-text";
 
 let cachedAccessToken: { value: string; expiresAt: number } | null = null;
 let accessTokenRefresh: Promise<string> | null = null;
@@ -160,14 +161,13 @@ function isEventInput(
 }
 
 function legacyFcmMessage(input: LegacyDeviceNotificationInput) {
+  const locale = input.locale?.toLowerCase().startsWith("en") ? "en" : "vi";
   return {
     message: {
       token: input.token,
       notification: {
         title: "LumaPOS",
-        body: input.locale?.toLowerCase().startsWith("en")
-          ? "You have a new operational alert."
-          : "Bạn có cảnh báo vận hành mới.",
+        body: catalogText(locale, "notifications.operationalAlert"),
       },
       data: {
         kind: "operational_alert",

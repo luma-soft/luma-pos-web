@@ -1,4 +1,5 @@
 "use client";
+import { catalogTextByFlag, legacyTextByFlag } from "@/lib/i18n/catalog-text";
 
 import { type ReactNode, useCallback, useMemo, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -31,14 +32,10 @@ import { ProductSearchThumbnail } from "@/components/product-search/product-sear
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 
 const DEPARTMENTS = [
-  ["kitchen", "Kitchen", "Bếp"], ["office", "Office", "Văn phòng"], ["marketing", "Marketing", "Tiếp thị"],
-  ["management", "Management", "Ban quản lý"], ["security", "Security", "Bảo vệ"], ["maintenance", "Maintenance", "Bảo trì"],
+  "kitchen", "office", "marketing", "management", "security", "maintenance",
 ] as const;
 const REASONS = [
-  ["staff_meal", "Staff meals", "Bữa ăn nhân viên"], ["supplies", "Office supplies", "Vật tư văn phòng"],
-  ["sample", "Marketing samples", "Mẫu tiếp thị"], ["display", "Store display", "Trưng bày"],
-  ["cleaning", "Cleaning supplies", "Vệ sinh"], ["training", "Staff training", "Đào tạo nhân viên"],
-  ["other", "Other", "Khác"],
+  "staff_meal", "supplies", "sample", "display", "cleaning", "training", "other",
 ] as const;
 
 type Line = {
@@ -68,8 +65,8 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
   const [toast, setToast] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
 
-  const deptOpts: { value: string; label: string }[] = DEPARTMENTS.map(([v, en, vi]) => ({ value: v, label: L ? vi : en }));
-  const reasonOpts: { value: string; label: string }[] = REASONS.map(([v, en, vi]) => ({ value: v, label: L ? vi : en }));
+  const deptOpts: { value: string; label: string }[] = DEPARTMENTS.map((value) => ({ value, label: catalogTextByFlag(L, `inventory.internalUse.departments.${value}`) }));
+  const reasonOpts: { value: string; label: string }[] = REASONS.map((value) => ({ value, label: catalogTextByFlag(L, `inventory.internalUse.reasons.${value}`) }));
   if (department && !deptOpts.some((o) => o.value === department)) deptOpts.push({ value: department, label: department });
   if (reason && !reasonOpts.some((o) => o.value === reason)) reasonOpts.push({ value: reason, label: internalUseReasonLabel(reason, locale) });
   const labelOf = (opts: { value: string; label: string }[], v: string) => opts.find((o) => o.value === v)?.label ?? v;
@@ -180,7 +177,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
       const res = await (initial ? updateInternalUse(initial.id, payload) : createInternalUse(payload));
       if (res.ok) {
         void catalog.refresh();
-        setToast(res.data.status === "draft" || res.data.status === "pending" ? (L ? "Đã lưu nháp" : "Draft saved") : t("internalUse.submitted"));
+        setToast(res.data.status === "draft" || res.data.status === "pending" ? (legacyTextByFlag(L, "ed46e541d6a1")) : t("internalUse.submitted"));
         setLines([]); setNote(""); setReason(""); setDepartment("");
         router.push(`${Routes.Inventory}?tab=internal${initial ? `&expanded=${initial.id}` : ""}`);
         router.refresh();
@@ -397,7 +394,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
             </Button>}
             {(initial?.status !== "pending" || canCompletePending) && <Button type="button" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={() => submit("complete")} block>
               {!pending && <Check className="w-4 h-4" />}
-              {initial?.status === "approved" ? (L ? "Lưu thay đổi" : "Save changes") : t("internalUse.complete")}
+              {initial?.status === "approved" ? (legacyTextByFlag(L, "2320a5a3ea8c")) : t("internalUse.complete")}
             </Button>}
           </div>
       </aside>

@@ -1,4 +1,5 @@
 "use client";
+import { legacyTextByFlag } from "@/lib/i18n/catalog-text";
 
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -61,10 +62,10 @@ export function ColorPicker({ value, onChange, label }: { value: string | null; 
           popupRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]')[(index + delta + colors.length) % colors.length]?.focus();
         }}>{value?.toLowerCase() === color && <Check className={cn("size-4", color === "#ffffff" ? "text-slate-900" : "text-white")} />}</button>)}
       </div>
-      <label className="mt-3 block text-xs font-medium">{vi ? "Mã màu HEX" : "HEX color"}
+      <label className="mt-3 block text-xs font-medium">{legacyTextByFlag(vi, "a122d0610756")}
         <input value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (valid) choose(draft); } }} className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 font-mono text-sm outline-none focus:border-primary-600" aria-invalid={!valid} maxLength={7} />
       </label>
-      <button type="button" disabled={!valid} onClick={() => choose(draft)} className="mt-3 min-h-11 w-full rounded-lg bg-primary-600 text-sm font-semibold text-white disabled:opacity-50">{vi ? "Áp dụng" : "Apply"}</button>
+      <button type="button" disabled={!valid} onClick={() => choose(draft)} className="mt-3 min-h-11 w-full rounded-lg bg-primary-600 text-sm font-semibold text-white disabled:opacity-50">{legacyTextByFlag(vi, "7b131edeebbd")}</button>
     </div>, document.body)}
   </>;
 }

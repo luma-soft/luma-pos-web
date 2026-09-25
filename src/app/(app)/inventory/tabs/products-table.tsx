@@ -1,4 +1,5 @@
 "use client";
+import { legacyText } from "@/lib/i18n/catalog-text";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -1858,7 +1859,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
         {cameraMaterials ? (
           <ActionButton
             icon={Trash2}
-            label={locale === "vi" ? "Xóa khỏi vật tư lắp camera" : "Remove from camera materials"}
+            label={legacyText(locale, "d0d8a15eb7df")}
             onClick={toggleCameraMaterial}
             disabled={pending}
             tone="danger"
@@ -1898,7 +1899,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
             <button
               ref={moreButtonRef}
               type="button"
-              aria-label={locale === "vi" ? "Thao tác khác" : "More actions"}
+              aria-label={legacyText(locale, "df4a04789361")}
               aria-haspopup="menu"
               aria-expanded={moreOpen}
               onClick={() => setMoreOpen((value) => !value)}
@@ -1937,7 +1938,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
                   {ONLINE_SALES_ENABLED && (
                     <MenuActionLink
                       icon={Store}
-                      label={locale === "vi" ? "Đăng sàn" : "List online"}
+                      label={legacyText(locale, "89a329ca46b4")}
                       href={productModalHref({ onlineProductId: product.id })}
                     />
                   )}
@@ -1949,7 +1950,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
                   />
                   <MenuActionButton
                     icon={PackagePlus}
-                    label={locale === "vi" ? "Thêm vào vật tư lắp camera" : "Add to camera materials"}
+                    label={legacyText(locale, "3f95e66a40a5")}
                     onClick={toggleCameraMaterial}
                     disabled={pending}
                   />

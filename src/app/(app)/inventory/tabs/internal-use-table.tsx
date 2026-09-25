@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { catalogText } from "@/lib/i18n/catalog-text";
 import type { ReactNode } from "react";
 import { LayoutList } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
@@ -15,25 +16,23 @@ type InternalUseRow = Awaited<ReturnType<typeof getInternalUseIssues>>[number];
 export function InternalUseTable({ rows, capabilities }: { rows: InternalUseRow[]; capabilities?: { canEdit: boolean; canDelete: boolean; canApprovePending?: boolean } }) {
   const t = useTranslations();
   const locale = useLocale();
-  const isVi = locale === "vi";
-
   const columns: DataTableColumn<InternalUseRow>[] = [
     {
       key: "code",
-      label: isVi ? "Mã phiếu" : t("internalUse.cols.code"),
+      label: catalogText(locale, "inventory.internalUse.table.code"),
       required: true,
       width: "150px",
       render: (row) => <span className="font-mono font-semibold text-primary-600">{row.code}</span>,
     },
     {
       key: "reason",
-      label: isVi ? "Loại xuất" : t("internalUse.reason"),
+      label: catalogText(locale, "inventory.internalUse.table.reason"),
       defaultVisible: true,
       render: (row) => <span className="text-slate-700 dark:text-slate-200">{internalUseReasonLabel(row.reason, locale)}</span>,
     },
     {
       key: "cost",
-      label: isVi ? "Tổng giá trị" : t("internalUse.cols.cost"),
+      label: catalogText(locale, "inventory.internalUse.table.cost"),
       defaultVisible: true,
       align: "right",
       cellClassName: "font-mono font-bold text-warn",
@@ -41,7 +40,7 @@ export function InternalUseTable({ rows, capabilities }: { rows: InternalUseRow[
     },
     {
       key: "date",
-      label: isVi ? "Thời gian" : t("orders.cols.date"),
+      label: catalogText(locale, "inventory.internalUse.table.date"),
       defaultVisible: true,
       width: "180px",
       render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span>,
@@ -54,7 +53,7 @@ export function InternalUseTable({ rows, capabilities }: { rows: InternalUseRow[
     },
     {
       key: "status",
-      label: isVi ? "Trạng thái" : t("orders.cols.status"),
+      label: catalogText(locale, "inventory.internalUse.table.status"),
       defaultVisible: true,
       width: "130px",
       render: (row) => <StatusBadge status={row.status} />,
@@ -87,20 +86,19 @@ export function InternalUseTable({ rows, capabilities }: { rows: InternalUseRow[
 function ExpandedIssue({ row }: { row: InternalUseRow }) {
   const t = useTranslations();
   const locale = useLocale();
-  const isVi = locale === "vi";
   const totalQty = row.items.reduce((sum, item) => sum + Number(item.quantity), 0);
 
   return (
     <div className="bg-surface px-4 py-4">
       <div className="mb-4 grid min-w-0 gap-4 rounded-lg border border-border-soft bg-canvas p-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
-        <Info label={isVi ? "Người tạo" : "Created by"} value={row.createdByName ?? "—"} />
-        <Info label={isVi ? "Loại xuất" : t("internalUse.reason")} value={internalUseReasonLabel(row.reason, locale)} />
-        <Info label={isVi ? "Người nhận" : t("internalUse.department")} value={row.department ?? "—"} />
-        <Info label={isVi ? "Ngày xuất" : t("orders.cols.date")} value={formatDate(row.createdAt)} />
-        <Info label={isVi ? "Trạng thái" : t("orders.cols.status")} value={<StatusBadge status={row.status} />} />
-        <Info label={isVi ? "Tổng số lượng" : "Total quantity"} value={formatNumber(totalQty)} />
-        <Info label={isVi ? "Tổng giá trị" : "Total value"} value={formatCurrency(row.totalCost)} />
-        <Info label={t("internalUse.note")} value={row.note ?? (isVi ? "Không có ghi chú" : "No note")} />
+        <Info label={catalogText(locale, "inventory.internalUse.table.createdBy")} value={row.createdByName ?? "—"} />
+        <Info label={catalogText(locale, "inventory.internalUse.table.reason")} value={internalUseReasonLabel(row.reason, locale)} />
+        <Info label={catalogText(locale, "inventory.internalUse.table.recipient")} value={row.department ?? "—"} />
+        <Info label={catalogText(locale, "inventory.internalUse.table.date")} value={formatDate(row.createdAt)} />
+        <Info label={catalogText(locale, "inventory.internalUse.table.status")} value={<StatusBadge status={row.status} />} />
+        <Info label={catalogText(locale, "inventory.internalUse.table.totalQuantity")} value={formatNumber(totalQty)} />
+        <Info label={catalogText(locale, "inventory.internalUse.table.totalValue")} value={formatCurrency(row.totalCost)} />
+        <Info label={t("internalUse.note")} value={row.note ?? catalogText(locale, "inventory.internalUse.table.noNote")} />
       </div>
 
       <div className="overflow-hidden rounded-card border border-border">
@@ -133,10 +131,10 @@ function ExpandedIssue({ row }: { row: InternalUseRow }) {
           </colgroup>
           <thead>
             <tr className="bg-canvas text-left text-xs font-semibold text-slate-600 dark:text-slate-300">
-              <th className="px-3 py-3">{isVi ? "Mã hàng" : "SKU"}</th>
-              <th className="px-3 py-3">{isVi ? "Tên hàng" : "Product"}</th>
-              <th className="px-3 py-3">{isVi ? "ĐVT" : "Unit"}</th>
-              <th className="px-3 py-3 text-right">{isVi ? "SL xuất" : "Qty"}</th>
+              <th className="px-3 py-3">{catalogText(locale, "inventory.internalUse.table.itemSku")}</th>
+              <th className="px-3 py-3">{catalogText(locale, "inventory.internalUse.table.itemProduct")}</th>
+              <th className="px-3 py-3">{catalogText(locale, "inventory.internalUse.table.itemUnit")}</th>
+              <th className="px-3 py-3 text-right">{catalogText(locale, "inventory.internalUse.table.itemQty")}</th>
               <th className="px-3 py-3 text-right">{t("internalUse.unitCost")}</th>
               <th className="px-3 py-3 text-right">{t("internalUse.lineTotal")}</th>
             </tr>

@@ -1,4 +1,5 @@
 "use client";
+import { legacyText } from "@/lib/i18n/catalog-text";
 
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 
@@ -171,9 +172,9 @@ export function ServiceDashboardFilters({
             value={urgency}
             onChange={(event) => update("urgency", event.target.value)}
             options={[
-              { value: "", label: locale === "vi" ? "Tất cả tiến độ" : "All schedule states" },
-              { value: "attention", label: locale === "vi" ? "Cần chú ý" : "Needs attention" },
-              { value: "overdue", label: locale === "vi" ? "Quá hạn" : "Overdue" },
+              { value: "", label: legacyText(locale, "38cf1b7f8dc2") },
+              { value: "attention", label: legacyText(locale, "69a2b410b7ae") },
+              { value: "overdue", label: legacyText(locale, "66da0e7fb240") },
             ]}
             className="min-w-40"
           />
@@ -182,10 +183,10 @@ export function ServiceDashboardFilters({
             value={sort}
             onChange={(event) => update("sort", event.target.value)}
             options={[
-              { value: "starts_desc", label: locale === "vi" ? "Bắt đầu · Mới nhất" : "Start · Newest" },
-              { value: "starts_asc", label: locale === "vi" ? "Bắt đầu · Cũ nhất" : "Start · Oldest" },
-              { value: "target_asc", label: locale === "vi" ? "Kết thúc · Gần nhất" : "Target · Nearest" },
-              { value: "target_desc", label: locale === "vi" ? "Kết thúc · Xa nhất" : "Target · Farthest" },
+              { value: "starts_desc", label: legacyText(locale, "06a23ef9fceb") },
+              { value: "starts_asc", label: legacyText(locale, "734a01a52f48") },
+              { value: "target_asc", label: legacyText(locale, "54508e173558") },
+              { value: "target_desc", label: legacyText(locale, "7bb9cc180282") },
             ]}
             className="min-w-44"
           />

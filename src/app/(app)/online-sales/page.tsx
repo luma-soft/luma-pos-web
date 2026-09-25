@@ -1,3 +1,4 @@
+import { catalogTextByFlag, legacyTextByFlag } from "@/lib/i18n/catalog-text";
 import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
@@ -50,23 +51,21 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
     <div className="p-4 sm:p-6 space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide text-primary-600">{L ? "Bán online" : "Online sales"}</div>
-          <h1 className="text-2xl font-extrabold tracking-tight">{L ? "Kênh bán hàng online" : "Online sales channels"}</h1>
+          <div className="text-[10px] font-bold uppercase tracking-wide text-primary-600">{legacyTextByFlag(L, "870091dab44d")}</div>
+          <h1 className="text-2xl font-extrabold tracking-tight">{legacyTextByFlag(L, "c15ba4ec48b3")}</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            {L
-              ? "Quản lý gian hàng, listing, đơn hàng, inbox và đồng bộ tồn kho trên Shopee, TikTok Shop, Lazada, Tiki."
-              : "Manage shops, listings, orders, inbox, and stock sync across Shopee, TikTok Shop, Lazada, and Tiki."}
+            {legacyTextByFlag(L, "ab7c80c71f6e")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={tabHref("inbox")} className="inline-flex h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold hover:bg-surface-2">
-            <Inbox className="h-4 w-4" /> {L ? "Inbox" : "Inbox"}
+            <Inbox className="h-4 w-4" /> {legacyTextByFlag(L, "8dd0da0692b2")}
           </Link>
           <Link href="/settings?tab=shopee" className="inline-flex h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold hover:bg-surface-2">
-            <Store className="h-4 w-4" /> {L ? "Developer apps" : "Developer apps"}
+            <Store className="h-4 w-4" /> {legacyTextByFlag(L, "61acf89ee6a8")}
           </Link>
           <Link href={tabHref("channels")} className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
-            <ShoppingBag className="h-4 w-4" /> {L ? "Thêm kênh" : "Add channel"}
+            <ShoppingBag className="h-4 w-4" /> {legacyTextByFlag(L, "80e925617bfc")}
           </Link>
         </div>
       </div>
@@ -95,20 +94,20 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
       {(tab === "overview" || tab === "channels") && (
         <>
           <section className="grid grid-cols-1 gap-3 md:grid-cols-4">
-            <Metric title={L ? "Kênh đã kết nối" : "Connected channels"} value={formatNumber(connectedChannels)} muted={connectedChannels === 0} />
-            <Metric title={L ? "Listing online" : "Online listings"} value={formatNumber(data.metrics.listings)} />
-            <Metric title={L ? "Đơn online" : "Online orders"} value={formatNumber(onlineOrderCount)} />
-            <Metric title={L ? "Queue lỗi/chờ" : "Failed/Pending"} value={`${formatNumber(data.metrics.failedJobs)} / ${formatNumber(data.metrics.pendingJobs)}`} tone={data.metrics.failedJobs > 0 ? "warn" : "normal"} />
+            <Metric title={legacyTextByFlag(L, "d763b07b7e3e")} value={formatNumber(connectedChannels)} muted={connectedChannels === 0} />
+            <Metric title={legacyTextByFlag(L, "78b5ecaca7d4")} value={formatNumber(data.metrics.listings)} />
+            <Metric title={legacyTextByFlag(L, "3bf1fff1f721")} value={formatNumber(onlineOrderCount)} />
+            <Metric title={legacyTextByFlag(L, "a0a2016e2487")} value={`${formatNumber(data.metrics.failedJobs)} / ${formatNumber(data.metrics.pendingJobs)}`} tone={data.metrics.failedJobs > 0 ? "warn" : "normal"} />
           </section>
 
           <section className="rounded-card border border-border bg-surface">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-soft px-4 py-3">
               <div>
-                <h2 className="text-sm font-extrabold">{L ? "Kênh bán hàng" : "Sales channels"}</h2>
-                <p className="text-xs text-slate-500">{L ? "Kết nối gian hàng và cấu hình chính sách đồng bộ theo từng sàn." : "Connect shops and configure sync policy per marketplace."}</p>
+                <h2 className="text-sm font-extrabold">{legacyTextByFlag(L, "58d47eb1b848")}</h2>
+                <p className="text-xs text-slate-500">{legacyTextByFlag(L, "33bba144ab08")}</p>
               </div>
               <Link href={tabHref("channels")} className="inline-flex h-11 items-center gap-2 rounded-lg border border-border px-3 text-xs font-bold hover:bg-surface-2">
-                <Layers3 className="h-3.5 w-3.5" /> {L ? "Quản lý kênh" : "Manage channels"}
+                <Layers3 className="h-3.5 w-3.5" /> {legacyTextByFlag(L, "52179dbb8ecb")}
               </Link>
             </div>
             <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
@@ -121,8 +120,8 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
           {tab === "channels" && data.shops.length > 0 && (
             <section className="rounded-card border border-border bg-surface">
               <div className="border-b border-border-soft px-4 py-3">
-                <h2 className="text-sm font-extrabold">{L ? "Chính sách đồng bộ theo gian hàng" : "Shop sync policies"}</h2>
-                <p className="text-xs text-slate-500">{L ? "Cấu hình kho nguồn, tồn đệm và dữ liệu được đồng bộ cho từng shop." : "Configure source warehouse, stock buffer, and synced data per shop."}</p>
+                <h2 className="text-sm font-extrabold">{legacyTextByFlag(L, "718a727e7512")}</h2>
+                <p className="text-xs text-slate-500">{legacyTextByFlag(L, "37c377c2e71c")}</p>
               </div>
               <div className="divide-y divide-border-soft">
                 {data.shops.map((shopRow) => (
@@ -181,32 +180,32 @@ function ShopPolicyForm({
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         <input type="hidden" name="warehouseId" value={policy.warehouseId ?? ""} />
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Tồn đệm" : "Stock buffer"}</span>
+          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{legacyTextByFlag(L, "3d4ce4f326f6")}</span>
           <NumberInput name="stockBuffer" decimals={4} min={0} defaultValue={policy.stockBuffer} className="bg-canvas" />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Ngưỡng tồn thấp" : "Min stock"}</span>
+          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{legacyTextByFlag(L, "1176d368d1be")}</span>
           <NumberInput name="minStockThreshold" decimals={4} min={0} defaultValue={policy.minStockThreshold} className="bg-canvas" />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Khi hết hàng" : "Out of stock"}</span>
+          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{legacyTextByFlag(L, "25b2b4f1a6d8")}</span>
           <Select
             name="outOfStockBehavior"
             defaultValue={policy.outOfStockBehavior}
             options={[
-              { value: "keep_visible", label: L ? "Giữ hiển thị" : "Keep visible" },
-              { value: "unlist", label: L ? "Ẩn listing" : "Unlist" },
-              { value: "set_zero", label: L ? "Set tồn = 0" : "Set zero" },
+              { value: "keep_visible", label: legacyTextByFlag(L, "6915a1c6d014") },
+              { value: "unlist", label: legacyTextByFlag(L, "dea0d40fa780") },
+              { value: "set_zero", label: legacyTextByFlag(L, "736a05178c80") },
             ]}
             className="w-full bg-canvas"
           />
         </label>
         {[
-          ["syncStock", L ? "Sync tồn" : "Sync stock", policy.syncStock],
-          ["syncPrice", L ? "Sync giá" : "Sync price", policy.syncPrice],
-          ["importOrders", L ? "Import đơn" : "Import orders", policy.importOrders],
-          ["syncMessages", L ? "Sync tin nhắn" : "Sync messages", policy.syncMessages],
-          ["autoCreateCustomer", L ? "Tự tạo khách" : "Auto-create customer", policy.autoCreateCustomer],
+          ["syncStock", legacyTextByFlag(L, "e96763ba4eca"), policy.syncStock],
+          ["syncPrice", legacyTextByFlag(L, "2f3782706ef0"), policy.syncPrice],
+          ["importOrders", legacyTextByFlag(L, "5ec1f0dc6f85"), policy.importOrders],
+          ["syncMessages", legacyTextByFlag(L, "2ba98abb03f2"), policy.syncMessages],
+          ["autoCreateCustomer", legacyTextByFlag(L, "932d4723739a"), policy.autoCreateCustomer],
         ].map(([name, label, checked]) => (
           <label key={String(name)} className="flex min-h-11 min-w-11 items-center justify-between gap-3 rounded-lg border border-border-soft bg-canvas px-3 py-2 text-sm font-semibold lg:min-h-0 lg:min-w-0">
             <span>{label}</span>
@@ -215,7 +214,7 @@ function ShopPolicyForm({
         ))}
       </div>
       <div className="flex items-start justify-end">
-        <button className="h-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">{L ? "Lưu" : "Save"}</button>
+        <button className="h-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">{legacyTextByFlag(L, "2d7e281f1bcd")}</button>
       </div>
     </form>
   );
@@ -255,28 +254,28 @@ function onlineSalesModalHref(params: SP, patch: Record<string, string>) {
 }
 
 function tabLabel(tab: OnlineSalesTab, L: boolean) {
-  const labels: Record<OnlineSalesTab, [string, string]> = {
-    overview: ["Overview", "Tổng quan"],
-    channels: ["Channels", "Kênh bán"],
-    listings: ["Listings", "Listing"],
-    orders: ["Orders", "Đơn online"],
-    inbox: ["Inbox", "Inbox"],
-    sync: ["Sync logs", "Sync logs"],
+  const keys: Record<OnlineSalesTab, string> = {
+    overview: "overview",
+    channels: "channels",
+    listings: "listings",
+    orders: "orders",
+    inbox: "inbox",
+    sync: "sync",
   };
-  return L ? labels[tab][1] : labels[tab][0];
+  return catalogTextByFlag(L, `onlineSales.tabs.${keys[tab]}`);
 }
 
 function onlineSalesError(error: string, L: boolean) {
   if (error === "missing_shopee_partner_credentials") {
-    return L ? "Thiếu Shopee Partner ID/key. Vào Settings > App sàn TMĐT để cấu hình trước khi kết nối." : "Missing Shopee Partner ID/key. Configure Settings > Marketplace Apps before connecting.";
+    return legacyTextByFlag(L, "8c26f340ef71");
   }
   if (error === "invalid_shopee_partner_id") {
-    return L ? "Shopee Partner ID không hợp lệ. Partner ID phải là số, không phải email." : "Invalid Shopee Partner ID. Partner ID must be numeric, not an email.";
+    return legacyTextByFlag(L, "3d373b0060ed");
   }
   if (error === "marketplace_migration_required") {
-    return L ? "Cần chạy migration marketplace trên production DB trước khi lưu shop." : "Marketplace migration must be applied to the production DB before saving shops.";
+    return legacyTextByFlag(L, "6d3f3decb1ba");
   }
-  return L ? "Không thể kết nối kênh online. Kiểm tra cấu hình rồi thử lại." : "Could not connect the online channel. Check configuration and try again.";
+  return legacyTextByFlag(L, "c657cbb5b515");
 }
 
 function ProviderCard({ provider, shop, L }: { provider: (typeof PROVIDERS)[number]; shop: Awaited<ReturnType<typeof getShopeeDashboard>>["shop"]; L: boolean }) {
@@ -288,8 +287,8 @@ function ProviderCard({ provider, shop, L }: { provider: (typeof PROVIDERS)[numb
           <div className="text-sm font-extrabold">{provider.name}</div>
           <div className="mt-1 text-xs text-slate-500">
             {provider.ready
-              ? connected ? `${shop?.shopName || shop?.shopId} · ${shop?.status}` : (L ? "Sẵn sàng kết nối" : "Ready to connect")
-              : (L ? "Sắp hỗ trợ" : "Coming soon")}
+              ? connected ? `${shop?.shopName || shop?.shopId} · ${shop?.status}` : (legacyTextByFlag(L, "85b59c66b347"))
+              : (legacyTextByFlag(L, "7d8362626964"))}
           </div>
         </div>
         <Badge value={provider.ready ? (connected ? "connected" : "available") : "soon"} />
@@ -301,15 +300,15 @@ function ProviderCard({ provider, shop, L }: { provider: (typeof PROVIDERS)[numb
               "use server";
               await disconnectShopeeShop(shop.id);
             }}>
-              <button className="h-11 w-full rounded-lg border border-border px-3 text-xs font-bold hover:bg-surface-2">{L ? "Ngắt kết nối" : "Disconnect"}</button>
+              <button className="h-11 w-full rounded-lg border border-border px-3 text-xs font-bold hover:bg-surface-2">{legacyTextByFlag(L, "78dd8a5562e5")}</button>
             </form>
           ) : (
             <Link href="/api/shopee/connect" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-xs font-bold text-white hover:brightness-110">
-              <ExternalLink className="h-3.5 w-3.5" /> {L ? "Kết nối" : "Connect"}
+              <ExternalLink className="h-3.5 w-3.5" /> {legacyTextByFlag(L, "3ff549165767")}
             </Link>
           )
         ) : (
-          <button disabled className="h-11 w-full rounded-lg border border-border px-3 text-xs font-bold text-slate-400">{L ? "Sắp ra mắt" : "Coming soon"}</button>
+          <button disabled className="h-11 w-full rounded-lg border border-border px-3 text-xs font-bold text-slate-400">{legacyTextByFlag(L, "f4895efd37b3")}</button>
         )}
       </div>
     </div>
@@ -321,8 +320,8 @@ function ListingsSection({ data, L, tab }: { data: Awaited<ReturnType<typeof get
     <section className="rounded-card border border-border bg-surface">
       <div className="flex flex-col gap-3 border-b border-border-soft px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-sm font-extrabold">{L ? "Listing sản phẩm" : "Product listings"}</h2>
-          <p className="text-xs text-slate-500">{L ? "Listing đã lưu draft hoặc publish theo từng kênh bán online." : "Drafted or published listings per online sales channel."}</p>
+          <h2 className="text-sm font-extrabold">{legacyTextByFlag(L, "6ae9f768a649")}</h2>
+          <p className="text-xs text-slate-500">{legacyTextByFlag(L, "5bc1c75fa89d")}</p>
         </div>
         <OnlineSalesListingButton L={L} tab={tab === "overview" ? "overview" : "listings"} />
       </div>
@@ -341,35 +340,35 @@ function ListingsSection({ data, L, tab }: { data: Awaited<ReturnType<typeof get
               </div>
               <div className="text-xs text-slate-500">{row.sku}</div>
               <dl className="grid grid-cols-2 gap-2 text-xs">
-                <div><dt className="text-slate-500">{L ? "Kênh" : "Channel"}</dt><dd className="mt-0.5"><Badge value="Shopee" /></dd></div>
-                <div><dt className="text-slate-500">{L ? "Giá" : "Price"}</dt><dd className="mt-0.5 text-right font-semibold tabular-nums">{row.price ? formatCurrency(Number(row.price)) : "—"}</dd></div>
-                <div><dt className="text-slate-500">{L ? "Tồn" : "Stock"}</dt><dd className="mt-0.5 tabular-nums">{row.stock ? formatNumber(Number(row.stock)) : "—"}</dd></div>
-                <div><dt className="text-slate-500">{L ? "Mã sàn" : "Marketplace item"}</dt><dd className="mt-0.5 break-all font-mono">{row.externalItemId ?? "—"}</dd></div>
-                <div className="col-span-2"><dt className="text-slate-500">{L ? "Sync cuối" : "Last sync"}</dt><dd className="mt-0.5 break-words">{row.lastSyncAt ? formatDate(row.lastSyncAt) : row.lastError || "—"}</dd></div>
+                <div><dt className="text-slate-500">{legacyTextByFlag(L, "d59890269eb3")}</dt><dd className="mt-0.5"><Badge value="Shopee" /></dd></div>
+                <div><dt className="text-slate-500">{legacyTextByFlag(L, "fcf865a68ac5")}</dt><dd className="mt-0.5 text-right font-semibold tabular-nums">{row.price ? formatCurrency(Number(row.price)) : "—"}</dd></div>
+                <div><dt className="text-slate-500">{legacyTextByFlag(L, "75dc5449a256")}</dt><dd className="mt-0.5 tabular-nums">{row.stock ? formatNumber(Number(row.stock)) : "—"}</dd></div>
+                <div><dt className="text-slate-500">{legacyTextByFlag(L, "13053e86f1ba")}</dt><dd className="mt-0.5 break-all font-mono">{row.externalItemId ?? "—"}</dd></div>
+                <div className="col-span-2"><dt className="text-slate-500">{legacyTextByFlag(L, "1117ac6b3218")}</dt><dd className="mt-0.5 break-words">{row.lastSyncAt ? formatDate(row.lastSyncAt) : row.lastError || "—"}</dd></div>
               </dl>
             </article>
           ))}
         </div>
       )}
       {data.mappings.length === 0 && (
-        <p className="px-4 py-10 text-center text-sm text-slate-400 lg:hidden">{L ? "Chưa có listing online." : "No online listings yet."}</p>
+        <p className="px-4 py-10 text-center text-sm text-slate-400 lg:hidden">{legacyTextByFlag(L, "a286e9fdfb2e")}</p>
       )}
       <div className="hidden overflow-x-auto lg:block">
         <table className="w-full min-w-[900px] text-sm">
           <thead className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-4 py-3">{L ? "Sản phẩm" : "Product"}</th>
-              <th className="px-4 py-3">{L ? "Kênh" : "Channel"}</th>
-              <th className="px-4 py-3">{L ? "Trạng thái" : "Status"}</th>
-              <th className="px-4 py-3 text-right">{L ? "Giá" : "Price"}</th>
-              <th className="px-4 py-3 text-right">{L ? "Tồn" : "Stock"}</th>
-              <th className="px-4 py-3">{L ? "Mã sàn" : "Marketplace item"}</th>
-              <th className="px-4 py-3">{L ? "Sync cuối" : "Last sync"}</th>
+              <th className="px-4 py-3">{legacyTextByFlag(L, "67403942504d")}</th>
+              <th className="px-4 py-3">{legacyTextByFlag(L, "d59890269eb3")}</th>
+              <th className="px-4 py-3">{legacyTextByFlag(L, "81a5b063f527")}</th>
+              <th className="px-4 py-3 text-right">{legacyTextByFlag(L, "fcf865a68ac5")}</th>
+              <th className="px-4 py-3 text-right">{legacyTextByFlag(L, "75dc5449a256")}</th>
+              <th className="px-4 py-3">{legacyTextByFlag(L, "13053e86f1ba")}</th>
+              <th className="px-4 py-3">{legacyTextByFlag(L, "1117ac6b3218")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border-soft">
             {data.mappings.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-400">{L ? "Chưa có listing online." : "No online listings yet."}</td></tr>
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-400">{legacyTextByFlag(L, "a286e9fdfb2e")}</td></tr>
             ) : data.mappings.map((row) => (
               <tr key={row.id}>
                 <td className="px-4 py-3">
@@ -396,13 +395,13 @@ function OnlineOrdersSection({ rows, L }: { rows: Awaited<ReturnType<typeof getS
     <section className="rounded-card border border-border bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-soft px-4 py-3">
         <div>
-          <h2 className="text-sm font-extrabold">{L ? "Đơn online tập trung" : "Centralized online orders"}</h2>
+          <h2 className="text-sm font-extrabold">{legacyTextByFlag(L, "68f38f3ae6c9")}</h2>
           <p className="text-xs text-slate-500">
-            {L ? "Đơn Shopee được map về đơn LumaPOS để xử lý chung với POS." : "Shopee orders map into LumaPOS orders for a shared handling flow."}
+            {legacyTextByFlag(L, "759346ac02cd")}
           </p>
         </div>
         <Link href={`${Routes.Sales}?tab=orders&source=shopee`} className="inline-flex h-11 items-center rounded-lg border border-border px-3 text-xs font-bold hover:bg-surface-2">
-          {L ? "Xem trong Đơn hàng" : "View in Orders"}
+          {legacyTextByFlag(L, "f04690c8d203")}
         </Link>
       </div>
       {rows.length > 0 && (
@@ -418,7 +417,7 @@ function OnlineOrdersSection({ rows, L }: { rows: Awaited<ReturnType<typeof getS
               </div>
               <div className="flex items-end justify-between gap-3">
                 <div>
-                  <div className="text-xs text-slate-500">{L ? "Đơn Luma" : "Luma order"}</div>
+                  <div className="text-xs text-slate-500">{legacyTextByFlag(L, "ed786b9af2fe")}</div>
                   {row.orderId && row.orderCode ? (
                     <OrderDetailLink orderId={row.orderId} className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
                       {row.orderCode}
@@ -435,23 +434,23 @@ function OnlineOrdersSection({ rows, L }: { rows: Awaited<ReturnType<typeof getS
         </div>
       )}
       {rows.length === 0 && (
-        <p className="px-4 py-10 text-center text-sm text-slate-400 lg:hidden">{L ? "Chưa có đơn online." : "No online orders yet."}</p>
+        <p className="px-4 py-10 text-center text-sm text-slate-400 lg:hidden">{legacyTextByFlag(L, "93a4d6d0e7c7")}</p>
       )}
       <div className="hidden overflow-x-auto lg:block">
         <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-4 py-3">{L ? "Mã đơn sàn" : "Marketplace order"}</th>
-              <th className="px-4 py-3">{L ? "Đơn Luma" : "Luma order"}</th>
-              <th className="px-4 py-3">{L ? "Khách hàng" : "Customer"}</th>
-              <th className="px-4 py-3">{L ? "Trạng thái" : "Status"}</th>
-              <th className="px-4 py-3 text-right">{L ? "Tổng tiền" : "Total"}</th>
-              <th className="px-4 py-3">{L ? "Import lúc" : "Imported"}</th>
+              <th className="px-4 py-3">{legacyTextByFlag(L, "669b1519f34c")}</th>
+              <th className="px-4 py-3">{legacyTextByFlag(L, "ed786b9af2fe")}</th>
+              <th className="px-4 py-3">{legacyTextByFlag(L, "3b5afa5c941a")}</th>
+              <th className="px-4 py-3">{legacyTextByFlag(L, "81a5b063f527")}</th>
+              <th className="px-4 py-3 text-right">{legacyTextByFlag(L, "d213bb0e14cc")}</th>
+              <th className="px-4 py-3">{legacyTextByFlag(L, "7e926945e5a4")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border-soft">
             {rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-400">{L ? "Chưa có đơn online." : "No online orders yet."}</td></tr>
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-400">{legacyTextByFlag(L, "93a4d6d0e7c7")}</td></tr>
             ) : rows.map((row) => (
               <tr key={row.id}>
                 <td className="px-4 py-3 font-mono text-xs">{row.externalOrderSn}</td>
@@ -474,7 +473,7 @@ function OnlineOrdersSection({ rows, L }: { rows: Awaited<ReturnType<typeof getS
 function InboxSection({ threads, L }: { threads: Awaited<ReturnType<typeof getShopeeInbox>>["threads"]; L: boolean }) {
   return threads.length === 0 ? (
     <section className="rounded-card border border-dashed border-border bg-surface px-6 py-14 text-center text-sm text-slate-400">
-      {L ? "Chưa có hội thoại online." : "No online conversations yet."}
+      {legacyTextByFlag(L, "6c41e4eeeed7")}
     </section>
   ) : (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -484,7 +483,7 @@ function InboxSection({ threads, L }: { threads: Awaited<ReturnType<typeof getSh
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="truncate text-sm font-extrabold">{thread.buyerName || thread.externalThreadId}</h2>
-                <p className="truncate text-xs text-slate-500">Shopee · <PartnerDetailLink kind="customer" partnerId={thread.customerId} name={thread.customerName || (L ? "Chưa liên kết khách hàng" : "No linked customer")} />{thread.orderCode ? ` · ${thread.orderCode}` : ""}</p>
+                <p className="truncate text-xs text-slate-500">Shopee · <PartnerDetailLink kind="customer" partnerId={thread.customerId} name={thread.customerName || (legacyTextByFlag(L, "0d79442a277a"))} />{thread.orderCode ? ` · ${thread.orderCode}` : ""}</p>
               </div>
               <Badge value={thread.status} />
             </div>
@@ -503,9 +502,9 @@ function InboxSection({ threads, L }: { threads: Awaited<ReturnType<typeof getSh
             "use server";
             await sendMarketplaceMessage({ threadId: thread.id, body: String(formData.get("body") ?? "") });
           }} className="flex gap-2 border-t border-border-soft px-4 py-3">
-            <input name="body" className="flex-1 rounded-lg border border-border bg-canvas px-3 py-2 text-sm outline-none focus:border-primary-500 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" placeholder={L ? "Nhập phản hồi..." : "Type a reply..."} />
+            <input name="body" className="flex-1 rounded-lg border border-border bg-canvas px-3 py-2 text-sm outline-none focus:border-primary-500 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" placeholder={legacyTextByFlag(L, "18840625afe9")} />
             <button className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
-              <Send className="h-4 w-4" /> {L ? "Gửi" : "Send"}
+              <Send className="h-4 w-4" /> {legacyTextByFlag(L, "e9c6acb3db1b")}
             </button>
           </form>
         </section>
@@ -519,11 +518,11 @@ function SyncSection({ jobs, L }: { jobs: Awaited<ReturnType<typeof getShopeeDas
     <section className="rounded-card border border-border bg-surface">
       <div className="flex items-center gap-2 border-b border-border-soft px-4 py-3">
         <RefreshCw className="h-4 w-4 text-primary-600" />
-        <h2 className="text-sm font-extrabold">{L ? "Sync logs" : "Sync logs"}</h2>
+        <h2 className="text-sm font-extrabold">{legacyTextByFlag(L, "8dc1bf0c9bd7")}</h2>
       </div>
       <div className="divide-y divide-border-soft">
         {jobs.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-slate-400">{L ? "Chưa có job đồng bộ." : "No sync jobs yet."}</div>
+          <div className="px-4 py-8 text-center text-sm text-slate-400">{legacyTextByFlag(L, "b0c4adf5040a")}</div>
         ) : jobs.map((job) => (
           <div key={job.id} className="grid grid-cols-1 gap-2 px-4 py-3 text-sm md:grid-cols-[100px_180px_120px_1fr_160px]">
             <span className="font-semibold">Shopee</span>

@@ -106,7 +106,7 @@ export function ServiceRequestForm({
         />
         <Button type="button" variant="outline" className="mt-1 w-full justify-start" onClick={() => fileRef.current?.click()}>
           <span className="min-w-0 truncate" title={fileNames.length ? fileNames.join(", ") : undefined}>
-            {fileNames.length ? fileNames.join(", ") : locale.startsWith("vi") ? "Chọn ảnh" : "Choose images"}
+            {fileNames.length ? fileNames.join(", ") : t("chooseImages")}
           </span>
         </Button>
       </div>

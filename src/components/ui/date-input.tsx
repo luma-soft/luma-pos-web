@@ -1,4 +1,5 @@
 "use client";
+import { legacyTextByFlag } from "@/lib/i18n/catalog-text";
 
 import * as React from "react";
 import { createPortal } from "react-dom";
@@ -50,11 +51,11 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
     const triggerRef = React.useRef<HTMLButtonElement>(null);
     const popupId = React.useId();
     const dateTime = type === "datetime-local";
-    const chooseLabel = vi ? "Chọn ngày" : "Choose date";
+    const chooseLabel = legacyTextByFlag(vi, "ad7236a9559f");
     React.useImperativeHandle(forwardedRef, () => inputRef.current!, []);
 
     React.useEffect(() => {
-      validationRef.current?.setCustomValidity(readOnly || isDateInputValueValid(committedValue, type, min, max) ? "" : vi ? "Ngày hoặc giờ không hợp lệ." : "Enter a valid date and time.");
+      validationRef.current?.setCustomValidity(readOnly || isDateInputValueValid(committedValue, type, min, max) ? "" : legacyTextByFlag(vi, "84eec5799fdb"));
     }, [committedValue, type, min, max, readOnly, vi]);
 
     React.useEffect(() => {
@@ -156,14 +157,14 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
             if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
           }}>
             <label className="mb-2 block text-xs font-medium">
-              {dateTime ? (vi ? "Ngày và giờ" : "Date and time") : (vi ? "Ngày" : "Date")}
+              {dateTime ? (legacyTextByFlag(vi, "8698d9e5abb9")) : (legacyTextByFlag(vi, "69790dda07ce"))}
               <input type="text" value={draft} aria-invalid={!validDraft} placeholder={dateTime ? "YYYY-MM-DDTHH:mm" : "YYYY-MM-DD"} className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-primary-600" onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (validDraft) { change(draft); close(); } } }} />
             </label>
-            {!validDraft && <p className="mb-2 text-xs text-red-600">{vi ? "Ngày hoặc giờ không hợp lệ." : "Enter a valid date and time."}</p>}
+            {!validDraft && <p className="mb-2 text-xs text-red-600">{legacyTextByFlag(vi, "84eec5799fdb")}</p>}
             <div className="mb-2 flex items-center justify-between">
-              <button type="button" className={buttonStyle} aria-label={vi ? "Tháng trước" : "Previous month"} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}><ChevronLeft className="size-4" /></button>
+              <button type="button" className={buttonStyle} aria-label={legacyTextByFlag(vi, "c89cb47c4a30")} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}><ChevronLeft className="size-4" /></button>
               <span className="text-sm font-semibold" aria-live="polite">{new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(month)}</span>
-              <button type="button" className={buttonStyle} aria-label={vi ? "Tháng sau" : "Next month"} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}><ChevronRight className="size-4" /></button>
+              <button type="button" className={buttonStyle} aria-label={legacyTextByFlag(vi, "8d5d6dafe0af")} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}><ChevronRight className="size-4" /></button>
             </div>
             <div className="grid grid-cols-7" role="grid" aria-label={chooseLabel}>
               {(vi ? ["T2", "T3", "T4", "T5", "T6", "T7", "CN"] : ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]).map((day) => <span key={day} className="py-2 text-center text-xs text-slate-500">{day}</span>)}
@@ -184,15 +185,15 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
               })}
             </div>
             {dateTime && <label className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3 text-sm font-medium">
-              {vi ? "Giờ (HH:mm)" : "Time (HH:mm)"}
-              <input type="text" inputMode="numeric" aria-label={vi ? "Giờ" : "Time"} placeholder="HH:mm" defaultValue={time} key={time} maxLength={5} pattern="[0-2][0-9]:[0-5][0-9]" className="h-11 w-24 rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary-600" onBlur={(event) => {
+              {legacyTextByFlag(vi, "b748baae9f10")}
+              <input type="text" inputMode="numeric" aria-label={legacyTextByFlag(vi, "6013a84b2bcb")} placeholder="HH:mm" defaultValue={time} key={time} maxLength={5} pattern="[0-2][0-9]:[0-5][0-9]" className="h-11 w-24 rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary-600" onBlur={(event) => {
                 if (/^([01]\d|2[0-3]):[0-5]\d$/.test(event.target.value)) setDraft(`${draft.slice(0, 10) || isoDay(new Date())}T${event.target.value}`);
                 else event.target.value = time;
               }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} />
             </label>}
             <div className="mt-3 flex justify-between gap-2 border-t border-border pt-2">
-              <button type="button" disabled={required} className="min-h-11 rounded-lg px-3 text-sm text-slate-600 hover:bg-surface-2 disabled:opacity-50" onClick={() => { change(""); close(); }}>{vi ? "Xóa" : "Clear"}</button>
-              <button type="button" disabled={!validDraft} className="min-h-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50" onClick={() => { change(draft); close(); }}>{vi ? "Áp dụng" : "Apply"}</button>
+              <button type="button" disabled={required} className="min-h-11 rounded-lg px-3 text-sm text-slate-600 hover:bg-surface-2 disabled:opacity-50" onClick={() => { change(""); close(); }}>{legacyTextByFlag(vi, "0462d45bf155")}</button>
+              <button type="button" disabled={!validDraft} className="min-h-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50" onClick={() => { change(draft); close(); }}>{legacyTextByFlag(vi, "7b131edeebbd")}</button>
             </div>
           </div>, document.body,
         )}

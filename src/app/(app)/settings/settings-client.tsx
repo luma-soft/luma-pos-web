@@ -18,6 +18,7 @@ import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { cn, formatCurrency } from "@/lib/utils";
 import { normalizeSearch } from "@/lib/normalize";
+import { settingsTextByFlag } from "@/lib/i18n/settings-text";
 import { useAppDataQuery } from "@/components/use-app-data-query";
 import {
   deletePaymentBankAccount,
@@ -76,36 +77,35 @@ import {
 import { applyDirectTaxPreset, DIRECT_TAX_PRESETS, DIRECT_TAX_REDUCTION_PERCENT } from "@/lib/tax/direct-tax";
 
 /* ── sample data (design preview — chưa nối backend) ── */
-const ROLE_LABELS: Record<string, [string, string]> = {
-  owner: ["Owner", "Chủ cửa hàng"], manager: ["Manager", "Quản lý"],
-  cashier: ["Cashier", "Thu ngân"], stock: ["Stock-keeper", "Thủ kho"], accountant: ["Accountant", "Kế toán"],
+const ROLE_LABELS: Record<string, string> = {
+  owner: "owner", manager: "manager", cashier: "cashier", stock: "stock", accountant: "accountant",
 };
-const PERMS: { en: string; vi: string; roles: Record<string, boolean> }[] = [
-  { en: "Process sales", vi: "Thực hiện bán hàng", roles: { owner: true, manager: true, cashier: true, stock: false, accountant: false } },
-  { en: "Apply discount", vi: "Áp dụng giảm giá", roles: { owner: true, manager: true, cashier: true, stock: false, accountant: false } },
-  { en: "Price override", vi: "Ghi đè giá bán", roles: { owner: true, manager: true, cashier: false, stock: false, accountant: false } },
-  { en: "Process refund", vi: "Thực hiện hoàn tiền", roles: { owner: true, manager: true, cashier: false, stock: false, accountant: false } },
-  { en: "Void / delete invoice", vi: "Hủy hóa đơn", roles: { owner: true, manager: true, cashier: false, stock: false, accountant: false } },
-  { en: "Add / edit products", vi: "Thêm / sửa sản phẩm", roles: { owner: true, manager: true, cashier: false, stock: true, accountant: false } },
-  { en: "Stock inbound", vi: "Nhập kho", roles: { owner: true, manager: true, cashier: false, stock: true, accountant: false } },
-  { en: "View reports", vi: "Xem báo cáo", roles: { owner: true, manager: true, cashier: false, stock: false, accountant: true } },
-  { en: "Settings access", vi: "Truy cập cài đặt", roles: { owner: true, manager: false, cashier: false, stock: false, accountant: false } },
+const PERMS: { key: string; roles: Record<string, boolean> }[] = [
+  { key: "processSales", roles: { owner: true, manager: true, cashier: true, stock: false, accountant: false } },
+  { key: "applyDiscount", roles: { owner: true, manager: true, cashier: true, stock: false, accountant: false } },
+  { key: "priceOverride", roles: { owner: true, manager: true, cashier: false, stock: false, accountant: false } },
+  { key: "processRefund", roles: { owner: true, manager: true, cashier: false, stock: false, accountant: false } },
+  { key: "voidDeleteInvoice", roles: { owner: true, manager: true, cashier: false, stock: false, accountant: false } },
+  { key: "editProducts", roles: { owner: true, manager: true, cashier: false, stock: true, accountant: false } },
+  { key: "stockInbound", roles: { owner: true, manager: true, cashier: false, stock: true, accountant: false } },
+  { key: "viewReports", roles: { owner: true, manager: true, cashier: false, stock: false, accountant: true } },
+  { key: "settingsAccess", roles: { owner: true, manager: false, cashier: false, stock: false, accountant: false } },
 ];
 const DEVICES = [
-  { ico: "🖨️", name: "XPrinter XP-N260L", en: "Thermal Printer 80mm", vi: "Máy in nhiệt 80mm", status: "connected", detail: "USB · COM3" },
-  { ico: "📷", name: "Honeywell Voyager 1250g", en: "Barcode Scanner", vi: "Máy quét mã vạch", status: "connected", detail: "USB HID · Wedge" },
-  { ico: "🗃️", name: "APG Vasario 1416", en: "Cash Drawer", vi: "Ngăn kéo tiền", status: "connected", detail: "Triggered via printer" },
-  { ico: "⚖️", name: "CAS SW-1S", en: "Weighing Scale", vi: "Cân điện tử", status: "disconnected", detail: "COM4 · not responding" },
-  { ico: "💳", name: "POS terminal / SoftPOS", en: "Card Reader / mPOS", vi: "Đầu đọc thẻ", status: "unconfigured", detail: "Configure in Payments" },
+  { ico: "🖨️", name: "XPrinter XP-N260L", labelKey: "thermalPrinter", status: "connected", detail: "USB · COM3" },
+  { ico: "📷", name: "Honeywell Voyager 1250g", labelKey: "barcodeScanner", status: "connected", detail: "USB HID · Wedge" },
+  { ico: "🗃️", name: "APG Vasario 1416", labelKey: "cashDrawer", status: "connected", detail: "Triggered via printer" },
+  { ico: "⚖️", name: "CAS SW-1S", labelKey: "weighingScale", status: "disconnected", detail: "COM4 · not responding" },
+  { ico: "💳", name: "POS terminal / SoftPOS", labelKey: "cardReader", status: "unconfigured", detail: "Configure in Payments" },
 ];
 const PAYMENTS = [
-  { ico: "💵", name: "Cash", vi: "Tiền mặt", id: "cash", enabled: true, color: "#15803D", note: "Always available · change calc built-in" },
-  { ico: "📱", name: "VietQR / Napas", vi: "VietQR", id: "qr", enabled: true, color: "#1D4ED8", note: "Dynamic QR · auto-confirm · Napas" },
-  { ico: "🟣", name: "MoMo", vi: "Ví MoMo", id: "momo", enabled: true, color: "#A50064", note: "Deep-link + webhook · timeout 90s" },
-  { ico: "🔵", name: "ZaloPay", vi: "Ví ZaloPay", id: "zalopay", enabled: false, color: "#006AFF", note: "Not yet configured — tap to set up" },
-  { ico: "🔴", name: "VNPay", vi: "VNPay", id: "vnpay", enabled: false, color: "#CC0000", note: "Not yet configured — tap to set up" },
-  { ico: "💳", name: "Card / SoftPOS", vi: "Thẻ / mPOS", id: "card", enabled: false, color: "#374151", note: "Connect card reader in Hardware first" },
-  { ico: "🧾", name: "Customer credit", vi: "Công nợ", id: "credit", enabled: true, color: "#B45309", note: "Saved customer required · server-owned debt" },
+  { ico: "💵", labelKey: "cash", id: "cash", enabled: true, color: "#15803D", note: "Always available · change calc built-in" },
+  { ico: "📱", labelKey: "qr", id: "qr", enabled: true, color: "#1D4ED8", note: "Dynamic QR · auto-confirm · Napas" },
+  { ico: "🟣", labelKey: "momo", id: "momo", enabled: true, color: "#A50064", note: "Deep-link + webhook · timeout 90s" },
+  { ico: "🔵", labelKey: "zalopay", id: "zalopay", enabled: false, color: "#006AFF", note: "Not yet configured — tap to set up" },
+  { ico: "🔴", labelKey: "vnpay", id: "vnpay", enabled: false, color: "#CC0000", note: "Not yet configured — tap to set up" },
+  { ico: "💳", labelKey: "card", id: "card", enabled: false, color: "#374151", note: "Connect card reader in Hardware first" },
+  { ico: "🧾", labelKey: "credit", id: "credit", enabled: true, color: "#B45309", note: "Saved customer required · server-owned debt" },
 ];
 const VIETQR_BANKS = [
   { code: "ICB", bin: "970415", shortName: "VietinBank", name: "Ngân hàng TMCP Công thương Việt Nam", logo: "https://api.vietqr.io/img/ICB.png", aliases: [] },
@@ -134,10 +134,10 @@ const VIETQR_BANKS = [
 ] as const;
 type VietQrBank = (typeof VIETQR_BANKS)[number];
 const VAT_RATES = [
-  { rate: 0, en: "0% rate", vi: "Thuế suất 0%", itemsEn: "Distinct from exempt or not subject to VAT", itemsVi: "Khác với không chịu thuế hoặc không kê khai" },
-  { rate: 5, en: "5% rate", vi: "Thuế suất 5%", itemsEn: "Apply only to eligible goods and services", itemsVi: "Chỉ áp dụng cho hàng hóa, dịch vụ đủ điều kiện" },
-  { rate: 8, en: "8% reduced rate", vi: "Thuế suất giảm 8%", itemsEn: "Temporary reduction where legally eligible", itemsVi: "Mức giảm có thời hạn, chỉ áp dụng khi đủ điều kiện" },
-  { rate: 10, en: "10% standard rate", vi: "Thuế suất chuẩn 10%", itemsEn: "Standard taxable goods and services", itemsVi: "Hàng hóa, dịch vụ chịu thuế suất chuẩn" },
+  { rate: 0 },
+  { rate: 5 },
+  { rate: 8 },
+  { rate: 10 },
 ];
 const AI_PROVIDER_OPTIONS = AI_PROVIDERS.map((value) => ({
   value,
@@ -213,76 +213,70 @@ function defaultVisionModelForProvider(provider: AiProvider): AiVisionModel {
   return "gpt-4.1-mini";
 }
 function providerKeyPlaceholder(provider: AiProvider, keySet: boolean, L: boolean) {
-  if (keySet) return L ? "Nhập key mới để thay thế" : "Enter a new key to replace";
+  if (keySet) return settingsTextByFlag(L, "legacy.01c9fa6b03ac");
   if (provider === "gemini") return "AIza...";
   if (provider === "openai") return "sk-...";
   return "sk-... or DeepSeek key";
 }
 function providerKeyHelp(provider: AiProvider, L: boolean) {
   if (provider === "gemini") {
-    return L
-      ? "Tạo key trong Google AI Studio, rồi lưu tại đây. Server sẽ dùng key này cho chat và OCR/ảnh."
-      : "Create a key in Google AI Studio, then save it here. The server uses this key for chat and vision/OCR.";
+    return settingsTextByFlag(L, "legacy.3b38bbf86122");
   }
   if (provider === "deepseek") {
-    return L
-      ? "DeepSeek chỉ dùng cho lập kế hoạch text; OCR/ảnh sẽ không khả dụng."
-      : "DeepSeek is text-planning only; vision/OCR is unavailable.";
+    return settingsTextByFlag(L, "legacy.bfdf4f758afa");
   }
-  return L
-    ? "Dùng OpenAI API key cho text và OCR/ảnh."
-    : "Use an OpenAI API key for text and vision/OCR.";
+  return settingsTextByFlag(L, "legacy.d1145a562bef");
 }
 function formatAiTestMessage(message: string, L: boolean) {
-  const map: Record<string, [string, string]> = {
-    missing_api_key: ["Missing API key.", "Thiếu API key."],
-    unsupported_vision: ["This provider does not support vision/OCR.", "Provider này không hỗ trợ vision/OCR."],
-    unsupported_text_planning: ["This provider does not support text planning.", "Provider này không hỗ trợ lập kế hoạch text."],
+  const map: Record<string, string> = {
+    missing_api_key: "missingApiKey",
+    unsupported_vision: "unsupportedVision",
+    unsupported_text_planning: "unsupportedTextPlanning",
   };
-  return map[message] ? (L ? map[message][1] : map[message][0]) : message;
+  return map[message] ? settingsTextByFlag(L, `ui.aiTest.${map[message]}`) : message;
 }
 
 type SectionId = "store" | "staff" | "pos" | "cameraQuote" | "hardware" | "payments" | "print" | "promotions" | "tax" | "notifications" | "zalo" | "shopee" | "ai";
 
-const NAV: { group: [string, string]; items: { id: SectionId; ico: string; en: string; vi: string; badge?: string }[] }[] = [
-  { group: ["Store", "Cửa hàng"], items: [
-    { id: "store", ico: "🏪", en: "Store Profile", vi: "Thông tin cửa hàng" },
-    { id: "staff", ico: "👤", en: "Staff & RBAC", vi: "Nhân viên & Phân quyền" },
+const NAV: { groupKey: string; items: { id: SectionId; ico: string; labelKey: string; badge?: string }[] }[] = [
+  { groupKey: "store", items: [
+    { id: "store", ico: "🏪", labelKey: "store" },
+    { id: "staff", ico: "👤", labelKey: "staff" },
   ] },
-  { group: ["Operations", "Vận hành"], items: [
-    { id: "pos", ico: "🛒", en: "POS Page", vi: "Trang bán hàng POS" },
-    { id: "cameraQuote", ico: "📷", en: "Camera Quotes", vi: "Báo giá camera" },
-    { id: "hardware", ico: "🖨️", en: "Hardware", vi: "Thiết bị phần cứng" },
-    { id: "payments", ico: "💳", en: "Payments", vi: "Thanh toán" },
-    { id: "print", ico: "📄", en: "Print Templates", vi: "Mẫu in", badge: "15.1" },
-    { id: "promotions", ico: "%", en: "Promotions", vi: "Khuyến mãi" },
+  { groupKey: "operations", items: [
+    { id: "pos", ico: "🛒", labelKey: "pos" },
+    { id: "cameraQuote", ico: "📷", labelKey: "cameraQuote" },
+    { id: "hardware", ico: "🖨️", labelKey: "hardware" },
+    { id: "payments", ico: "💳", labelKey: "payments" },
+    { id: "print", ico: "📄", labelKey: "print", badge: "15.1" },
+    { id: "promotions", ico: "%", labelKey: "promotions" },
   ] },
-  { group: ["Compliance", "Tuân thủ"], items: [
-    { id: "tax", ico: "📋", en: "Tax & E-Invoice", vi: "Thuế & HĐ điện tử" },
+  { groupKey: "compliance", items: [
+    { id: "tax", ico: "📋", labelKey: "tax" },
   ] },
-  { group: ["System", "Hệ thống"], items: [
-    { id: "notifications", ico: "🔔", en: "Notifications", vi: "Thông báo" },
-    { id: "zalo", ico: "💬", en: "Zalo OA", vi: "Zalo OA" },
+  { groupKey: "system", items: [
+    { id: "notifications", ico: "🔔", labelKey: "notifications" },
+    { id: "zalo", ico: "💬", labelKey: "zalo" },
     ...(ONLINE_SALES_ENABLED
-      ? [{ id: "shopee" as const, ico: "🧩", en: "Marketplace Apps", vi: "App sàn TMĐT" }]
+      ? [{ id: "shopee" as const, ico: "🧩", labelKey: "shopee" }]
       : []),
-    { id: "ai", ico: "✨", en: "AI", vi: "AI" },
+    { id: "ai", ico: "✨", labelKey: "ai" },
   ] },
 ];
-const SEC_META: Record<SectionId, { en: string; vi: string; subEn: string; subVi: string }> = {
-  store: { en: "Store Profile", vi: "Thông tin cửa hàng", subEn: "Business identity, currency & locale", subVi: "Thông tin doanh nghiệp, tiền tệ & ngôn ngữ" },
-  staff: { en: "Staff & RBAC", vi: "Nhân viên & Phân quyền", subEn: "Members and role-based access control", subVi: "Nhân viên và phân quyền theo vai trò" },
-  pos: { en: "POS Page", vi: "Trang bán hàng POS", subEn: "Show or hide optional selling controls", subVi: "Ẩn/hiện các trường tùy chọn khi bán hàng" },
-  cameraQuote: { en: "Camera Quotes", vi: "Báo giá camera", subEn: "Default camera, memory card, material, and installation prices", subVi: "Giá mặc định camera, thẻ nhớ, vật tư và công lắp đặt" },
-  hardware: { en: "Hardware Devices", vi: "Thiết bị phần cứng", subEn: "Printer, scanner, drawer, scale, reader", subVi: "Máy in, quét mã, ngăn kéo, cân, đọc thẻ" },
-  payments: { en: "Payment Methods", vi: "Phương thức thanh toán", subEn: "Vietnamese payment ecosystem", subVi: "Hệ sinh thái thanh toán Việt Nam" },
-  print: { en: "Print Templates", vi: "Mẫu in", subEn: "Receipt & document template designer", subVi: "Thiết kế mẫu hóa đơn & chứng từ" },
-  promotions: { en: "Promotions", vi: "Khuyến mãi", subEn: "Quantity-based product promotions", subVi: "Khuyến mãi sản phẩm theo bậc số lượng" },
-  tax: { en: "Tax & E-Invoice", vi: "Thuế & Hóa đơn điện tử", subEn: "VAT rates + Decree 70/2025 e-invoice", subVi: "Thuế GTGT + HĐĐT theo Nghị định 70/2025" },
-  notifications: { en: "Notifications", vi: "Thông báo", subEn: "Alert types and channels", subVi: "Loại thông báo và kênh gửi" },
-  zalo: { en: "Zalo OA", vi: "Zalo OA", subEn: "Official Account and ZNS templates", subVi: "Official Account và template ZNS" },
-  shopee: { en: "Marketplace Developer Apps", vi: "App developer sàn TMĐT", subEn: "Provider credentials and OAuth callbacks", subVi: "Credential provider và OAuth callback" },
-  ai: { en: "AI Settings", vi: "Cấu hình AI", subEn: "Provider key, vision model, and attachment bucket", subVi: "API key, model vision và bucket lưu file AI" },
+const SEC_META: Record<SectionId, { titleKey: string; subtitleKey: string }> = {
+  store: { titleKey: "store", subtitleKey: "store" },
+  staff: { titleKey: "staff", subtitleKey: "staff" },
+  pos: { titleKey: "pos", subtitleKey: "pos" },
+  cameraQuote: { titleKey: "cameraQuote", subtitleKey: "cameraQuote" },
+  hardware: { titleKey: "hardware", subtitleKey: "hardware" },
+  payments: { titleKey: "payments", subtitleKey: "payments" },
+  print: { titleKey: "print", subtitleKey: "print" },
+  promotions: { titleKey: "promotions", subtitleKey: "promotions" },
+  tax: { titleKey: "tax", subtitleKey: "tax" },
+  notifications: { titleKey: "notifications", subtitleKey: "notifications" },
+  zalo: { titleKey: "zalo", subtitleKey: "zalo" },
+  shopee: { titleKey: "shopee", subtitleKey: "shopee" },
+  ai: { titleKey: "ai", subtitleKey: "ai" },
 };
 
 function isVisibleSection(id: SectionId) {
@@ -371,18 +365,17 @@ export function SettingsClient({
     if (saved && SEC_META[saved] && isVisibleSection(saved)) setActive(saved);
   }, [normalizedInitialTab]);
   const pick = (id: SectionId) => { setActive(id); localStorage.setItem("lp-settings-active", id); };
-  const sec = SEC_META[active];
   return (
     <div className="flex h-dvh overflow-hidden">
       {/* settings nav */}
       <nav className="w-55 shrink-0 bg-surface border-r border-border overflow-y-auto hidden md:flex flex-col">
         <div className="px-4 py-3.5 border-b border-border">
-          <div className="text-sm font-extrabold">{L ? "Cài đặt" : "Settings"}</div>
-          <div className="text-[10px] italic text-slate-400 mt-0.5">{L ? "Cài đặt hệ thống" : "System settings"}</div>
+          <div className="text-sm font-extrabold">{settingsTextByFlag(L, "legacy.55a9ce6867eb")}</div>
+          <div className="text-[10px] italic text-slate-400 mt-0.5">{settingsTextByFlag(L, "legacy.4511c97881b0")}</div>
         </div>
         {NAV.map((grp, gi) => (
           <div key={gi}>
-            <div className="px-3 pt-2.5 pb-1 text-[9px] font-bold uppercase tracking-[0.07em] text-slate-400">{L ? grp.group[1] : grp.group[0]}</div>
+            <div className="px-3 pt-2.5 pb-1 text-[9px] font-bold uppercase tracking-[0.07em] text-slate-400">{settingsTextByFlag(L, `ui.nav.groups.${grp.groupKey}`)}</div>
             {grp.items.map((it) => (
               <button
                 key={it.id}
@@ -395,7 +388,7 @@ export function SettingsClient({
                 )}
               >
                 <span className="w-4.5 text-center text-sm shrink-0">{it.ico}</span>
-                <span className="flex-1 text-left">{L ? it.vi : it.en}</span>
+                <span className="flex-1 text-left">{settingsTextByFlag(L, `ui.nav.items.${it.labelKey}`)}</span>
                 {it.badge && <span className="text-[8px] bg-in-soft text-in border border-in/30 rounded-full px-1.5 py-px">{it.badge}</span>}
               </button>
             ))}
@@ -407,14 +400,14 @@ export function SettingsClient({
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <MobileTopBar
           className="md:hidden"
-          title={L ? sec.vi : sec.en}
-          subtitle={L ? sec.subVi : sec.subEn}
+          title={settingsTextByFlag(L, `ui.sections.${active}.title`)}
+          subtitle={settingsTextByFlag(L, `ui.sections.${active}.subtitle`)}
           bottom={
             <Select
               value={active}
               onChange={(e) => pick(e.target.value as SectionId)}
-              options={NAV.flatMap((g) => g.items).map((it) => ({ value: it.id, label: L ? it.vi : it.en }))}
-              aria-label={L ? "Chọn mục cài đặt" : "Choose settings section"}
+              options={NAV.flatMap((g) => g.items).map((it) => ({ value: it.id, label: settingsTextByFlag(L, `ui.nav.items.${it.labelKey}`) }))}
+              aria-label={settingsTextByFlag(L, "legacy.21fca9114fb3")}
               className="min-h-11"
             />
           }
@@ -427,13 +420,13 @@ export function SettingsClient({
           <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.07em] text-primary-600">
             {tSettings("breadcrumb.settings")} · {tSettings(`breadcrumb.${active}`)}
           </div>
-          {active !== "payments" && active !== "tax" && <h1 className="text-xl font-extrabold tracking-tight">{L ? sec.vi : sec.en}</h1>}
+          {active !== "payments" && active !== "tax" && <h1 className="text-xl font-extrabold tracking-tight">{settingsTextByFlag(L, `ui.sections.${active}.title`)}</h1>}
         </div>
 
-        {active === "store" && <StoreSection L={L} locale={locale} store={store} canManage={canManage} />}
+        {active === "store" && <StoreSection L={L} store={store} canManage={canManage} />}
         {active === "staff" && (staff ? <StaffSection L={L} staff={staff} canManage={canManage} /> : <LazySectionState L={L} loading={Boolean(lazyLoading.staff)} error={lazyError.staff} />)}
         {active === "pos" && <PosSettingsSection L={L} prefs={store.prefs.pos} canManage={canManage} />}
-        {active === "cameraQuote" && <CameraQuoteSettingsSection L={L} prefs={store.prefs.cameraQuote} options={cameraQuoteOptions} canManage={canManage} />}
+        {active === "cameraQuote" && <CameraQuoteSettingsSection prefs={store.prefs.cameraQuote} options={cameraQuoteOptions} canManage={canManage} />}
         {active === "hardware" && <HardwareSection L={L} prefs={store.prefs.hardware} canManage={canManage} />}
         {active === "payments" && <PaymentsSection L={L} prefs={store.prefs.payments} canManage={canManage} bankAccounts={bankAccounts ?? []} accountsLoading={Boolean(lazyLoading.payments)} accountsError={lazyError.payments} />}
         {active === "print" && <PrintSection L={L} />}
@@ -451,27 +444,18 @@ export function SettingsClient({
 
 function LazySectionState({ L, loading, error }: { L: boolean; loading: boolean; error?: string }) {
   return (
-    <Card title={L ? "Đang tải dữ liệu" : "Loading data"} vi={L ? "Chỉ tải khi mở mục này" : "Loaded only when this section is opened"}>
+    <Card title={settingsTextByFlag(L, "legacy.3184a6c399d7")} vi={settingsTextByFlag(L, "legacy.62887f198996")}>
       <div className="flex items-center gap-2 px-4 py-6 text-sm text-slate-500">
         {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-        <span>{error ? (L ? "Không tải được dữ liệu. Vui lòng thử lại." : "Could not load data. Please try again.") : (L ? "Đang tải..." : "Loading...")}</span>
+        <span>{error ? (settingsTextByFlag(L, "legacy.5a6881c9222f")) : (settingsTextByFlag(L, "legacy.d4fa8a2f9d26"))}</span>
       </div>
     </Card>
   );
 }
 
-const INDUSTRY_OPTS = [
-  ["grocery", "Grocery / Mini-mart", "Tạp hóa / Siêu thị mini"], ["cafe", "Café", "Quán cà phê"],
-  ["restaurant", "Restaurant", "Nhà hàng"], ["fashion", "Fashion & Apparel", "Thời trang"],
-  ["electronics", "Electronics", "Điện tử / Điện máy"], ["cosmetics", "Cosmetics & Beauty", "Mỹ phẩm"],
-  ["books", "Books & Stationery", "Sách & VPP"], ["services", "Service Business", "Dịch vụ"],
-  ["petshop", "Pet Shop", "Thú cưng"], ["mobile", "Mobile & Gadgets", "Điện thoại & Phụ kiện"],
-  ["construction", "Construction Materials", "Vật liệu xây dựng"],
-] as const;
-const ROLE_TEXT: Record<string, [string, string]> = {
-  owner: ["Owner", "Chủ cửa hàng"], manager: ["Manager", "Quản lý"],
-  cashier: ["Cashier", "Thu ngân"], warehouse: ["Stock-keeper", "Thủ kho"],
-  technician: ["Technician", "Kỹ thuật viên"],
+const INDUSTRY_OPTS = ["grocery", "cafe", "restaurant", "fashion", "electronics", "cosmetics", "books", "services", "petshop", "mobile", "construction"] as const;
+const ROLE_TEXT: Record<string, string> = {
+  owner: "owner", manager: "manager", cashier: "cashier", warehouse: "warehouse", technician: "technician",
 };
 const ROLE_PILL: Record<string, string> = {
   owner: "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300",
@@ -479,43 +463,43 @@ const ROLE_PILL: Record<string, string> = {
 };
 const AVATAR_COLORS = ["#0C7B6B", "#1D4ED8", "#B45309", "#6B6F76", "#9CA0A8"];
 
-function StoreSection({ L, locale, store, canManage }: { L: boolean; locale: string; store: StoreSettings; canManage: boolean }) {
+function StoreSection({ L, store, canManage }: { L: boolean; store: StoreSettings; canManage: boolean }) {
   const [form, setForm] = useState(store);
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
   const set = <K extends keyof StoreSettings>(k: K, v: StoreSettings[K]) => { setForm((p) => ({ ...p, [k]: v })); setDirty(true); setSaved(false); };
-  const industryOpts = INDUSTRY_OPTS.map(([value, en, vi]) => ({ value, label: locale === "vi" ? vi : en }));
-  const currencyOpts = [{ value: "VND", label: "VND — Việt Nam Đồng (₫)" }, { value: "USD", label: "USD — US Dollar ($)" }];
+  const industryOpts = INDUSTRY_OPTS.map((value) => ({ value, label: settingsTextByFlag(L, `ui.industries.${value}`) }));
+  const currencyOpts = [{ value: "VND", label: settingsTextByFlag(L, "ui.currency.vnd") }, { value: "USD", label: settingsTextByFlag(L, "ui.currency.usd") }];
   function save() { start(async () => { const res = await updateStoreSettings(form); if (res.ok) { setDirty(false); setSaved(true); } }); }
   return (
-    <Card title={L ? "Thông tin cửa hàng" : "Store Profile"} vi={L ? "Store Profile" : "Thông tin cửa hàng"}>
+    <Card title={settingsTextByFlag(L, "legacy.0c4a17131dac")} vi={settingsTextByFlag(L, "legacy.2b5c7ad93928")}>
       <div className="p-4.5 flex flex-col gap-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1"><span className={FL}>{L ? "Tên cửa hàng" : "Store Name"}</span><input className={FI} value={form.name} disabled={!canManage} onChange={(e) => set("name", e.target.value)} /></div>
-          <div className="flex flex-col gap-1"><span className={FL}>{L ? "Số điện thoại" : "Phone"}</span><input className={FI} value={form.phone} disabled={!canManage} onChange={(e) => set("phone", e.target.value)} /></div>
+          <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.a8d9ef6d3dc5")}</span><input className={FI} value={form.name} disabled={!canManage} onChange={(e) => set("name", e.target.value)} /></div>
+          <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.8f0bb5fb2246")}</span><input className={FI} value={form.phone} disabled={!canManage} onChange={(e) => set("phone", e.target.value)} /></div>
         </div>
-        <div className="flex flex-col gap-1"><span className={FL}>{L ? "Địa chỉ" : "Address"}</span><input className={FI} value={form.address} disabled={!canManage} onChange={(e) => set("address", e.target.value)} /></div>
+        <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.4c007f9511be")}</span><input className={FI} value={form.address} disabled={!canManage} onChange={(e) => set("address", e.target.value)} /></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1"><span className={FL}>{L ? "Mã số thuế" : "Tax ID"}</span><input className={FI} value={form.taxCode} disabled={!canManage} onChange={(e) => set("taxCode", e.target.value)} /></div>
-          <div className="flex flex-col gap-1"><span className={FL}>{L ? "Ngành" : "Industry"}</span>
+          <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.50d1b0adcda3")}</span><input className={FI} value={form.taxCode} disabled={!canManage} onChange={(e) => set("taxCode", e.target.value)} /></div>
+          <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.d251731ba879")}</span>
             <SearchableSelect options={industryOpts} value={form.industry} onChange={(v) => set("industry", v)} allowClear={false} disabled={!canManage} className={searchableTouch} />
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1"><span className={FL}>{L ? "Tiền tệ" : "Currency"}</span>
+          <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.b5fc197ba6f4")}</span>
             <SearchableSelect options={currencyOpts} value={form.currency} onChange={(v) => set("currency", v)} allowClear={false} disabled={!canManage} className={searchableTouch} />
           </div>
         </div>
         {canManage && (dirty || saved) && (
           <div className="flex items-center gap-2 pt-1">
-            <span className="text-[11px] text-slate-500 flex-1">{dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved")}</span>
+            <span className="text-[11px] text-slate-500 flex-1">{dirty ? (settingsTextByFlag(L, "legacy.3bf5caaee8b4")) : (settingsTextByFlag(L, "legacy.e8f6c0afb49d"))}</span>
             <button disabled={!dirty || pending} onClick={save} className={cn(btnF, "disabled:opacity-50")}>
-              {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
+              {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{settingsTextByFlag(L, "legacy.2d7e281f1bcd")}
             </button>
           </div>
         )}
-        {!canManage && <p className="text-[11px] text-slate-400 italic">{L ? "Chỉ Chủ/Quản lý mới sửa được." : "Only Owner/Manager can edit."}</p>}
+        {!canManage && <p className="text-[11px] text-slate-400 italic">{settingsTextByFlag(L, "legacy.f2daa8f757fc")}</p>}
       </div>
     </Card>
   );
@@ -546,27 +530,27 @@ function StaffRowItem({ s, i, L, canManage }: { s: StaffRow; i: number; L: boole
         <span className="font-bold text-xs">{s.fullName}</span>
       </div>{error && <p role="alert" className="mt-1 text-xs text-er">{error}</p>}</td>
       <td className="block p-0 md:table-cell md:px-3 md:py-2.5">
-        <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{L ? "Vai trò" : "Role"}</div>
+        <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{settingsTextByFlag(L, "legacy.500066278f54")}</div>
         {canManage ? (
           <Select
             value={role}
             onChange={(e) => { const r = e.target.value as StaffRole; save(() => updateStaffRole(s.id, r)); }}
             disabled={pending}
             size="sm"
-            options={STAFF_ROLES.map((r) => ({ value: r, label: L ? ROLE_TEXT[r][1] : ROLE_TEXT[r][0] }))}
+            options={STAFF_ROLES.map((r) => ({ value: r, label: settingsTextByFlag(L, `ui.roles.${ROLE_TEXT[r] ?? r}`) }))}
             className="min-h-11 text-xs lg:min-h-0"
           />
-        ) : <span className={cn("inline-block px-2 py-0.5 rounded-full text-[9px] font-bold", ROLE_PILL[role] ?? "bg-surface-2 text-slate-500")}>{L ? (ROLE_TEXT[role]?.[1] ?? role) : (ROLE_TEXT[role]?.[0] ?? role)}</span>}
+        ) : <span className={cn("inline-block px-2 py-0.5 rounded-full text-[9px] font-bold", ROLE_PILL[role] ?? "bg-surface-2 text-slate-500")}>{settingsTextByFlag(L, `ui.roles.${ROLE_TEXT[role] ?? role}`)}</span>}
       </td>
       <td className="block p-0 font-mono text-[11px] text-slate-500 md:table-cell md:px-3 md:py-2.5">
-        <div className="mb-1 font-sans text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{L ? "Điện thoại" : "Phone"}</div>
+        <div className="mb-1 font-sans text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{settingsTextByFlag(L, "legacy.5745605d2af1")}</div>
         {s.phone ?? "—"}
       </td>
       <td className="col-span-2 flex min-h-11 items-center justify-between p-0 md:table-cell md:px-3 md:py-2.5">
-        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{L ? "Trạng thái" : "Status"}</div>
+        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{settingsTextByFlag(L, "legacy.81a5b063f527")}</div>
         {canManage
           ? <TouchTargetToggle checked={active} disabled={pending} onChange={(v) => save(() => setStaffActive(s.id, v))} aria-label="active" />
-          : <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", active ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-400")}>{active ? (L ? "Hoạt động" : "Active") : (L ? "Vô hiệu" : "Inactive")}</span>}
+          : <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", active ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-400")}>{active ? (settingsTextByFlag(L, "legacy.91c275269ca2")) : (settingsTextByFlag(L, "legacy.c6878ed4526d"))}</span>}
       </td>
     </tr>
   );
@@ -594,13 +578,13 @@ function PosSettingsSection({ L, prefs, canManage }: { L: boolean; prefs: StoreP
 
   return (
     <Card
-      title={L ? "Hiển thị trang bán hàng" : "POS Page Display"}
-      vi={L ? "Ẩn/hiện các trường ít dùng trong màn hình POS" : "Show or hide optional controls on the POS screen"}
+      title={settingsTextByFlag(L, "legacy.22987928dd72")}
+      vi={settingsTextByFlag(L, "legacy.04749a4fae6b")}
     >
       <div className="p-4.5 flex flex-col gap-3">
         <CtrlRow
-          title={L ? "Hiện phần Công trình" : "Show project fields"}
-          desc={L ? "Bật khi cần gắn đơn hàng với công trình/dự án." : "Enable when orders need a project/job reference."}
+          title={settingsTextByFlag(L, "legacy.d193d6dbb537")}
+          desc={settingsTextByFlag(L, "legacy.6b6330bb9f31")}
           checked={form.showProjectFields}
           onChange={canManage ? (v) => set("showProjectFields", v) : undefined}
         />
@@ -677,16 +661,15 @@ function materializeCameraQuotePrefs(
 }
 
 function CameraQuoteSettingsSection({
-  L,
   prefs,
   options,
   canManage,
 }: {
-  L: boolean;
   prefs: StorePrefs["cameraQuote"];
   options: CameraQuoteFormOptions;
   canManage: boolean;
 }) {
+  const t = useTranslations("settings.cameraQuote");
   const [form, setForm] = useState(() => materializeCameraQuotePrefs(prefs, options));
   const [query, setQuery] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -709,13 +692,15 @@ function CameraQuoteSettingsSection({
   const ipProductOptions = (skus: readonly string[], selectedId?: string) => options.ipQuoteProducts
     .filter((product) => product.id === selectedId || (product.sku && skus.includes(product.sku)))
     .map((product) => ({ value: product.id, label: product.name, hint: product.sku }));
-  const visibleCameras = options.cameras.filter((product) =>
+  const ipCameraSkus = new Set<string>(Object.values(CAMERA_IP_QUOTE_LEGACY_SKUS.camera));
+  const wifiCameras = options.cameras.filter((product) => !ipCameraSkus.has(product.sku));
+  const visibleCameras = wifiCameras.filter((product) =>
     `${product.name} ${product.sku}`.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi")),
   );
   const cameraColumns: DataTableColumn<CameraQuoteCamera>[] = [
     {
       key: "product",
-      label: L ? "Sản phẩm" : "Product",
+      label: t("wifi.product"),
       required: true,
       render: (product) => (
         <div className="min-w-0">
@@ -727,7 +712,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "costPrice",
-      label: rightHeader(L ? "Giá nhập" : "Cost price"),
+      label: rightHeader(t("wifi.costPrice")),
       required: true,
       align: "right",
       width: "120px",
@@ -736,13 +721,13 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "quotePrice",
-      label: rightHeader(L ? "Giá bán" : "Sale price"),
+      label: rightHeader(t("wifi.salePrice")),
       required: true,
       align: "right",
       width: "150px",
       render: (product) => (
         <MoneyInput
-          aria-label={L ? `Giá báo giá ${product.name}` : `Quote price ${product.name}`}
+          aria-label={t("wifi.quotePriceAria", { product: product.name })}
           value={cameraQuotePrice(product.id, product.retailPrice, form)}
           disabled={!canManage}
           className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -812,7 +797,7 @@ function CameraQuoteSettingsSection({
     start(async () => {
       const result = await updateCameraQuoteSettings(form);
       if (!result.ok) {
-        setError(L ? "Không thể lưu cấu hình báo giá." : "Could not save camera quote settings.");
+        setError(t("errors.save"));
         return;
       }
       setDirty(false);
@@ -826,9 +811,9 @@ function CameraQuoteSettingsSection({
     materialField: CameraQuoteProductField;
     installationField: CameraQuoteProductField;
   }> = [
-    { id: "indoor", label: L ? "Trong nhà" : "Indoor", materialField: "indoorMaterialProductId", installationField: "indoorInstallationProductId" },
-    { id: "outdoor", label: L ? "Ngoài trời cố định" : "Outdoor fixed", materialField: "outdoorMaterialProductId", installationField: "outdoorInstallationProductId" },
-    { id: "ptz", label: L ? "Ngoài trời xoay / PTZ" : "Outdoor PTZ", materialField: "ptzMaterialProductId", installationField: "ptzInstallationProductId" },
+    { id: "indoor", label: t("installation.profiles.indoor"), materialField: "indoorMaterialProductId", installationField: "indoorInstallationProductId" },
+    { id: "outdoor", label: t("installation.profiles.outdoor"), materialField: "outdoorMaterialProductId", installationField: "outdoorInstallationProductId" },
+    { id: "ptz", label: t("installation.profiles.ptz"), materialField: "ptzMaterialProductId", installationField: "ptzInstallationProductId" },
   ];
   const memoryRows = cardGroups.map(([capacity, products]) => ({
     id: `memory-${capacity}`,
@@ -838,7 +823,7 @@ function CameraQuoteSettingsSection({
   const memoryColumns: DataTableColumn<(typeof memoryRows)[number]>[] = [
     {
       key: "capacity",
-      label: L ? "Dung lượng" : "Capacity",
+      label: t("memory.capacity"),
       required: true,
       width: "100px",
       render: (row) => <span className="font-extrabold text-slate-700">{row.capacity}</span>,
@@ -846,7 +831,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "product",
-      label: L ? "Thẻ đang chọn" : "Selected card",
+      label: t("memory.selected"),
       required: true,
       render: (row) => {
         const selectedId = form.memoryCardSelections?.[row.capacity] ?? row.products.find((product) => selectedCardIds.has(product.id))?.id ?? "";
@@ -865,7 +850,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "costPrice",
-      label: rightHeader(L ? "Giá nhập" : "Cost price"),
+      label: rightHeader(t("memory.costPrice")),
       required: true,
       align: "right",
       width: "120px",
@@ -878,7 +863,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "quotePrice",
-      label: rightHeader(L ? "Giá bán" : "Sale price"),
+      label: rightHeader(t("memory.salePrice")),
       required: true,
       align: "right",
       width: "150px",
@@ -887,7 +872,7 @@ function CameraQuoteSettingsSection({
         const selected = selectedId ? productById.get(selectedId) : undefined;
         return (
           <MoneyInput
-            aria-label={L ? `Giá báo giá thẻ ${row.capacity}` : `${row.capacity} card quote price`}
+            aria-label={t("memory.quotePriceAria", { capacity: row.capacity })}
             value={selected ? cameraQuotePrice(selected.id, selected.retailPrice, form) : null}
             disabled={!canManage || !selected}
             className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -901,28 +886,28 @@ function CameraQuoteSettingsSection({
   const installationColumns: DataTableColumn<(typeof profileRows)[number]>[] = [
     {
       key: "profile",
-      label: L ? "Vị trí lắp đặt" : "Installation profile",
+      label: t("installation.profile"),
       required: true,
       width: "150px",
       render: (profile) => (
         <div>
           <div className="text-xs font-bold">{profile.label}</div>
-          {profile.id === "ptz" && <div className="mt-1 text-[10px] text-slate-400">{L ? "Dùng riêng cho camera xoay/PTZ" : "Used for PTZ cameras"}</div>}
+          {profile.id === "ptz" && <div className="mt-1 text-[10px] text-slate-400">{t("installation.ptzHint")}</div>}
         </div>
       ),
       sortable: false,
     },
     {
       key: "itemType",
-      label: L ? "Hạng mục" : "Item",
+      label: t("installation.item"),
       required: true,
       width: "100px",
-      render: () => <span className="text-xs font-semibold">{L ? "Vật tư" : "Material"}</span>,
+      render: () => <span className="text-xs font-semibold">{t("installation.material")}</span>,
       sortable: false,
     },
     {
       key: "product",
-      label: L ? "Sản phẩm" : "Product",
+      label: t("installation.product"),
       required: true,
       render: (profile) => (
         <SearchableSelect
@@ -938,7 +923,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "costPrice",
-      label: rightHeader(L ? "Giá nhập" : "Cost price"),
+      label: rightHeader(t("installation.costPrice")),
       required: true,
       align: "right",
       width: "110px",
@@ -950,7 +935,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "salePrice",
-      label: rightHeader(L ? "Giá bán" : "Sale price"),
+      label: rightHeader(t("installation.salePrice")),
       required: true,
       align: "right",
       width: "135px",
@@ -958,7 +943,7 @@ function CameraQuoteSettingsSection({
         const material = form[profile.materialField] ? productById.get(form[profile.materialField]!) : undefined;
         return (
           <MoneyInput
-            aria-label={L ? `Giá bán vật tư ${profile.label}` : `${profile.label} material sale price`}
+            aria-label={t("installation.materialSaleAria", { profile: profile.label })}
             value={material ? cameraQuotePrice(material.id, material.retailPrice, form) : null}
             disabled={!canManage || !material}
             className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -972,25 +957,20 @@ function CameraQuoteSettingsSection({
   const ipCameraRows = CAMERA_IP_QUOTE_CAMERA_TYPES.map((key) => ({
     id: `ip-camera-${key}`,
     key,
-    label: {
-      bullet2: L ? "Camera thân 2MP" : "2MP bullet camera",
-      bullet4: L ? "Camera thân 4MP" : "4MP bullet camera",
-      dome4: L ? "Camera dome 4MP" : "4MP dome camera",
-      ptz4: L ? "Camera PTZ 4MP" : "4MP PTZ camera",
-    }[key],
+    label: t(`ip.cameraTypes.${key}`),
     legacySku: CAMERA_IP_QUOTE_LEGACY_SKUS.camera[key],
   }));
   const ipRecorderRows = (["4", "8", "16"] as const).flatMap((size) => [
     {
       id: `ip-recorder-${size}`,
-      label: `${size} ${L ? "camera · Đầu ghi PoE" : "cameras · PoE NVR"}`,
+      label: t("ip.recorderConfiguration", { count: size }),
       field: "recorderProductIds" as const,
       mapKey: `${size}:nvr`,
       legacySku: CAMERA_IP_QUOTE_LEGACY_SKUS.recorder[`${size}:nvr` as keyof typeof CAMERA_IP_QUOTE_LEGACY_SKUS.recorder],
     },
     {
       id: `ip-switch-${size}`,
-      label: `${size} ${L ? "camera · Switch PoE" : "cameras · PoE switch"}`,
+      label: t("ip.switchConfiguration", { count: size }),
       field: "switchProductIds" as const,
       mapKey: size,
       legacySku: CAMERA_IP_QUOTE_LEGACY_SKUS.switch[size],
@@ -1003,18 +983,18 @@ function CameraQuoteSettingsSection({
     legacySku: CAMERA_IP_QUOTE_LEGACY_SKUS.storage[size],
   }));
   const ipAccessoryRows = [
-    ["materialProductId", L ? "Vật tư theo camera" : "Per-camera materials", CAMERA_IP_QUOTE_LEGACY_SKUS.material],
-    ["installationProductId", L ? "Công lắp đặt" : "Installation", CAMERA_IP_QUOTE_LEGACY_SKUS.installation],
-    ["cableProductId", L ? "Dây mạng" : "Network cable", CAMERA_IP_QUOTE_LEGACY_SKUS.cable],
-    ["upsProductId", "UPS", CAMERA_IP_QUOTE_LEGACY_SKUS.ups],
-    ["rackProductId", L ? "Tủ rack" : "Rack cabinet", CAMERA_IP_QUOTE_LEGACY_SKUS.rack],
-    ["monitorProductId", L ? "Màn hình" : "Monitor", CAMERA_IP_QUOTE_LEGACY_SKUS.monitor],
-    ["surgeProductId", L ? "Chống sét" : "Surge protection", CAMERA_IP_QUOTE_LEGACY_SKUS.surge],
+    ["materialProductId", t("ip.accessories.material"), CAMERA_IP_QUOTE_LEGACY_SKUS.material],
+    ["installationProductId", t("ip.accessories.installation"), CAMERA_IP_QUOTE_LEGACY_SKUS.installation],
+    ["cableProductId", t("ip.accessories.cable"), CAMERA_IP_QUOTE_LEGACY_SKUS.cable],
+    ["upsProductId", t("ip.accessories.ups"), CAMERA_IP_QUOTE_LEGACY_SKUS.ups],
+    ["rackProductId", t("ip.accessories.rack"), CAMERA_IP_QUOTE_LEGACY_SKUS.rack],
+    ["monitorProductId", t("ip.accessories.monitor"), CAMERA_IP_QUOTE_LEGACY_SKUS.monitor],
+    ["surgeProductId", t("ip.accessories.surge"), CAMERA_IP_QUOTE_LEGACY_SKUS.surge],
   ] as const;
   const ipCameraColumns: DataTableColumn<(typeof ipCameraRows)[number]>[] = [
     {
       key: "type",
-      label: L ? "Loại camera" : "Camera type",
+      label: t("ip.cameraType"),
       required: true,
       width: "180px",
       render: (row) => <span className="text-xs font-bold">{row.label}</span>,
@@ -1022,7 +1002,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "product",
-      label: L ? "Sản phẩm" : "Product",
+      label: t("ip.product"),
       required: true,
       render: (row) => {
         const id = form.ipQuote.cameraProductIds[row.key] ?? "";
@@ -1041,7 +1021,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "costPrice",
-      label: rightHeader(L ? "Giá nhập" : "Cost price"),
+      label: rightHeader(t("ip.costPrice")),
       required: true,
       align: "right",
       width: "120px",
@@ -1053,7 +1033,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "quotePrice",
-      label: rightHeader(L ? "Giá bán" : "Sale price"),
+      label: rightHeader(t("ip.salePrice")),
       required: true,
       align: "right",
       width: "150px",
@@ -1061,7 +1041,7 @@ function CameraQuoteSettingsSection({
         const product = ipProduct(form.ipQuote.cameraProductIds[row.key]);
         return (
           <MoneyInput
-            aria-label={L ? `Giá báo giá ${row.label}` : `${row.label} quote price`}
+            aria-label={t("ip.quotePriceAria", { label: row.label })}
             value={product ? cameraQuotePrice(product.id, product.retailPrice, form) : null}
             disabled={!canManage || !product}
             className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1075,7 +1055,7 @@ function CameraQuoteSettingsSection({
   const ipRecorderColumns: DataTableColumn<(typeof ipRecorderRows)[number]>[] = [
     {
       key: "configuration",
-      label: L ? "Cấu hình" : "Configuration",
+      label: t("ip.configuration"),
       required: true,
       width: "210px",
       render: (row) => <span className="text-xs font-bold">{row.label}</span>,
@@ -1083,7 +1063,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "product",
-      label: L ? "Sản phẩm" : "Product",
+      label: t("ip.product"),
       required: true,
       render: (row) => {
         const id = form.ipQuote[row.field][row.mapKey] ?? "";
@@ -1102,7 +1082,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "costPrice",
-      label: rightHeader(L ? "Giá nhập" : "Cost price"),
+      label: rightHeader(t("ip.costPrice")),
       required: true,
       align: "right",
       width: "120px",
@@ -1114,7 +1094,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "quotePrice",
-      label: rightHeader(L ? "Giá bán" : "Sale price"),
+      label: rightHeader(t("ip.salePrice")),
       required: true,
       align: "right",
       width: "150px",
@@ -1122,7 +1102,7 @@ function CameraQuoteSettingsSection({
         const product = ipProduct(form.ipQuote[row.field][row.mapKey]);
         return (
           <MoneyInput
-            aria-label={L ? `Giá báo giá ${row.label}` : `${row.label} quote price`}
+            aria-label={t("ip.quotePriceAria", { label: row.label })}
             value={product ? cameraQuotePrice(product.id, product.retailPrice, form) : null}
             disabled={!canManage || !product}
             className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1136,7 +1116,7 @@ function CameraQuoteSettingsSection({
   const ipStorageColumns: DataTableColumn<(typeof ipStorageRows)[number]>[] = [
     {
       key: "capacity",
-      label: L ? "Dung lượng" : "Capacity",
+      label: t("ip.capacity"),
       required: true,
       width: "120px",
       render: (row) => <span className="text-xs font-bold">{row.label}</span>,
@@ -1144,7 +1124,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "product",
-      label: L ? "Sản phẩm" : "Product",
+      label: t("ip.product"),
       required: true,
       render: (row) => {
         const id = form.ipQuote.storageProductIds[row.mapKey] ?? "";
@@ -1163,7 +1143,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "costPrice",
-      label: rightHeader(L ? "Giá nhập" : "Cost price"),
+      label: rightHeader(t("ip.costPrice")),
       required: true,
       align: "right",
       width: "120px",
@@ -1175,7 +1155,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "quotePrice",
-      label: rightHeader(L ? "Giá bán" : "Sale price"),
+      label: rightHeader(t("ip.salePrice")),
       required: true,
       align: "right",
       width: "150px",
@@ -1183,7 +1163,7 @@ function CameraQuoteSettingsSection({
         const product = ipProduct(form.ipQuote.storageProductIds[row.mapKey]);
         return (
           <MoneyInput
-            aria-label={L ? `Giá báo giá ổ cứng ${row.label}` : `${row.label} quote price`}
+            aria-label={t("ip.quotePriceAria", { label: row.label })}
             value={product ? cameraQuotePrice(product.id, product.retailPrice, form) : null}
             disabled={!canManage || !product}
             className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1197,7 +1177,7 @@ function CameraQuoteSettingsSection({
   const ipAccessoryColumns: DataTableColumn<(typeof ipAccessoryRows)[number]>[] = [
     {
       key: "accessory",
-      label: L ? "Hạng mục" : "Item",
+      label: t("ip.item"),
       required: true,
       width: "190px",
       render: (row) => <span className="text-xs font-bold">{row[1]}</span>,
@@ -1205,7 +1185,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "product",
-      label: L ? "Sản phẩm" : "Product",
+      label: t("ip.product"),
       required: true,
       render: (row) => {
         const id = form.ipQuote[row[0]] ?? "";
@@ -1224,7 +1204,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "costPrice",
-      label: rightHeader(L ? "Giá nhập" : "Cost price"),
+      label: rightHeader(t("ip.costPrice")),
       required: true,
       align: "right",
       width: "120px",
@@ -1236,7 +1216,7 @@ function CameraQuoteSettingsSection({
     },
     {
       key: "quotePrice",
-      label: rightHeader(L ? "Giá bán" : "Sale price"),
+      label: rightHeader(t("ip.salePrice")),
       required: true,
       align: "right",
       width: "150px",
@@ -1244,7 +1224,7 @@ function CameraQuoteSettingsSection({
         const product = ipProduct(form.ipQuote[row[0]]);
         return (
           <MoneyInput
-            aria-label={L ? `Giá báo giá ${row[1]}` : `${row[1]} quote price`}
+            aria-label={t("ip.quotePriceAria", { label: row[1] })}
             value={product ? cameraQuotePrice(product.id, product.retailPrice, form) : null}
             disabled={!canManage || !product}
             className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1265,18 +1245,18 @@ function CameraQuoteSettingsSection({
       <div className="flex items-start justify-between gap-3">
         <span className="min-w-0 text-xs font-bold leading-5">{label}</span>
         <div className="shrink-0 text-right">
-          <div className={FL}>{L ? "Giá nhập" : "Cost price"}</div>
+          <div className={FL}>{t("ip.costPrice")}</div>
           <div className="mt-0.5 text-xs tabular-nums text-slate-500">{product ? formatCurrency(product.costPrice) : "—"}</div>
         </div>
       </div>
       <div className="grid gap-1.5">
-        <span className={FL}>{L ? "Sản phẩm" : "Product"}</span>
+        <span className={FL}>{t("ip.product")}</span>
         {selector}
       </div>
       <div className="grid gap-1.5">
-        <span className={FL}>{L ? "Giá bán" : "Sale price"}</span>
+        <span className={FL}>{t("ip.salePrice")}</span>
         <MoneyInput
-          aria-label={L ? `Giá bán ${label}` : `${label} sale price`}
+          aria-label={t("ip.mobileSalePriceAria", { label })}
           value={product ? cameraQuotePrice(product.id, product.retailPrice, form) : null}
           disabled={!canManage || !product}
           className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1289,24 +1269,22 @@ function CameraQuoteSettingsSection({
   return (
     <>
       <Card
-        title={L ? "Cấu hình mặc định báo giá camera" : "Camera quote defaults"}
-        vi={L ? "Áp dụng cho báo giá mới; từng báo giá vẫn có thể sửa riêng." : "Applied to new quotes; each quote can still be edited independently."}
+        title={t("defaultsTitle")}
+        vi={t("defaultsSubtitle")}
       >
         <div className="p-4.5 flex flex-col gap-4">
           <div className="rounded-[10px] border border-primary-200 bg-primary-50 px-3.5 py-3 text-[11px] leading-5 text-primary-800 dark:border-primary-900 dark:bg-primary-950/30 dark:text-primary-200">
-            {L
-              ? "Giá bán trong báo giá mặc định lấy từ giá bán sản phẩm. Chỉ các dòng có giá bán riêng mới ghi đè giá dùng cho báo giá; không thay đổi giá sản phẩm trong POS. Thay đổi tại đây không làm đổi các báo giá đã lưu."
-              : "Quote sale prices default to the product retail price. Row-level sale prices override the quote only; they do not change POS product prices. Changes here do not rewrite saved quotes."}
+            {t("notice")}
           </div>
 
-          <Card title={L ? "Camera Wifi" : "Available cameras"} vi={L ? "Giá bán trong báo giá tùy chọn theo từng model" : "Optional quote sale price per model"}>
+          <Card title={t("wifi.title")} vi={t("wifi.subtitle")}>
             <div className="p-3.5">
               <input
                 className={FI}
                 value={query}
                 disabled={!canManage}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder={L ? "Tìm theo tên hoặc SKU" : "Search by name or SKU"}
+                placeholder={t("wifi.searchPlaceholder")}
               />
               <div className="mt-3">
                 <DataTableShell
@@ -1319,7 +1297,7 @@ function CameraQuoteSettingsSection({
                   fillHeight={false}
                   showColumnMenu={false}
                   embedded
-                  empty={<div className="p-6 text-center text-xs text-slate-400">{L ? "Không tìm thấy camera." : "No cameras found."}</div>}
+                  empty={<div className="p-6 text-center text-xs text-slate-400">{t("wifi.empty")}</div>}
                   renderMobileRow={({ row }) => (
                     <div className="grid gap-3 border-b border-border-soft p-3 last:border-0">
                       <div className="flex items-start justify-between gap-3">
@@ -1328,14 +1306,14 @@ function CameraQuoteSettingsSection({
                           <div className="mt-0.5 text-[10px] text-slate-400">{row.sku}</div>
                         </div>
                         <div className="shrink-0 text-right">
-                          <div className={FL}>{L ? "Giá nhập" : "Cost price"}</div>
+                          <div className={FL}>{t("wifi.costPrice")}</div>
                           <div className="mt-0.5 text-xs tabular-nums text-slate-500">{formatCurrency(row.costPrice)}</div>
                         </div>
                       </div>
                       <div className="grid gap-1.5">
-                        <span className={FL}>{L ? "Giá bán" : "Sale price"}</span>
+                        <span className={FL}>{t("wifi.salePrice")}</span>
                         <MoneyInput
-                          aria-label={L ? `Giá bán ${row.name}` : `${row.name} sale price`}
+                          aria-label={t("wifi.quotePriceAria", { product: row.name })}
                           value={cameraQuotePrice(row.id, row.retailPrice, form)}
                           disabled={!canManage}
                           className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1349,7 +1327,7 @@ function CameraQuoteSettingsSection({
             </div>
           </Card>
 
-          <Card title={L ? "Thẻ nhớ" : "Memory cards"} vi={L ? "Mỗi dung lượng chọn một thẻ đang dùng và giá bán trong báo giá" : "Choose one active card and sale price per capacity"}>
+          <Card title={t("memory.title")} vi={t("memory.subtitle")}>
             <div className="p-3.5">
               <DataTableShell
                 tableId="settings.camera-quote.memory-cards"
@@ -1361,7 +1339,7 @@ function CameraQuoteSettingsSection({
                 fillHeight={false}
                 showColumnMenu={false}
                 embedded
-                empty={<div className="p-6 text-center text-xs text-slate-400">{L ? "Chưa có thẻ nhớ theo dung lượng." : "No memory cards grouped by capacity."}</div>}
+                empty={<div className="p-6 text-center text-xs text-slate-400">{t("memory.empty")}</div>}
                 renderMobileRow={({ row }) => {
                   const selectedId = form.memoryCardSelections?.[row.capacity] ?? row.products.find((product) => selectedCardIds.has(product.id))?.id ?? "";
                   const selected = selectedId ? productById.get(selectedId) : undefined;
@@ -1369,16 +1347,16 @@ function CameraQuoteSettingsSection({
                     <div className="grid gap-3 border-b border-border-soft p-3 last:border-0">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className={FL}>{L ? "Dung lượng" : "Capacity"}</div>
+                          <div className={FL}>{t("memory.capacity")}</div>
                           <div className="mt-0.5 text-xs font-extrabold text-slate-700">{row.capacity}</div>
                         </div>
                         <div className="shrink-0 text-right">
-                          <div className={FL}>{L ? "Giá nhập" : "Cost price"}</div>
+                          <div className={FL}>{t("memory.costPrice")}</div>
                           <div className="mt-0.5 text-xs tabular-nums text-slate-500">{selected ? formatCurrency(selected.costPrice) : "—"}</div>
                         </div>
                       </div>
                       <div className="grid gap-1.5">
-                        <span className={FL}>{L ? "Thẻ đang chọn" : "Selected card"}</span>
+                        <span className={FL}>{t("memory.selected")}</span>
                         <SearchableSelect
                           value={selectedId}
                           options={row.products.map((product) => ({ value: product.id, label: product.name, hint: product.sku }))}
@@ -1389,9 +1367,9 @@ function CameraQuoteSettingsSection({
                         />
                       </div>
                       <div className="grid gap-1.5">
-                        <span className={FL}>{L ? "Giá bán" : "Sale price"}</span>
+                        <span className={FL}>{t("memory.salePrice")}</span>
                         <MoneyInput
-                          aria-label={L ? `Giá bán thẻ ${row.capacity}` : `${row.capacity} card sale price`}
+                          aria-label={t("memory.quotePriceAria", { capacity: row.capacity })}
                           value={selected ? cameraQuotePrice(selected.id, selected.retailPrice, form) : null}
                           disabled={!canManage || !selected}
                           className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1405,7 +1383,7 @@ function CameraQuoteSettingsSection({
             </div>
           </Card>
 
-          <Card title={L ? "Vật tư và công lắp đặt" : "Materials and installation"} vi={L ? "Cấu hình theo vị trí lắp đặt" : "Configure by installation profile"}>
+          <Card title={t("installation.title")} vi={t("installation.subtitle")}>
             <div className="p-3.5">
               <DataTableShell
                 tableId="settings.camera-quote.installation"
@@ -1429,7 +1407,7 @@ function CameraQuoteSettingsSection({
                           cellClassName,
                         );
                         if (column.key === "profile") return <td key={column.key} className={cellClass} />;
-                        if (column.key === "itemType") return <td key={column.key} className={cellClass}><span className="text-xs font-semibold">{L ? "Công lắp đặt" : "Installation"}</span></td>;
+                        if (column.key === "itemType") return <td key={column.key} className={cellClass}><span className="text-xs font-semibold">{t("installation.labor")}</span></td>;
                         if (column.key === "product") {
                           return (
                             <td key={column.key} className={cellClass}>
@@ -1448,7 +1426,7 @@ function CameraQuoteSettingsSection({
                         return (
                           <td key={column.key} className={cellClass}>
                             <MoneyInput
-                              aria-label={L ? `Giá bán công lắp đặt ${profile.label}` : `${profile.label} installation sale price`}
+                              aria-label={t("installation.laborSaleAria", { profile: profile.label })}
                               value={installation ? cameraQuotePrice(installation.id, installation.retailPrice, form) : null}
                               disabled={!canManage || !installation}
                               className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1467,7 +1445,7 @@ function CameraQuoteSettingsSection({
                     <div className="grid gap-3 border-b border-border-soft p-3 last:border-0">
                       <div className="text-xs font-bold leading-5">{row.label}</div>
                       <div className="grid gap-1.5">
-                        <span className={FL}>{L ? "Vật tư" : "Material"}</span>
+                        <span className={FL}>{t("installation.material")}</span>
                         <SearchableSelect
                           value={form[row.materialField] ?? ""}
                           options={options.materials.map((product) => ({ value: product.id, label: product.name, hint: product.sku }))}
@@ -1478,13 +1456,13 @@ function CameraQuoteSettingsSection({
                         />
                       </div>
                       <div className="flex items-center justify-between gap-3 text-xs tabular-nums">
-                        <span className={FL}>{L ? "Giá nhập vật tư" : "Material cost price"}</span>
+                        <span className={FL}>{t("installation.materialCostPrice")}</span>
                         <span>{material ? formatCurrency(material.costPrice) : "—"}</span>
                       </div>
                       <div className="grid gap-1.5">
-                        <span className={FL}>{L ? "Giá bán vật tư" : "Material sale price"}</span>
+                        <span className={FL}>{t("installation.materialSalePrice")}</span>
                         <MoneyInput
-                          aria-label={L ? `Giá bán vật tư ${row.label}` : `${row.label} material sale price`}
+                          aria-label={t("installation.materialSaleAria", { profile: row.label })}
                           value={material ? cameraQuotePrice(material.id, material.retailPrice, form) : null}
                           disabled={!canManage || !material}
                           className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1492,7 +1470,7 @@ function CameraQuoteSettingsSection({
                         />
                       </div>
                       <div className="grid gap-1.5 border-t border-border-soft pt-3">
-                        <span className={FL}>{L ? "Công lắp đặt" : "Installation"}</span>
+                        <span className={FL}>{t("installation.labor")}</span>
                         <SearchableSelect
                           value={form[row.installationField] ?? ""}
                           options={options.installations.map((product) => ({ value: product.id, label: product.name, hint: product.sku }))}
@@ -1503,13 +1481,13 @@ function CameraQuoteSettingsSection({
                         />
                       </div>
                       <div className="flex items-center justify-between gap-3 text-xs tabular-nums">
-                        <span className={FL}>{L ? "Giá nhập công" : "Installation cost price"}</span>
+                        <span className={FL}>{t("installation.laborCostPrice")}</span>
                         <span>{installation ? formatCurrency(installation.costPrice) : "—"}</span>
                       </div>
                       <div className="grid gap-1.5">
-                        <span className={FL}>{L ? "Giá bán công" : "Installation sale price"}</span>
+                        <span className={FL}>{t("installation.laborSalePrice")}</span>
                         <MoneyInput
-                          aria-label={L ? `Giá bán công lắp đặt ${row.label}` : `${row.label} installation sale price`}
+                          aria-label={t("installation.laborSaleAria", { profile: row.label })}
                           value={installation ? cameraQuotePrice(installation.id, installation.retailPrice, form) : null}
                           disabled={!canManage || !installation}
                           className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1523,12 +1501,12 @@ function CameraQuoteSettingsSection({
             </div>
           </Card>
 
-          <Card title={L ? "Báo giá camera IP" : "IP camera quote"} vi={L ? "Cấu hình camera, đầu ghi, ổ cứng và phụ kiện dùng cho báo giá IP" : "Configure cameras, NVRs, storage, and accessories used by IP quotes"}>
+          <Card title={t("ip.title")} vi={t("ip.subtitle")}>
             <div className="space-y-5 p-3.5">
               <section>
                 <div className="mb-2">
-                  <div className="text-xs font-bold">{L ? "Camera IP" : "IP cameras"}</div>
-                  <div className="mt-1 text-[10px] text-slate-400">{L ? "Giá nhập và giá bán riêng cho từng loại camera" : "Cost and sale price by IP camera type"}</div>
+                  <div className="text-xs font-bold">{t("ip.cameraTitle")}</div>
+                  <div className="mt-1 text-[10px] text-slate-400">{t("ip.cameraSubtitle")}</div>
                 </div>
                 <DataTableShell
                   tableId="settings.camera-quote.ip-cameras"
@@ -1562,8 +1540,8 @@ function CameraQuoteSettingsSection({
 
               <section>
                 <div className="mb-2">
-                  <div className="text-xs font-bold">{L ? "Đầu ghi và switch PoE" : "NVRs and PoE switches"}</div>
-                  <div className="mt-1 text-[10px] text-slate-400">{L ? "Theo số lượng camera và phương án cấp nguồn" : "By camera count and power method"}</div>
+                  <div className="text-xs font-bold">{t("ip.recorderTitle")}</div>
+                  <div className="mt-1 text-[10px] text-slate-400">{t("ip.recorderSubtitle")}</div>
                 </div>
                 <DataTableShell
                   tableId="settings.camera-quote.ip-recorders"
@@ -1597,8 +1575,8 @@ function CameraQuoteSettingsSection({
 
               <section>
                 <div className="mb-2">
-                  <div className="text-xs font-bold">{L ? "Ổ cứng" : "Hard drives"}</div>
-                  <div className="mt-1 text-[10px] text-slate-400">{L ? "Giá theo dung lượng lưu trữ" : "Price by storage capacity"}</div>
+                  <div className="text-xs font-bold">{t("ip.storageTitle")}</div>
+                  <div className="mt-1 text-[10px] text-slate-400">{t("ip.storageSubtitle")}</div>
                 </div>
                 <DataTableShell
                   tableId="settings.camera-quote.ip-storage"
@@ -1632,8 +1610,8 @@ function CameraQuoteSettingsSection({
 
               <section>
                 <div className="mb-2">
-                  <div className="text-xs font-bold">{L ? "Vật tư và phụ kiện" : "Materials and accessories"}</div>
-                  <div className="mt-1 text-[10px] text-slate-400">{L ? "Các sản phẩm dùng chung cho báo giá camera IP" : "Shared products used by IP quotes"}</div>
+                  <div className="text-xs font-bold">{t("ip.accessoriesTitle")}</div>
+                  <div className="mt-1 text-[10px] text-slate-400">{t("ip.accessoriesSubtitle")}</div>
                 </div>
                 <DataTableShell
                   tableId="settings.camera-quote.ip-accessories"
@@ -1667,7 +1645,21 @@ function CameraQuoteSettingsSection({
             </div>
           </Card>
 
-          <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} error={error} onSave={save} />
+          <SaveBar
+            L={false}
+            labels={{
+              permission: t("saveBar.permission"),
+              unsaved: t("saveBar.unsaved"),
+              saved: t("saveBar.saved"),
+              save: t("saveBar.save"),
+            }}
+            dirty={dirty}
+            saved={saved}
+            pending={pending}
+            canManage={canManage}
+            error={error}
+            onSave={save}
+          />
         </div>
       </Card>
     </>
@@ -1682,43 +1674,43 @@ function StaffSection({ L, staff, canManage }: { L: boolean; staff: StaffRow[]; 
       <SegmentedTabs
         className="mb-3.5"
         items={[
-          { id: "list", label: L ? "Danh sách NV" : "Staff List" },
-          { id: "perms", label: L ? "Phân quyền" : "Permission Matrix" },
+          { id: "list", label: settingsTextByFlag(L, "legacy.fbeb731bf942") },
+          { id: "perms", label: settingsTextByFlag(L, "legacy.39f66c66bb76") },
         ]}
         value={tab}
         onChange={setTab}
       />
       {tab === "list" && (
-        <Card title={L ? "Danh sách nhân viên" : "Staff Members"} vi={L ? "Staff Members — RBAC" : "Nhân viên — phân quyền"}>
+        <Card title={settingsTextByFlag(L, "legacy.495fdd9788f8")} vi={settingsTextByFlag(L, "legacy.deca5f03b901")}>
           {staff.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-slate-400">{L ? "Chưa có nhân viên." : "No staff yet."}</p>
+            <p className="px-4 py-8 text-center text-sm text-slate-400">{settingsTextByFlag(L, "legacy.3d5570d660db")}</p>
           ) : (
             <div className="overflow-visible md:overflow-x-auto" data-mobile-audit="settings-staff">
               <table className="block w-full text-sm md:table">
                 <thead className="hidden md:table-header-group"><tr className="bg-canvas text-left text-[9px] uppercase tracking-wide text-slate-400 border-b border-border">
-                  <th className="px-3 py-2 font-bold">{L ? "Nhân viên" : "Staff"}</th>
-                  <th className="px-3 py-2 font-bold">{L ? "Vai trò" : "Role"}</th>
-                  <th className="px-3 py-2 font-bold">{L ? "Điện thoại" : "Phone"}</th>
-                  <th className="px-3 py-2 font-bold">{L ? "Trạng thái" : "Status"}</th>
+                  <th className="px-3 py-2 font-bold">{settingsTextByFlag(L, "legacy.28433b857242")}</th>
+                  <th className="px-3 py-2 font-bold">{settingsTextByFlag(L, "legacy.500066278f54")}</th>
+                  <th className="px-3 py-2 font-bold">{settingsTextByFlag(L, "legacy.5745605d2af1")}</th>
+                  <th className="px-3 py-2 font-bold">{settingsTextByFlag(L, "legacy.81a5b063f527")}</th>
                 </tr></thead>
                 <tbody className="block md:table-row-group">{staff.map((s, i) => <StaffRowItem key={s.id} s={s} i={i} L={L} canManage={canManage} />)}</tbody>
               </table>
             </div>
           )}
-          {canManage && <div className="px-4 py-2.5 border-t border-border text-[10px] text-slate-400 italic">{L ? "Thêm nhân viên qua mời tài khoản (sắp có)." : "Add staff via account invite (coming soon)."}</div>}
+          {canManage && <div className="px-4 py-2.5 border-t border-border text-[10px] text-slate-400 italic">{settingsTextByFlag(L, "legacy.a29acbc36055")}</div>}
         </Card>
       )}
       {tab === "perms" && (
-        <Card title={L ? "Ma trận phân quyền" : "Permission Matrix"} vi={L ? "RBAC" : "Phân quyền theo vai trò (RBAC)"}>
+        <Card title={settingsTextByFlag(L, "legacy.0c3cf56f43fe")} vi={settingsTextByFlag(L, "legacy.d3462055821b")}>
           <div className="divide-y divide-border-soft md:hidden" data-mobile-audit="settings-permissions">
             {PERMS.map((p, i) => (
               <article key={i} className="p-3">
-                <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">{L ? p.vi : p.en}</h4>
+                <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">{settingsTextByFlag(L, `ui.permissions.${p.key}`)}</h4>
                 <dl className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
                   {roles.map((r) => (
                     <div key={r} className="flex items-center justify-between gap-2 rounded-lg bg-canvas px-2 py-2">
-                      <dt className="text-slate-500">{L ? ROLE_LABELS[r][1] : ROLE_LABELS[r][0]}</dt>
-                      <dd aria-label={p.roles[r] ? (L ? "Cho phép" : "Allowed") : (L ? "Không cho phép" : "Not allowed")}>
+                      <dt className="text-slate-500">{settingsTextByFlag(L, `ui.roles.${ROLE_LABELS[r] ?? r}`)}</dt>
+                      <dd aria-label={p.roles[r] ? (settingsTextByFlag(L, "legacy.11225dbe9c65")) : (settingsTextByFlag(L, "legacy.487230a9c0fa"))}>
                         {p.roles[r] ? <Check className="h-4 w-4 text-ok" /> : <span className="text-slate-300 dark:text-slate-700">✕</span>}
                       </dd>
                     </div>
@@ -1730,19 +1722,19 @@ function StaffSection({ L, staff, canManage }: { L: boolean; staff: StaffRow[]; 
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-[11px]">
               <thead><tr className="bg-canvas border-b border-border text-[9px] uppercase tracking-wide text-slate-400">
-                <th className="px-2 py-2 text-left font-bold min-w-45">{L ? "Hành động" : "Action"}</th>
-                {roles.map((r) => <th key={r} className="px-2 py-2 font-bold text-center">{L ? ROLE_LABELS[r][1] : ROLE_LABELS[r][0]}</th>)}
+                <th className="px-2 py-2 text-left font-bold min-w-45">{settingsTextByFlag(L, "legacy.51927998f6ae")}</th>
+                {roles.map((r) => <th key={r} className="px-2 py-2 font-bold text-center">{settingsTextByFlag(L, `ui.roles.${ROLE_LABELS[r] ?? r}`)}</th>)}
               </tr></thead>
               <tbody>{PERMS.map((p, i) => (
                 <tr key={i} className="border-b border-border-soft last:border-0">
-                  <td className="px-2 py-2 font-semibold text-slate-900 dark:text-slate-100">{L ? p.vi : p.en}</td>
+                  <td className="px-2 py-2 font-semibold text-slate-900 dark:text-slate-100">{settingsTextByFlag(L, `ui.permissions.${p.key}`)}</td>
                   {roles.map((r) => <td key={r} className="px-2 py-2 text-center">{p.roles[r] ? <Check className="w-3.5 h-3.5 text-ok inline" /> : <span className="text-slate-300 dark:text-slate-700">✕</span>}</td>)}
                 </tr>
               ))}</tbody>
             </table>
           </div>
           <div className="px-3.5 py-2.5 bg-in-soft border-t border-in/20 text-[10px] text-in">
-            {L ? "RBAC mặc định — Owner có thể tùy chỉnh từng quyền (bản Enterprise)." : "Default RBAC — Owner can customise individual permissions (Enterprise plan)."}
+            {settingsTextByFlag(L, "legacy.cdfc710b5ed9")}
           </div>
         </Card>
       )}
@@ -1759,29 +1751,29 @@ function HardwareSection({ L, prefs, canManage }: { L: boolean; prefs: StorePref
   function save() { start(async () => { const r = await updateStorePrefs({ hardware: form }); if (r.ok) { setDirty(false); setSaved(true); } }); }
 
   const dot = { connected: "bg-ok", disconnected: "bg-er", unconfigured: "bg-slate-400" } as const;
-  const lbl = { connected: [L ? "Đã kết nối" : "Connected", "text-ok"], disconnected: [L ? "Mất kết nối" : "Disconnected", "text-er"], unconfigured: [L ? "Chưa cấu hình" : "Not configured", "text-slate-400"] } as const;
+  const lbl = { connected: [settingsTextByFlag(L, "legacy.a213c40eb1c6"), "text-ok"], disconnected: [settingsTextByFlag(L, "legacy.8ed42f8a481b"), "text-er"], unconfigured: [settingsTextByFlag(L, "legacy.38655a2b9fca"), "text-slate-400"] } as const;
   return (
     <>
-      <Card title={L ? "Tùy chọn in & ngăn kéo" : "Print & Drawer Options"} vi={L ? "Áp dụng khi in hóa đơn POS" : "Applied when printing POS receipts"}>
+      <Card title={settingsTextByFlag(L, "legacy.e2c29e998b87")} vi={settingsTextByFlag(L, "legacy.95354db6d787")}>
         <div className="p-4.5 flex flex-col gap-3">
           <div className="flex flex-col gap-1 max-w-50">
-            <span className={FL}>{L ? "Khổ giấy mặc định" : "Default paper size"}</span>
+            <span className={FL}>{settingsTextByFlag(L, "legacy.a2fc979f0e38")}</span>
             <SearchableSelect options={PAPER_SIZES.map((s) => ({ value: s, label: s }))} value={form.paperSize} onChange={(v) => set("paperSize", v as typeof form.paperSize)} allowClear={false} disabled={!canManage} className={searchableTouch} />
           </div>
-          <CtrlRow title={L ? "In tự động sau mỗi đơn" : "Auto-print after each order"} checked={form.autoPrint} onChange={canManage ? (v) => set("autoPrint", v) : undefined} />
-          <CtrlRow title={L ? "Mở ngăn kéo khi thu tiền mặt" : "Open cash drawer on cash payment"} checked={form.openDrawer} onChange={canManage ? (v) => set("openDrawer", v) : undefined} />
-          <div className="flex items-center gap-2"><Link href="/settings/print" className={btnS}><Printer className="w-3 h-3" />{L ? "Mở thiết kế mẫu in →" : "Open template designer →"}</Link></div>
+          <CtrlRow title={settingsTextByFlag(L, "legacy.1aa189ecc1cc")} checked={form.autoPrint} onChange={canManage ? (v) => set("autoPrint", v) : undefined} />
+          <CtrlRow title={settingsTextByFlag(L, "legacy.47e373cda842")} checked={form.openDrawer} onChange={canManage ? (v) => set("openDrawer", v) : undefined} />
+          <div className="flex items-center gap-2"><Link href="/settings/print" className={btnS}><Printer className="w-3 h-3" />{settingsTextByFlag(L, "legacy.06d544b44c79")}</Link></div>
           <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} />
         </div>
       </Card>
-      <Card title={L ? "Thiết bị (xem trước)" : "Devices (preview)"} vi={L ? "Phát hiện thiết bị sẽ có ở bản desktop" : "Device detection ships with the desktop app"}>
+      <Card title={settingsTextByFlag(L, "legacy.b440eb4f8ce5")} vi={settingsTextByFlag(L, "legacy.bc838bfce768")}>
         <div className="p-4 flex flex-col gap-2">
           {DEVICES.map((d, i) => (
             <div key={i} className={cn(ROW, "opacity-70")}>
               <span className="w-9 h-9 rounded-[10px] bg-surface-2 grid place-items-center text-lg shrink-0">{d.ico}</span>
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-bold truncate">{d.name}</div>
-                <div className="text-[10px] text-slate-500">{(L ? d.vi : d.en)} · {d.detail}</div>
+                <div className="text-[10px] text-slate-500">{settingsTextByFlag(L, `ui.devices.${d.labelKey}`)} · {d.detail}</div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className={cn("w-2 h-2 rounded-full", dot[d.status as keyof typeof dot])} />
@@ -1833,23 +1825,23 @@ function PaymentsSection({
   const toggle = (id: keyof typeof pm) => { if (!canManage) return; setPm((p) => ({ ...p, [id]: !p[id] })); setDirty(true); setSaved(false); };
   function save() { start(async () => { const r = await updateStorePrefs({ payments: pm }); if (r.ok) { setDirty(false); setSaved(true); } }); }
   const tabs = [
-    { id: "methods", label: L ? "Phương thức" : "Methods" },
-    { id: "accounts", label: L ? "Tài khoản ngân hàng" : "Bank accounts" },
-    { id: "notifications", label: L ? "Thông báo thanh toán" : "Payment notifications" },
+    { id: "methods", label: settingsTextByFlag(L, "legacy.75b7ecc9fa25") },
+    { id: "accounts", label: settingsTextByFlag(L, "legacy.6cf92dd12923") },
+    { id: "notifications", label: settingsTextByFlag(L, "legacy.9f8d503d1f1c") },
   ] as const;
   return (
     <>
       <SegmentedTabs className="mb-4" items={tabs} value={tab} onChange={setTab} />
       {tab === "methods" && (
-        <Card title={L ? "Phương thức thanh toán" : "Payment Methods"} vi={L ? "Bật phương thức cho màn thanh toán" : "Enable methods for checkout"}>
+        <Card title={settingsTextByFlag(L, "legacy.492a4cefe2c7")} vi={settingsTextByFlag(L, "legacy.abe75d28763f")}>
           <div className="p-4 flex flex-col gap-2">
             {PAYMENTS.map((p) => {
               const id = p.id as keyof typeof pm;
               return (
                 <div key={p.id} className={ROW}>
                   <span className="w-9 h-9 rounded-[10px] grid place-items-center text-lg shrink-0" style={{ background: p.color + "22", border: `1px solid ${p.color}33` }}>{p.ico}</span>
-                  <div className="flex-1 min-w-0"><div className="text-xs font-bold">{L ? p.vi : p.name}</div><div className="text-[10px] text-slate-500">{p.note}</div></div>
-                  <TouchTargetToggle checked={pm[id]} onChange={() => toggle(id)} aria-label={p.name} />
+                  <div className="flex-1 min-w-0"><div className="text-xs font-bold">{settingsTextByFlag(L, `ui.payments.${p.labelKey}`)}</div><div className="text-[10px] text-slate-500">{p.note}</div></div>
+                  <TouchTargetToggle checked={pm[id]} onChange={() => toggle(id)} aria-label={settingsTextByFlag(L, `ui.payments.${p.labelKey}`)} />
                 </div>
               );
             })}
@@ -1883,7 +1875,7 @@ function SePayNotificationsSection({ L }: { L: boolean }) {
     }
   };
   return (
-    <Card title={t("notificationTitle")} vi={L ? "Webhook SePay để tự xác nhận tiền vào" : "SePay webhook for automatic payment confirmation"}>
+    <Card title={t("notificationTitle")} vi={settingsTextByFlag(L, "legacy.ab21a20f0c4d")}>
       <div className="p-4 flex flex-col gap-4">
         <div className="rounded-xl border border-border bg-canvas p-3.5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1995,7 +1987,7 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
     setMessage("");
   };
   return (
-    <Card title={t("title")} vi={L ? "Chỉ cần tài khoản ngân hàng để tạo VietQR" : "Only a bank account is required to generate VietQR"}>
+    <Card title={t("title")} vi={settingsTextByFlag(L, "legacy.9d784c22316b")}>
       <div className="p-4 flex flex-col gap-4">
         <div className="rounded-xl border border-in/20 bg-in-soft px-3.5 py-3 text-[11px] leading-relaxed text-in">{t("qrOnlyHelp")}</div>
         <div className="flex items-start justify-between gap-3">
@@ -2077,7 +2069,7 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
             <header className="flex items-start justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-5">
               <div className="min-w-0">
                 <div className="text-sm font-bold">{isEditing ? t("editAccount") : t("addAccount")}</div>
-                <div className="mt-0.5 text-[11px] text-slate-500">{L ? "Tài khoản dùng để tạo VietQR và nhận callback SePay." : "Use this account for VietQR and SePay callbacks."}</div>
+                <div className="mt-0.5 text-[11px] text-slate-500">{settingsTextByFlag(L, "legacy.147751e48352")}</div>
               </div>
               <button
                 type="button"
@@ -2223,24 +2215,24 @@ function PrintSection({ L }: { L: boolean }) {
   const items = [
     {
       href: "/settings/print",
-      title: L ? "Mẫu chứng từ" : "Document templates",
-      desc: L ? "Hóa đơn, báo giá, đặt hàng, nhập hàng, trả hàng và biên nhận." : "Invoices, quotes, bookings, purchases, returns and receipts.",
+      title: settingsTextByFlag(L, "legacy.2d209a8a0bcb"),
+      desc: settingsTextByFlag(L, "legacy.e40ff82a67ce"),
       meta: "A4 / A5 / K80",
       primary: true,
     },
     {
       href: Routes.LabelSettings,
-      title: L ? "Mẫu tem mã" : "Barcode label templates",
-      desc: L ? "Tem mã vạch sản phẩm, SKU, giá bán, lề trắng và kích thước tem." : "Product barcode labels, SKU, price, quiet zones and label sizes.",
+      title: settingsTextByFlag(L, "legacy.c5754b82e407"),
+      desc: settingsTextByFlag(L, "legacy.96601028158a"),
       meta: "40x30 / 50x30 / 35x22",
       primary: false,
     },
   ];
   return (
-    <Card title={L ? "Thiết kế mẫu in (15.1)" : "Print Template Designer (15.1)"} vi={L ? "Chứng từ · tem mã · K80/K57/A5/A4" : "Documents · barcode labels · K80/K57/A5/A4"}>
+    <Card title={settingsTextByFlag(L, "legacy.59d3763dab7e")} vi={settingsTextByFlag(L, "legacy.71ca4511628b")}>
       <div className="p-4.5">
         <p className="mb-3 text-[12px] leading-relaxed text-slate-500">
-          {L ? "Tùy chỉnh mẫu in theo từng nhóm để tránh nhầm giữa chứng từ và tem mã vạch sản phẩm." : "Manage each print-template group separately so document layouts and product barcode labels stay clear."}
+          {settingsTextByFlag(L, "legacy.27464a4f5215")}
         </p>
         <div className="grid gap-3 md:grid-cols-2">
           {items.map((item) => (
@@ -2315,38 +2307,30 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
         setSaved(true);
         setError("");
       } else {
-        setError(L ? "Không lưu được cấu hình thuế. Kiểm tra các trường bắt buộc rồi thử lại." : "Could not save tax settings. Check required fields and try again.");
+        setError(settingsTextByFlag(L, "legacy.193dd7944aa5"));
       }
     });
   }
   const pctColor = (r: number) => r === 0 ? "text-slate-400" : r === 5 ? "text-ok" : r === 8 ? "text-warn" : "text-er";
   const taxpayerTypeOptions = TAXPAYER_TYPES.map((value) => ({
     value,
-    label: L
-      ? ({ household_business: "Hộ kinh doanh", individual_business: "Cá nhân kinh doanh", enterprise: "Doanh nghiệp" } as const)[value]
-      : ({ household_business: "Household business", individual_business: "Individual business", enterprise: "Enterprise" } as const)[value],
+    label: settingsTextByFlag(L, `ui.tax.taxpayerType.${value}`),
   }));
   const calculationMethodOptions = TAX_CALCULATION_METHODS.map((value) => ({
     value,
-    label: L
-      ? ({ unconfigured: "Chưa xác định", non_taxable: "Không chịu GTGT / không phải nộp TNCN", revenue_percentage: "GTGT và TNCN theo tỷ lệ doanh thu", taxable_income: "GTGT theo doanh thu, TNCN theo thu nhập" } as const)[value]
-      : ({ unconfigured: "Not configured", non_taxable: "Not subject to VAT / PIT", revenue_percentage: "VAT and PIT as revenue percentages", taxable_income: "VAT on revenue, PIT on taxable income" } as const)[value],
+    label: settingsTextByFlag(L, `ui.tax.calculationMethod.${value}`),
   }));
   const filingFrequencyOptions = TAX_FILING_FREQUENCIES.map((value) => ({
     value,
-    label: L
-      ? ({ unconfigured: "Chưa xác định", monthly: "Theo tháng", quarterly: "Theo quý", annual: "Theo năm", per_occurrence: "Theo từng lần phát sinh" } as const)[value]
-      : ({ unconfigured: "Not configured", monthly: "Monthly", quarterly: "Quarterly", annual: "Annual", per_occurrence: "Per occurrence" } as const)[value],
+    label: settingsTextByFlag(L, `ui.tax.filingFrequency.${value}`),
   }));
   const vatTreatmentOptions = VAT_TREATMENTS.map((value) => ({
     value,
-    label: L
-      ? ({ taxable: "Chịu thuế GTGT", zero_rated: "Thuế suất 0%", not_subject: "Không chịu thuế GTGT", not_declared: "Không kê khai, tính nộp GTGT" } as const)[value]
-      : ({ taxable: "Subject to VAT", zero_rated: "0% VAT", not_subject: "Not subject to VAT", not_declared: "Not declared for VAT" } as const)[value],
+    label: settingsTextByFlag(L, `ui.tax.vatTreatment.${value}`),
   }));
   const directTaxPresetOptions = [
-    { value: "", label: L ? "Chưa chọn ngành nghề mặc định" : "No default activity" },
-    ...DIRECT_TAX_PRESETS.map((preset) => ({ value: preset.id, label: L ? preset.vi : preset.en })),
+    { value: "", label: settingsTextByFlag(L, "legacy.0da96b6841aa") },
+    ...DIRECT_TAX_PRESETS.map((preset) => ({ value: preset.id, label: settingsTextByFlag(L, `ui.tax.directTaxPresets.${preset.labelKey}`) })),
   ];
   function selectDirectTaxPreset(value: string) {
     const preset = DIRECT_TAX_PRESETS.find((item) => item.id === value);
@@ -2361,91 +2345,91 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
     <>
       <div className="sticky top-0 z-30 -mx-3 mb-4 hidden min-h-16 items-center justify-between gap-4 border-b border-border bg-canvas px-3 py-2 md:flex md:-mx-7 md:px-7">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight">{L ? "Thuế & Hóa đơn điện tử" : "Tax & E-Invoice"}</h1>
-          <p className="mt-0.5 text-[10px] italic text-slate-400">{L ? "Thiết lập thuế, sổ kế toán và hóa đơn điện tử" : "Tax, accounting book, and e-invoice settings"}</p>
+          <h1 className="text-xl font-extrabold tracking-tight">{settingsTextByFlag(L, "legacy.f2f25ea19d25")}</h1>
+          <p className="mt-0.5 text-[10px] italic text-slate-400">{settingsTextByFlag(L, "legacy.182380bace9e")}</p>
         </div>
         <div className="flex items-center gap-3">
           <span className={cn("text-[11px]", error ? "text-er" : "text-slate-500")}>
-            {error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : saved ? (L ? "Đã lưu" : "Saved") : "")}
+            {error || (dirty ? (settingsTextByFlag(L, "legacy.3bf5caaee8b4")) : saved ? (settingsTextByFlag(L, "legacy.e8f6c0afb49d")) : "")}
           </span>
           {canManage && (
             <Button disabled={!dirty} loading={pending} onClick={save}>
               {!pending && <Check />}
-              {L ? "Lưu" : "Save"}
+              {settingsTextByFlag(L, "legacy.2d7e281f1bcd")}
             </Button>
           )}
         </div>
       </div>
-      <Card title={L ? "Hồ sơ và phương pháp tính thuế" : "Tax profile and calculation method"} vi={L ? "Quyết định loại sổ kế toán và tờ khai được sử dụng" : "Determines the accounting books and filing forms"}>
+      <Card title={settingsTextByFlag(L, "legacy.1e881eccdabb")} vi={settingsTextByFlag(L, "legacy.3c2bb7488041")}>
         <div className="grid gap-4 p-4.5 md:grid-cols-2">
           <div className="flex min-w-0 flex-col gap-2">
-            <span id="taxpayer-type-label" className={FL}>{L ? "Loại người nộp thuế" : "Taxpayer type"}</span>
+            <span id="taxpayer-type-label" className={FL}>{settingsTextByFlag(L, "legacy.d795c86a7e4e")}</span>
             <Select aria-labelledby="taxpayer-type-label" disabled={!canManage} value={form.taxpayerType} onValueChange={(value) => set("taxpayerType", value as typeof form.taxpayerType)} options={taxpayerTypeOptions} rootClassName="w-full" menuMinWidth={320} wrapLabel />
           </div>
           <div className="flex min-w-0 flex-col gap-2">
-            <span id="tax-calculation-method-label" className={FL}>{L ? "Phương pháp tính thuế" : "Tax calculation method"}</span>
+            <span id="tax-calculation-method-label" className={FL}>{settingsTextByFlag(L, "legacy.835061cc49c8")}</span>
             <Select aria-labelledby="tax-calculation-method-label" disabled={!canManage} value={form.calculationMethod} onValueChange={(value) => set("calculationMethod", value as typeof form.calculationMethod)} options={calculationMethodOptions} rootClassName="w-full" menuMinWidth={520} wrapLabel />
           </div>
           <div className="flex min-w-0 flex-col gap-2">
-            <span id="tax-filing-frequency-label" className={FL}>{L ? "Kỳ kê khai" : "Filing frequency"}</span>
+            <span id="tax-filing-frequency-label" className={FL}>{settingsTextByFlag(L, "legacy.d20df8de1d87")}</span>
             <Select aria-labelledby="tax-filing-frequency-label" disabled={!canManage} value={form.filingFrequency} onValueChange={(value) => set("filingFrequency", value as typeof form.filingFrequency)} options={filingFrequencyOptions} rootClassName="w-full" menuMinWidth={320} wrapLabel />
           </div>
           <label className="flex min-w-0 flex-col gap-2">
-            <span className={FL}>{L ? "Áp dụng từ ngày" : "Effective from"}</span>
+            <span className={FL}>{settingsTextByFlag(L, "legacy.4d1333bf2034")}</span>
             <input type="date" disabled={!canManage} value={form.effectiveFrom} onChange={(event) => set("effectiveFrom", event.target.value)} className={FI} />
           </label>
         </div>
         {form.calculationMethod === "unconfigured" && (
           <div className="px-4.5 pb-4.5">
             <p className="rounded-lg border border-warn/30 bg-warn-soft px-3.5 py-2.5 text-[11px] leading-relaxed text-warn">
-              {L ? "Cần chọn phương pháp trước khi Luma tạo sổ kế toán hoặc tờ khai." : "Choose a method before Luma generates accounting books or filings."}
+              {settingsTextByFlag(L, "legacy.71896b3892b3")}
             </p>
           </div>
         )}
       </Card>
 
       {form.calculationMethod === "revenue_percentage" && (
-        <Card title={L ? "Thiết lập thuế trực tiếp" : "Direct tax settings"} vi={L ? "Mặc định cho giao dịch mới; không thay đổi chứng từ đã lưu" : "Defaults for new transactions; saved documents are unchanged"}>
+        <Card title={settingsTextByFlag(L, "legacy.c9b1cd76e0d0")} vi={settingsTextByFlag(L, "legacy.f38abc4a3ffc")}>
           <div className="flex flex-col gap-2 p-3.5">
             <div className="flex min-w-0 flex-col gap-2">
-              <span id="direct-tax-rate-label" className={FL}>{L ? "Tỷ lệ thuế mặc định" : "Default tax rates"}</span>
+              <span id="direct-tax-rate-label" className={FL}>{settingsTextByFlag(L, "legacy.f26b2c0033c1")}</span>
               <Select aria-labelledby="direct-tax-rate-label" disabled={!canManage} value={form.defaultDirectTaxActivityId} onValueChange={selectDirectTaxPreset} options={directTaxPresetOptions} rootClassName="w-full" menuMinWidth={720} wrapLabel />
               <span className="block text-[10px] leading-relaxed text-slate-500">
-                {L ? "Chọn preset sẽ thêm hoặc cập nhật ngành nghề tương ứng bên dưới; bạn vẫn có thể chỉnh tỷ lệ thủ công." : "Selecting a preset adds or updates the matching activity below; rates can still be edited manually."}
+                {settingsTextByFlag(L, "legacy.584dd01e1c27")}
               </span>
             </div>
             <CtrlRow
-              title={L ? "Mặc định giảm thuế cho giao dịch" : "Apply tax reduction to new transactions by default"}
-              desc={L ? `Giảm ${DIRECT_TAX_REDUCTION_PERCENT}% số thuế GTGT theo tỷ lệ doanh thu; không giảm TNCN` : `Reduces revenue-based VAT by ${DIRECT_TAX_REDUCTION_PERCENT}%; PIT is unchanged`}
+              title={settingsTextByFlag(L, "legacy.3c73f3977389")}
+              desc={settingsTextByFlag(L, "legacy.ec0ee2a9227d", { percent: DIRECT_TAX_REDUCTION_PERCENT })}
               checked={form.defaultTaxReductionOnTransaction}
               onChange={canManage ? (value) => set("defaultTaxReductionOnTransaction", value) : undefined}
             />
             <CtrlRow
-              title={L ? "Mặc định giảm thuế cho tất cả hàng hóa" : "Treat all products as reduction-eligible by default"}
-              desc={L ? "Chỉ bật khi toàn bộ hàng hóa, dịch vụ thuộc diện được giảm; có thể thay đổi trên từng giao dịch mới" : "Enable only when all goods and services are eligible; this can be changed on each new transaction"}
+              title={settingsTextByFlag(L, "legacy.b7a138ca9e8c")}
+              desc={settingsTextByFlag(L, "legacy.1e44c6c1b158")}
               checked={form.defaultTaxReductionForAllProducts}
               onChange={canManage ? (value) => set("defaultTaxReductionForAllProducts", value) : undefined}
             />
             <p className="rounded-[10px] border border-warn/25 bg-warn-soft px-3 py-2 text-[10px] leading-relaxed text-warn">
-              {L ? "Luma chỉ tự động giảm thuế khi cả hai tùy chọn trên được bật. Hãy kiểm tra điều kiện áp dụng theo kỳ kê khai trước khi lập tờ khai." : "Luma applies the reduction automatically only when both options are enabled. Confirm eligibility for the filing period before preparing a declaration."}
+              {settingsTextByFlag(L, "legacy.2766f698cfde")}
             </p>
           </div>
         </Card>
       )}
 
-      <Card title={L ? "Thông tin người nộp thuế" : "Taxpayer information"} vi={L ? "Mã số thuế hiện tại lấy từ Thông tin cửa hàng" : "Current tax code comes from Store profile"}>
+      <Card title={settingsTextByFlag(L, "legacy.67d61854e7b0")} vi={settingsTextByFlag(L, "legacy.e22d3deaaf41")}>
         <div className="grid gap-3 p-3.5 md:grid-cols-2">
-          <label className="space-y-1.5"><span className={FL}>{L ? "Tên người nộp thuế" : "Taxpayer name"}</span><input disabled={!canManage} value={form.taxpayerName} onChange={(event) => set("taxpayerName", event.target.value)} className={FI} maxLength={200} /></label>
-          <label className="space-y-1.5"><span className={FL}>{L ? "Mã số thuế cũ" : "Former tax code"}</span><input disabled={!canManage} value={form.formerTaxCode} onChange={(event) => set("formerTaxCode", event.target.value)} className={FI} maxLength={30} /></label>
-          <label className="space-y-1.5"><span className={FL}>{L ? "Email nhận hồ sơ" : "Filing email"}</span><input type="email" disabled={!canManage} value={form.taxpayerEmail} onChange={(event) => set("taxpayerEmail", event.target.value)} className={FI} maxLength={254} /></label>
-          <label className="space-y-1.5 md:col-span-2"><span className={FL}>{L ? "Địa chỉ người nộp thuế" : "Taxpayer address"}</span><input disabled={!canManage} value={form.taxpayerAddress} onChange={(event) => set("taxpayerAddress", event.target.value)} className={FI} maxLength={300} /></label>
+          <label className="space-y-1.5"><span className={FL}>{settingsTextByFlag(L, "legacy.1a69f60027ed")}</span><input disabled={!canManage} value={form.taxpayerName} onChange={(event) => set("taxpayerName", event.target.value)} className={FI} maxLength={200} /></label>
+          <label className="space-y-1.5"><span className={FL}>{settingsTextByFlag(L, "legacy.9a3f40f892dd")}</span><input disabled={!canManage} value={form.formerTaxCode} onChange={(event) => set("formerTaxCode", event.target.value)} className={FI} maxLength={30} /></label>
+          <label className="space-y-1.5"><span className={FL}>{settingsTextByFlag(L, "legacy.424014f49dcf")}</span><input type="email" disabled={!canManage} value={form.taxpayerEmail} onChange={(event) => set("taxpayerEmail", event.target.value)} className={FI} maxLength={254} /></label>
+          <label className="space-y-1.5 md:col-span-2"><span className={FL}>{settingsTextByFlag(L, "legacy.886eabd43286")}</span><input disabled={!canManage} value={form.taxpayerAddress} onChange={(event) => set("taxpayerAddress", event.target.value)} className={FI} maxLength={300} /></label>
         </div>
       </Card>
 
-      <Card title={L ? "Quy tắc thuế GTGT" : "VAT rules"} vi={L ? "Áp cho đơn mới; chứng từ đã lưu không bị đổi" : "Applied to new documents; saved documents are unchanged"}>
+      <Card title={settingsTextByFlag(L, "legacy.118edd864453")} vi={settingsTextByFlag(L, "legacy.c9d915f2cb4b")}>
         <div className="p-3.5 flex flex-col gap-1.5">
           <div className="mb-2 flex min-w-0 flex-col gap-2">
-            <span id="vat-treatment-label" className={FL}>{L ? "Phân loại GTGT mặc định" : "Default VAT treatment"}</span>
+            <span id="vat-treatment-label" className={FL}>{settingsTextByFlag(L, "legacy.1e04dd0a2947")}</span>
             <Select aria-labelledby="vat-treatment-label" disabled={!canManage} value={form.vatTreatment} onValueChange={(value) => {
               const treatment = value as typeof form.vatTreatment;
               setForm((current) => ({ ...current, vatTreatment: treatment, autoApplyDefaultVat: treatment === "taxable" && current.autoApplyDefaultVat }));
@@ -2457,32 +2441,32 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
             return (
               <button key={v.rate} type="button" disabled={!canManage} onClick={() => set("defaultRate", v.rate)} className={cn(ROW, "text-left transition", on && "border-primary-500 ring-2 ring-primary-500/20", canManage && "hover:border-primary-400")}>
                 <span className={cn("font-mono text-base font-extrabold w-10 shrink-0", pctColor(v.rate))}>{v.rate}%</span>
-                <div className="flex-1 min-w-0"><div className="text-xs font-bold">{L ? v.vi : v.en}</div><div className="text-[10px] text-slate-500">{L ? v.itemsVi : v.itemsEn}</div></div>
-                {on && <span className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300 shrink-0">{L ? "Mặc định" : "Default"}</span>}
+                <div className="flex-1 min-w-0"><div className="text-xs font-bold">{settingsTextByFlag(L, `ui.tax.vatRates.${v.rate}.title`)}</div><div className="text-[10px] text-slate-500">{settingsTextByFlag(L, `ui.tax.vatRates.${v.rate}.description`)}</div></div>
+                {on && <span className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300 shrink-0">{settingsTextByFlag(L, "legacy.242be4b0c6c5")}</span>}
               </button>
             );
           })}
           {form.vatTreatment === "taxable" && (
             <label className={cn(ROW, "mt-1")}>
-              <span className="flex-1"><span className="block text-xs font-bold">{L ? "Thuế suất khác" : "Other VAT rate"}</span><span className="block text-[10px] italic text-slate-500">{L ? "Nhập khi mức áp dụng không có trong danh sách trên" : "Use when the applicable rate is not listed above"}</span></span>
+              <span className="flex-1"><span className="block text-xs font-bold">{settingsTextByFlag(L, "legacy.a49b6b85a36f")}</span><span className="block text-[10px] italic text-slate-500">{settingsTextByFlag(L, "legacy.8ef22b88d8fc")}</span></span>
               <NumberInput disabled={!canManage} min={0} max={100} value={form.defaultRate} onChange={(value) => set("defaultRate", value ?? 0)} suffix="%" thousandSeparator={false} className="w-28" />
             </label>
           )}
-          <CtrlRow title={L ? "Tự áp dụng VAT cho đơn mới" : "Apply VAT to new documents automatically"} desc={L ? "Đơn mới dùng thuế suất mặc định; từng sản phẩm vẫn được ưu tiên" : "New documents use the default rate; product rates take precedence"} checked={form.autoApplyDefaultVat} onChange={canManage && form.vatTreatment === "taxable" ? (v) => set("autoApplyDefaultVat", v) : undefined} />
-          <CtrlRow title={L ? "Giá đã bao gồm thuế" : "Prices include tax"} desc={L ? "Giá niêm yết đã gồm GTGT" : "Listed prices are tax-inclusive"} checked={form.priceIncludesTax} onChange={canManage ? (v) => set("priceIncludesTax", v) : undefined} />
+          <CtrlRow title={settingsTextByFlag(L, "legacy.520dc5c159c3")} desc={settingsTextByFlag(L, "legacy.92f6e5b7362a")} checked={form.autoApplyDefaultVat} onChange={canManage && form.vatTreatment === "taxable" ? (v) => set("autoApplyDefaultVat", v) : undefined} />
+          <CtrlRow title={settingsTextByFlag(L, "legacy.99793dc70dcb")} desc={settingsTextByFlag(L, "legacy.2d902814b228")} checked={form.priceIncludesTax} onChange={canManage ? (v) => set("priceIncludesTax", v) : undefined} />
         </div>
       </Card>
 
-      <Card title={L ? "Ngành nghề và tỷ lệ tính thuế" : "Business activities and tax rates"} vi={L ? "Dùng khi tổng hợp doanh thu, thuế GTGT và TNCN" : "Used to aggregate revenue, VAT, and PIT"} action={canManage ? <button type="button" onClick={addActivity} className={btnS}><Plus className="h-3.5 w-3.5" />{L ? "Thêm" : "Add"}</button> : undefined}>
+      <Card title={settingsTextByFlag(L, "legacy.81869576af6d")} vi={settingsTextByFlag(L, "legacy.c8be17cc7214")} action={canManage ? <button type="button" onClick={addActivity} className={btnS}><Plus className="h-3.5 w-3.5" />{settingsTextByFlag(L, "legacy.9b1c10451b78")}</button> : undefined}>
         <div className="space-y-2 p-3.5">
           {form.businessActivities.length === 0 ? (
-            <p className="rounded-[10px] border border-dashed border-border px-3 py-5 text-center text-xs text-slate-400">{L ? "Chưa cấu hình ngành nghề tính thuế." : "No tax activity is configured."}</p>
+            <p className="rounded-[10px] border border-dashed border-border px-3 py-5 text-center text-xs text-slate-400">{settingsTextByFlag(L, "legacy.5b6684c86ab5")}</p>
           ) : form.businessActivities.map((activity, index) => (
             <div key={activity.id} className="grid gap-2 rounded-[10px] border border-border-soft bg-canvas p-3 md:grid-cols-[minmax(0,1fr)_110px_110px_auto] md:items-end">
-              <label className="space-y-1.5"><span className={FL}>{L ? "Ngành nghề" : "Activity"}</span><input disabled={!canManage} value={activity.name} onChange={(event) => setActivity(index, { name: event.target.value })} className={FI} maxLength={160} /></label>
+              <label className="space-y-1.5"><span className={FL}>{settingsTextByFlag(L, "legacy.bd8d3f19edf0")}</span><input disabled={!canManage} value={activity.name} onChange={(event) => setActivity(index, { name: event.target.value })} className={FI} maxLength={160} /></label>
               <label className="space-y-1.5"><span className={FL}>GTGT</span><NumberInput disabled={!canManage} min={0} max={100} value={activity.vatRate} onChange={(value) => setActivity(index, { vatRate: value ?? 0 })} suffix="%" thousandSeparator={false} /></label>
               <label className="space-y-1.5"><span className={FL}>TNCN</span><NumberInput disabled={!canManage} min={0} max={100} value={activity.pitRate} onChange={(value) => setActivity(index, { pitRate: value ?? 0 })} suffix="%" thousandSeparator={false} /></label>
-              {canManage && <button type="button" onClick={() => removeActivity(index)} aria-label={L ? `Xóa ngành nghề ${activity.name || index + 1}` : `Remove activity ${activity.name || index + 1}`} className={cn(btnS, "text-er")}><Trash2 className="h-3.5 w-3.5" /></button>}
+              {canManage && <button type="button" onClick={() => removeActivity(index)} aria-label={settingsTextByFlag(L, "legacy.467a638d08d5", { name: activity.name || index + 1 })} className={cn(btnS, "text-er")}><Trash2 className="h-3.5 w-3.5" /></button>}
             </div>
           ))}
         </div>
@@ -2549,52 +2533,50 @@ function NotificationsSection({
   function save() { start(async () => { const r = await updateStorePrefs({ notifications: form }); if (r.ok) { setDirty(false); setSaved(true); } }); }
 
   const types: { k: TK; title: string; desc: string }[] = [
-    { k: "lowStock", title: L ? "Cảnh báo tồn kho thấp" : "Low-stock alert", desc: L ? "Khi tồn < mức tối thiểu" : "When stock < minimum" },
-    { k: "stagnant", title: L ? "Hàng chậm bán (>60 ngày)" : "Stagnant stock (>60 days)", desc: L ? "SKU không bán 60 ngày" : "SKU unsold 60+ days" },
-    { k: "shiftClose", title: L ? "Nhắc đóng ca (18:00)" : "Shift close reminder (18:00)", desc: L ? "Nhắc đóng ca mỗi ngày" : "Daily shift close reminder" },
-    { k: "einvoiceError", title: L ? "Lỗi hóa đơn điện tử" : "E-invoice error", desc: L ? "Khi HĐĐT gửi thất bại" : "When e-invoice fails" },
-    { k: "syncDone", title: L ? "Đồng bộ hoàn tất" : "Sync completed", desc: L ? "Khi dữ liệu offline đồng bộ xong" : "When offline data syncs" },
-    { k: "serviceDue", title: L ? "Công việc bảo trì đến hạn" : "Maintenance due", desc: L ? "Khi hệ thống tự tạo việc bảo trì" : "When a maintenance job is generated" },
-    { k: "invoiceCreated", title: L ? "Hóa đơn mới" : "New invoice", desc: L ? "Khi hóa đơn hoàn tất được tạo" : "When a completed invoice is created" },
-    { k: "invoiceCancelled", title: L ? "Hủy hóa đơn" : "Invoice cancelled", desc: L ? "Khi hóa đơn hoặc đơn bán bị hủy" : "When an invoice or sales order is cancelled" },
-    { k: "purchaseReceived", title: L ? "Nhập hàng đã nhận" : "Purchase received", desc: L ? "Khi phiếu nhập được ghi nhận đã nhận hàng" : "When a purchase receipt is recorded" },
-    { k: "purchaseCancelled", title: L ? "Hủy phiếu nhập" : "Purchase cancelled", desc: L ? "Khi phiếu nhập bị hủy" : "When a purchase receipt is cancelled" },
-    { k: "debtChanged", title: L ? "Thay đổi công nợ" : "Debt changed", desc: L ? "Khi công nợ khách hàng hoặc nhà cung cấp thay đổi" : "When customer or supplier debt changes" },
-    { k: "paymentReceived", title: L ? "Nhận thanh toán" : "Payment received", desc: L ? "Khi ghi nhận khách hàng thanh toán" : "When a customer payment is recorded" },
-    { k: "qrPaymentConfirmed", title: L ? "Thanh toán QR thành công" : "QR payment confirmed", desc: L ? "Khi hệ thống xác nhận thanh toán QR" : "When a QR payment is confirmed" },
-    { k: "qrPaymentException", title: L ? "Giao dịch QR cần kiểm tra" : "QR payment needs review", desc: L ? "Khi giao dịch QR cần đối soát thủ công" : "When a QR payment needs manual review" },
+    { k: "lowStock", title: settingsTextByFlag(L, "legacy.b9b474ebb698"), desc: settingsTextByFlag(L, "legacy.0bcb37916708") },
+    { k: "stagnant", title: settingsTextByFlag(L, "legacy.c17364a6bbf3"), desc: settingsTextByFlag(L, "legacy.48697b5a9527") },
+    { k: "shiftClose", title: settingsTextByFlag(L, "legacy.2e55a239721f"), desc: settingsTextByFlag(L, "legacy.9a9c82ebecf5") },
+    { k: "einvoiceError", title: settingsTextByFlag(L, "legacy.06c1d3e0c412"), desc: settingsTextByFlag(L, "legacy.fe218ac4a1ee") },
+    { k: "syncDone", title: settingsTextByFlag(L, "legacy.2169b32092b5"), desc: settingsTextByFlag(L, "legacy.0eeb1bf9900d") },
+    { k: "serviceDue", title: settingsTextByFlag(L, "legacy.0a88d5f066df"), desc: settingsTextByFlag(L, "legacy.22579e4ecce9") },
+    { k: "invoiceCreated", title: settingsTextByFlag(L, "legacy.b4672761abb1"), desc: settingsTextByFlag(L, "legacy.988322cc0014") },
+    { k: "invoiceCancelled", title: settingsTextByFlag(L, "legacy.9867c63cf650"), desc: settingsTextByFlag(L, "legacy.6951d20e7ba0") },
+    { k: "purchaseReceived", title: settingsTextByFlag(L, "legacy.d3183363028d"), desc: settingsTextByFlag(L, "legacy.f64ab21d6cbd") },
+    { k: "purchaseCancelled", title: settingsTextByFlag(L, "legacy.91ee48894067"), desc: settingsTextByFlag(L, "legacy.43f2d46e3898") },
+    { k: "debtChanged", title: settingsTextByFlag(L, "legacy.93e17de2010e"), desc: settingsTextByFlag(L, "legacy.00a763912ad9") },
+    { k: "paymentReceived", title: settingsTextByFlag(L, "legacy.4a3d08a4add7"), desc: settingsTextByFlag(L, "legacy.0e60b9f7dcd3") },
+    { k: "qrPaymentConfirmed", title: settingsTextByFlag(L, "legacy.c25cb9be4779"), desc: settingsTextByFlag(L, "legacy.984e93d75e87") },
+    { k: "qrPaymentException", title: settingsTextByFlag(L, "legacy.20f9ea2e4ce0"), desc: settingsTextByFlag(L, "legacy.b5b062a8728a") },
   ];
   const channelView = (id: string) => id === "push"
     ? { ico: "📲", name: "Push" }
     : id === "inApp"
-      ? { ico: "🔔", name: L ? "Thông báo trong ứng dụng" : "In-app" }
+      ? { ico: "🔔", name: settingsTextByFlag(L, "legacy.edacff77af19") }
       : { ico: "🔌", name: id };
   const roleLabel = (role: StaffRole) => ({
-    owner: L ? "Chủ cửa hàng" : "Owner",
-    manager: L ? "Quản lý" : "Manager",
-    cashier: L ? "Thu ngân" : "Cashier",
-    warehouse: L ? "Thủ kho" : "Warehouse",
-    technician: L ? "Kỹ thuật viên" : "Technician",
+    owner: settingsTextByFlag(L, "legacy.24e60d31645c"),
+    manager: settingsTextByFlag(L, "legacy.f0fd1990dc43"),
+    cashier: settingsTextByFlag(L, "legacy.d5f4adff8e64"),
+    warehouse: settingsTextByFlag(L, "legacy.21ff0a4b373f"),
+    technician: settingsTextByFlag(L, "legacy.843021669584"),
   }[role]);
   const entityLabel = (entityType: string) => ({
-    order: L ? "Đơn bán" : "Sales order",
-    purchase: L ? "Phiếu nhập" : "Purchase",
-    customer: L ? "Công nợ khách hàng" : "Customer debt",
-    supplier: L ? "Công nợ nhà cung cấp" : "Supplier debt",
-    payment: L ? "Giao dịch thanh toán" : "Payment",
+    order: settingsTextByFlag(L, "legacy.4bc11291c21c"),
+    purchase: settingsTextByFlag(L, "legacy.32c4ffa7c0f1"),
+    customer: settingsTextByFlag(L, "legacy.f3b9133e10c4"),
+    supplier: settingsTextByFlag(L, "legacy.a778f2731897"),
+    payment: settingsTextByFlag(L, "legacy.6329011de5f8"),
   }[entityType] ?? entityType);
   return (
     <>
-      <Card title={L ? "Loại thông báo" : "Notification Types"} vi={L ? "Ngưỡng & sự kiện" : "Thresholds & events"}>
+      <Card title={settingsTextByFlag(L, "legacy.887bc4bc8781")} vi={settingsTextByFlag(L, "legacy.f147727dcede")}>
         <div className="p-4.5 flex flex-col gap-1.5">
           {types.map((tp) => <CtrlRow key={tp.k} title={tp.title} desc={tp.desc} checked={form[tp.k]} onChange={canManage ? (v) => setType(tp.k, v) : undefined} />)}
         </div>
       </Card>
       <Card
-        title={L ? "Vai trò nhận thông báo nội bộ" : "Internal notification roles"}
-        vi={L
-          ? "Chỉ hiển thị vai trò có quyền mở đúng màn hình đích"
-          : "Only roles authorized to open each target are configurable"}
+        title={settingsTextByFlag(L, "legacy.2eed00681927")}
+        vi={settingsTextByFlag(L, "legacy.e5869286db0e")}
       >
         <div className="p-3.5 flex flex-col gap-2">
           {notificationCategories.map((category) => {
@@ -2625,9 +2607,7 @@ function NotificationsSection({
                           aria-pressed={selected}
                           disabled={!canManage || lastSelected}
                           title={lastSelected
-                            ? (L
-                              ? "Mỗi sự kiện cần ít nhất một vai trò"
-                              : "Each event needs at least one role")
+                            ? (settingsTextByFlag(L, "legacy.c947df15ef62"))
                             : undefined}
                           onClick={() =>
                             setRoutingRole(category, role, !selected)}
@@ -2662,7 +2642,7 @@ function NotificationsSection({
           })}
         </div>
       </Card>
-      <Card title={L ? "Kênh thông báo" : "Notification Channels"} vi={L ? "Nơi gửi thông báo" : "Where alerts are sent"}>
+      <Card title={settingsTextByFlag(L, "legacy.6c19c3efeeb4")} vi={settingsTextByFlag(L, "legacy.b2520df025b4")}>
         <div className="p-3.5 flex flex-col gap-1.5">
           {availableChannels.map((channel) => {
             const view = channelView(channel.id);
@@ -2672,7 +2652,7 @@ function NotificationsSection({
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-bold">{view.name}</div>
                   <div className="text-[9px] text-slate-500">
-                    {channel.configured ? (L ? "Sẵn sàng" : "Available") : (L ? "Chưa cấu hình phía server" : "Not configured on server")}
+                    {channel.configured ? (settingsTextByFlag(L, "legacy.d4c553c6bc2f")) : (settingsTextByFlag(L, "legacy.c5c261406d5a"))}
                   </div>
                 </div>
                 <TouchTargetToggle checked={form.channels[channel.id] === true} disabled={!canManage || !channel.configured} onChange={(v) => setChannel(channel.id, v)} aria-label={view.name} />
@@ -2717,12 +2697,12 @@ function ZaloSecretInput({
         type="password"
         value={value}
         disabled={!canEdit || clear}
-        placeholder={setFlag ? (L ? "Để trống để giữ giá trị hiện tại" : "Leave blank to keep current value") : ""}
+        placeholder={setFlag ? (settingsTextByFlag(L, "legacy.299a2f37de8c")) : ""}
         onChange={(e) => onValueChange(id, e.target.value)}
       />
       <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0 min-w-11 lg:min-w-0">
         <Checkbox checked={clear} disabled={!canEdit} onChange={(e) => onClearChange(id, e.target.checked)} />
-        {L ? "Xóa giá trị đang lưu" : "Clear saved value"}
+        {settingsTextByFlag(L, "legacy.8afe247b39e8")}
       </label>
     </div>
   );
@@ -2768,29 +2748,29 @@ function ShopeeSettingsSection({ L, prefs, canEdit }: { L: boolean; prefs: Store
   const callbackUrl = typeof window === "undefined" ? form.redirectPath : `${window.location.origin}${form.redirectPath.startsWith("/") ? form.redirectPath : `/${form.redirectPath}`}`;
   return (
     <>
-      <Card title={L ? "Marketplace Developer Apps" : "Marketplace Developer Apps"} vi={L ? "Cấu hình kỹ thuật cho OAuth và API sàn" : "Technical OAuth and marketplace API setup"}>
+      <Card title={settingsTextByFlag(L, "legacy.a6e8871843dd")} vi={settingsTextByFlag(L, "legacy.3873df3af493")}>
         <div className="p-4.5 flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className={cn(
               "inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold",
               form.enabled ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500"
             )}>
-              {form.enabled ? (L ? "Đang bật" : "Enabled") : (L ? "Đang tắt" : "Disabled")}
+              {form.enabled ? (settingsTextByFlag(L, "legacy.154bec51baa8")) : (settingsTextByFlag(L, "legacy.29712c0cd824"))}
             </span>
-            <Link href={Routes.OnlineSales} className={btnS}>{L ? "Mở Bán online" : "Open Online Sales"}</Link>
+            <Link href={Routes.OnlineSales} className={btnS}>{settingsTextByFlag(L, "legacy.e442a4cc7ca5")}</Link>
             <a href="https://open.shopee.com/" target="_blank" rel="noreferrer" className={btnS}>
-              <ExternalLink className="w-3 h-3" /> {L ? "Đăng ký Shopee app" : "Register Shopee app"}
+              <ExternalLink className="w-3 h-3" /> {settingsTextByFlag(L, "legacy.db3af85c7589")}
             </a>
           </div>
           <CtrlRow
-            title={L ? "Bật provider Shopee" : "Enable Shopee provider"}
-            desc={L ? "Bật app credential để Online Sales có thể kết nối gian hàng Shopee." : "Enable app credentials so Online Sales can connect Shopee shops."}
+            title={settingsTextByFlag(L, "legacy.d58e5b4189bb")}
+            desc={settingsTextByFlag(L, "legacy.f7f181f444b6")}
             checked={form.enabled}
             onChange={(value) => set("enabled", value)}
           />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="flex flex-col gap-1">
-              <span className={FL}>{L ? "Môi trường" : "Environment"}</span>
+              <span className={FL}>{settingsTextByFlag(L, "legacy.3efba0fdd616")}</span>
               <Select
                 value={form.environment}
                 onChange={(e) => set("environment", e.target.value === "production" ? "production" : "sandbox")}
@@ -2799,7 +2779,7 @@ function ShopeeSettingsSection({ L, prefs, canEdit }: { L: boolean; prefs: Store
                 className={FI}
               />
             </div>
-            <div className="flex flex-col gap-1"><span className={FL}>{L ? "Vùng" : "Region"}</span><input className={FI} name="marketplace-region" autoComplete="off" value={form.region} disabled={!canEdit} onChange={(e) => set("region", e.target.value.toUpperCase())} /></div>
+            <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.73a16b4b1c32")}</span><input className={FI} name="marketplace-region" autoComplete="off" value={form.region} disabled={!canEdit} onChange={(e) => set("region", e.target.value.toUpperCase())} /></div>
             <div className="flex flex-col gap-1"><span className={FL}>Shopee Partner ID</span><input className={cn(FI, "font-mono")} name="shopee-partner-id" autoComplete="off" inputMode="numeric" value={form.partnerId} disabled={!canEdit} onChange={(e) => set("partnerId", e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2812,29 +2792,27 @@ function ShopeeSettingsSection({ L, prefs, canEdit }: { L: boolean; prefs: Store
                 autoComplete="new-password"
                 value={form.partnerKey}
                 disabled={!canEdit || clearPartnerKey}
-                placeholder={partnerKeySet ? (L ? "Đã lưu, nhập key mới để thay" : "Saved, enter a new key to replace") : (L ? "Chưa cấu hình" : "Not configured")}
+                placeholder={partnerKeySet ? (settingsTextByFlag(L, "legacy.b3cd56883157")) : (settingsTextByFlag(L, "legacy.38655a2b9fca"))}
                 onChange={(e) => set("partnerKey", e.target.value)}
               />
               <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0 min-w-11 lg:min-w-0">
                 <Checkbox checked={clearPartnerKey} disabled={!canEdit} onChange={(e) => { setClearPartnerKey(e.target.checked); mark(); }} />
-                {L ? "Xóa partner key đang lưu" : "Clear saved partner key"}
+                {settingsTextByFlag(L, "legacy.8ef32aa218d6")}
               </label>
             </div>
             <div className="flex flex-col gap-1"><span className={FL}>OAuth callback</span><input className={cn(FI, "font-mono")} name="shopee-oauth-callback" autoComplete="off" value={form.redirectPath} disabled={!canEdit} onChange={(e) => set("redirectPath", e.target.value)} /><span className="text-[11px] text-slate-500 break-all">{callbackUrl}</span></div>
           </div>
           <div className="px-3.5 py-2.5 bg-in-soft border border-in/20 rounded-[10px] text-[11px] text-in leading-relaxed">
-            {L
-              ? "Đây là cấu hình kỹ thuật cho owner/developer. Nhân viên bán hàng nên kết nối gian hàng, chọn kho và chính sách đồng bộ trong Bán online. AI chỉ tạo gợi ý listing, không tự publish."
-              : "This is owner/developer setup. Sales staff should connect shops, choose warehouses, and configure sync policy in Online Sales. AI only drafts listings and never auto-publishes."}
+            {settingsTextByFlag(L, "legacy.0dfaa5ed39b5")}
           </div>
         </div>
       </Card>
-      {!canEdit && <p className="text-[11px] text-slate-400 italic mt-1">{L ? "Chỉ owner được sửa cấu hình developer sàn." : "Only the owner can edit marketplace developer settings."}</p>}
+      {!canEdit && <p className="text-[11px] text-slate-400 italic mt-1">{settingsTextByFlag(L, "legacy.9d47ccfe5585")}</p>}
       {canEdit && (dirty || saved || error) && (
         <div className="flex items-center gap-2 pt-1">
-          <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved"))}</span>
+          <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (settingsTextByFlag(L, "legacy.3bf5caaee8b4")) : (settingsTextByFlag(L, "legacy.e8f6c0afb49d")))}</span>
           <button disabled={!dirty || pending} onClick={save} className={cn(btnF, "disabled:opacity-50")}>
-            {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
+            {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{settingsTextByFlag(L, "legacy.2d7e281f1bcd")}
           </button>
         </div>
       )}
@@ -2908,8 +2886,8 @@ function ZaloSection({ L, prefs, canEdit }: { L: boolean; prefs: StorePrefs["zal
   return (
     <>
       <Card
-        title={L ? "Zalo Official Account" : "Zalo Official Account"}
-        vi={L ? "OA token và trạng thái gửi ZNS" : "OA token and ZNS sending status"}
+        title={settingsTextByFlag(L, "legacy.2c6494d86f34")}
+        vi={settingsTextByFlag(L, "legacy.e4d855486d10")}
         action={<TouchTargetToggle checked={form.enabled} onChange={canEdit ? (v) => set("enabled", v) : () => {}} aria-label="zalo" />}
       >
         <div className="p-4.5 flex flex-col gap-3">
@@ -2921,28 +2899,28 @@ function ZaloSection({ L, prefs, canEdit }: { L: boolean; prefs: StorePrefs["zal
               <MessageCircle className="h-3.5 w-3.5" />
               {channelReady
                 ? isZnsMode
-                  ? (L ? "Sẵn sàng gửi ZNS" : "Ready for ZNS")
-                  : (L ? "Sẵn sàng gửi tin OA" : "Ready for OA messages")
+                  ? (settingsTextByFlag(L, "legacy.2a4c34033786"))
+                  : (settingsTextByFlag(L, "legacy.8cdf06eab520"))
                 : connected
-                  ? (L ? "Thiếu template ZNS" : "ZNS template missing")
-                  : (L ? "Chưa đủ cấu hình" : "Configuration incomplete")}
+                  ? (settingsTextByFlag(L, "legacy.bb3448ecc6dd"))
+                  : (settingsTextByFlag(L, "legacy.832ddc21260a"))}
             </span>
             {isZnsMode && connected && !znsReady && (
               <span className="text-[11px] font-semibold text-slate-500">
-                {L ? "Template ZNS cần để gửi bằng SĐT." : "ZNS templates are required for phone delivery."}
+                {settingsTextByFlag(L, "legacy.242e04d44a0f")}
               </span>
             )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <span className={FL}>{L ? "Kênh gửi mặc định" : "Default sending channel"}</span>
+              <span className={FL}>{settingsTextByFlag(L, "legacy.7fcdb26cd1c9")}</span>
               <Select
                 className="w-full"
                 disabled={!canEdit}
                 value={form.deliveryMode}
                 options={[
-                  { value: "oa", label: L ? "Tin nhắn OA (Zalo user ID)" : "OA message (Zalo user ID)" },
-                  { value: "zns", label: L ? "ZNS Template (SĐT)" : "ZNS Template (phone)" },
+                  { value: "oa", label: settingsTextByFlag(L, "legacy.6121adc526f7") },
+                  { value: "zns", label: settingsTextByFlag(L, "legacy.64bb9b14ba03") },
                 ]}
                 onValueChange={(value) => set("deliveryMode", value === "zns" ? "zns" : "oa")}
               />
@@ -2958,24 +2936,22 @@ function ZaloSection({ L, prefs, canEdit }: { L: boolean; prefs: StorePrefs["zal
           </div>
           {isZnsMode && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="flex flex-col gap-1"><span className={FL}>{L ? "Template link đặt hàng" : "Portal link template"}</span><input className={cn(FI, "font-mono")} value={form.portalTemplateId} disabled={!canEdit} onChange={(e) => set("portalTemplateId", e.target.value)} /></div>
-              <div className="flex flex-col gap-1"><span className={FL}>{L ? "Template hóa đơn" : "Invoice template"}</span><input className={cn(FI, "font-mono")} value={form.invoiceTemplateId} disabled={!canEdit} onChange={(e) => set("invoiceTemplateId", e.target.value)} /></div>
-              <div className="flex flex-col gap-1"><span className={FL}>{L ? "Template công nợ" : "Debt template"}</span><input className={cn(FI, "font-mono")} value={form.debtTemplateId} disabled={!canEdit} onChange={(e) => set("debtTemplateId", e.target.value)} /></div>
+              <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.c2cd41ad23bb")}</span><input className={cn(FI, "font-mono")} value={form.portalTemplateId} disabled={!canEdit} onChange={(e) => set("portalTemplateId", e.target.value)} /></div>
+              <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.13d721b048ea")}</span><input className={cn(FI, "font-mono")} value={form.invoiceTemplateId} disabled={!canEdit} onChange={(e) => set("invoiceTemplateId", e.target.value)} /></div>
+              <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.f5a4c33ef6c8")}</span><input className={cn(FI, "font-mono")} value={form.debtTemplateId} disabled={!canEdit} onChange={(e) => set("debtTemplateId", e.target.value)} /></div>
             </div>
           )}
           <div className="px-3.5 py-2.5 bg-in-soft border border-in/20 rounded-[10px] text-[11px] text-in leading-relaxed">
-            {L
-              ? "Token và secret chỉ lưu server-side trong Settings. Mobile/web chỉ gọi backend LumaPOS; tin giao dịch cần template ZNS đã được Zalo duyệt."
-              : "Tokens and secrets are stored server-side in Settings only. Web/mobile call the LumaPOS backend; transactional messages require approved ZNS templates."}
+            {settingsTextByFlag(L, "legacy.5d740bef6a90")}
           </div>
         </div>
       </Card>
-      {!canEdit && <p className="text-[11px] text-slate-400 italic mt-1">{L ? "Chỉ owner được sửa cấu hình Zalo." : "Only the owner can edit Zalo settings."}</p>}
+      {!canEdit && <p className="text-[11px] text-slate-400 italic mt-1">{settingsTextByFlag(L, "legacy.90581ba97c26")}</p>}
       {canEdit && (dirty || saved || error) && (
         <div className="flex items-center gap-2 pt-1">
-          <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved"))}</span>
+          <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (settingsTextByFlag(L, "legacy.3bf5caaee8b4")) : (settingsTextByFlag(L, "legacy.e8f6c0afb49d")))}</span>
           <button disabled={!dirty || pending} onClick={save} className={cn(btnF, "disabled:opacity-50")}>
-            {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
+            {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{settingsTextByFlag(L, "legacy.2d7e281f1bcd")}
           </button>
         </div>
       )}
@@ -3044,29 +3020,30 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
   const displayRemaining = Math.max(0, displayLimit - usage.used);
   const displayExhausted = displayRemaining <= 0;
   const limitPreviewChanged = displayLimit !== usage.limit;
+  const limitPreviewEffect = limitPreviewChanged ? settingsTextByFlag(L, "legacy.8a8478eae228") : "";
   const diagnosticsRows: Array<[string, string, boolean]> = [
-    [L ? "Provider" : "Provider", AI_PROVIDER_OPTIONS.find((item) => item.value === form.provider)?.label ?? form.provider, true],
-    [L ? "Text model" : "Text model", form.textModel, true],
-    [L ? "Vision model" : "Vision model", form.visionModel, form.provider !== "deepseek"],
-    [L ? "API key" : "API key", configured ? (L ? "Đã cấu hình" : "Configured") : (L ? "Chưa có" : "Missing"), configured],
-    [L ? "Text planning" : "Text planning", L ? "Hỗ trợ" : "Supported", true],
-    [L ? "Vision/OCR" : "Vision/OCR", form.provider === "deepseek" ? (L ? "Không hỗ trợ" : "Unsupported") : (L ? "Hỗ trợ" : "Supported"), form.provider !== "deepseek"],
+    [settingsTextByFlag(L, "legacy.e52086d77002"), AI_PROVIDER_OPTIONS.find((item) => item.value === form.provider)?.label ?? form.provider, true],
+    [settingsTextByFlag(L, "legacy.c3b8ce820623"), form.textModel, true],
+    [settingsTextByFlag(L, "legacy.4c603a4587fd"), form.visionModel, form.provider !== "deepseek"],
+    [settingsTextByFlag(L, "legacy.29aea4bc18f1"), configured ? (settingsTextByFlag(L, "legacy.3d9c2c3792fd")) : (settingsTextByFlag(L, "legacy.9396719137cc")), configured],
+    [settingsTextByFlag(L, "legacy.f3d0db036f26"), settingsTextByFlag(L, "legacy.2f6121b0abfd"), true],
+    [settingsTextByFlag(L, "legacy.30d3001ba776"), form.provider === "deepseek" ? (settingsTextByFlag(L, "legacy.3a81bde116b9")) : (settingsTextByFlag(L, "legacy.2f6121b0abfd")), form.provider !== "deepseek"],
   ];
   return (
     <>
-      <Card title={L ? "Nhà cung cấp AI" : "AI Provider"} vi={L ? "OCR và lập kế hoạch cho trợ lý AI" : "OCR and planning for AI Assistant"}>
+      <Card title={settingsTextByFlag(L, "legacy.5f2e88c09d4c")} vi={settingsTextByFlag(L, "legacy.58bd995dda76")}>
         <div className="p-4.5 flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className={cn(
               "inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold",
               configured ? "bg-ok-soft text-ok" : "bg-warn-soft text-warn"
             )}>
-              {configured ? (L ? "Đã cấu hình API key" : "API key configured") : (L ? "Chưa có API key" : "API key missing")}
+              {configured ? (settingsTextByFlag(L, "legacy.d93ca6c76e55")) : (settingsTextByFlag(L, "legacy.268a460390e9"))}
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <span className={FL}>{L ? "Provider" : "Provider"}</span>
+              <span className={FL}>{settingsTextByFlag(L, "legacy.e52086d77002")}</span>
               <SearchableSelect
                 options={AI_PROVIDER_OPTIONS}
                 value={form.provider}
@@ -3089,7 +3066,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
               />
             </div>
             <div className="flex flex-col gap-1">
-              <span className={FL}>{L ? "API key của provider" : "Provider API key"}</span>
+              <span className={FL}>{settingsTextByFlag(L, "legacy.c529a1e20292")}</span>
               <input
                 className={cn(FI, "font-mono")}
                 type="password"
@@ -3101,13 +3078,13 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
               <span className="text-[11px] text-slate-500">{providerKeyHelp(form.provider, L)}</span>
               <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0 min-w-11 lg:min-w-0">
                 <Checkbox checked={clearOpenaiApiKey} disabled={!canEdit} onChange={(e) => toggleClearKey(e.target.checked)} />
-                {L ? "Xóa API key đang lưu" : "Clear saved API key"}
+                {settingsTextByFlag(L, "legacy.816e58b4c8ea")}
               </label>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <span className={FL}>{L ? "Model lập kế hoạch" : "Planner model"}</span>
+              <span className={FL}>{settingsTextByFlag(L, "legacy.d2b6d68bd98c")}</span>
               <SearchableSelect
                 options={AI_TEXT_MODEL_OPTIONS}
                 value={form.textModel}
@@ -3119,7 +3096,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
               />
             </div>
             <div className="flex flex-col gap-1">
-              <span className={FL}>{L ? "Model OCR/ảnh" : "OCR/image model"}</span>
+              <span className={FL}>{settingsTextByFlag(L, "legacy.a62d98d9b055")}</span>
               <SearchableSelect
                 options={AI_MODEL_OPTIONS}
                 value={form.visionModel}
@@ -3137,22 +3114,20 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <span className={FL}>{L ? "Lưu trữ file đính kèm" : "Attachment storage"}</span>
+              <span className={FL}>{settingsTextByFlag(L, "legacy.f84bb7aabc7a")}</span>
               <div className={cn(FI, "flex items-center justify-between gap-3 bg-canvas")}
-                aria-label={L ? "Lưu trữ file đính kèm được quản lý" : "Managed attachment storage"}>
+                aria-label={settingsTextByFlag(L, "legacy.d6f0627586d2")}>
                 <span className="font-semibold text-slate-800 dark:text-slate-100">Cloudflare R2 (managed)</span>
                 <span className="rounded-full bg-ok-soft px-2 py-0.5 text-[10px] font-bold text-ok">
-                  {L ? "Tự động" : "Automatic"}
+                  {settingsTextByFlag(L, "legacy.6c3f44c37882")}
                 </span>
               </div>
               <span className="text-[11px] leading-relaxed text-slate-500">
-                {L
-                  ? "File mới được lưu riêng tư trên hạ tầng R2 do LumaPOS quản lý. Bucket Supabase cũ chỉ còn dùng để đọc dữ liệu trước khi chuyển đổi."
-                  : "New files use private LumaPOS-managed R2 storage. The legacy Supabase bucket remains read-only for pre-migration attachments."}
+                {settingsTextByFlag(L, "legacy.cbcbf33f008b")}
               </span>
             </div>
             <div className="flex flex-col gap-1">
-              <span className={FL}>{L ? "Giới hạn lượt AI/tháng" : "Monthly AI unit limit"}</span>
+              <span className={FL}>{settingsTextByFlag(L, "legacy.6d00c82adf73")}</span>
               <NumberInput
                 className={cn(FI, "font-mono")}
                 min={0}
@@ -3165,29 +3140,29 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
             </div>
           </div>
           <CtrlRow
-            title={L ? "Hiện nút AI nổi" : "Show floating AI button"}
-            desc={L ? "Tắt để ẩn nút AI nổi góc màn hình; trang AI và cấu hình provider vẫn giữ nguyên." : "Turn off to hide the floating AI button; the AI page and provider settings remain available."}
+            title={settingsTextByFlag(L, "legacy.422a09840268")}
+            desc={settingsTextByFlag(L, "legacy.b6fbbd5d3664")}
             checked={form.showFloatingLauncher}
             onChange={(value) => set("showFloatingLauncher", value)}
           />
           <div className="grid grid-cols-3 gap-2">
             {[
-              [L ? "Lượt đã dùng" : "Units used", usage.used],
-              [L ? "Lượt còn lại" : "Units remaining", displayRemaining],
-              [L ? "Giới hạn lượt/tháng" : "Monthly unit limit", displayLimit],
+              [settingsTextByFlag(L, "legacy.ec152bad9d84"), usage.used],
+              [settingsTextByFlag(L, "legacy.050069d3ca8b"), displayRemaining],
+              [settingsTextByFlag(L, "legacy.fcb5b52800b7"), displayLimit],
             ].map(([label, value]) => (
               <div key={String(label)} className="rounded-[10px] border border-border bg-canvas px-3 py-2">
                 <div className={FL}>{label}</div>
-                <div className={cn("mt-1 font-mono text-base font-extrabold", label === (L ? "Lượt còn lại" : "Units remaining") && displayExhausted ? "text-er" : "text-slate-800 dark:text-slate-100")}>{Number(value).toLocaleString("vi-VN")}</div>
+                <div className={cn("mt-1 font-mono text-base font-extrabold", label === (settingsTextByFlag(L, "legacy.050069d3ca8b")) && displayExhausted ? "text-er" : "text-slate-800 dark:text-slate-100")}>{Number(value).toLocaleString("vi-VN")}</div>
               </div>
             ))}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
             {[
-              [L ? "Input tokens" : "Input tokens", usage.inputTokens.toLocaleString("vi-VN")],
-              [L ? "Output tokens" : "Output tokens", usage.outputTokens.toLocaleString("vi-VN")],
-              [L ? "Tổng tokens" : "Total tokens", usage.totalTokens.toLocaleString("vi-VN")],
-              [L ? "Chi phí ước tính" : "Estimated cost", `$${usage.estimatedCostUsd.toFixed(4)}`],
+              [settingsTextByFlag(L, "legacy.57cbd03ff2e9"), usage.inputTokens.toLocaleString("vi-VN")],
+              [settingsTextByFlag(L, "legacy.a237f74e8d0c"), usage.outputTokens.toLocaleString("vi-VN")],
+              [settingsTextByFlag(L, "legacy.480b4d2fae41"), usage.totalTokens.toLocaleString("vi-VN")],
+              [settingsTextByFlag(L, "legacy.2d1ba2c485dd"), `$${usage.estimatedCostUsd.toFixed(4)}`],
             ].map(([label, value]) => (
               <div key={String(label)} className="rounded-[10px] border border-border bg-canvas px-3 py-2">
                 <div className={FL}>{label}</div>
@@ -3196,13 +3171,14 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
             ))}
           </div>
           <div className="px-3.5 py-2.5 bg-in-soft border border-in/20 rounded-[10px] text-[11px] text-in leading-relaxed">
-            {L
-              ? `API key không hiển thị lại sau khi lưu, chỉ được dùng server-side từ Settings và không được ghi raw vào audit log. Usage được tính theo tháng ${usage.period}; mỗi lần hỏi AI tốn 1 lượt, mỗi file đính kèm được xử lý (tối đa 4 file/lần) tốn thêm 1 lượt. Giới hạn/còn lại hiển thị theo giá trị đang nhập${limitPreviewChanged ? ", có hiệu lực sau khi lưu" : ""}. Token/chi phí là ước tính từ provider/model trả về, không phải hóa đơn chính thức.`
-              : `The API key is never shown again after saving, is used server-side from Settings only, and is not written raw into audit logs. Usage is tracked for ${usage.period}; each AI request costs 1 unit, and each processed attachment (up to 4 files per request) adds 1 unit. Limit/remaining values follow the current input${limitPreviewChanged ? " and take effect after saving" : ""}. Token/cost totals are provider/model estimates, not official billing.`}
+            {settingsTextByFlag(L, "legacy.4909d9facb90", {
+              period: usage.period,
+              effect: limitPreviewEffect,
+            })}
           </div>
         </div>
       </Card>
-      <Card title={L ? "Chẩn đoán provider" : "Provider diagnostics"} vi={L ? "Kiểm tra key, model text và OCR/ảnh" : "Test key, text model and vision/OCR"}>
+      <Card title={settingsTextByFlag(L, "legacy.c070b430375b")} vi={settingsTextByFlag(L, "legacy.3d35f8f51e50")}>
         <div className="p-4.5 flex flex-col gap-3">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {diagnosticsRows.map(([label, value, ok]) => (
@@ -3220,7 +3196,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
               className={cn(btnF, "disabled:opacity-50")}
             >
               {testing === "text" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-              {L ? "Test text model" : "Test text model"}
+              {settingsTextByFlag(L, "legacy.f650a9d3506c")}
             </button>
             <button
               type="button"
@@ -3229,7 +3205,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
               className={cn(btnS, "disabled:opacity-50")}
             >
               {testing === "vision" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-              {L ? "Test vision model" : "Test vision model"}
+              {settingsTextByFlag(L, "legacy.330f5c579c80")}
             </button>
           </div>
           {testResult && (
@@ -3238,10 +3214,10 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
               testResult.ok ? "border-ok/20 bg-ok-soft text-ok" : "border-warn/20 bg-warn-soft text-warn"
             )}>
               <div className="font-bold">
-                {testResult.kind === "text" ? "Text" : "Vision"} · {testResult.ok ? (L ? "Kết nối OK" : "Connection OK") : (L ? "Cần kiểm tra lại" : "Needs attention")}
+                {testResult.kind === "text" ? "Text" : "Vision"} · {testResult.ok ? (settingsTextByFlag(L, "legacy.7df9017eeff6")) : (settingsTextByFlag(L, "legacy.6e7ad658067f"))}
               </div>
               <div className="mt-1">
-                {L ? "Kết quả" : "Result"}: {formatAiTestMessage(testResult.message, L)}
+                {settingsTextByFlag(L, "legacy.6cb54b294cf0")}: {formatAiTestMessage(testResult.message, L)}
                 {testResult.tokenUsage ? ` · tokens ${testResult.tokenUsage.totalTokens}` : ""}
               </div>
               <div className="mt-1 text-[10px] opacity-75">{new Date(testResult.testedAt).toLocaleString("vi-VN")}</div>
@@ -3250,12 +3226,12 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
           {testError && <div className="rounded-[10px] border border-er/20 bg-er-soft px-3.5 py-2.5 text-[11px] font-semibold text-er">{testError}</div>}
         </div>
       </Card>
-      {!canEdit && <p className="text-[11px] text-slate-400 italic mt-1">{L ? "Chỉ owner được sửa cấu hình AI." : "Only the owner can edit AI settings."}</p>}
+      {!canEdit && <p className="text-[11px] text-slate-400 italic mt-1">{settingsTextByFlag(L, "legacy.535f3902ad18")}</p>}
       {canEdit && (dirty || saved || error) && (
         <div className="flex items-center gap-2 pt-1">
-          <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved"))}</span>
+          <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (settingsTextByFlag(L, "legacy.3bf5caaee8b4")) : (settingsTextByFlag(L, "legacy.e8f6c0afb49d")))}</span>
           <button disabled={!dirty || pending} onClick={save} className={cn(btnF, "disabled:opacity-50")}>
-            {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
+            {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{settingsTextByFlag(L, "legacy.2d7e281f1bcd")}
           </button>
         </div>
       )}
@@ -3275,14 +3251,20 @@ function CtrlRow({ title, desc, checked, onChange }: { title: string; desc?: str
   );
 }
 
-function SaveBar({ L, dirty, saved, pending, canManage, onSave, error = "", className }: { L: boolean; dirty: boolean; saved: boolean; pending: boolean; canManage: boolean; onSave: () => void; error?: string; className?: string }) {
-  if (!canManage) return <p className={cn("text-[11px] text-slate-400 italic mt-1", className)}>{L ? "Chỉ Chủ/Quản lý mới sửa được." : "Only Owner/Manager can edit."}</p>;
+function SaveBar({ L, labels, dirty, saved, pending, canManage, onSave, error = "", className }: { L: boolean; labels?: { permission: string; unsaved: string; saved: string; save: string }; dirty: boolean; saved: boolean; pending: boolean; canManage: boolean; onSave: () => void; error?: string; className?: string }) {
+  const copy = labels ?? {
+    permission: settingsTextByFlag(L, "legacy.f2daa8f757fc"),
+    unsaved: settingsTextByFlag(L, "legacy.3bf5caaee8b4"),
+    saved: settingsTextByFlag(L, "legacy.e8f6c0afb49d"),
+    save: settingsTextByFlag(L, "legacy.2d7e281f1bcd"),
+  };
+  if (!canManage) return <p className={cn("text-[11px] text-slate-400 italic mt-1", className)}>{copy.permission}</p>;
   if (!dirty && !saved) return null;
   return (
     <div className={cn("flex items-center gap-2 pt-1", className)}>
-      <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved"))}</span>
+      <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? copy.unsaved : copy.saved)}</span>
       <button disabled={!dirty || pending} onClick={onSave} className={cn(btnF, "disabled:opacity-50")}>
-        {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
+        {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{copy.save}
       </button>
     </div>
   );

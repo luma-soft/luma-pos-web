@@ -15,9 +15,10 @@ test("camera quote settings uses the shared table for camera prices", () => {
 });
 
 test("memory, installation, and IP quote settings stay in table sections", () => {
+  expect(source).toContain('const t = useTranslations("settings.cameraQuote");');
   expect(source).toContain('tableId="settings.camera-quote.memory-cards"');
   expect(source).toContain('tableId="settings.camera-quote.installation"');
-  expect(source).toContain('title={L ? "Báo giá camera IP"');
+  expect(source).toContain('title={t("ip.title")}');
   expect(source).toContain('tableId="settings.camera-quote.ip-cameras"');
   expect(source).toContain('tableId="settings.camera-quote.ip-recorders"');
   expect(source).toContain('tableId="settings.camera-quote.ip-storage"');
@@ -25,17 +26,26 @@ test("memory, installation, and IP quote settings stay in table sections", () =>
   expect(source).not.toContain("Thẻ nhớ mặc định");
 });
 
+test("Wi-Fi cameras are kept above the dedicated IP quote section", () => {
+  expect(source).toContain("const ipCameraSkus = new Set<string>(Object.values(CAMERA_IP_QUOTE_LEGACY_SKUS.camera));");
+  expect(source).toContain("const wifiCameras = options.cameras.filter");
+  expect(source).toContain("const visibleCameras = wifiCameras.filter");
+  expect(source).toContain('title={t("wifi.title")}');
+  expect(source).toContain('title={t("ip.title")}');
+});
+
 test("installation pricing is rendered as a following row in the aligned table", () => {
   expect(source).toContain('renderFollowingRows={(profile, visibleColumns) =>');
-  expect(source).toContain('L ? "Công lắp đặt" : "Installation"');
-  expect(source).toContain('minWidth="760px"');
-  expect(source).toContain('label: rightHeader(L ? "Giá nhập" : "Cost price")');
+  expect(source).toContain('t("installation.labor")');
+  expect(source).toContain('minWidth="640px"');
+  expect(source).toContain('label: rightHeader(t("installation.costPrice"))');
 });
 
 test("mobile quote rows keep price and picker labels visible", () => {
   expect(source).toContain('renderMobileRow={({ row }) =>');
-  expect(source).toContain('L ? "Sản phẩm" : "Product"');
-  expect(source).toContain('L ? "Vật tư" : "Material"');
-  expect(source).toContain('L ? "Công lắp đặt" : "Installation"');
-  expect(source).toContain('L ? "Giá bán" : "Sale price"');
+  expect(source).toContain('t("wifi.product")');
+  expect(source).toContain('t("installation.material")');
+  expect(source).toContain('t("installation.labor")');
+  expect(source).toContain('t("wifi.salePrice")');
+  expect(source).not.toContain('L ? "Camera Wifi" : "Available cameras"');
 });

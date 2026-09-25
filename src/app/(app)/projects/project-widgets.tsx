@@ -1,4 +1,5 @@
 "use client";
+import { legacyText } from "@/lib/i18n/catalog-text";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -48,15 +49,9 @@ export function ProjectQuickCreate({
     ...createdCustomers.filter((created) => !customers.some((customer) => customer.id === created.id)),
   ];
   const schedule = projectScheduleState({ startsOn, targetEndsOn, completed });
-  const scheduleOrderError = locale === "vi"
-    ? "Ngày kết thúc dự kiến phải bằng hoặc sau ngày bắt đầu."
-    : "The target completion date must be on or after the start date.";
-  const pastTargetWarning = locale === "vi"
-    ? "Ngày này đã qua. Công trình sẽ hiển thị Quá hạn."
-    : "This date has passed. The project will appear as Overdue.";
-  const completionHint = locale === "vi"
-    ? "Bật khi công trình đã thi công xong."
-    : "Turn on when project work is finished.";
+  const scheduleOrderError = legacyText(locale, "ba5be4f43e31");
+  const pastTargetWarning = legacyText(locale, "0f9aa6a9d11b");
+  const completionHint = legacyText(locale, "a91ff856372c");
 
   function suggestProjectName(customerName: string, type = serviceType) {
     return `${customerName} - ${t(`services.types.${type}` as never)}`;
@@ -220,10 +215,8 @@ export function ProjectToggle({ id, status }: { id: string; status: string }) {
   async function toggle() {
     if (status !== "active") {
       const approved = await confirm({
-        title: locale === "vi" ? "Mở lại công trình?" : "Reopen this project?",
-        description: locale === "vi"
-          ? "Trạng thái hoàn thành sẽ được gỡ và tiến độ được tính lại theo lệnh việc hiện có."
-          : "Completion will be removed and progress recalculated from the current work orders.",
+        title: legacyText(locale, "63fb27b6b341"),
+        description: legacyText(locale, "0a26a5501536"),
         confirmLabel: t("projects.reopen"),
         variant: "warning",
       });
@@ -298,15 +291,9 @@ export function ProjectEdit({
     ...createdCustomers.filter((created) => !customers.some((customer) => customer.id === created.id)),
   ];
   const schedule = projectScheduleState({ startsOn, targetEndsOn, completed });
-  const scheduleOrderError = locale === "vi"
-    ? "Ngày kết thúc dự kiến phải bằng hoặc sau ngày bắt đầu."
-    : "The target completion date must be on or after the start date.";
-  const pastTargetWarning = locale === "vi"
-    ? "Ngày này đã qua. Công trình sẽ hiển thị Quá hạn."
-    : "This date has passed. The project will appear as Overdue.";
-  const completionHint = locale === "vi"
-    ? "Bật khi công trình đã thi công xong."
-    : "Turn on when project work is finished.";
+  const scheduleOrderError = legacyText(locale, "ba5be4f43e31");
+  const pastTargetWarning = legacyText(locale, "0f9aa6a9d11b");
+  const completionHint = legacyText(locale, "a91ff856372c");
 
   function applyCreatedCustomer(customer: CustomerCreateResult) {
     setCreatedCustomers((current) => [...current.filter((item) => item.id !== customer.id), { id: customer.id, name: customer.name }]);
@@ -323,10 +310,8 @@ export function ProjectEdit({
     }
     if (isServiceProject && project.status === "done" && !completed) {
       const approved = await confirm({
-        title: locale === "vi" ? "Mở lại công trình?" : "Reopen this project?",
-        description: locale === "vi"
-          ? "Trạng thái hoàn thành sẽ được gỡ và tiến độ được tính lại theo lệnh việc hiện có."
-          : "Completion will be removed and progress recalculated from the current work orders.",
+        title: legacyText(locale, "63fb27b6b341"),
+        description: legacyText(locale, "0a26a5501536"),
         confirmLabel: t("projects.reopen"),
         variant: "warning",
       });

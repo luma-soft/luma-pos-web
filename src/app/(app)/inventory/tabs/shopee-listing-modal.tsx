@@ -1,4 +1,5 @@
 "use client";
+import { legacyTextByFlag } from "@/lib/i18n/catalog-text";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
@@ -140,13 +141,13 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
         stock: typeof data.stock === "number" ? data.stock : prev.stock,
         weight: typeof data.weight === "number" ? data.weight : prev.weight,
       }));
-      setMessage(L ? "AI đã điền gợi ý. Kiểm tra lại trước khi publish." : "AI filled a draft. Review before publishing.");
+      setMessage(legacyTextByFlag(L, "6fb62f156d77"));
     });
   }
 
   function save(action: "draft" | "publish") {
     if (!product || provider !== "shopee") {
-      setError(L ? "Chọn sản phẩm và kênh Shopee trước khi lưu." : "Select a product and Shopee before saving.");
+      setError(legacyTextByFlag(L, "3de80ce2f0aa"));
       return;
     }
     setError("");
@@ -159,7 +160,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
         setError(res.error);
         return;
       }
-      setMessage(action === "publish" ? (L ? "Đã queue publish listing lên kênh online." : "Online listing publish queued.") : (L ? "Đã lưu draft listing online." : "Online listing draft saved."));
+      setMessage(action === "publish" ? (legacyTextByFlag(L, "ef6fe8aff243")) : (legacyTextByFlag(L, "d2a9a57f354d")));
       router.refresh();
     });
   }
@@ -169,8 +170,8 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
       <div className="flex h-[min(94dvh,960px)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-primary-600">{L ? "Đăng sàn" : "List online"}</div>
-            <h2 className="truncate text-lg font-extrabold">{product ? product.name : (L ? "Tạo listing bán online" : "Create online listing")}</h2>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-primary-600">{legacyTextByFlag(L, "89a329ca46b4")}</div>
+            <h2 className="truncate text-lg font-extrabold">{product ? product.name : (legacyTextByFlag(L, "da3b61b87bb2"))}</h2>
           </div>
           <Link href={closeHref} className="grid h-9 w-9 place-items-center rounded-full border border-border hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" aria-label="Close">
             <X className="h-4 w-4" />
@@ -186,16 +187,16 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
               {product ? (
                 <>
                   <Info label="SKU" value={product.sku} />
-                  <Info label={L ? "Giá nhập" : "Cost price"} value={formatCurrency(Number(product.costPrice))} />
-                  <Info label={L ? "Giá Luma" : "Luma price"} value={formatCurrency(Number(product.retailPrice))} />
+                  <Info label={legacyTextByFlag(L, "1c657b68a7ba")} value={formatCurrency(Number(product.costPrice))} />
+                  <Info label={legacyTextByFlag(L, "5b43a3d792e7")} value={formatCurrency(Number(product.retailPrice))} />
                   {isProductStockManaged(product.categoryName) && (
-                    <Info label={L ? "Tồn" : "Stock"} value={`${formatNumber(Number(product.totalStock))} ${product.baseUnit}`} />
+                    <Info label={legacyTextByFlag(L, "75dc5449a256")} value={`${formatNumber(Number(product.totalStock))} ${product.baseUnit}`} />
                   )}
-                  <Info label={L ? "Danh mục" : "Category"} value={product.categoryName ?? "—"} />
-                  <Info label={L ? "Biến thể" : "Variants"} value={String(product.children.length)} />
+                  <Info label={legacyTextByFlag(L, "3172c4e861e2")} value={product.categoryName ?? "—"} />
+                  <Info label={legacyTextByFlag(L, "270f0fef47bb")} value={String(product.children.length)} />
                 </>
               ) : (
-                <p className="text-sm text-slate-500">{L ? "Tìm và chọn sản phẩm để bắt đầu điền thông tin đăng bán." : "Search and select a product to start filling listing details."}</p>
+                <p className="text-sm text-slate-500">{legacyTextByFlag(L, "87a67058c89d")}</p>
               )}
             </div>
           </aside>
@@ -213,13 +214,13 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
                 }}
               />
               <label className="flex flex-col gap-1">
-                <span className={LABEL}>{L ? "Kênh bán" : "Sales channel"}</span>
+                <span className={LABEL}>{legacyTextByFlag(L, "438049c1a2a5")}</span>
                 <Select
                   value={provider}
                   onValueChange={(value) => setProvider(value as ProviderId)}
                   options={PROVIDERS.map((item) => ({
                     value: item.id,
-                    label: `${item.name}${item.ready ? "" : ` · ${L ? "sắp hỗ trợ" : "soon"}`}`,
+                    label: `${item.name}${item.ready ? "" : ` · ${legacyTextByFlag(L, "f0080c06cfcc")}`}`,
                   }))}
                   className="w-full"
                 />
@@ -228,19 +229,19 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
 
             {!product ? (
               <div className="rounded-card border border-dashed border-border bg-canvas px-4 py-10 text-center text-sm text-slate-400">
-                {L ? "Chọn sản phẩm ở ô tìm kiếm để mở form theo từng sàn." : "Select a product from search to open the marketplace-specific form."}
+                {legacyTextByFlag(L, "e45351b19199")}
               </div>
             ) : (
               <>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" disabled={aiPending || provider !== "shopee"} onClick={autoFill} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
                 {aiPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {L ? "Auto fill bằng AI" : "Auto fill with AI"}
+                {legacyTextByFlag(L, "02c83daf3957")}
               </button>
               <span className="text-xs text-slate-500">
                 {provider === "shopee"
-                  ? (L ? "AI không tự publish; mọi field đều sửa được." : "AI never publishes; every field remains editable.")
-                  : (L ? "AI/publish sẽ bật khi adapter sàn này sẵn sàng." : "AI/publish unlocks when this marketplace adapter is ready.")}
+                  ? (legacyTextByFlag(L, "57e8953996ba"))
+                  : (legacyTextByFlag(L, "fd8d819f1ec4"))}
               </span>
             </div>
 
@@ -256,7 +257,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
 
             {product.children.length > 0 && (
               <div className="rounded-card border border-border px-4 py-3">
-                <div className={LABEL}>{L ? "Biến thể sẽ được map sang model của kênh" : "Variants mapped to channel models"}</div>
+                <div className={LABEL}>{legacyTextByFlag(L, "691620fe0b93")}</div>
                 <div className="mt-2 grid gap-2">
                   {product.children.map((child) => (
                     <div key={child.id} className="grid grid-cols-[1fr_auto_auto] gap-3 rounded-lg bg-canvas px-3 py-2 text-sm">
@@ -278,14 +279,14 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
-          <span className="text-xs text-slate-500">{L ? "Publish sẽ tạo sync job và lưu payload/response để retry." : "Publish creates a sync job and stores payload/response for retry."}</span>
+          <span className="text-xs text-slate-500">{legacyTextByFlag(L, "d0343104a431")}</span>
           <div className="flex gap-2">
             <button type="button" disabled={pending} onClick={() => save("draft")} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              {L ? "Lưu draft" : "Save draft"}
+              {legacyTextByFlag(L, "f6b14ad03ac3")}
             </button>
             <button type="button" disabled={pending || !canPublish} onClick={() => save("publish")} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
-              {L ? "Publish lên sàn" : "Publish online"}
+              {legacyTextByFlag(L, "10b8292ebf66")}
             </button>
           </div>
         </div>
@@ -351,7 +352,7 @@ function ShopeeCategoryPicker({ L, value, onChange }: { L: boolean; value: strin
   return (
     <div className="flex flex-col gap-1">
       <span className="text-sm font-semibold">
-        {L ? "Danh mục sản phẩm" : "Product category"} <span className="text-er">*</span>
+        {legacyTextByFlag(L, "79657f3097e5")} <span className="text-er">*</span>
       </span>
       <button
         type="button"
@@ -361,7 +362,7 @@ function ShopeeCategoryPicker({ L, value, onChange }: { L: boolean; value: strin
           !value && "text-slate-400",
         )}
       >
-        <span className="min-w-0 truncate">{value || (L ? "Chọn danh mục sản phẩm" : "Choose product category")}</span>
+        <span className="min-w-0 truncate">{value || (legacyTextByFlag(L, "321febbbd9fb"))}</span>
         <ChevronRight className="h-4 w-4 rotate-90 text-slate-400" />
       </button>
       {open && (
@@ -413,7 +414,7 @@ function ShopeeCategoryDialog({
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-3 sm:p-5">
       <div className="flex h-[min(88dvh,760px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
         <div className="flex items-center justify-between gap-3 px-5 py-4">
-          <h3 className="text-xl font-extrabold">{L ? "Chọn danh mục sản phẩm" : "Choose product category"}</h3>
+          <h3 className="text-xl font-extrabold">{legacyTextByFlag(L, "321febbbd9fb")}</h3>
           <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" aria-label="Close">
             <X className="h-5 w-5" />
           </button>
@@ -426,26 +427,26 @@ function ShopeeCategoryDialog({
               onChange={(event) => setQuery(event.target.value)}
               autoFocus
               className="h-11 w-full rounded-lg border border-border bg-canvas pl-10 pr-3 text-sm focus:border-primary-500 focus:outline-none lg:h-10"
-              placeholder={L ? "Tìm kiếm" : "Search"}
+              placeholder={legacyTextByFlag(L, "e0e1ae6e892c")}
             />
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-hidden border-t border-border-soft">
           {loading ? (
             <div className="grid h-full place-items-center text-sm text-slate-500">
-              <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />{L ? "Đang tải danh mục Shopee..." : "Loading Shopee categories..."}</span>
+              <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />{legacyTextByFlag(L, "997ab229b62d")}</span>
             </div>
           ) : error ? (
             <div className="grid h-full place-items-center px-6 text-center text-sm text-er">
               <div>
-                <div className="font-bold">{L ? "Không tải được danh mục Shopee" : "Could not load Shopee categories"}</div>
+                <div className="font-bold">{legacyTextByFlag(L, "d779f8b9aacf")}</div>
                 <div className="mt-1 text-xs text-slate-500">{error}</div>
               </div>
             </div>
           ) : query.trim() ? (
             <div className="h-full overflow-auto p-4">
               {searchResults.length === 0 ? (
-                <div className="px-4 py-10 text-center text-sm text-slate-400">{L ? "Không tìm thấy danh mục." : "No categories found."}</div>
+                <div className="px-4 py-10 text-center text-sm text-slate-400">{legacyTextByFlag(L, "737fca001312")}</div>
               ) : searchResults.map((category) => (
                 <button
                   key={category.id}
@@ -465,14 +466,14 @@ function ShopeeCategoryDialog({
             <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[320px_1fr]">
               <div className="overflow-auto border-r border-border-soft py-2">
                 {tree.length === 0 ? (
-                  <div className="px-5 py-10 text-sm text-slate-400">{L ? "Chưa có danh mục Shopee." : "No Shopee categories."}</div>
+                  <div className="px-5 py-10 text-sm text-slate-400">{legacyTextByFlag(L, "ab327a726a25")}</div>
                 ) : tree.map((node) => (
                   <CategoryRow key={node.id} active={activeLevel1?.id === node.id} label={node.name} hasChildren={Boolean(node.children?.length)} onClick={() => { setLevel1(node); setLevel2(null); }} />
                 ))}
               </div>
               <div className="overflow-auto py-2">
                 {!activeLevel1 ? (
-                  <div className="px-5 py-10 text-sm text-slate-400">{L ? "Chọn danh mục cấp 1." : "Choose a top-level category."}</div>
+                  <div className="px-5 py-10 text-sm text-slate-400">{legacyTextByFlag(L, "189ed1fba835")}</div>
                 ) : children.length === 0 ? (
                   <CategoryRow active={selected?.id === activeLevel1.id} label={activeLevel1.name} onClick={() => setSelected(categoryPick(activeLevel1, []))} />
                 ) : children.map((child) => (
@@ -507,14 +508,14 @@ function ShopeeCategoryDialog({
           )}
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-border-soft px-5 py-4">
-          <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">{L ? "Bỏ qua" : "Skip"}</button>
+          <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">{legacyTextByFlag(L, "3b9363169ccc")}</button>
           <button
             type="button"
             disabled={!selected}
             onClick={() => selected && onConfirm(selected)}
             className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
           >
-            {L ? "Xác nhận" : "Confirm"}
+            {legacyTextByFlag(L, "3e9f7a91e7af")}
           </button>
         </div>
       </div>
@@ -561,23 +562,21 @@ function PricingRecommendation({
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wide text-primary-700 dark:text-primary-300">
-            {L ? "Gợi ý giá bán" : "Suggested selling price"}
+            {legacyTextByFlag(L, "c4dd9f946d26")}
           </div>
           <div className="mt-1 grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-300 md:grid-cols-4">
-            <PriceMetric label={L ? "Giá nhập" : "Cost"} value={costPrice > 0 ? formatCurrency(costPrice) : "—"} />
-            <PriceMetric label={L ? "Phí tạm tính" : "Fee estimate"} value={`${Math.round(assumption.percentFee * 1000) / 10}%${assumption.fixedFee ? ` + ${formatCurrency(assumption.fixedFee)}` : ""}`} />
-            <PriceMetric label={L ? "Margin mục tiêu" : "Target margin"} value={`${Math.round(targetMarginRate * 100)}%`} />
-            <PriceMetric label={L ? "Lãi giá hiện tại" : "Current profit"} value={currentPrice > 0 ? `${formatCurrency(currentProfit)} (${Math.round(currentMargin * 100)}%)` : "—"} />
+            <PriceMetric label={legacyTextByFlag(L, "eb302aa637a8")} value={costPrice > 0 ? formatCurrency(costPrice) : "—"} />
+            <PriceMetric label={legacyTextByFlag(L, "c889c1b09155")} value={`${Math.round(assumption.percentFee * 1000) / 10}%${assumption.fixedFee ? ` + ${formatCurrency(assumption.fixedFee)}` : ""}`} />
+            <PriceMetric label={legacyTextByFlag(L, "1621d26cdfdf")} value={`${Math.round(targetMarginRate * 100)}%`} />
+            <PriceMetric label={legacyTextByFlag(L, "6a894f893f81")} value={currentPrice > 0 ? `${formatCurrency(currentProfit)} (${Math.round(currentMargin * 100)}%)` : "—"} />
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            {L
-              ? `Tạm tính theo biểu phí ${assumption.label}; phí thực tế thay đổi theo ngành hàng, chương trình và loại shop.`
-              : `Estimated using ${assumption.label}; actual fees vary by category, campaign, and shop type.`}
+            {legacyTextByFlag(L, "f5b98c111f9b", { label: assumption.label })}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
           <div className="text-right">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Giá đề xuất" : "Suggested price"}</div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{legacyTextByFlag(L, "5db96ec9f5ca")}</div>
             <div className="text-lg font-extrabold tabular-nums text-primary-700 dark:text-primary-300">{canSuggest ? formatCurrency(suggestedPrice) : "—"}</div>
           </div>
           <button
@@ -586,7 +585,7 @@ function PricingRecommendation({
             onClick={() => onUse(suggestedPrice)}
             className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
           >
-            {L ? "Dùng giá này" : "Use price"}
+            {legacyTextByFlag(L, "1f2be83d73ac")}
           </button>
         </div>
       </div>
@@ -710,9 +709,9 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
       <section className="space-y-3 rounded-card border border-border-soft bg-surface px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-extrabold">{L ? "Thông tin sàn Shopee" : "Shopee marketplace info"}</h3>
+            <h3 className="text-sm font-extrabold">{legacyTextByFlag(L, "bbc7204958db")}</h3>
             <p className="mt-1 text-xs text-slate-500">
-              {L ? "Cần category_id, brand/attributes theo danh mục, ảnh đã upload sang Shopee, logistics và package." : "Requires category_id, category brand/attributes, Shopee-uploaded media, logistics, and package data."}
+              {legacyTextByFlag(L, "c09e0e30f8d7")}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2 text-[#ee4d2d]">
@@ -726,25 +725,25 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
           onChange={selectCategory}
         />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Field label={L ? "Tên sản phẩm Shopee" : "Shopee item name"}><input className={FIELD} value={form.title} maxLength={120} onChange={(e) => set("title", e.target.value)} /></Field>
-          <Field label={L ? "Shopee brand_id / brand" : "Shopee brand_id / brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "edf1244f4478")}><input className={FIELD} value={form.title} maxLength={120} onChange={(e) => set("title", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "2ef6b15c0b5f")}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
           <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
-          <Field label={L ? "Giá bán" : "Price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
-          <Field label={L ? "Normal stock" : "Normal stock"}><NumberInput className={FIELD} min={0} value={form.stock} onChange={(value) => set("stock", value ?? 0)} /></Field>
-          <Field label={L ? "Kênh vận chuyển" : "Logistics channel"}>
+          <Field label={legacyTextByFlag(L, "dded874d4b6b")}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
+          <Field label={legacyTextByFlag(L, "9dd3422dfa2c")}><NumberInput className={FIELD} min={0} value={form.stock} onChange={(value) => set("stock", value ?? 0)} /></Field>
+          <Field label={legacyTextByFlag(L, "d25a858575fc")}>
             {logistics.length > 0 ? (
               <Select
                 value={form.logisticId}
                 onValueChange={(value) => set("logisticId", value)}
                 options={[
-                  { value: "", label: L ? "Chọn kênh vận chuyển" : "Choose logistics channel" },
+                  { value: "", label: legacyTextByFlag(L, "fced57459404") },
                   ...logistics.filter((channel) => channel.enabled).map((channel) => ({ value: channel.id, label: channel.name })),
                 ]}
                 className="w-full"
               />
             ) : (
               <div className={cn(FIELD, "flex h-10 items-center text-slate-400")}>
-                {logisticsLoading ? (L ? "Đang tải kênh vận chuyển..." : "Loading logistics...") : logisticsError || (L ? "Chưa có dữ liệu logistics" : "No logistics data")}
+                {logisticsLoading ? (legacyTextByFlag(L, "5977dba98ddd")) : logisticsError || (legacyTextByFlag(L, "fe242d8be9af"))}
               </div>
             )}
           </Field>
@@ -753,9 +752,9 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
           <div className="rounded-card border border-border-soft bg-canvas p-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className={LABEL}>{L ? "Attributes theo danh mục Shopee" : "Shopee category attributes"}</div>
+                <div className={LABEL}>{legacyTextByFlag(L, "1206a998b28c")}</div>
                 <p className="mt-1 text-xs text-slate-500">
-                  {L ? "Field bắt buộc sẽ đổi theo category đã chọn." : "Required fields change based on the selected category."}
+                  {legacyTextByFlag(L, "e7578bba9baf")}
                 </p>
               </div>
               {attributesLoading && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
@@ -763,7 +762,7 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
             {attributesError ? (
               <div className="mt-3 rounded-lg bg-er-soft px-3 py-2 text-xs font-semibold text-er">{attributesError}</div>
             ) : attributes.length === 0 && !attributesLoading ? (
-              <div className="mt-3 text-xs text-slate-400">{L ? "Shopee không trả về attribute cho danh mục này." : "Shopee returned no attributes for this category."}</div>
+              <div className="mt-3 text-xs text-slate-400">{legacyTextByFlag(L, "dbc1b62d3ee4")}</div>
             ) : (
               <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                 {attributes.filter((attribute) => attribute.mandatory).slice(0, 12).map((attribute) => (
@@ -773,7 +772,7 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
                         value={form.attributeValues[attribute.id] ?? ""}
                         onValueChange={(value) => setAttribute(attribute.id, value)}
                         options={[
-                          { value: "", label: L ? "Chọn giá trị" : "Choose value" },
+                          { value: "", label: legacyTextByFlag(L, "0203a4907821") },
                           ...attribute.values.slice(0, 80).map((value) => ({ value: value.id, label: value.name })),
                         ]}
                         className="w-full"
@@ -783,7 +782,7 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
                         className={FIELD}
                         value={form.attributeValues[attribute.id] ?? ""}
                         onChange={(event) => setAttribute(attribute.id, event.target.value)}
-                        placeholder={attribute.inputType || (L ? "Nhập giá trị" : "Enter value")}
+                        placeholder={attribute.inputType || (legacyTextByFlag(L, "a038bab398c2"))}
                       />
                     )}
                   </Field>
@@ -794,14 +793,14 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
         )}
       </section>
 
-      <FormSection title={L ? "Media, vận chuyển & thuộc tính" : "Media, logistics & attributes"} note={L ? "Ảnh cần chuyển thành image_id_list, logistic_info cần lấy từ shop logistics." : "Images should become image_id_list; logistic_info should come from shop logistics."}>
+      <FormSection title={legacyTextByFlag(L, "6edd22b73a30")} note={legacyTextByFlag(L, "f392a8737ffa")}>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Field label={L ? "Ảnh / image_id_list" : "Images / image_id_list"}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
-          <Field label={L ? "Mô tả Shopee" : "Shopee description"}><textarea className={cn(FIELD, "min-h-24")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
-          <Field label={L ? "Khối lượng gói hàng (kg)" : "Package weight (kg)"}><NumberInput className={FIELD} min={0} decimals={4} value={form.weight} onChange={(value) => set("weight", value ?? 0)} /></Field>
-          <Field label={L ? "Kích thước D x R x C (cm)" : "Dimensions L x W x H (cm)"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} placeholder="20 x 10 x 8" /></Field>
-          <Field label={L ? "Logistic ID" : "Logistic ID"}><input className={FIELD} value={form.logisticId} onChange={(e) => set("logisticId", e.target.value)} placeholder={L ? "Tự lấy từ kênh vận chuyển phía trên" : "Auto-filled from logistics selector above"} /></Field>
-          <Field label={L ? "Payload attributes" : "Payload attributes"}><textarea className={cn(FIELD, "min-h-20 font-mono text-xs")} value={JSON.stringify({ brand: form.brand, categoryPath: form.categoryPath, ...form.attributeValues }, null, 2)} readOnly /></Field>
+          <Field label={legacyTextByFlag(L, "3f3475a0a141")}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "6015ffc7daeb")}><textarea className={cn(FIELD, "min-h-24")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "15f639ebebf2")}><NumberInput className={FIELD} min={0} decimals={4} value={form.weight} onChange={(value) => set("weight", value ?? 0)} /></Field>
+          <Field label={legacyTextByFlag(L, "039faf966639")}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} placeholder="20 x 10 x 8" /></Field>
+          <Field label={legacyTextByFlag(L, "46fb3bc0a6d3")}><input className={FIELD} value={form.logisticId} onChange={(e) => set("logisticId", e.target.value)} placeholder={legacyTextByFlag(L, "e9504dee0337")} /></Field>
+          <Field label={legacyTextByFlag(L, "cb3f98908866")}><textarea className={cn(FIELD, "min-h-20 font-mono text-xs")} value={JSON.stringify({ brand: form.brand, categoryPath: form.categoryPath, ...form.attributeValues }, null, 2)} readOnly /></Field>
         </div>
       </FormSection>
       <SyncFields form={form} set={set} L={L} />
@@ -812,19 +811,19 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
 function TikTokListingFields({ form, set, L }: { form: FormState; set: <K extends keyof FormState>(key: K, value: FormState[K]) => void; L: boolean }) {
   return (
     <>
-      <FormSection title="TikTok Shop" note={L ? "TikTok cần category, attributes, description dạng HTML, media upload, package, SKU/inventory và có thể cần certification." : "TikTok needs category, attributes, HTML description, uploaded media, package data, SKU/inventory, and possibly certifications."}>
+      <FormSection title="TikTok Shop" note={legacyTextByFlag(L, "d972daedd307")}>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Field label={L ? "Product title" : "Product title"}><input className={FIELD} value={form.title} maxLength={255} onChange={(e) => set("title", e.target.value)} /></Field>
-          <Field label={L ? "TikTok category" : "TikTok category"}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} /></Field>
-          <Field label={L ? "Brand" : "Brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "386c02c7dfe8")}><input className={FIELD} value={form.title} maxLength={255} onChange={(e) => set("title", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "638888075acd")}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "ca61cdeb5c7f")}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
           <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
-          <Field label={L ? "Giá SKU" : "SKU price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
-          <Field label={L ? "Warehouse inventory" : "Warehouse inventory"}><NumberInput className={FIELD} min={0} value={form.stock} onChange={(value) => set("stock", value ?? 0)} /></Field>
-          <Field label={L ? "Package weight" : "Package weight"}><NumberInput className={FIELD} min={0} decimals={4} value={form.weight} onChange={(value) => set("weight", value ?? 0)} /></Field>
-          <Field label={L ? "Package dimensions" : "Package dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "7e3fadfad006")}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
+          <Field label={legacyTextByFlag(L, "9be76c1f3ab2")}><NumberInput className={FIELD} min={0} value={form.stock} onChange={(value) => set("stock", value ?? 0)} /></Field>
+          <Field label={legacyTextByFlag(L, "7181ca3e7c27")}><NumberInput className={FIELD} min={0} decimals={4} value={form.weight} onChange={(value) => set("weight", value ?? 0)} /></Field>
+          <Field label={legacyTextByFlag(L, "d810c16c5323")}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
         </div>
-        <Field label={L ? "Description HTML" : "HTML description"}><textarea className={cn(FIELD, "min-h-32")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
-        <Field label={L ? "Images/video/certification assets" : "Images/video/certification assets"}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
+        <Field label={legacyTextByFlag(L, "1d951388ecb6")}><textarea className={cn(FIELD, "min-h-32")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
+        <Field label={legacyTextByFlag(L, "f0bd15aea2f3")}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
       </FormSection>
       <AdapterPending provider="TikTok Shop" L={L} />
     </>
@@ -834,21 +833,21 @@ function TikTokListingFields({ form, set, L }: { form: FormState; set: <K extend
 function LazadaListingFields({ form, set, L }: { form: FormState; set: <K extends keyof FormState>(key: K, value: FormState[K]) => void; L: boolean }) {
   return (
     <>
-      <FormSection title="Lazada" note={L ? "Lazada create product dùng primary category, SPU/SKU attributes, SellerSku, package, quantity, price và images." : "Lazada create product uses primary category, SPU/SKU attributes, SellerSku, package, quantity, price, and images."}>
+      <FormSection title="Lazada" note={legacyTextByFlag(L, "9b3ed4835607")}>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Field label={L ? "Primary category" : "Primary category"}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} /></Field>
-          <Field label={L ? "Product name" : "Product name"}><input className={FIELD} value={form.title} onChange={(e) => set("title", e.target.value)} /></Field>
-          <Field label={L ? "Brand" : "Brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
-          <Field label={L ? "Model" : "Model"}><input className={FIELD} placeholder={L ? "Model hoặc dòng sản phẩm" : "Model or product line"} /></Field>
+          <Field label={legacyTextByFlag(L, "243348471e57")}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "df4c6e15deac")}><input className={FIELD} value={form.title} onChange={(e) => set("title", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "ca61cdeb5c7f")}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "97a247f8bd92")}><input className={FIELD} placeholder={legacyTextByFlag(L, "ac7058a832cf")} /></Field>
           <Field label="SellerSku"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
-          <Field label={L ? "Quantity" : "Quantity"}><NumberInput className={FIELD} min={0} value={form.stock} onChange={(value) => set("stock", value ?? 0)} /></Field>
-          <Field label={L ? "Price" : "Price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
-          <Field label={L ? "Special price" : "Special price"}><MoneyInput className={FIELD} value={form.compareAtPrice} min={0} onChange={(value) => set("compareAtPrice", value ?? 0)} /></Field>
-          <Field label={L ? "Package weight" : "Package weight"}><NumberInput className={FIELD} min={0} decimals={4} value={form.weight} onChange={(value) => set("weight", value ?? 0)} /></Field>
-          <Field label={L ? "Package dimensions" : "Package dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "f888c63bd999")}><NumberInput className={FIELD} min={0} value={form.stock} onChange={(value) => set("stock", value ?? 0)} /></Field>
+          <Field label={legacyTextByFlag(L, "ea4daad6802b")}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
+          <Field label={legacyTextByFlag(L, "3b6fe915e58d")}><MoneyInput className={FIELD} value={form.compareAtPrice} min={0} onChange={(value) => set("compareAtPrice", value ?? 0)} /></Field>
+          <Field label={legacyTextByFlag(L, "7181ca3e7c27")}><NumberInput className={FIELD} min={0} decimals={4} value={form.weight} onChange={(value) => set("weight", value ?? 0)} /></Field>
+          <Field label={legacyTextByFlag(L, "d810c16c5323")}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
         </div>
-        <Field label={L ? "Description" : "Description"}><textarea className={cn(FIELD, "min-h-32")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
-        <Field label={L ? "Images" : "Images"}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
+        <Field label={legacyTextByFlag(L, "ae3c3e0b217f")}><textarea className={cn(FIELD, "min-h-32")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
+        <Field label={legacyTextByFlag(L, "0049661513d7")}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
       </FormSection>
       <AdapterPending provider="Lazada" L={L} />
     </>
@@ -858,20 +857,20 @@ function LazadaListingFields({ form, set, L }: { form: FormState; set: <K extend
 function TikiListingFields({ form, set, L }: { form: FormState; set: <K extends keyof FormState>(key: K, value: FormState[K]) => void; L: boolean }) {
   return (
     <>
-      <FormSection title="Tiki" note={L ? "Tiki flow cần chọn category, lấy attribute theo category, map attribute, chuẩn bị certificate files nếu category/brand yêu cầu." : "Tiki flow needs category selection, category attributes, attribute mapping, and certificate files when category/brand requires them."}>
+      <FormSection title="Tiki" note={legacyTextByFlag(L, "9cce19132ed3")}>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Field label={L ? "Tiki category" : "Tiki category"}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} /></Field>
-          <Field label={L ? "Tên sản phẩm" : "Product name"}><input className={FIELD} value={form.title} onChange={(e) => set("title", e.target.value)} /></Field>
-          <Field label={L ? "Brand" : "Brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "f743c66c7848")}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "386cc3272911")}><input className={FIELD} value={form.title} onChange={(e) => set("title", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "ca61cdeb5c7f")}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
           <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
-          <Field label={L ? "Giá" : "Price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
-          <Field label={L ? "Tồn" : "Inventory"}><NumberInput className={FIELD} min={0} value={form.stock} onChange={(value) => set("stock", value ?? 0)} /></Field>
-          <Field label={L ? "Khối lượng" : "Weight"}><NumberInput className={FIELD} min={0} decimals={4} value={form.weight} onChange={(value) => set("weight", value ?? 0)} /></Field>
-          <Field label={L ? "Kích thước" : "Dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
+          <Field label={legacyTextByFlag(L, "fcf865a68ac5")}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
+          <Field label={legacyTextByFlag(L, "8f62f0fff83b")}><NumberInput className={FIELD} min={0} value={form.stock} onChange={(value) => set("stock", value ?? 0)} /></Field>
+          <Field label={legacyTextByFlag(L, "a92a5ec58dc0")}><NumberInput className={FIELD} min={0} decimals={4} value={form.weight} onChange={(value) => set("weight", value ?? 0)} /></Field>
+          <Field label={legacyTextByFlag(L, "917664212f1c")}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
         </div>
-        <Field label={L ? "Mô tả" : "Description"}><textarea className={cn(FIELD, "min-h-32")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
-        <Field label={L ? "Attribute mapping / certificate files" : "Attribute mapping / certificate files"}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} placeholder={L ? "Điền attribute bắt buộc và file chứng nhận nếu Tiki yêu cầu" : "Enter required attributes and certificate files if Tiki requires them"} /></Field>
-        <Field label={L ? "Images" : "Images"}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
+        <Field label={legacyTextByFlag(L, "3334eb9934f6")}><textarea className={cn(FIELD, "min-h-32")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
+        <Field label={legacyTextByFlag(L, "895a7b6d3902")}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} placeholder={legacyTextByFlag(L, "82c69b1deb0b")} /></Field>
+        <Field label={legacyTextByFlag(L, "0049661513d7")}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
       </FormSection>
       <AdapterPending provider="Tiki" L={L} />
     </>
@@ -880,29 +879,29 @@ function TikiListingFields({ form, set, L }: { form: FormState; set: <K extends 
 
 function SyncFields({ form, set, L }: { form: FormState; set: <K extends keyof FormState>(key: K, value: FormState[K]) => void; L: boolean }) {
   return (
-    <FormSection title={L ? "Chính sách đồng bộ" : "Sync policy"}>
+    <FormSection title={legacyTextByFlag(L, "c8cefb39fe77")}>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <Field label={L ? "Sync mode" : "Sync mode"}>
+        <Field label={legacyTextByFlag(L, "e451c140bb31")}>
           <Select
             value={form.syncMode}
             onValueChange={(value) => set("syncMode", value as FormState["syncMode"])}
             options={[
-              { value: "luma_to_shopee", label: L ? "Luma → Kênh online" : "Luma → Online channel" },
-              { value: "shopee_to_luma", label: L ? "Kênh online → Luma" : "Online channel → Luma" },
+              { value: "luma_to_shopee", label: legacyTextByFlag(L, "e405652b16a8") },
+              { value: "shopee_to_luma", label: legacyTextByFlag(L, "8b5efc041622") },
               { value: "manual", label: "Manual" },
             ]}
             className="w-full"
           />
         </Field>
-        <Field label={L ? "Ngưỡng tồn thấp" : "Min stock threshold"}><NumberInput className={FIELD} min={0} decimals={4} value={form.minStockThreshold} onChange={(value) => set("minStockThreshold", value ?? 0)} /></Field>
-        <Field label={L ? "Khi hết hàng" : "Out of stock"}>
+        <Field label={legacyTextByFlag(L, "d4583f251a0c")}><NumberInput className={FIELD} min={0} decimals={4} value={form.minStockThreshold} onChange={(value) => set("minStockThreshold", value ?? 0)} /></Field>
+        <Field label={legacyTextByFlag(L, "25b2b4f1a6d8")}>
           <Select
             value={form.outOfStockBehavior}
             onValueChange={(value) => set("outOfStockBehavior", value as FormState["outOfStockBehavior"])}
             options={[
-              { value: "keep_visible", label: L ? "Giữ hiển thị" : "Keep visible" },
-              { value: "unlist", label: L ? "Ẩn listing" : "Unlist" },
-              { value: "set_zero", label: L ? "Set tồn = 0" : "Set zero" },
+              { value: "keep_visible", label: legacyTextByFlag(L, "6915a1c6d014") },
+              { value: "unlist", label: legacyTextByFlag(L, "dea0d40fa780") },
+              { value: "set_zero", label: legacyTextByFlag(L, "736a05178c80") },
             ]}
             className="w-full"
           />
@@ -927,7 +926,7 @@ function FormSection({ title, note, children }: { title: string; note?: string; 
 function AdapterPending({ provider, L }: { provider: string; L: boolean }) {
   return (
     <div className="rounded-card border border-warn/20 bg-warn-soft px-4 py-3 text-xs font-semibold text-warn">
-      {L ? `${provider} form đã tách theo sàn, nhưng adapter publish/API chưa bật.` : `${provider} form is marketplace-specific, but publish/API adapter is not enabled yet.`}
+      {legacyTextByFlag(L, "8b598058f8b5", { provider })}
     </div>
   );
 }
@@ -1026,24 +1025,24 @@ function ProductSearchInListing({
 
   return (
     <div className="relative flex flex-col gap-1">
-      <span className={LABEL}>{L ? "Sản phẩm" : "Product"}</span>
+      <span className={LABEL}>{legacyTextByFlag(L, "67403942504d")}</span>
       <Search className="absolute left-3 top-[34px] z-10 h-4 w-4 text-slate-400" />
       <input
         type="text"
         value={search}
         onChange={(event) => setSearch(event.target.value)}
-        placeholder={selectedProduct ? selectedProduct.name : (L ? "Tìm theo tên, SKU hoặc barcode..." : "Search by name, SKU, or barcode...")}
+        placeholder={selectedProduct ? selectedProduct.name : (legacyTextByFlag(L, "b8d56b1a11bb"))}
         className="h-11 w-full rounded-lg border border-border bg-canvas pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none lg:h-10"
       />
-      {selectedProduct && !query && <div className="text-xs text-slate-500">{selectedProduct.sku} · {selectedProduct.categoryName ?? (L ? "Chưa có danh mục" : "No category")}</div>}
+      {selectedProduct && !query && <div className="text-xs text-slate-500">{selectedProduct.sku} · {selectedProduct.categoryName ?? (legacyTextByFlag(L, "7d78c9ff9bf2"))}</div>}
       {(query || isPending) && (
         <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-auto rounded-xl border border-border bg-surface shadow-e2">
           {isPending ? (
             <div className="px-4 py-6 text-center text-sm text-slate-400">
-              <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />{L ? "Đang tìm..." : "Searching..."}</span>
+              <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />{legacyTextByFlag(L, "f01bef56e435")}</span>
             </div>
           ) : results.length === 0 ? (
-            <div className="px-4 py-6 text-center text-sm text-slate-400">{L ? "Không tìm thấy sản phẩm." : "No products found."}</div>
+            <div className="px-4 py-6 text-center text-sm text-slate-400">{legacyTextByFlag(L, "ed982db0890e")}</div>
           ) : (
             <div className="divide-y divide-border-soft">
               {results.map((product) => (
@@ -1060,7 +1059,7 @@ function ProductSearchInListing({
                       {product.isVariantParent
                         ? `${product.children.length} SKU con`
                         : isProductStockManaged(product.categoryName)
-                          ? `${product.sku} · ${L ? "Tồn" : "Stock"} ${formatNumber(Number(product.stock))} ${product.baseUnit}`
+                          ? `${product.sku} · ${legacyTextByFlag(L, "75dc5449a256")} ${formatNumber(Number(product.stock))} ${product.baseUnit}`
                           : product.sku}
                     </div>
                   </div>

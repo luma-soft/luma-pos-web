@@ -1,15 +1,17 @@
-const REASON_LABELS: Record<string, readonly [en: string, vi: string]> = {
-  staff: ["Staff use", "Nhân viên sử dụng"],
-  mobile_product_internal_use: ["Staff use", "Nhân viên sử dụng"],
-  sample: ["Samples & marketing", "Hàng mẫu / tiếp thị"],
-  consumable: ["Store consumables", "Vật tư tiêu hao"],
-  display: ["Display", "Trưng bày"],
-  gift: ["Gift / Promo", "Quà tặng / KM"],
-  staff_meal: ["Staff meals", "Bữa ăn nhân viên"],
-  supplies: ["Office supplies", "Vật tư văn phòng"],
-  cleaning: ["Cleaning supplies", "Vật tư vệ sinh"],
-  training: ["Staff training", "Đào tạo nhân viên"],
-  other: ["Other", "Khác"],
+import { catalogText } from "../i18n/catalog-text";
+
+const REASON_LABELS: Record<string, string> = {
+  staff: "staff",
+  mobile_product_internal_use: "mobile_product_internal_use",
+  sample: "sample",
+  consumable: "consumable",
+  display: "display",
+  gift: "gift",
+  staff_meal: "staff_meal",
+  supplies: "supplies",
+  cleaning: "cleaning",
+  training: "training",
+  other: "other",
 };
 
 export function internalUseReasonLabel(
@@ -20,5 +22,5 @@ export function internalUseReasonLabel(
   if (!source) return "—";
   const labels = REASON_LABELS[source.toLowerCase()];
   if (!labels) return source;
-  return locale === "vi" ? labels[1] : labels[0];
+  return catalogText(locale, `inventory.internalUse.reasons.${labels}`);
 }
