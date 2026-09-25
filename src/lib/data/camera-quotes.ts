@@ -8,11 +8,13 @@ import {
   CAMERA_QUOTE_INSTALL_SKUS,
   CAMERA_QUOTE_MATERIAL_SKUS,
 } from "@/lib/data/camera-quote-constants";
+import { CAMERA_IP_QUOTE_SKUS } from "@/lib/data/camera-ip-quote";
 
 const requiredSkus = [
   ...CAMERA_QUOTE_CARD_SKUS,
   ...CAMERA_QUOTE_INSTALL_SKUS,
   ...CAMERA_QUOTE_MATERIAL_SKUS,
+  ...CAMERA_IP_QUOTE_SKUS,
 ];
 const optionalMaterialSkus = CAMERA_QUOTE_DETAIL_MATERIAL_SKUS;
 
@@ -128,6 +130,10 @@ export async function getCameraQuoteFormOptions(storeId: string, includePrivate 
         return row ? [mapProduct(row)] : [];
       }),
     ],
+    ipQuoteProducts: CAMERA_IP_QUOTE_SKUS.flatMap((sku) => {
+      const row = utilityBySku.get(sku);
+      return row ? [mapProduct(row)] : [];
+    }),
     customers: customerRows,
     warehouses: warehouseRows,
     defaultWarehouseId: warehouseRows.find((row) => row.isDefault)?.id ?? warehouseRows[0]?.id ?? null,

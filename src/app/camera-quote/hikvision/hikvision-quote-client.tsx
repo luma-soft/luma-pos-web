@@ -11,6 +11,9 @@ import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { ArrowLeft, Check, CircleAlert, Copy, Database, Network, Pencil, Printer, RotateCcw, Server, ShieldCheck, X } from "lucide-react";
 import type { HikvisionQuoteProduct } from "@/lib/data/hikvision-quote";
+import { CAMERA_IP_QUOTE_LEGACY_SKUS } from "@/lib/data/camera-ip-quote";
+import { cameraQuotePrice, resolveCameraIpQuoteDefaults } from "@/lib/camera-quote-settings";
+import type { CameraQuoteSettings } from "@/lib/camera-quote-settings";
 import { formatCurrency } from "@/lib/utils";
 
 type SystemSize = "4" | "8" | "16";
@@ -20,17 +23,21 @@ type StorageDays = "7" | "15" | "30";
 type QuoteLineItem = { id: string; sku?: string; label: string; model: string; quantity: number; total: number; unitPrice: number; unavailable: boolean };
 
 const SKU = {
-  camera: { bullet2: "HK-IP-DS2CD1023G2-LIUF", bullet4: "HK-IP-DS2CD1043G2-LIUF", dome4: "HK-IP-DS2CD1143G2-LIUF", ptz4: "HK-PTZ-DS2DE2A404IW-DE3" },
-  nvr: { "4": { nvr: "HK-NVR-DS7604NI-K1-4P", switch: "HK-NVR-DS7604NI-K1" }, "8": { nvr: "HK-NVR-DS7608NI-K1-8P", switch: "HK-NVR-DS7608NI-K1" }, "16": { nvr: "HK-NVR-DS7616NI-K2-16P", switch: "HK-NVR-DS7616NI-K1" } },
-  switch: { "4": "HK-SW-DS3E0106P-EM", "8": "HK-SW-DS3E1310P-EIM", "16": "HK-SW-DS3E1518P-SI" },
-  storage: { "1": "SG-SKYHAWK-1TB", "2": "SG-SKYHAWK-2TB", "4": "SG-SKYHAWK-4TB", "6": "SG-SKYHAWK-6TB" },
-  materials: "MAT-HIK-IP-PER-CAMERA",
-  installation: "SVC-HIK-IP-INSTALL-PER-CAMERA",
-  ups: "UPS-HIK-650VA",
-  cable: "504585",
-  rack: "ACC-HIK-RACK-6U",
-  monitor: "ACC-HIK-MONITOR-22",
-  surge: "ACC-HIK-SURGE-PER-CAMERA",
+  camera: CAMERA_IP_QUOTE_LEGACY_SKUS.camera,
+  nvr: {
+    "4": { nvr: CAMERA_IP_QUOTE_LEGACY_SKUS.recorder["4:nvr"], switch: CAMERA_IP_QUOTE_LEGACY_SKUS.recorder["4:switch"] },
+    "8": { nvr: CAMERA_IP_QUOTE_LEGACY_SKUS.recorder["8:nvr"], switch: CAMERA_IP_QUOTE_LEGACY_SKUS.recorder["8:switch"] },
+    "16": { nvr: CAMERA_IP_QUOTE_LEGACY_SKUS.recorder["16:nvr"], switch: CAMERA_IP_QUOTE_LEGACY_SKUS.recorder["16:switch"] },
+  },
+  switch: CAMERA_IP_QUOTE_LEGACY_SKUS.switch,
+  storage: CAMERA_IP_QUOTE_LEGACY_SKUS.storage,
+  materials: CAMERA_IP_QUOTE_LEGACY_SKUS.material,
+  installation: CAMERA_IP_QUOTE_LEGACY_SKUS.installation,
+  ups: CAMERA_IP_QUOTE_LEGACY_SKUS.ups,
+  cable: CAMERA_IP_QUOTE_LEGACY_SKUS.cable,
+  rack: CAMERA_IP_QUOTE_LEGACY_SKUS.rack,
+  monitor: CAMERA_IP_QUOTE_LEGACY_SKUS.monitor,
+  surge: CAMERA_IP_QUOTE_LEGACY_SKUS.surge,
 } as const;
 
 const POE_WATTS_PER_CAMERA: Record<CameraType, number> = { bullet2: 6.5, bullet4: 6.5, dome4: 6.5, ptz4: 12 };
@@ -64,7 +71,7 @@ function storageSize(size: SystemSize, cameraType: CameraType, days: StorageDays
   return "6";
 }
 
-export function HikvisionQuoteClient({ backLabel, catalogReady, priceOverrides, products }: { backLabel: string; catalogReady: boolean; priceOverrides: Record<string, number>; products: HikvisionQuoteProduct[] }) {
+export function HikvisionQuoteClient({ backLabel, catalogReady, cameraQuoteSettings, products }: { backLabel: string; catalogReady: boolean; cameraQuoteSettings: CameraQuoteSettings; products: HikvisionQuoteProduct[] }) {
   const t = useTranslations("cameraQuotePage.hikvision");
   const [systemSize, setSystemSize] = useState<SystemSize>("4");
   const [cameraType, setCameraType] = useState<CameraType>("bullet4");
@@ -81,7 +88,12 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, priceOverrides, 
   const [temporaryPriceValue, setTemporaryPriceValue] = useState<number | null>(null);
   const printReady = useSyncExternalStore(subscribeToNothing, () => true, () => false);
   const bySku = useMemo(() => new Map(products.map((product) => [product.sku, product])), [products]);
+  const byId = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const product = useCallback((sku: string) => bySku.get(sku), [bySku]);
+  const ipDefaults = useMemo(
+    () => resolveCameraIpQuoteDefaults(products, cameraQuoteSettings.ipQuote),
+    [cameraQuoteSettings.ipQuote, products],
+  );
   const selectedStorage = storageSize(systemSize, cameraType, storageDays);
   const cameraCount = Number(systemSize);
   const hasCatalogGap = !catalogReady;
@@ -97,28 +109,35 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, priceOverrides, 
   }, [notice]);
 
   const lineItems = useMemo(() => {
-    const fromProduct = (label: string, sku: string, quantity = 1): QuoteLineItem => {
-      const item = product(sku);
-      const unitPrice = temporaryPrices[sku] ?? (item ? priceOverrides[item.id] : undefined) ?? item?.retailPrice ?? 0;
-      return { id: sku, sku, label, model: item?.name ?? sku, quantity, unitPrice, total: unitPrice * quantity, unavailable: !item };
+    const fromProduct = (label: string, sku: string, quantity = 1, configuredProductId?: string): QuoteLineItem => {
+      const item = (configuredProductId ? byId.get(configuredProductId) : undefined) ?? product(sku);
+      const itemSku = item?.sku ?? sku;
+      const unitPrice = temporaryPrices[itemSku]
+        ?? (item ? cameraQuotePrice(item.id, item.retailPrice, cameraQuoteSettings) : 0);
+      return { id: itemSku, sku: itemSku, label, model: item?.name ?? sku, quantity, unitPrice, total: unitPrice * quantity, unavailable: !item };
     };
+    const recorderKey = `${systemSize}:${poeMethod}`;
+    const recorder = ipDefaults.recorders[recorderKey];
+    const storage = ipDefaults.storage[selectedStorage];
+    const selectedCamera = ipDefaults.cameras[cameraType];
+    const selectedSwitch = ipDefaults.switches[systemSize];
     const items = [
-      fromProduct(t("items.camera", { count: cameraCount }), SKU.camera[cameraType], cameraCount),
-      fromProduct(t("items.recorder"), SKU.nvr[systemSize][poeMethod]),
-      fromProduct(t("items.storage"), SKU.storage[selectedStorage]),
+      fromProduct(t("items.camera", { count: cameraCount }), SKU.camera[cameraType], cameraCount, selectedCamera?.id),
+      fromProduct(t("items.recorder"), SKU.nvr[systemSize][poeMethod], 1, recorder?.id),
+      fromProduct(t("items.storage"), SKU.storage[selectedStorage], 1, storage?.id),
       poeMethod === "switch"
-        ? fromProduct(t("items.poeSwitch"), SKU.switch[systemSize])
-        : { id: "poe-integrated", label: t("items.poeIntegrated"), model: product(SKU.nvr[systemSize].nvr)?.name ?? SKU.nvr[systemSize].nvr, quantity: 1, unitPrice: 0, total: 0, unavailable: false },
-      fromProduct(t("items.materials"), SKU.materials, cameraCount),
-      fromProduct(t("items.cable", { meters: cableMeters }), SKU.cable, cableMeters),
-      fromProduct(t("items.installation"), SKU.installation, cameraCount),
+        ? fromProduct(t("items.poeSwitch"), SKU.switch[systemSize], 1, selectedSwitch?.id)
+        : { id: "poe-integrated", label: t("items.poeIntegrated"), model: recorder?.name ?? SKU.nvr[systemSize].nvr, quantity: 1, unitPrice: 0, total: 0, unavailable: false },
+      fromProduct(t("items.materials"), SKU.materials, cameraCount, ipDefaults.material?.id),
+      fromProduct(t("items.cable", { meters: cableMeters }), SKU.cable, cableMeters, ipDefaults.cable?.id),
+      fromProduct(t("items.installation"), SKU.installation, cameraCount, ipDefaults.installation?.id),
     ];
-    if (includeUps) items.push(fromProduct(t("items.ups"), SKU.ups));
-    if (includeRack) items.push(fromProduct(t("items.rack"), SKU.rack));
-    if (includeMonitor) items.push(fromProduct(t("items.monitor"), SKU.monitor));
-    if (includeSurge) items.push(fromProduct(t("items.surge"), SKU.surge, cameraCount));
+    if (includeUps) items.push(fromProduct(t("items.ups"), SKU.ups, 1, ipDefaults.ups?.id));
+    if (includeRack) items.push(fromProduct(t("items.rack"), SKU.rack, 1, ipDefaults.rack?.id));
+    if (includeMonitor) items.push(fromProduct(t("items.monitor"), SKU.monitor, 1, ipDefaults.monitor?.id));
+    if (includeSurge) items.push(fromProduct(t("items.surge"), SKU.surge, cameraCount, ipDefaults.surge?.id));
     return items;
-  }, [cableMeters, cameraCount, cameraType, includeMonitor, includeRack, includeSurge, includeUps, poeMethod, priceOverrides, product, selectedStorage, systemSize, t, temporaryPrices]);
+  }, [byId, cableMeters, cameraCount, cameraType, cameraQuoteSettings, includeMonitor, includeRack, includeSurge, includeUps, ipDefaults, poeMethod, product, selectedStorage, systemSize, t, temporaryPrices]);
 
   const hasUnavailableItem = lineItems.some((item) => item.unavailable);
   const total = lineItems.reduce((sum, item) => sum + item.total, 0);

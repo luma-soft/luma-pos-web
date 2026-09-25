@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
   cameraQuoteInstallationProfile,
   cameraQuotePrice,
+  groupCameraQuoteCardsByCapacity,
+  resolveCameraIpQuoteDefaults,
   resolveCameraQuoteDefaults,
 } from "./camera-quote-settings.ts";
 
@@ -66,5 +68,39 @@ describe("camera quote settings", () => {
     expect(cameraQuoteInstallationProfile("Hikvision PTZ camera", {})).toBe("ptz");
     expect(cameraQuoteInstallationProfile("EZVIZ H3C", {})).toBe("outdoor");
     expect(cameraQuoteInstallationProfile("EZVIZ C6N", {})).toBe("indoor");
+  });
+
+  test("groups memory cards by capacity and keeps one selected SKU per capacity", () => {
+    const groups = groupCameraQuoteCardsByCapacity([
+      { id: "card-64-a", sku: "CARD-A", name: "Lexar xanh 64GB", specs: {} },
+      { id: "card-32", sku: "CARD-32", name: "Hikvision 32GB", specs: { "Dung lượng": ["32GB"] } },
+      { id: "card-64-b", sku: "CARD-B", name: "Kioxia 64GB", specs: { "Dung lượng": ["64 GB"] } },
+    ]);
+
+    expect(groups.map(([capacity, cards]) => [capacity, cards.map((card) => card.id)])).toEqual([
+      ["32GB", ["card-32"]],
+      ["64GB", ["card-64-a", "card-64-b"]],
+    ]);
+  });
+
+  test("resolves central IP quote products from saved IDs and legacy SKUs", () => {
+    const ipProducts = [
+      { id: "ip-camera-2", sku: "HK-IP-DS2CD1023G2-LIUF", retailPrice: 700000 },
+      { id: "ip-camera-4", sku: "HK-IP-DS2CD1043G2-LIUF", retailPrice: 900000 },
+      { id: "ip-camera-custom", sku: "HK-CUSTOM-CAMERA", retailPrice: 1200000 },
+      { id: "ip-cable", sku: "504585", retailPrice: 12000 },
+      { id: "ip-storage", sku: "SG-SKYHAWK-2TB", retailPrice: 1800000 },
+    ];
+
+    const resolved = resolveCameraIpQuoteDefaults(ipProducts, {
+      cameraProductIds: { bullet4: "ip-camera-custom" },
+      cableProductId: "ip-cable",
+      storageProductIds: { "2": "ip-storage" },
+    });
+
+    expect(resolved.cameras.bullet4?.id).toBe("ip-camera-custom");
+    expect(resolved.cable?.id).toBe("ip-cable");
+    expect(resolved.storage["2"]?.id).toBe("ip-storage");
+    expect(resolved.cameras.bullet2?.sku).toBe("HK-IP-DS2CD1023G2-LIUF");
   });
 });

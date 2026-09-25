@@ -14,7 +14,7 @@ export default async function StoreBrandCameraQuotePage({ params }: { params: Pr
 
   if (brand === "hikvision") {
     const [products, settings] = await Promise.all([getHikvisionQuoteProducts(store.id), getStoreSettings(store.id)]);
-    return <main className="min-h-dvh bg-slate-100 px-4 py-8 sm:px-6 sm:py-12"><HikvisionQuoteClient backLabel="Quay lại" catalogReady={products.length === HIKVISION_QUOTE_SKUS.length} priceOverrides={settings.prefs.cameraQuote.priceOverrides} products={products} /></main>;
+    return <main className="min-h-dvh bg-slate-100 px-4 py-8 sm:px-6 sm:py-12"><HikvisionQuoteClient backLabel="Quay lại" catalogReady={products.length === HIKVISION_QUOTE_SKUS.length} cameraQuoteSettings={settings.prefs.cameraQuote} products={products} /></main>;
   }
   const brandName = brands[brand as keyof typeof brands];
   if (!brandName) notFound();

@@ -272,10 +272,31 @@ const posPrefs = z.object({
   showProjectFields: z.boolean().default(false),
 });
 
+const cameraIpQuotePrefsSchema = z.object({
+  // Each map stores the selected catalog product for one IP quote role.
+  // Missing keys keep the legacy SKU mapping until the owner chooses a value.
+  cameraProductIds: z.record(z.string().trim().min(1).max(40), z.string().trim().min(1).max(120)).default({}),
+  recorderProductIds: z.record(z.string().trim().min(1).max(40), z.string().trim().min(1).max(120)).default({}),
+  switchProductIds: z.record(z.string().trim().min(1).max(40), z.string().trim().min(1).max(120)).default({}),
+  storageProductIds: z.record(z.string().trim().min(1).max(40), z.string().trim().min(1).max(120)).default({}),
+  materialProductId: z.string().trim().max(120).nullable().default(null),
+  installationProductId: z.string().trim().max(120).nullable().default(null),
+  cableProductId: z.string().trim().max(120).nullable().default(null),
+  upsProductId: z.string().trim().max(120).nullable().default(null),
+  rackProductId: z.string().trim().max(120).nullable().default(null),
+  monitorProductId: z.string().trim().max(120).nullable().default(null),
+  surgeProductId: z.string().trim().max(120).nullable().default(null),
+});
+
+export type CameraIpQuotePrefs = z.infer<typeof cameraIpQuotePrefsSchema>;
+
 export const cameraQuotePrefsSchema = z.object({
   // null means "keep the legacy catalog defaults" until the owner saves an
   // explicit selection from the camera quote settings screen.
   memoryCardProductIds: z.array(z.string()).nullable().default(null),
+  // New shape: one selected product per capacity (32GB, 64GB, ...). Keep the
+  // list above for old stores and clients that still read it.
+  memoryCardSelections: z.record(z.string().trim().min(1).max(20), z.string().trim().min(1).max(120)).nullable().default(null),
   defaultMemoryCardProductId: z.string().nullable().default(null),
   indoorMaterialProductId: z.string().nullable().default(null),
   outdoorMaterialProductId: z.string().nullable().default(null),
@@ -286,6 +307,19 @@ export const cameraQuotePrefsSchema = z.object({
   // Optional quote-only price overrides. Product retail prices remain the
   // source of truth when an id is absent from this map.
   priceOverrides: z.record(z.string(), z.number().int().min(0).max(10_000_000_000)).default({}),
+  ipQuote: cameraIpQuotePrefsSchema.default({
+    cameraProductIds: {},
+    recorderProductIds: {},
+    switchProductIds: {},
+    storageProductIds: {},
+    materialProductId: null,
+    installationProductId: null,
+    cableProductId: null,
+    upsProductId: null,
+    rackProductId: null,
+    monitorProductId: null,
+    surgeProductId: null,
+  }),
 });
 
 export type CameraQuotePrefs = z.infer<typeof cameraQuotePrefsSchema>;
@@ -405,6 +439,7 @@ export const storePrefsSchema = z.object({
   pos: posPrefs.default({ showProjectFields: false }),
   cameraQuote: cameraQuotePrefsSchema.default({
     memoryCardProductIds: null,
+    memoryCardSelections: null,
     defaultMemoryCardProductId: null,
     indoorMaterialProductId: null,
     outdoorMaterialProductId: null,
@@ -413,6 +448,19 @@ export const storePrefsSchema = z.object({
     outdoorInstallationProductId: null,
     ptzInstallationProductId: null,
     priceOverrides: {},
+    ipQuote: {
+      cameraProductIds: {},
+      recorderProductIds: {},
+      switchProductIds: {},
+      storageProductIds: {},
+      materialProductId: null,
+      installationProductId: null,
+      cableProductId: null,
+      upsProductId: null,
+      rackProductId: null,
+      monitorProductId: null,
+      surgeProductId: null,
+    },
   }),
   security: securityPrefs.default({
     maxDiscountPercent: 10,

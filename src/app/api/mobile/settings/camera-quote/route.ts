@@ -28,6 +28,7 @@ function productOptions(
     cards: map(options.cards),
     installations: map(options.installations),
     materials: map(options.materials),
+    ipQuoteProducts: map(options.ipQuoteProducts),
   };
 }
 

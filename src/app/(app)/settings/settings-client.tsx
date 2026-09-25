@@ -38,7 +38,19 @@ import {
 } from "@/lib/actions/settings";
 import type { PaymentBankAccountRow, StoreSettings, StaffRow } from "@/lib/data/settings";
 import type { CameraQuoteFormOptions } from "@/lib/data/camera-quotes";
-import { cameraQuotePrice, resolveCameraQuoteDefaults } from "@/lib/camera-quote-settings";
+import {
+  cameraQuoteMemoryCapacity,
+  cameraQuotePrice,
+  groupCameraQuoteCardsByCapacity,
+  resolveCameraIpQuoteDefaults,
+  resolveCameraQuoteDefaults,
+} from "@/lib/camera-quote-settings";
+import {
+  CAMERA_IP_QUOTE_CAMERA_TYPES,
+  CAMERA_IP_QUOTE_LEGACY_SKUS,
+  CAMERA_IP_QUOTE_POE_METHODS,
+  CAMERA_IP_QUOTE_STORAGE_SIZES,
+} from "@/lib/data/camera-ip-quote";
 import {
   AI_PROVIDERS,
   AI_TEXT_MODELS,
@@ -610,9 +622,22 @@ function materializeCameraQuotePrefs(
   options: CameraQuoteFormOptions,
 ): StorePrefs["cameraQuote"] {
   const defaults = resolveCameraQuoteDefaults(options, prefs);
+  const cardByCapacity = new Map(
+    groupCameraQuoteCardsByCapacity(options.cards).map(([capacity, cards]) => [capacity, cards]),
+  );
+  const memoryCardSelections = prefs.memoryCardSelections
+    ?? Object.fromEntries(
+      [...cardByCapacity.entries()].flatMap(([capacity, cards]) => {
+        const selected = defaults.cards.find((card) => cameraQuoteMemoryCapacity(card) === capacity) ?? cards[0];
+        return selected ? [[capacity, selected.id]] : [];
+      }),
+    );
+  const memoryCardProductIds = [...new Set(Object.values(memoryCardSelections))];
+  const ipDefaults = resolveCameraIpQuoteDefaults(options.ipQuoteProducts, prefs.ipQuote);
   return {
     ...prefs,
-    memoryCardProductIds: defaults.cards.map((product) => product.id),
+    memoryCardProductIds,
+    memoryCardSelections,
     defaultMemoryCardProductId: defaults.defaultCard?.id ?? null,
     indoorMaterialProductId: defaults.indoorMaterial?.id ?? null,
     outdoorMaterialProductId: defaults.outdoorMaterial?.id ?? null,
@@ -620,6 +645,31 @@ function materializeCameraQuotePrefs(
     indoorInstallationProductId: defaults.indoorInstallation?.id ?? null,
     outdoorInstallationProductId: defaults.outdoorInstallation?.id ?? null,
     ptzInstallationProductId: defaults.ptzInstallation?.id ?? null,
+    ipQuote: {
+      ...prefs.ipQuote,
+      cameraProductIds: Object.fromEntries(
+        CAMERA_IP_QUOTE_CAMERA_TYPES.flatMap((key) => {
+          const product = ipDefaults.cameras[key];
+          return product ? [[key, product.id]] : [];
+        }),
+      ),
+      recorderProductIds: Object.fromEntries(
+        Object.entries(ipDefaults.recorders).flatMap(([key, product]) => product ? [[key, product.id]] : []),
+      ),
+      switchProductIds: Object.fromEntries(
+        Object.entries(ipDefaults.switches).flatMap(([key, product]) => product ? [[key, product.id]] : []),
+      ),
+      storageProductIds: Object.fromEntries(
+        Object.entries(ipDefaults.storage).flatMap(([key, product]) => product ? [[key, product.id]] : []),
+      ),
+      materialProductId: ipDefaults.material?.id ?? null,
+      installationProductId: ipDefaults.installation?.id ?? null,
+      cableProductId: ipDefaults.cable?.id ?? null,
+      upsProductId: ipDefaults.ups?.id ?? null,
+      rackProductId: ipDefaults.rack?.id ?? null,
+      monitorProductId: ipDefaults.monitor?.id ?? null,
+      surgeProductId: ipDefaults.surge?.id ?? null,
+    },
   };
 }
 
@@ -641,11 +691,22 @@ function CameraQuoteSettingsSection({
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
   const productById = useMemo(
-    () => new Map([...options.cameras, ...options.cards, ...options.installations, ...options.materials].map((product) => [product.id, product])),
+    () => new Map([
+      ...options.cameras,
+      ...options.cards,
+      ...options.installations,
+      ...options.materials,
+      ...options.ipQuoteProducts,
+    ].map((product) => [product.id, product])),
     [options],
   );
   const selectedCardIds = new Set(form.memoryCardProductIds ?? []);
   const selectedCards = options.cards.filter((product) => selectedCardIds.has(product.id));
+  const cardGroups = groupCameraQuoteCardsByCapacity(options.cards);
+  const ipProductById = new Map(options.ipQuoteProducts.map((product) => [product.id, product]));
+  const ipProductOptions = (skus: readonly string[], selectedId?: string) => options.ipQuoteProducts
+    .filter((product) => product.id === selectedId || (product.sku && skus.includes(product.sku)))
+    .map((product) => ({ value: product.id, label: product.name, hint: product.sku }));
   const defaultCardOptions = selectedCards.map((product) => ({
     value: product.id,
     label: `${product.name} · ${formatCurrency(cameraQuotePrice(product.id, product.retailPrice, form))}`,
@@ -668,19 +729,45 @@ function CameraQuoteSettingsSection({
     markChanged({ ...form, priceOverrides });
   }
 
-  function toggleCard(productId: string, checked: boolean) {
-    const next = new Set(form.memoryCardProductIds ?? []);
-    if (checked) next.add(productId);
-    else next.delete(productId);
-    const memoryCardProductIds = [...next];
+  function setMemoryCardSelection(capacity: string, productId: string) {
+    const memoryCardSelections = {
+      ...(form.memoryCardSelections ?? {}),
+      [capacity]: productId,
+    };
+    const memoryCardProductIds = [...new Set(Object.values(memoryCardSelections))];
     const defaultMemoryCardProductId = memoryCardProductIds.includes(form.defaultMemoryCardProductId ?? "")
       ? form.defaultMemoryCardProductId
       : memoryCardProductIds[0] ?? null;
-    markChanged({ ...form, memoryCardProductIds, defaultMemoryCardProductId });
+    markChanged({ ...form, memoryCardSelections, memoryCardProductIds, defaultMemoryCardProductId });
   }
 
   function setProduct(field: CameraQuoteProductField, value: string) {
     markChanged({ ...form, [field]: value || null });
+  }
+
+  function setIpProductMap(
+    field: "cameraProductIds" | "recorderProductIds" | "switchProductIds" | "storageProductIds",
+    key: string,
+    value: string,
+  ) {
+    markChanged({
+      ...form,
+      ipQuote: {
+        ...form.ipQuote,
+        [field]: { ...form.ipQuote[field], [key]: value },
+      },
+    });
+  }
+
+  function setIpProduct(field: "materialProductId" | "installationProductId" | "cableProductId" | "upsProductId" | "rackProductId" | "monitorProductId" | "surgeProductId", value: string) {
+    markChanged({
+      ...form,
+      ipQuote: { ...form.ipQuote, [field]: value || null },
+    });
+  }
+
+  function ipProduct(id: string | null | undefined) {
+    return id ? ipProductById.get(id) : undefined;
   }
 
   function save() {
@@ -744,7 +831,7 @@ function CameraQuoteSettingsSection({
                     <MoneyInput
                       value={cameraQuotePrice(product.id, product.retailPrice, form)}
                       disabled={!canManage}
-                      className="h-9 text-xs"
+                      className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
                       onChange={(value) => setPriceOverride(product.id, value, product.retailPrice)}
                     />
                   </div>
@@ -754,24 +841,37 @@ function CameraQuoteSettingsSection({
             </div>
           </Card>
 
-          <Card title={L ? "Thẻ nhớ" : "Memory cards"} vi={L ? "Chọn các gói hiển thị và giá mặc định" : "Choose visible packages and default pricing"}>
+          <Card title={L ? "Thẻ nhớ" : "Memory cards"} vi={L ? "Mỗi dung lượng chọn một thẻ đang dùng và giá báo giá" : "Choose one active card and quote price per capacity"}>
             <div className="p-3.5 flex flex-col gap-3">
+              <div className="grid grid-cols-[92px_minmax(0,1fr)_140px] items-center gap-2 border-b border-border-soft px-2 pb-2 text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                <span>{L ? "Dung lượng" : "Capacity"}</span>
+                <span>{L ? "Thẻ đang chọn" : "Selected card"}</span>
+                <span className="text-right">{L ? "Giá" : "Price"}</span>
+              </div>
               <div className="grid gap-2">
-                {options.cards.map((product) => (
-                  <div key={product.id} className={cn(ROW, "grid grid-cols-[auto_minmax(0,1fr)_130px] items-center")}>
-                    <Checkbox checked={selectedCardIds.has(product.id)} disabled={!canManage} onChange={(event) => toggleCard(product.id, event.currentTarget.checked)} aria-label={product.name} />
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-semibold">{product.name}</div>
-                      <div className="text-[10px] text-slate-400">{product.sku}</div>
+                {cardGroups.map(([capacity, products]) => {
+                  const selectedId = form.memoryCardSelections?.[capacity] ?? products.find((product) => selectedCardIds.has(product.id))?.id ?? "";
+                  const selected = selectedId ? productById.get(selectedId) : undefined;
+                  return (
+                    <div key={capacity} className={cn(ROW, "grid gap-3 md:grid-cols-[92px_minmax(0,1fr)_140px] md:items-center")}>
+                      <div className="text-xs font-extrabold text-slate-700">{capacity}</div>
+                      <SearchableSelect
+                        value={selectedId}
+                        options={products.map((product) => ({ value: product.id, label: product.name, hint: product.sku }))}
+                        allowClear={false}
+                        disabled={!canManage}
+                        onChange={(value) => setMemoryCardSelection(capacity, value)}
+                        className={searchableTouch}
+                      />
+                      <MoneyInput
+                        value={selected ? cameraQuotePrice(selected.id, selected.retailPrice, form) : null}
+                        disabled={!canManage || !selected}
+                        className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        onChange={(value) => selected && setPriceOverride(selected.id, value, selected.retailPrice)}
+                      />
                     </div>
-                    <MoneyInput
-                      value={cameraQuotePrice(product.id, product.retailPrice, form)}
-                      disabled={!canManage || !selectedCardIds.has(product.id)}
-                      className="h-9 text-xs"
-                      onChange={(value) => setPriceOverride(product.id, value, product.retailPrice)}
-                    />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="max-w-xl">
                 <span className={FL}>{L ? "Thẻ nhớ mặc định" : "Default memory card"}</span>
@@ -812,9 +912,10 @@ function CameraQuoteSettingsSection({
                       />
                     </div>
                     <MoneyInput
+                      aria-label={L ? `Giá vật tư ${profile.label}` : `${profile.label} material price`}
                       value={material ? cameraQuotePrice(material.id, material.retailPrice, form) : null}
                       disabled={!canManage || !material}
-                      className="h-10 text-xs"
+                      className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
                       onChange={(value) => material && setPriceOverride(material.id, value, material.retailPrice)}
                     />
                     <div className="min-w-0">
@@ -829,14 +930,171 @@ function CameraQuoteSettingsSection({
                       />
                     </div>
                     <MoneyInput
+                      aria-label={L ? `Giá công lắp đặt ${profile.label}` : `${profile.label} installation price`}
                       value={installation ? cameraQuotePrice(installation.id, installation.retailPrice, form) : null}
                       disabled={!canManage || !installation}
-                      className="h-10 text-xs"
+                      className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
                       onChange={(value) => installation && setPriceOverride(installation.id, value, installation.retailPrice)}
                     />
                   </div>
                 );
               })}
+            </div>
+          </Card>
+
+          <Card title={L ? "Báo giá camera IP" : "IP camera quote"} vi={L ? "Chọn sản phẩm và giá mặc định cho đầu ghi, ổ cứng, dây mạng, tủ và phụ kiện" : "Choose default products and prices for recorder, storage, cable, rack, and accessories"}>
+            <div className="divide-y divide-border-soft">
+              <div className="grid gap-3 p-3.5">
+                <div>
+                  <div className="text-xs font-bold">{L ? "Camera IP" : "IP cameras"}</div>
+                  <div className="mt-1 text-[10px] text-slate-400">{L ? "Giá từng loại camera trong báo giá IP" : "Price by IP camera type"}</div>
+                </div>
+                <div className="grid gap-2">
+                  {CAMERA_IP_QUOTE_CAMERA_TYPES.map((key) => {
+                    const id = form.ipQuote.cameraProductIds[key] ?? "";
+                    const product = ipProduct(id);
+                    const labels: Record<typeof key, string> = {
+                      bullet2: L ? "Camera thân 2MP" : "2MP bullet camera",
+                      bullet4: L ? "Camera thân 4MP" : "4MP bullet camera",
+                      dome4: L ? "Camera dome 4MP" : "4MP dome camera",
+                      ptz4: L ? "Camera PTZ 4MP" : "4MP PTZ camera",
+                    };
+                    const legacySku = CAMERA_IP_QUOTE_LEGACY_SKUS.camera[key];
+                    return (
+                      <div key={key} className="grid gap-2 md:grid-cols-[150px_minmax(0,1fr)_140px] md:items-center">
+                        <span className="text-xs font-semibold">{labels[key]}</span>
+                        <SearchableSelect
+                          value={id}
+                          options={ipProductOptions([legacySku], id)}
+                          allowClear={false}
+                          disabled={!canManage}
+                          onChange={(value) => setIpProductMap("cameraProductIds", key, value)}
+                          className={searchableTouch}
+                        />
+                        <MoneyInput
+                          aria-label={labels[key]}
+                          value={product ? cameraQuotePrice(product.id, product.retailPrice, form) : null}
+                          disabled={!canManage || !product}
+                          className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          onChange={(value) => product && setPriceOverride(product.id, value, product.retailPrice)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid gap-3 p-3.5">
+                <div>
+                  <div className="text-xs font-bold">{L ? "Đầu ghi / switch PoE" : "Recorder / PoE switch"}</div>
+                  <div className="mt-1 text-[10px] text-slate-400">{L ? "Theo số lượng camera và phương án cấp nguồn" : "By camera count and power method"}</div>
+                </div>
+                <div className="grid gap-2">
+                  {(["4", "8", "16"] as const).flatMap((size) => CAMERA_IP_QUOTE_POE_METHODS.map((method) => {
+                    const key = `${size}:${method}`;
+                    const id = form.ipQuote.recorderProductIds[key] ?? "";
+                    const product = ipProduct(id);
+                    const legacySku = CAMERA_IP_QUOTE_LEGACY_SKUS.recorder[key as keyof typeof CAMERA_IP_QUOTE_LEGACY_SKUS.recorder];
+                    return (
+                      <div key={key} className="grid gap-2 md:grid-cols-[150px_minmax(0,1fr)_140px] md:items-center">
+                        <span className="text-xs font-semibold">{size} camera · {method === "nvr" ? "PoE" : "Switch"}</span>
+                        <SearchableSelect
+                          value={id}
+                          options={ipProductOptions([legacySku], id)}
+                          allowClear={false}
+                          disabled={!canManage}
+                          onChange={(value) => setIpProductMap("recorderProductIds", key, value)}
+                          className={searchableTouch}
+                        />
+                        <MoneyInput
+                          aria-label={`${size} camera ${method}`}
+                          value={product ? cameraQuotePrice(product.id, product.retailPrice, form) : null}
+                          disabled={!canManage || !product}
+                          className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          onChange={(value) => product && setPriceOverride(product.id, value, product.retailPrice)}
+                        />
+                      </div>
+                    );
+                  }))}
+                </div>
+              </div>
+
+              <div className="grid gap-3 p-3.5">
+                <div>
+                  <div className="text-xs font-bold">{L ? "Ổ cứng" : "Hard drives"}</div>
+                  <div className="mt-1 text-[10px] text-slate-400">{L ? "Giá theo dung lượng lưu trữ" : "Price by storage capacity"}</div>
+                </div>
+                <div className="grid gap-2">
+                  {CAMERA_IP_QUOTE_STORAGE_SIZES.map((size) => {
+                    const id = form.ipQuote.storageProductIds[size] ?? "";
+                    const product = ipProduct(id);
+                    const legacySku = CAMERA_IP_QUOTE_LEGACY_SKUS.storage[size];
+                    return (
+                      <div key={size} className="grid gap-2 md:grid-cols-[150px_minmax(0,1fr)_140px] md:items-center">
+                        <span className="text-xs font-semibold">{size}TB</span>
+                        <SearchableSelect
+                          value={id}
+                          options={ipProductOptions([legacySku], id)}
+                          allowClear={false}
+                          disabled={!canManage}
+                          onChange={(value) => setIpProductMap("storageProductIds", size, value)}
+                          className={searchableTouch}
+                        />
+                        <MoneyInput
+                          aria-label={`${size}TB`}
+                          value={product ? cameraQuotePrice(product.id, product.retailPrice, form) : null}
+                          disabled={!canManage || !product}
+                          className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          onChange={(value) => product && setPriceOverride(product.id, value, product.retailPrice)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid gap-3 p-3.5">
+                <div>
+                  <div className="text-xs font-bold">{L ? "Dây mạng và phụ kiện" : "Cable and accessories"}</div>
+                  <div className="mt-1 text-[10px] text-slate-400">{L ? "Các sản phẩm dùng chung cho báo giá camera IP" : "Shared products used by the IP quote"}</div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {([
+                    ["materialProductId", "Vật tư theo camera", CAMERA_IP_QUOTE_LEGACY_SKUS.material],
+                    ["installationProductId", "Công lắp đặt", CAMERA_IP_QUOTE_LEGACY_SKUS.installation],
+                    ["cableProductId", "Dây mạng", CAMERA_IP_QUOTE_LEGACY_SKUS.cable],
+                    ["upsProductId", "UPS", CAMERA_IP_QUOTE_LEGACY_SKUS.ups],
+                    ["rackProductId", "Tủ rack", CAMERA_IP_QUOTE_LEGACY_SKUS.rack],
+                    ["monitorProductId", "Màn hình", CAMERA_IP_QUOTE_LEGACY_SKUS.monitor],
+                    ["surgeProductId", "Chống sét", CAMERA_IP_QUOTE_LEGACY_SKUS.surge],
+                  ] as const).map(([field, label, sku]) => {
+                    const id = form.ipQuote[field] ?? "";
+                    const product = ipProduct(id);
+                    return (
+                      <div key={field} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_130px] sm:items-end">
+                        <div className="min-w-0">
+                          <span className={FL}>{L ? label : label}</span>
+                          <SearchableSelect
+                            value={id}
+                            options={ipProductOptions([sku], id)}
+                            allowClear={false}
+                            disabled={!canManage}
+                            onChange={(value) => setIpProduct(field, value)}
+                            className={searchableTouch}
+                          />
+                        </div>
+                        <MoneyInput
+                          aria-label={label}
+                          value={product ? cameraQuotePrice(product.id, product.retailPrice, form) : null}
+                          disabled={!canManage || !product}
+                          className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-right text-xs tabular-nums outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          onChange={(value) => product && setPriceOverride(product.id, value, product.retailPrice)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </Card>
 

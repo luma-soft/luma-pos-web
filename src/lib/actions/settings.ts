@@ -6,6 +6,12 @@ import { db } from "@/db";
 import { paymentBankAccounts, storeSettings } from "@/db/schema";
 import { getPaymentBankAccounts, getStaff } from "@/lib/data/settings";
 import { getCameraQuoteFormOptions } from "@/lib/data/camera-quotes";
+import {
+  CAMERA_IP_QUOTE_CAMERA_TYPES,
+  CAMERA_IP_QUOTE_RECORDER_KEYS,
+  CAMERA_IP_QUOTE_STORAGE_KEYS,
+  CAMERA_IP_QUOTE_SWITCH_KEYS,
+} from "@/lib/data/camera-ip-quote";
 import { getAiUsageStatus } from "@/lib/ai/usage";
 import {
   aiSettingsInputSchema,
@@ -247,19 +253,45 @@ async function persistCameraQuoteSettings(
     const cardIds = new Set(options.cards.map((product) => product.id));
     const installationIds = new Set(options.installations.map((product) => product.id));
     const materialIds = new Set(options.materials.map((product) => product.id));
-    const quoteProductIds = new Set([...cameraIds, ...cardIds, ...installationIds, ...materialIds]);
+    const ipProductIds = new Set(options.ipQuoteProducts.map((product) => product.id));
+    const quoteProductIds = new Set([
+      ...cameraIds,
+      ...cardIds,
+      ...installationIds,
+      ...materialIds,
+      ...ipProductIds,
+    ]);
     const value = parsed.data;
+    const ipQuote = value.ipQuote;
+    const validIpMap = (map: Record<string, string>, keys: readonly string[]) =>
+      Object.entries(map).every(([key, id]) => keys.includes(key) && ipProductIds.has(id));
+    const validIpProduct = (id: string | null) => id === null || ipProductIds.has(id);
 
     if (
       (value.memoryCardProductIds !== null && value.memoryCardProductIds.some((id) => !cardIds.has(id)))
+      || (value.memoryCardSelections !== null && Object.values(value.memoryCardSelections).some((id) => !cardIds.has(id)))
       || (value.defaultMemoryCardProductId !== null && !cardIds.has(value.defaultMemoryCardProductId))
-      || (value.defaultMemoryCardProductId !== null && value.memoryCardProductIds !== null && !value.memoryCardProductIds.includes(value.defaultMemoryCardProductId))
+      || (value.defaultMemoryCardProductId !== null
+        && value.memoryCardProductIds !== null
+        && !value.memoryCardProductIds.includes(value.defaultMemoryCardProductId)
+        && (value.memoryCardSelections === null || !Object.values(value.memoryCardSelections).includes(value.defaultMemoryCardProductId)))
       || (value.indoorMaterialProductId !== null && !materialIds.has(value.indoorMaterialProductId))
       || (value.outdoorMaterialProductId !== null && !materialIds.has(value.outdoorMaterialProductId))
       || (value.ptzMaterialProductId !== null && !materialIds.has(value.ptzMaterialProductId))
       || (value.indoorInstallationProductId !== null && !installationIds.has(value.indoorInstallationProductId))
       || (value.outdoorInstallationProductId !== null && !installationIds.has(value.outdoorInstallationProductId))
       || (value.ptzInstallationProductId !== null && !installationIds.has(value.ptzInstallationProductId))
+      || !validIpMap(ipQuote.cameraProductIds, CAMERA_IP_QUOTE_CAMERA_TYPES)
+      || !validIpMap(ipQuote.recorderProductIds, CAMERA_IP_QUOTE_RECORDER_KEYS)
+      || !validIpMap(ipQuote.switchProductIds, CAMERA_IP_QUOTE_SWITCH_KEYS)
+      || !validIpMap(ipQuote.storageProductIds, CAMERA_IP_QUOTE_STORAGE_KEYS)
+      || !validIpProduct(ipQuote.materialProductId)
+      || !validIpProduct(ipQuote.installationProductId)
+      || !validIpProduct(ipQuote.cableProductId)
+      || !validIpProduct(ipQuote.upsProductId)
+      || !validIpProduct(ipQuote.rackProductId)
+      || !validIpProduct(ipQuote.monitorProductId)
+      || !validIpProduct(ipQuote.surgeProductId)
       || Object.keys(value.priceOverrides).some((id) => !quoteProductIds.has(id))
     ) {
       return { ok: false, error: "errors.invalidData" };

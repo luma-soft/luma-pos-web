@@ -1,33 +1,9 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { brands, products } from "@/db/schema";
+import { CAMERA_IP_QUOTE_SKUS } from "@/lib/data/camera-ip-quote";
 
-export const HIKVISION_QUOTE_SKUS = [
-  "HK-IP-DS2CD1023G2-LIUF",
-  "HK-IP-DS2CD1043G2-LIUF",
-  "HK-NVR-DS7604NI-K1",
-  "HK-NVR-DS7604NI-K1-4P",
-  "HK-NVR-DS7608NI-K1",
-  "HK-NVR-DS7608NI-K1-8P",
-  "HK-SW-DS3E0106P-EM",
-  "HK-SW-DS3E1310P-EIM",
-  "SG-SKYHAWK-1TB",
-  "SG-SKYHAWK-2TB",
-  "SG-SKYHAWK-4TB",
-  "MAT-HIK-IP-PER-CAMERA",
-  "SVC-HIK-IP-INSTALL-PER-CAMERA",
-  "UPS-HIK-650VA",
-  "HK-IP-DS2CD1143G2-LIUF",
-  "HK-PTZ-DS2DE2A404IW-DE3",
-  "HK-NVR-DS7616NI-K1",
-  "HK-NVR-DS7616NI-K2-16P",
-  "HK-SW-DS3E1518P-SI",
-  "SG-SKYHAWK-6TB",
-  "ACC-HIK-RACK-6U",
-  "ACC-HIK-MONITOR-22",
-  "ACC-HIK-SURGE-PER-CAMERA",
-  "504585",
-] as const;
+export const HIKVISION_QUOTE_SKUS = CAMERA_IP_QUOTE_SKUS;
 
 export type HikvisionQuoteProduct = {
   id: string;
