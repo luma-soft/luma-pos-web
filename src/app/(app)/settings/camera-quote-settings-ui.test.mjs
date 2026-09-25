@@ -25,6 +25,13 @@ test("memory, installation, and IP quote settings stay in table sections", () =>
   expect(source).not.toContain("Thẻ nhớ mặc định");
 });
 
+test("installation pricing is rendered as a following row in the aligned table", () => {
+  expect(source).toContain('renderFollowingRows={(profile, visibleColumns) =>');
+  expect(source).toContain('L ? "Công lắp đặt" : "Installation"');
+  expect(source).toContain('minWidth="760px"');
+  expect(source).toContain('label: rightHeader(L ? "Giá nhập" : "Cost price")');
+});
+
 test("mobile quote rows keep price and picker labels visible", () => {
   expect(source).toContain('renderMobileRow={({ row }) =>');
   expect(source).toContain('L ? "Sản phẩm" : "Product"');
