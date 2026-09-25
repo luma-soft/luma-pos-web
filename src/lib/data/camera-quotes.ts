@@ -38,6 +38,7 @@ export type CameraQuoteProductOption = {
   name: string;
   baseUnit: string;
   brand: string | null;
+  costPrice: number;
   retailPrice: number;
   description: string | null;
   imageUrl: string | null;
@@ -54,6 +55,7 @@ export async function getCameraQuoteFormOptions(storeId: string, includePrivate 
         name: products.name,
         baseUnit: products.baseUnit,
         brand: brands.name,
+        costPrice: products.costPrice,
         retailPrice: products.retailPrice,
         description: products.description,
         imageUrls,
@@ -71,6 +73,7 @@ export async function getCameraQuoteFormOptions(storeId: string, includePrivate 
         name: products.name,
         baseUnit: products.baseUnit,
         brand: brands.name,
+        costPrice: products.costPrice,
         retailPrice: products.retailPrice,
         description: products.description,
         imageUrls,
@@ -104,6 +107,7 @@ export async function getCameraQuoteFormOptions(storeId: string, includePrivate 
     name: row.name,
     baseUnit: row.baseUnit,
     brand: row.brand,
+    costPrice: Number(row.costPrice),
     retailPrice: Number(row.retailPrice),
     description: row.description,
     imageUrl: firstImage(row.imageUrls),
