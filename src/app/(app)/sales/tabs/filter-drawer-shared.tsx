@@ -122,6 +122,7 @@ export function LumaWebPicker({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [internalValue, setInternalValue] = useState(defaultValue);
+  const searchRef = useRef<HTMLInputElement>(null);
   const selectedValue = value ?? internalValue;
   const selectedIndex = Math.max(
     0,
@@ -131,6 +132,14 @@ export function LumaWebPicker({
   const visibleOptions = search.trim()
     ? options.filter((option) => option.label.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
     : options;
+
+  useEffect(() => {
+    if (!open || !searchable) return;
+    const frame = window.requestAnimationFrame(() => {
+      searchRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, searchable]);
 
   function focusOption(index: number) {
     if (visibleOptions.length === 0) return;
@@ -213,7 +222,7 @@ export function LumaWebPicker({
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                 <input
-                  autoFocus
+                  ref={searchRef}
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder={searchPlaceholder}

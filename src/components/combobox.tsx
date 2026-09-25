@@ -67,6 +67,7 @@ export function SearchableSelect({
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const selected = options.find((o) => o.value === value);
   const searchable = showSearch ?? options.length > 8;
 
@@ -97,6 +98,14 @@ export function SearchableSelect({
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- reset highlighted index when query/open changes
   useEffect(() => { setActive(0); }, [nq, open]);
+
+  useEffect(() => {
+    if (!open || !searchable) return;
+    const frame = window.requestAnimationFrame(() => {
+      searchRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, searchable]);
 
   useLayoutEffect(() => {
     if (!open || !isDesktop) {
@@ -185,7 +194,8 @@ export function SearchableSelect({
       {searchable && (
         <div className="border-b border-border-soft">
           <Input
-            autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown}
+            ref={searchRef}
+            value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown}
             placeholder={placeholder ?? t("search")}
             leftIcon={<Search />}
             className="h-11 rounded-none border-0 bg-transparent focus:ring-0 focus:border-transparent"
