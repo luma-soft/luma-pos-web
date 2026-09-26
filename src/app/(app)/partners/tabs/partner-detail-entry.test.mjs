@@ -4,7 +4,7 @@ const customerId = "7dca0eeb-dc17-4607-8964-18574c2400e9";
 const supplierId = "141ed272-a296-46de-aa2a-9ec124296390";
 const customer = { id: customerId, name: "Anh Nhật", salesHistory: [], debtLedger: [] };
 const supplier = { id: supplierId, name: "Nhà cung cấp", currentDebt: "0" };
-const list = { rows: [], total: 40, page: 2, pageCount: 2, pageSize: 20 };
+const list = { rows: [], total: 40, page: 2, pageCount: 2, pageSize: 20, totalDebt: 123456 };
 const getCustomers = mock(async () => list);
 const getSuppliers = mock(async () => list);
 const getCustomerPartnerDetail = mock(async () => customer);
@@ -42,6 +42,7 @@ describe("partner modal deep-link entry", () => {
     expect(getSupplier).toHaveBeenCalledWith("store-1", supplierId);
     expect(getSuppliers.mock.calls[0][1]).toMatchObject({ page: 2, q: "another name" });
     expect(table.props.rows).toBe(list.rows);
+    expect(table.props.totalDebt).toBe(list.totalDebt);
     expect(table.props.initialDetailId).toBe(supplierId);
     expect(table.props.initialDetailSupplier).toBe(supplier);
   });

@@ -105,6 +105,7 @@ async function loadSupplierPreview(id: string, signal: AbortSignal): Promise<Sup
 
 export function SuppliersTable({
   rows,
+  totalDebt,
   query,
   owing,
   pageSize,
@@ -112,6 +113,7 @@ export function SuppliersTable({
   initialDetailSupplier = null,
 }: {
   rows: SupplierRow[];
+  totalDebt: number;
   query: string;
   owing: SupplierDebtFilter;
   pageSize: number;
@@ -248,6 +250,7 @@ export function SuppliersTable({
         columns={columns}
         getRowId={(row) => row.id}
         minWidth="860px"
+        summaryCells={[{ key: "debt", content: formatCurrency(totalDebt) }]}
         empty={(
           <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
             <Truck className="mx-auto mb-3 h-10 w-10 opacity-60" />

@@ -640,14 +640,15 @@ export async function getSuppliers(storeId: string, filters: { q?: string; owing
   else if (filters.owing === "clear") conditions.push(sql`${suppliers.currentDebt} <= 0`);
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [rows, [{ total }]] = await Promise.all([
+  const [rows, [{ total }], [{ totalDebt }]] = await Promise.all([
     db.select().from(suppliers).where(where)
       .orderBy(desc(suppliers.currentDebt), desc(suppliers.createdAt))
       .limit(size).offset((page - 1) * size),
     db.select({ total: count() }).from(suppliers).where(where),
+    db.select({ totalDebt: sql<string>`coalesce(sum(${suppliers.currentDebt}), 0)` }).from(suppliers).where(where),
   ]);
 
-  return { rows, total, page, pageSize: size, pageCount: Math.max(1, Math.ceil(total / size)) };
+  return { rows, total, totalDebt: Number(totalDebt), page, pageSize: size, pageCount: Math.max(1, Math.ceil(total / size)) };
 }
 
 export type CustomerDetail = NonNullable<Awaited<ReturnType<typeof getCustomer>>>;
