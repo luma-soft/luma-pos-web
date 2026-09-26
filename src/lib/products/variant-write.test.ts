@@ -101,6 +101,28 @@ test("creating E/F stores prices and 0/2 stock, then an identical retry creates 
   assert.equal((await pg.query<{ n: number }>("select count(*)::int n from stock_movements where product_id=any($1::uuid[])", [result.memberIds])).rows[0].n, 1);
 });
 
+test("variant creation applies editable custom and list price books to every created SKU", async () => {
+  const customBookID = randomUUID();
+  const listBookID = randomUUID();
+  await pg.query(
+    "insert into price_books(id,store_id,name,system_type,is_default,cost_based) values ($1,$3,$4,null,false,false),($2,$3,$5,'list',false,false)",
+    [customBookID, listBookID, store, `Custom ${customBookID}`, `List ${listBookID}`],
+  );
+  const input = makeInput({
+    priceBookPrices: { [customBookID]: 123_000, [listBookID]: 145_000 },
+  });
+
+  const result = await save(input);
+  const rows = await pg.query<{ product_id: string; price_book_id: string; price: string }>(
+    "select product_id,price_book_id,price::text from product_prices where product_id=any($1::uuid[]) order by product_id,price_book_id",
+    [result.createdIds],
+  );
+
+  assert.equal(rows.rows.length, result.createdIds.length * 2);
+  assert.ok(rows.rows.every((row) => result.createdIds.includes(row.product_id)));
+  assert.deepEqual([...new Set(rows.rows.map((row) => Number(row.price)))].sort((a, b) => a - b), [123_000, 145_000]);
+});
+
 test("renaming a value and editing prices preserves SKU IDs, unit IDs and stock history", async () => {
   const input = makeInput({ units: [{ unitName: "Hộp", multiplier: 2, barcode: "", priceOverride: null }] });
   const created = await save(input);
