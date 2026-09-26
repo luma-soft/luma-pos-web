@@ -126,6 +126,71 @@ test("renaming a value and editing prices preserves SKU IDs, unit IDs and stock 
   assert.equal((await pg.query<{ cost_price: string }>("select cost_price from products where id=$1", [oldMembers[0].id])).rows[0].cost_price, "1290000.00");
 });
 
+test("adding a variant inherits stored physical fields when the editor omits them", async () => {
+  const input = makeInput({
+    weight: 2.4,
+    weightUnit: "kg",
+    location: "Kệ A",
+    width: 30,
+    length: 40,
+    thickness: 2,
+    dimUnit: "cm",
+  });
+  const created = await save(input);
+  const members = (await pg.query<{ id: string; sku: string; variant_name: string }>(
+    "select id,sku,variant_name from products where parent_product_id=$1",
+    [created.id],
+  )).rows;
+  const revision = (await pg.query<{ revision: number }>(
+    "select revision from product_variant_groups where id=$1",
+    [created.id],
+  )).rows[0].revision;
+  const attributes = input.attributes.map((axis) => ({
+    ...axis,
+    values: ["E", "F", "G"],
+    valueIds: ["value-e", "value-f", "value-g"],
+  }));
+  const children = buildVariantCombinations(attributes).map((combination) => {
+    const existing = members.find((member) => member.variant_name === combination.variantName);
+    const original = input.variantChildren.find((child) => child.variantName === combination.variantName);
+    return {
+      ...original,
+      ...combination,
+      ...(existing ? { productId: existing.id } : {}),
+      sku: existing?.sku ?? "NEW-G-SKU",
+      costPrice: original?.costPrice ?? 1000,
+      retailPrice: original?.retailPrice ?? 2000,
+      initialStock: 0,
+      baseUnit: "cái",
+      directSale: true,
+    };
+  });
+  const edit = makeInput({
+    ...input,
+    requestId: randomUUID(),
+    variantOperation: "edit",
+    variantGroupId: created.id,
+    variantRevision: revision,
+    attributes,
+    variantChildren: children,
+    weight: undefined,
+    location: undefined,
+    width: undefined,
+    length: undefined,
+    thickness: undefined,
+  });
+
+  await save(edit);
+
+  const added = (await pg.query<{ weight: string; location: string; dimensions: string }>(
+    "select weight,location,dimensions from products where store_id=$1 and sku='NEW-G-SKU'",
+    [store],
+  )).rows[0];
+  assert.equal(added.weight, "2.400");
+  assert.equal(added.location, "Kệ A");
+  assert.equal(added.dimensions, "30 × 40 × 2 cm");
+});
+
 test("a direct SKU price update invalidates a stale group editor without overwriting the price", async () => {
   const input = makeInput();
   const created = await save(input);

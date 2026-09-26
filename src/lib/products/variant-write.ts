@@ -39,10 +39,12 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
   let revision = 0;
   let stored: StoredGroup | undefined;
   let existing: typeof products.$inferSelect[] = [];
+  let existingGroupRoot: typeof products.$inferSelect | undefined;
   let existingRootSku: string | undefined;
   if (v.variantGroupId) {
     const [root] = await tx.select().from(products).where(and(eq(products.storeId, storeId), eq(products.id, groupId))).for("update");
     if (!root || root.parentProductId || root.relatedProductId || root.productKind !== "product") fail("products.variants.invalidGroup");
+    existingGroupRoot = root;
     existingRootSku = root.sku;
     kind = root.isVariantParent ? "native" : "related";
     const result = await tx.execute<StoredGroup>(sql`select * from product_variant_groups where store_id=${storeId}::uuid and id=${groupId}::uuid for update`);
@@ -113,9 +115,20 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
   const covered = new Set([...submittedKeys, ...retainedKeys, ...exclusions]);
   if (canonicalCombos.some((combo) => !covered.has(combo.combinationKey))) fail("products.variants.missingCombinations");
 
-  const weight = v.weight == null ? null : String(v.weightUnit === "g" ? v.weight / 1000 : v.weight);
-  const physical = { weight, location: v.location?.trim() || null,
-    dimensions: [v.width, v.length, v.thickness].some((n) => n != null) ? `${[v.width, v.length, v.thickness].filter((n) => n != null).join(" × ")} ${v.dimUnit}` : null };
+  const weight = v.weight === undefined
+    ? existingGroupRoot?.weight == null ? null : String(existingGroupRoot.weight)
+    : v.weight == null ? null : String(v.weightUnit === "g" ? v.weight / 1000 : v.weight);
+  const dimensionsChanged = [v.width, v.length, v.thickness].some((value) => value !== undefined);
+  const dimensions = dimensionsChanged
+    ? [v.width, v.length, v.thickness].some((value) => value != null)
+      ? `${[v.width, v.length, v.thickness].filter((value) => value != null).join(" × ")} ${v.dimUnit}`
+      : null
+    : existingGroupRoot?.dimensions ?? null;
+  const physical = {
+    weight,
+    location: v.location === undefined ? existingGroupRoot?.location ?? null : v.location.trim() || null,
+    dimensions,
+  };
   const rootSku = existingRootSku || v.sku?.trim() || `SP${randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`;
   const common = {
     storeId, productKind: "product" as const, categoryId: v.categoryId, brandId: v.brandId || null, supplierId: supplierIds[0] || null,
