@@ -62,6 +62,7 @@ export async function CameraBrandPriceList({ brand, storeId }: { brand: CameraBr
       return {
         id: camera.id,
         model: camera.name,
+        sku: camera.sku,
         description: camera.description ?? "Thiết bị camera chính hãng, phù hợp nhu cầu giám sát.",
         imageUrl: camera.imageUrl,
         specs: camera.specs,

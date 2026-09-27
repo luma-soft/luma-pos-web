@@ -31,6 +31,7 @@ type PriceKey =
 type Model = {
   id: string;
   model: string;
+  sku: string;
   description: string;
   imageUrl: string | null;
   specs: Record<string, string[]>;
@@ -43,11 +44,30 @@ function detailsFor(model: Model) {
   const rows = Object.entries(model.specs).flatMap(([label, values]) =>
     values.length ? [[label, values.join(" · ")] as const] : [],
   );
+  const normalizeLabel = (label: string) => label.trim().toLocaleLowerCase("vi");
+  const installationRows = rows.filter(
+    ([label]) => normalizeLabel(label) === "vị trí lắp đặt",
+  );
+  const informationRows = rows.filter(
+    ([label]) => normalizeLabel(label) === "thông tin",
+  );
+  const sku = model.sku.trim();
   return [
-    ["Vị trí lắp đặt", model.installationLocation] as const,
-    ...(rows.length
-      ? rows
-      : [["Thông tin", model.description.split("\n")[0]] as const]),
+    [
+      "Vị trí lắp đặt",
+      [model.installationLocation, ...installationRows.map(([, value]) => value)]
+        .filter(Boolean)
+        .join(" · "),
+    ] as const,
+    [
+      "Thông tin",
+      [`${model.model}${sku ? ` – mã ${sku}` : ""}`, ...informationRows.map(([, value]) => value)]
+        .filter(Boolean)
+        .join(" · "),
+    ] as const,
+    ...rows.filter(
+      ([label]) => !["vị trí lắp đặt", "thông tin"].includes(normalizeLabel(label)),
+    ),
   ];
 }
 
@@ -250,7 +270,14 @@ export function CameraPriceListClient({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const rows = detailsFor(item);
+    const rows = [
+      ...detailsFor(item),
+      [
+        "Phù hợp cho",
+        item.suitableFor.map((recommendation) => `• ${recommendation}`).join("\n"),
+      ] as const,
+      ...(item.description.trim() ? [["Mô tả", item.description] as const] : []),
+    ];
     const tableX = 420;
     const tableY = 145;
     const tableWidth = 1030;
@@ -632,7 +659,7 @@ export function CameraPriceListClient({
               onChange={(event) => setQuery(event.target.value)}
               onClick={selectAllInputOnClick}
               placeholder="Tìm model..."
-              className="h-11 w-44 border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-[#078a82] lg:h-10"
+              className="h-11 w-44 border border-slate-300 py-2 pl-9 pr-3 text-sm text-[#14344d] placeholder:text-slate-400 outline-none focus:border-[#078a82] lg:h-10"
             />
           </label>
         </div>
@@ -1065,7 +1092,7 @@ export function CameraPriceListClient({
                 decimals={0}
                 suffix="đ"
                 aria-label="Giá tạm thời"
-                className="h-12 border-slate-200 bg-white pr-10 text-left text-lg font-bold tabular-nums focus:border-[#078a82]"
+                className="h-12 border-slate-200 bg-white pr-10 text-left text-lg font-bold tabular-nums text-[#14344d] placeholder:text-slate-400 focus:border-[#078a82]"
               />
             </div>
             <div className="mt-4 flex justify-end gap-2">
