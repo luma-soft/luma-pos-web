@@ -1997,6 +1997,7 @@
   "appError": {
     "title": "Không tải được dữ liệu",
     "descriptionBefore": "Máy chủ phản hồi chậm hoặc kết nối cơ sở dữ liệu bị gián đoạn. Thử lại sau giây lát — nếu vẫn lỗi, kiểm tra mạng hoặc cấu hình",
+    "tabDescription": "Không thể tải dữ liệu cho tab {tab}. Hãy thử lại sau giây lát.",
     "retry": "Thử lại",
     "retrying": "Đang thử lại…",
     "reload": "Tải lại trang",

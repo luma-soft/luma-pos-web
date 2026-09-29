@@ -1997,6 +1997,7 @@
   "appError": {
     "title": "Could not load data",
     "descriptionBefore": "The server is slow or the database connection was interrupted. Try again shortly — if it still fails, check the network or",
+    "tabDescription": "We couldn't load data for the {tab} tab. Please try again shortly.",
     "retry": "Try again",
     "retrying": "Retrying…",
     "reload": "Reload page",
