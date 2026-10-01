@@ -2408,6 +2408,7 @@
   "errors": {
     "unauthorized": "Phiên đăng nhập hết hạn — đăng nhập lại.",
     "invalidData": "Dữ liệu không hợp lệ.",
+    "versionConflict": "Bản ghi này đã được cập nhật trên máy chủ.",
     "serverError": "Có lỗi xảy ra, thử lại sau.",
     "notFound": "Không tìm thấy dữ liệu.",
     "forbidden": "Bạn không có quyền thực hiện thao tác này."

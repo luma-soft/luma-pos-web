@@ -2408,6 +2408,7 @@
   "errors": {
     "unauthorized": "Session expired — please sign in again.",
     "invalidData": "Invalid data.",
+    "versionConflict": "This record was updated on the server.",
     "serverError": "Something went wrong, please retry.",
     "notFound": "Data not found.",
     "forbidden": "You don't have permission for this action."
