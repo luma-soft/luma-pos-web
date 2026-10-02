@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
+import { PurchaseDetailLink } from "@/components/purchase-detail-link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2, Pencil, Truck, X } from "lucide-react";
@@ -613,12 +614,21 @@ function SupplierHistoryPanel({ rows }: { rows: SupplierHistoryRow[] }) {
       {rows.map((row) => (
         <article key={`${row.kind}-${row.id}`} className="space-y-2 p-3 text-sm">
           <div className="flex items-start justify-between gap-3">
-            <Link
-              href={row.kind === "purchase" ? Routes.purchase(row.id) : `${Routes.PurchaseReturns}?q=${encodeURIComponent(row.code)}`}
-              className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-              {row.code}
-            </Link>
+            {row.kind === "purchase" ? (
+              <PurchaseDetailLink
+                purchaseId={row.id}
+                className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                {row.code}
+              </PurchaseDetailLink>
+            ) : (
+              <Link
+                href={`${Routes.PurchaseReturns}?q=${encodeURIComponent(row.code)}`}
+                className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                {row.code}
+              </Link>
+            )}
             <SupplierHistoryStatus row={row} />
           </div>
           <div className="text-xs text-slate-500">{formatDate(row.createdAt)} · {t(`suppliers.details.types.${row.kind}`)}</div>
@@ -645,9 +655,15 @@ function SupplierHistoryPanel({ rows }: { rows: SupplierHistoryRow[] }) {
           {rows.map((row) => (
             <tr key={`${row.kind}-${row.id}`} className="hover:bg-surface-2">
               <td className="px-3 py-3 font-semibold">
-                <Link href={row.kind === "purchase" ? Routes.purchase(row.id) : `${Routes.PurchaseReturns}?q=${encodeURIComponent(row.code)}`} className="text-primary-600 hover:underline">
-                  {row.code}
-                </Link>
+                {row.kind === "purchase" ? (
+                  <PurchaseDetailLink purchaseId={row.id} className="text-primary-600 hover:underline">
+                    {row.code}
+                  </PurchaseDetailLink>
+                ) : (
+                  <Link href={`${Routes.PurchaseReturns}?q=${encodeURIComponent(row.code)}`} className="text-primary-600 hover:underline">
+                    {row.code}
+                  </Link>
+                )}
               </td>
               <td className="whitespace-nowrap px-3 py-3 text-slate-500">{formatDate(row.createdAt)}</td>
               <td className="px-3 py-3">{t(`suppliers.details.types.${row.kind}`)}</td>
@@ -698,7 +714,7 @@ function SupplierDebtPanel({ preview, rows, onPayablesChanged }: { preview: Supp
             <article key={`${row.kind}-${row.id}`} className="space-y-2 p-3 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  {row.purchaseOrderId ? <Link href={Routes.purchase(row.purchaseOrderId)} className="font-semibold text-primary-600 hover:underline min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 inline-flex">{row.code}</Link> : <div className="font-semibold text-primary-600 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">{row.code}</div>}
+                  {row.purchaseOrderId ? <PurchaseDetailLink purchaseId={row.purchaseOrderId} className="font-semibold text-primary-600 hover:underline min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 inline-flex">{row.code}</PurchaseDetailLink> : <div className="font-semibold text-primary-600 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">{row.code}</div>}
                   <div className="mt-0.5 text-xs text-slate-500">{formatDate(row.createdAt)} · {row.typeLabel}{row.reason ? ` · ${row.reason}` : ""}</div>
                 </div>
                 <div className={cn("shrink-0 font-semibold tabular-nums", row.value < 0 ? "text-ok" : "text-warn")}>
@@ -726,7 +742,7 @@ function SupplierDebtPanel({ preview, rows, onPayablesChanged }: { preview: Supp
             <tbody className="divide-y divide-border-soft">
               {visibleRows.map((row) => (
                 <tr key={`${row.kind}-${row.id}`}>
-                  <td className="px-3 py-3 font-semibold text-primary-600">{row.purchaseOrderId ? <Link href={Routes.purchase(row.purchaseOrderId)} className="hover:underline">{row.code}</Link> : row.code}</td>
+                  <td className="px-3 py-3 font-semibold text-primary-600">{row.purchaseOrderId ? <PurchaseDetailLink purchaseId={row.purchaseOrderId} className="hover:underline">{row.code}</PurchaseDetailLink> : row.code}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-500">{formatDate(row.createdAt)}</td>
                   <td className="px-3 py-3">{row.typeLabel}{row.reason ? <div className="text-xs text-slate-500">{row.reason}</div> : null}</td>
                   <td className={cn("px-3 py-3 text-right font-semibold tabular-nums", row.value < 0 ? "text-ok" : "text-warn")}>

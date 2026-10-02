@@ -26,11 +26,13 @@ export default async function AppLayout({
   children,
   productModal,
   orderModal,
+  purchaseModal,
   projectModal,
 }: {
   children: React.ReactNode;
   productModal: React.ReactNode;
   orderModal: React.ReactNode;
+  purchaseModal: React.ReactNode;
   projectModal: React.ReactNode;
 }) {
   let user: Awaited<ReturnType<typeof requireUser>>;
@@ -88,6 +90,7 @@ export default async function AppLayout({
         {context.features.ai_assistant && store.prefs.ai.openaiApiKeySet && store.prefs.ai.showFloatingLauncher && <AiAssistantLauncher />}
       </main>
       {orderModal}
+      {purchaseModal}
       {productModal}
       {projectModal}
     </div>
