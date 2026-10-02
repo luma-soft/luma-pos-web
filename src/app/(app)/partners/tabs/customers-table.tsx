@@ -3,7 +3,7 @@
 import { MoneyInput } from "@/components/ui/money-input";
 import { DateInput } from "@/components/ui/date-input";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
-import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
+import { OrderDetailLink } from "@/components/order-detail-link";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
@@ -13,10 +13,8 @@ import {
   Ban,
   CalendarDays,
   Download,
-  ExternalLink,
   FileDown,
   FileInput,
-  Loader2,
   Pencil,
   Plus,
   Trash2,
@@ -49,7 +47,6 @@ import { OrderStatusBadge } from "../../orders/status-badges";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { CustomerReceivableActions } from "@/components/partners/customer-receivable-actions";
-import { useAppDataQuery } from "@/components/use-app-data-query";
 import {
   DEFAULT_PARTNER_DEBT_FILTER,
   PartnerDebtFilterControl,
@@ -58,76 +55,6 @@ import {
 
 type CustomerRow = CustomerListResult["rows"][number];
 type CustomerExpandTab = "info" | "sales" | "debt";
-type OrderPreview = {
-  id: string;
-  code: string;
-  status: string;
-  customerId: string | null;
-  customerName: string | null;
-  createdAt: string;
-  total: string | number;
-  amountPaid: string | number;
-  subtotal: string | number;
-  discount: string | number;
-  tax: string | number;
-  shippingFee: string | number;
-  items: Array<{
-    id: string;
-    productName: string;
-    unitName: string;
-    quantity: string | number;
-    unitPrice: string | number;
-    discount: string | number;
-    total: string | number;
-    preDiscountUnitPrice?: string | number | null;
-    lineDiscountMode?: "pct" | "vnd" | null;
-    lineDiscountValue?: string | number | null;
-    priceBookName?: string | null;
-  }>;
-  payments: Array<{
-    id: string;
-    createdAt: string;
-    method: string;
-    amount: string | number;
-    note: string | null;
-  }>;
-};
-
-async function loadOrderPreview(
-  orderId: string,
-  signal: AbortSignal,
-): Promise<OrderPreview> {
-  const response = await fetch(
-    `/api/orders/${encodeURIComponent(orderId)}/preview`,
-    { cache: "no-store", signal },
-  );
-  const payload = await response.json();
-  if (!response.ok || !payload.ok) throw new Error("errors.serverError");
-  const order = payload.data.order as OrderPreview;
-  return {
-    ...order,
-    items: order.items.map((item) => ({
-      ...item,
-      ...readOrderLinePricing(item),
-    })),
-  };
-}
-
-function useOrderPreview() {
-  const t = useTranslations();
-  const [orderId, setOrderId] = useState<string | null>(null);
-  const { state } = useAppDataQuery(orderId, loadOrderPreview);
-  return {
-    openOrderPreview: setOrderId,
-    closeOrderPreview: () => setOrderId(null),
-    preview: state && {
-      loading: state.loading,
-      order: state.data,
-      error: state.error ? t(state.error as never) : undefined,
-    },
-  };
-}
-
 const CUSTOMER_EXPAND_TABS: CustomerExpandTab[] = ["info", "sales", "debt"];
 const CUSTOMER_TYPES = ["retail", "wholesale", "contractor", "agent"] as const;
 const FILTER_KEYS: Array<keyof CustomerFilters> = [
@@ -654,7 +581,6 @@ function CustomerSalesPanel({
   returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
 }) {
   const t = useTranslations();
-  const { preview, openOrderPreview, closeOrderPreview } = useOrderPreview();
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -675,13 +601,12 @@ function CustomerSalesPanel({
               >
                 <div className="flex items-start justify-between gap-3">
                   {row.kind === "order" && row.orderId ? (
-                    <button
-                      type="button"
-                      onClick={() => openOrderPreview(row.orderId!)}
+                    <OrderDetailLink
+                      orderId={row.orderId}
                       className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                     >
                       {row.code}
-                    </button>
+                    </OrderDetailLink>
                   ) : (
                     <PrintTemplateMenu
                       baseHref={`/returns/${row.id}/print`}
@@ -728,13 +653,12 @@ function CustomerSalesPanel({
                   <tr key={`${row.kind}-${row.id}`}>
                     <td className="px-3 py-3 font-semibold">
                       {row.kind === "order" && row.orderId ? (
-                        <button
-                          type="button"
-                          onClick={() => openOrderPreview(row.orderId!)}
+                        <OrderDetailLink
+                          orderId={row.orderId}
                           className="text-primary-600 hover:underline"
                         >
                           {row.code}
-                        </button>
+                        </OrderDetailLink>
                       ) : (
                         <PrintTemplateMenu
                           baseHref={`/returns/${row.id}/print`}
@@ -764,7 +688,6 @@ function CustomerSalesPanel({
         </>
       )}
 
-      <OrderPreviewDialog preview={preview} onClose={closeOrderPreview} />
     </div>
   );
 }
@@ -772,7 +695,6 @@ function CustomerSalesPanel({
 function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
   const t = useTranslations();
   const [filter, setFilter] = useState(DEFAULT_PARTNER_DEBT_FILTER);
-  const { preview, openOrderPreview, closeOrderPreview } = useOrderPreview();
   const rows = useMemo(
     () =>
       customer.debtLedger.filter((row) =>
@@ -802,13 +724,12 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
               >
                 <div className="flex items-start justify-between gap-3">
                   {row.orderId ? (
-                    <button
-                      type="button"
-                      onClick={() => openOrderPreview(row.orderId!)}
+                    <OrderDetailLink
+                      orderId={row.orderId}
                       className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                     >
                       {row.code}
-                    </button>
+                    </OrderDetailLink>
                   ) : (
                     <span className="font-semibold text-primary-600">
                       {row.code}
@@ -870,13 +791,12 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
                   <tr key={`${row.kind}-${row.id}`}>
                     <td className="px-3 py-3 font-semibold">
                       {row.orderId ? (
-                        <button
-                          type="button"
-                          onClick={() => openOrderPreview(row.orderId!)}
+                        <OrderDetailLink
+                          orderId={row.orderId}
                           className="text-primary-600 hover:underline"
                         >
                           {row.code}
-                        </button>
+                        </OrderDetailLink>
                       ) : (
                         <span className="text-primary-600">{row.code}</span>
                       )}
@@ -911,229 +831,6 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
         </>
       )}
 
-      <OrderPreviewDialog preview={preview} onClose={closeOrderPreview} />
-    </div>
-  );
-}
-
-function OrderPreviewDialog({
-  preview,
-  onClose,
-}: {
-  preview: { loading: boolean; error?: string; order?: OrderPreview } | null;
-  onClose: () => void;
-}) {
-  const t = useTranslations();
-  const order = preview?.order;
-  const total = order ? Number(order.total) : 0;
-  const paid = order ? Number(order.amountPaid) : 0;
-
-  return (
-    <RowPreviewModal
-      open={Boolean(preview)}
-      onClose={onClose}
-      title={order ? order.code : t("orders.title")}
-      subtitle={
-        order ? (
-          <>
-            <PartnerDetailLink
-              kind="customer"
-              partnerId={order.customerId}
-              name={order.customerName ?? t("orders.walkIn")}
-            />{" "}
-            · {formatDate(order.createdAt)}
-          </>
-        ) : undefined
-      }
-      footer={
-        order && (
-          <div className="flex justify-end">
-            <Link
-              href={Routes.salesOrder(order.id, order.status)}
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110 lg:min-h-10 min-w-11 lg:min-w-0"
-            >
-              <ExternalLink className="h-4 w-4" />
-              Mở phiếu
-            </Link>
-          </div>
-        )
-      }
-    >
-      {preview?.loading ? (
-        <div className="grid min-h-60 place-items-center text-sm font-semibold text-slate-500">
-          <span className="inline-flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" /> Đang tải...
-          </span>
-        </div>
-      ) : preview?.error ? (
-        <div className="rounded-card border border-dashed border-border px-4 py-10 text-center text-sm font-medium text-er">
-          {preview.error}
-        </div>
-      ) : order ? (
-        <div className="space-y-5">
-          <div className="grid gap-3 text-sm md:grid-cols-3">
-            <InfoField
-              label={t("orders.cols.customer")}
-              value={
-                <PartnerDetailLink
-                  kind="customer"
-                  partnerId={order.customerId}
-                  name={order.customerName ?? t("orders.walkIn")}
-                />
-              }
-            />
-            <InfoField
-              label={t("orders.cols.date")}
-              value={formatDate(order.createdAt)}
-            />
-            <InfoField label={t("orders.cols.status")} value={order.status} />
-          </div>
-          <div
-            className="divide-y divide-border-soft overflow-hidden rounded-lg border border-border lg:hidden"
-            data-mobile-audit="customer-order-preview"
-          >
-            {order.items.map((item) => (
-              <article key={item.id} className="space-y-2 p-3 text-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 break-words font-medium">
-                    {item.productName}
-                    <div className="mt-0.5 text-xs text-slate-400">
-                      {item.unitName}
-                      {item.priceBookName && ` · ${item.priceBookName}`}
-                    </div>
-                  </div>
-                  <div className="shrink-0 font-semibold tabular-nums">
-                    {formatCurrency(Number(item.total))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
-                  <span>
-                    {Number(item.quantity).toLocaleString("vi-VN")} ×{" "}
-                    {formatCurrency(Number(item.unitPrice))}
-                  </span>
-                  <span className="text-right">
-                    {t("orders.cols.discount")}:{" "}
-                    {Number(item.discount) > 0 ? (
-                      <>
-                        {item.lineDiscountMode === "pct" &&
-                          `${Number(item.lineDiscountValue).toLocaleString("vi-VN")}% · `}
-                        {formatCurrency(Number(item.discount))}
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </span>
-                </div>
-              </article>
-            ))}
-          </div>
-          <div className="hidden overflow-x-auto rounded-lg border border-border lg:block">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead>
-                <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
-                  <th className="px-3 py-3">{t("orders.cols.product")}</th>
-                  <th className="px-3 py-3 text-right">
-                    {t("orders.cols.qty")}
-                  </th>
-                  <th className="px-3 py-3 text-right">
-                    {t("orders.cols.unitPrice")}
-                  </th>
-                  <th className="px-3 py-3 text-right">
-                    {t("orders.cols.discount")}
-                  </th>
-                  <th className="px-3 py-3 text-right">
-                    {t("orders.cols.lineTotal")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-soft">
-                {order.items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-3 py-3 font-medium">
-                      {item.productName}
-                      <div className="text-xs text-slate-400">
-                        {item.unitName}
-                        {item.priceBookName && ` · ${item.priceBookName}`}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {Number(item.quantity).toLocaleString("vi-VN")}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {formatCurrency(Number(item.unitPrice))}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums text-slate-500">
-                      {Number(item.discount) > 0 ? (
-                        <>
-                          {item.lineDiscountMode === "pct" && (
-                            <div>
-                              {Number(item.lineDiscountValue).toLocaleString(
-                                "vi-VN",
-                              )}
-                              %
-                            </div>
-                          )}
-                          {formatCurrency(Number(item.discount))}
-                        </>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums font-semibold">
-                      {formatCurrency(Number(item.total))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="ml-auto max-w-sm space-y-2 text-sm">
-            <PreviewLine
-              label={t("pos.subtotal")}
-              value={formatCurrency(Number(order.subtotal))}
-            />
-            <PreviewLine
-              label={t("pos.discount")}
-              value={formatCurrency(Number(order.discount))}
-            />
-            <PreviewLine
-              label={t("pos.tax")}
-              value={formatCurrency(Number(order.tax))}
-            />
-            <PreviewLine
-              label={t("pos.shipping")}
-              value={formatCurrency(Number(order.shippingFee))}
-            />
-            <PreviewLine
-              label={t("pos.total")}
-              value={formatCurrency(total)}
-              strong
-            />
-            <PreviewLine
-              label={t("orders.detail.remaining")}
-              value={formatCurrency(Math.max(0, total - paid))}
-              strong
-            />
-          </div>
-        </div>
-      ) : null}
-    </RowPreviewModal>
-  );
-}
-
-function PreviewLine({
-  label,
-  value,
-  strong,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-}) {
-  return (
-    <div className="flex justify-between gap-3">
-      <span className="text-slate-500">{label}</span>
-      <span className={cn("tabular-nums", strong && "font-bold")}>{value}</span>
     </div>
   );
 }
