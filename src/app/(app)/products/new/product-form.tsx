@@ -464,6 +464,39 @@ export function NewProductForm({
     <Form
       form={form}
       onSubmit={onSubmit}
+      onInvalidSubmit={(errors) => {
+        if (tab !== "variants") return;
+        const infoFields = [
+          "productKind",
+          "sku",
+          "barcode",
+          "name",
+          "categoryId",
+          "brandId",
+          "imageUrls",
+          "imageMediaIds",
+          "imageSourceProductIds",
+          "costPrice",
+          "retailPrice",
+          "wholesalePrice",
+          "contractorPrice",
+          "agentPrice",
+          "vatRate",
+          "shelfLifeDays",
+          "priceBookPrices",
+          "initialStock",
+          "currentStock",
+          "minLevel",
+          "maxLevel",
+          "location",
+          "weight",
+          "width",
+          "length",
+          "thickness",
+          "comboItems",
+        ] as const;
+        if (infoFields.some((field) => errors[field])) setTab("info");
+      }}
       onSubmitCapture={(event) => {
         const trigger = (event.nativeEvent as SubmitEvent).submitter;
         submitFocus.current = trigger instanceof HTMLElement ? trigger : document.activeElement instanceof HTMLElement ? document.activeElement : null;

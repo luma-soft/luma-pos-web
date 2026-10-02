@@ -10,6 +10,7 @@ import {
   type FieldPath,
   type ControllerRenderProps,
   type FieldError,
+  type SubmitErrorHandler,
 } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
@@ -22,15 +23,16 @@ export interface FormProps<TIn extends FieldValues, TOut extends FieldValues = T
   extends Omit<React.FormHTMLAttributes<HTMLFormElement>, "onSubmit"> {
   form: UseFormReturn<TIn, unknown, TOut>;
   onSubmit: (values: TOut) => void | Promise<void>;
+  onInvalidSubmit?: SubmitErrorHandler<TIn>;
 }
 
 export function Form<TIn extends FieldValues, TOut extends FieldValues = TIn>({
-  form, onSubmit, className, children, ...props
+  form, onSubmit, onInvalidSubmit, className, children, ...props
 }: FormProps<TIn, TOut>) {
   return (
     <FormProvider {...form}>
       <form
-        onSubmit={form.handleSubmit(onSubmit)}
+        onSubmit={form.handleSubmit(onSubmit, onInvalidSubmit)}
         className={cn("space-y-4", className)}
         noValidate
         {...props}
