@@ -1,8 +1,10 @@
 import { z } from "zod";
 
 // stock_levels.quantity uses numeric(14, 4), including negative balances.
+export const MIN_STOCK_QUANTITY = -9_999_999_999.9999;
+
 export const stockQuantitySchema = z.number()
-  .min(-9_999_999_999.9999)
+  .min(MIN_STOCK_QUANTITY)
   .max(9_999_999_999.9999)
   .multipleOf(0.0001);
 

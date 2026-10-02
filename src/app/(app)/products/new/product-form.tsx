@@ -62,7 +62,10 @@ import type { ProductDetail, ProductFormOptions } from "@/lib/data/products";
 import type { PriceBookRow } from "@/lib/data/price-books";
 import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai-assistant/utils";
 import { useTenantClientScope } from "@/components/tenant-client-scope";
-import { changedProductStock } from "@/lib/products/stock-adjustment";
+import {
+  changedProductStock,
+  MIN_STOCK_QUANTITY,
+} from "@/lib/products/stock-adjustment";
 import {
   PRODUCT_IMAGE_ACCEPT,
   deleteUploadedProductImage,
@@ -1692,7 +1695,7 @@ function StockFields() {
         <NumberInput
           value={editingStock ? currentStock : watch("initialStock")}
           onChange={(v) => setValue(editingStock ? "currentStock" : "initialStock", v ?? 0)}
-          min={editingStock ? undefined : 0}
+          min={editingStock ? MIN_STOCK_QUANTITY : 0}
           decimals={4}
         />
       </Field>
