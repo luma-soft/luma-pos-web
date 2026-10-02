@@ -41,7 +41,6 @@ import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { CustomerCreateDialog } from "@/components/partners/customer-create-dialog";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Routes } from "@/lib/routes";
-import { OrderDetailLink } from "@/components/order-detail-link";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { setCustomerActive } from "@/lib/actions/partners";
 import type { CustomerFilters, CustomerListResult } from "@/lib/data/partners";
@@ -949,13 +948,13 @@ function OrderPreviewDialog({
       footer={
         order && (
           <div className="flex justify-end">
-            <OrderDetailLink
-              orderId={order.id}
+            <Link
+              href={Routes.salesOrder(order.id, order.status)}
               className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110 lg:min-h-10 min-w-11 lg:min-w-0"
             >
               <ExternalLink className="h-4 w-4" />
               Mở phiếu
-            </OrderDetailLink>
+            </Link>
           </div>
         )
       }
