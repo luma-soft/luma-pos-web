@@ -8,8 +8,8 @@ import {
 } from "./data-sync-plan";
 
 const CUSTOMER_CODE = "Mã khách hàng";
-const REVIEWED_CUSTOMER_DEBT_TOTAL = 130_924_782;
-const REVIEWED_CUSTOMER_NET_SALES_TOTAL = 3_400_176_291;
+const REVIEWED_CUSTOMER_DEBT_TOTAL = 69_709_000;
+const REVIEWED_CUSTOMER_NET_SALES_TOTAL = 3_430_066_791;
 
 export interface KiotVietCustomerSource {
   externalId: string;
