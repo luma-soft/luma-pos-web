@@ -60,6 +60,7 @@ async function sourceInvoiceFromParams(storeId: string, params: PosSearchParams)
     shippingFee: Number(order.shippingFee),
     tax: Number(order.tax ?? 0),
     subtotal: Number(order.subtotal),
+    amountPaid: Number(order.amountPaid),
     priceBookId: sourceInvoicePriceBookId(order.items),
     items: order.items.map((item) => {
       const pricing = readOrderLinePricing(item);

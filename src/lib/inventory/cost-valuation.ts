@@ -101,6 +101,13 @@ export async function revalueInventoryProducts(tx: InventoryTransaction, storeId
     eq(purchaseOrders.storeId, purchaseOrderItems.storeId), eq(purchaseOrders.id, purchaseOrderItems.purchaseOrderId),
   )).innerJoin(inventoryCostBaselines, and(
     eq(inventoryCostBaselines.storeId, purchaseOrderItems.storeId), eq(inventoryCostBaselines.productId, purchaseOrderItems.productId),
+  )).innerJoin(stockMovements, and(
+    eq(stockMovements.storeId, purchaseOrderItems.storeId),
+    eq(stockMovements.productId, purchaseOrderItems.productId),
+    eq(stockMovements.refId, purchaseOrders.id),
+    inArray(stockMovements.refType, ["purchase", "purchase_edit"]),
+    sql`${stockMovements.quantity} > 0`,
+    sql`${stockMovements.createdAt} >= ${inventoryCostBaselines.effectiveAt}`,
   )).where(and(eq(purchaseOrders.storeId, storeId), eq(purchaseOrders.status, "received"),
     inArray(purchaseOrderItems.productId, trackedIds), sql`${receiptTime} >= ${inventoryCostBaselines.effectiveAt}`));
   const eligibleKeys = new Set(eligible.map((row) => `${row.receiptId}:${row.productId}`));

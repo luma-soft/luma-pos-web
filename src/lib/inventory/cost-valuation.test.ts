@@ -87,6 +87,20 @@ async function receipt(lines: ReceiptLine[], at: string, header: { discount?: nu
   return id;
 }
 
+async function receiptWithoutStockMovement(productId: string, quantity: number, at: string) {
+  const id = randomUUID();
+  await database.insert(schema.purchaseOrders).values({
+    id, storeId: store, code: id.slice(0, 20), supplierId: supplier, warehouseId: warehouse, status: "received",
+    createdAt: new Date(at), costEffectiveAt: new Date(at),
+  });
+  await pg.query("update purchase_orders set cost_effective_at=$1 where id=$2", [at, id]);
+  await database.insert(schema.purchaseOrderItems).values({
+    storeId: store, purchaseOrderId: id, productId, quantity: String(quantity), unitCost: "999",
+    discount: "0", unitMultiplier: "1", total: String(quantity * 999),
+  });
+  return id;
+}
+
 async function movement(id: string, qty: number, at: string, input: {
   type?: typeof schema.stockMovements.$inferInsert["type"]; refType?: string; refId?: string; unitCost?: number;
 } = {}) {
@@ -172,6 +186,15 @@ test("receipt edits use current lines, ignore reversal audit rows and preserve l
   await movement(id, 20, "2020-01-05T00:00:01Z", { type: "purchase", refType: "purchase_edit", refId: first });
   await revalue([id]);
   assert.deepEqual(await values(id), { qty: 30, cost: 166.67, gross: 300 });
+});
+
+test("received history without a stock movement is not replayed as an inventory receipt", async () => {
+  const id = await product(10, 100, 90);
+  await baseline([id]);
+  await movement(id, -10, firstAt);
+  await receiptWithoutStockMovement(id, 999, secondAt);
+  await revalue([id]);
+  assert.deepEqual(await values(id), { qty: 0, cost: 100, gross: 90 });
 });
 
 test("converted receipt units divide both gross and landed value into base units", async () => {

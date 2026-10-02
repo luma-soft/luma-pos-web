@@ -2,6 +2,7 @@
 
 import { positiveQuantityOrDefault } from "@/lib/quantity";
 import { posBasePrice, posUnitPrice } from "@/lib/pos/price-book-price";
+import { unpaidSourceInvoicePaymentDraft } from "@/lib/pos/source-invoice-payment";
 import { approvePriceBookSwitch, prepareInvoicePriceBookSwitch, prepareLinePriceBookSwitch, selectedPosUnitPrice } from "@/lib/pos/price-book-switch";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 
@@ -189,6 +190,7 @@ export type PosSourceInvoice = {
   shippingFee?: number;
   tax?: number;
   subtotal?: number;
+  amountPaid?: number;
   priceBookId?: string | null;
   items?: Array<{
     productId: string;
@@ -297,6 +299,7 @@ function makeDraftFromContext(context: PosInitialContext, products: PosProduct[]
 function makeDraftFromSource(source: PosSourceInvoice, products: PosProduct[], id = FIRST_INV_ID): PosDraft {
   const afterDiscount = Math.max(0, (source.subtotal ?? 0) - (source.discount ?? 0));
   const taxRate = afterDiscount > 0 && source.tax ? Math.round(((source.tax / afterDiscount) * 100) * 100) / 100 : 0;
+  const paymentDraft = unpaidSourceInvoicePaymentDraft(source);
   if (source.mode === "return") {
     return {
       ...makeDraft(id, "return_invoice"),
@@ -331,6 +334,7 @@ function makeDraftFromSource(source: PosSourceInvoice, products: PosProduct[], i
   }
   return {
     ...makeDraft(id, source.kind),
+    ...(paymentDraft ?? {}),
     source,
     cart: (source.items ?? []).flatMap((item) => {
       const product = products.find((p) => p.id === item.productId);
