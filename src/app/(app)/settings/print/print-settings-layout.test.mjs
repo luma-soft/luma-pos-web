@@ -59,3 +59,10 @@ test("template actions are icon FABs below the footer and protect the default te
   expect(form).toContain("deletePrintTemplate(deletedId)");
   expect(form).toContain("setSelectedId(defaultId ?? defaultTemplate(deletedDocType, storeDefaults).id)");
 });
+
+test("the action button is the only control for setting a template as default", () => {
+  expect(form).not.toContain("<Checkbox checked={selected.isDefault}");
+  expect(form).toContain("onClick={makeSelectedTemplateDefault}");
+  expect(form).toContain("setDefaultPrintTemplate(templateId)");
+  expect(form).toContain("isDefault: item.id === templateId");
+});

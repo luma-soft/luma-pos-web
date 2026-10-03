@@ -185,6 +185,17 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
     );
   }
 
+  function makeSelectedTemplateDefault() {
+    if (!persisted || selected.isDefault || actionPending) return;
+    const templateId = selected.id;
+    const templateDocType = selected.docType;
+    runAction("setDefault", () => setDefaultPrintTemplate(templateId), "printSettings.defaultSaved", () => {
+      setDrafts((current) => current.map((item) => item.docType !== templateDocType
+        ? item
+        : { ...item, isDefault: item.id === templateId, isActive: item.id === templateId ? true : item.isActive }));
+    });
+  }
+
   async function removeTemplate() {
     if (!persisted || selected.isDefault || actionPending) return;
     const confirmed = await dialog.confirm({
@@ -340,10 +351,6 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   </div>
                 </Field>
               </div>
-              <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold lg:min-h-0 min-w-11 lg:min-w-0">
-                <Checkbox checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
-                {t("printSettings.defaultTemplate")}
-              </label>
             </Panel>
 
             <Panel title={`${t("printSettings.fontSize")} (px)`}>
@@ -506,7 +513,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                 <button type="button" onClick={() => persisted && runAction("duplicate", () => duplicatePrintTemplate(selected.id), "printSettings.duplicated")} disabled={!persisted || actionPending} title={t("printSettings.duplicate")} aria-label={t("printSettings.duplicate")} className="grid h-12 w-12 place-items-center rounded-full border border-border bg-surface shadow-md transition hover:-translate-y-0.5 hover:bg-surface-2 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
                   {pendingAction === "duplicate" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Copy className="h-5 w-5" />}
                 </button>
-                <button type="button" onClick={() => persisted && runAction("setDefault", () => setDefaultPrintTemplate(selected.id), "printSettings.defaultSaved")} disabled={!persisted || selected.isDefault || actionPending} title={t("printSettings.setDefault")} aria-label={t("printSettings.setDefault")} className="grid h-12 w-12 place-items-center rounded-full border border-border bg-surface shadow-md transition hover:-translate-y-0.5 hover:bg-surface-2 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="button" onClick={makeSelectedTemplateDefault} disabled={!persisted || selected.isDefault || actionPending} title={t("printSettings.setDefault")} aria-label={t("printSettings.setDefault")} className="grid h-12 w-12 place-items-center rounded-full border border-border bg-surface shadow-md transition hover:-translate-y-0.5 hover:bg-surface-2 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
                   {pendingAction === "setDefault" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Star className="h-5 w-5" />}
                 </button>
                 <button type="button" onClick={removeTemplate} disabled={!persisted || selected.isDefault || actionPending} title={t(selected.isDefault ? "printSettings.errors.cannotDeleteDefault" : "printSettings.deleteTemplate")} aria-label={t("printSettings.deleteTemplate")} className="grid h-12 w-12 place-items-center rounded-full border border-er/40 bg-surface text-er shadow-md transition hover:-translate-y-0.5 hover:bg-red-50 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-er disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-red-950/30">
