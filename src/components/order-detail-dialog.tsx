@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect } from "react";
+import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 
@@ -16,6 +16,7 @@ export function OrderDetailDialog({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => {
     const next = new URLSearchParams(searchParams.toString());
     next.delete("detailOrderId");
@@ -25,18 +26,25 @@ export function OrderDetailDialog({
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") close();
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+      if (dialogs[dialogs.length - 1] !== dialogRef.current) return;
+      // Consume Escape before the customer/history modal underneath handles it.
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      close();
     }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [close]);
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-5"
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-5"
       onMouseDown={close}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="order-detail-title"
