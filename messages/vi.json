@@ -3874,14 +3874,15 @@
     "templateName": "Tên mẫu",
     "newTemplateName": "Mẫu {type} mới",
     "defaultTemplate": "Mẫu mặc định cho loại chứng từ này",
-    "active": "Đang dùng",
-    "inactive": "Ngừng dùng",
     "duplicate": "Nhân bản",
     "duplicated": "Đã nhân bản mẫu in",
     "setDefault": "Đặt mặc định",
     "defaultSaved": "Đã đặt làm mẫu mặc định",
-    "deactivate": "Ngừng dùng",
-    "deactivated": "Đã ngừng dùng mẫu in",
+    "templateActions": "Thao tác mẫu in",
+    "deleteTemplate": "Xóa mẫu in",
+    "deletedTemplate": "Đã xóa mẫu in",
+    "deleteTitle": "Xóa mẫu in?",
+    "deleteConfirm": "Mẫu in “{name}” sẽ bị xóa vĩnh viễn. Thao tác này không thể hoàn tác.",
     "paperDefault": "Khổ giấy mặc định",
     "applyAll": "Áp dụng thông tin cửa hàng cho tất cả mẫu",
     "appliedAll": "Đã áp dụng cho cả 5 mẫu — nhớ Lưu từng mẫu.",
@@ -3996,7 +3997,7 @@
     "exitFullscreenPreview": "Thoát toàn màn hình",
     "previewHint": "Khi in thật, mẫu tự dàn trang theo khổ A4/A5/K80 đã chọn.",
     "errors": {
-      "defaultRequired": "Cần có mẫu mặc định khác trước khi ngừng dùng mẫu này."
+      "cannotDeleteDefault": "Không thể xóa mẫu mặc định. Hãy chọn một mẫu khác trước."
     }
   },
   "labelSettings": {

@@ -4,7 +4,7 @@ import { isDeepStrictEqual } from "node:util";
 
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { z } from "zod";
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { printTemplates } from "@/db/schema";
@@ -245,33 +245,71 @@ export async function setDefaultPrintTemplate(id: string): Promise<ActionResult>
   }
 }
 
-export async function deactivatePrintTemplate(id: string): Promise<ActionResult> {
+export async function deletePrintTemplate(id: string): Promise<ActionResult<{ defaultId: string | null }>> {
   const gate = await requireManager(); if (!gate.ok) return gate;
   if (!isPersistedTemplateId(id)) return { ok: false, error: "errors.invalidData" };
 
   try {
-    const [row] = await db.select({ docType: printTemplates.docType, isDefault: printTemplates.isDefault }).from(printTemplates).where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.id, id))).limit(1);
-    if (!row) return { ok: false, error: "errors.notFound" };
-    if (row.isDefault) {
-      const [replacement] = await db
-        .select({ id: printTemplates.id })
-        .from(printTemplates)
-        .where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.docType, row.docType), eq(printTemplates.isActive, true), ne(printTemplates.id, id)))
-        .limit(1);
-      if (!replacement) return { ok: false, error: "printSettings.errors.defaultRequired" };
-    }
-    await db.transaction(async (tx) => {
-      const [updated] = await tx.update(printTemplates).set({ isActive: false, isDefault: false, updatedAt: sql`now()` }).where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.id, id), eq(printTemplates.isActive, true))).returning({ name: printTemplates.name });
-      if (!updated) return;
+    const defaultId = await db.transaction(async (tx) => {
+      const [source] = await tx.select().from(printTemplates)
+        .where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.id, id)))
+        .limit(1).for("update");
+      if (!source) throw new Error("TEMPLATE_NOT_FOUND");
+      if (source.isDefault) throw new Error("TEMPLATE_DEFAULT_CANNOT_DELETE");
+
+      const [deleted] = await tx.delete(printTemplates)
+        .where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.id, id)))
+        .returning({ name: printTemplates.name, docType: printTemplates.docType });
+      if (!deleted) throw new Error("TEMPLATE_NOT_FOUND");
       await recordActivity(tx, {
-        storeId: gate.storeId, actorId: gate.userId, action: "print.template.deactivated", entityType: "print_template", entityId: id,
-        before: { name: updated.name, isActive: true }, after: { name: updated.name, isActive: false },
+        storeId: gate.storeId, actorId: gate.userId, action: "print.template.deleted", entityType: "print_template", entityId: id,
+        before: { name: deleted.name, docType: deleted.docType },
       });
+
+      const activeTemplates = await tx.select({
+        id: printTemplates.id,
+        name: printTemplates.name,
+        isDefault: printTemplates.isDefault,
+        isActive: printTemplates.isActive,
+      }).from(printTemplates)
+        .where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.docType, deleted.docType), eq(printTemplates.isActive, true)))
+        .orderBy(desc(printTemplates.isDefault), asc(printTemplates.sortOrder), asc(printTemplates.name))
+        .for("update");
+      const currentDefault = activeTemplates.find((template) => template.isDefault);
+      if (currentDefault) return currentDefault.id;
+
+      const remainingTemplates = activeTemplates.length > 0 ? activeTemplates : await tx.select({
+        id: printTemplates.id,
+        name: printTemplates.name,
+        isDefault: printTemplates.isDefault,
+        isActive: printTemplates.isActive,
+      }).from(printTemplates)
+        .where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.docType, deleted.docType)))
+        .orderBy(asc(printTemplates.sortOrder), asc(printTemplates.name))
+        .for("update");
+      const replacement = remainingTemplates[0];
+      if (!replacement) return null;
+
+      await tx.update(printTemplates)
+        .set({ isDefault: false, updatedAt: sql`now()` })
+        .where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.docType, deleted.docType)));
+      await tx.update(printTemplates)
+        .set({ isDefault: true, isActive: true, updatedAt: sql`now()` })
+        .where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.id, replacement.id)));
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "print.template.default_changed", entityType: "print_template", entityId: replacement.id,
+        before: { name: replacement.name, isDefault: replacement.isDefault, isActive: replacement.isActive },
+        after: { name: replacement.name, isDefault: true, isActive: true },
+        metadata: { reason: "replacement_after_template_delete" },
+      });
+      return replacement.id;
     });
     revalidatePath("/settings/print");
-    return { ok: true, data: undefined };
+    return { ok: true, data: { defaultId } };
   } catch (e) {
-    console.error("deactivatePrintTemplate failed:", e);
+    if (e instanceof Error && e.message === "TEMPLATE_NOT_FOUND") return { ok: false, error: "errors.notFound" };
+    if (e instanceof Error && e.message === "TEMPLATE_DEFAULT_CANNOT_DELETE") return { ok: false, error: "printSettings.errors.cannotDeleteDefault" };
+    console.error("deletePrintTemplate failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
 }

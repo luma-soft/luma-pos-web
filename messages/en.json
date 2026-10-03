@@ -3874,14 +3874,15 @@
     "templateName": "Template name",
     "newTemplateName": "New {type} template",
     "defaultTemplate": "Default template for this document type",
-    "active": "Active",
-    "inactive": "Inactive",
     "duplicate": "Duplicate",
     "duplicated": "Template duplicated",
     "setDefault": "Set default",
     "defaultSaved": "Default template updated",
-    "deactivate": "Deactivate",
-    "deactivated": "Template deactivated",
+    "templateActions": "Template actions",
+    "deleteTemplate": "Delete template",
+    "deletedTemplate": "Template deleted",
+    "deleteTitle": "Delete print template?",
+    "deleteConfirm": "The print template “{name}” will be permanently deleted. This action cannot be undone.",
     "paperDefault": "Default paper size",
     "applyAll": "Apply store info to all templates",
     "appliedAll": "Applied to all 5 templates — remember to Save each.",
@@ -3996,7 +3997,7 @@
     "exitFullscreenPreview": "Exit fullscreen",
     "previewHint": "Actual printing reflows per selected A4/A5/K80 size.",
     "errors": {
-      "defaultRequired": "Set another default before deactivating this template."
+      "cannotDeleteDefault": "The default template cannot be deleted. Choose another template first."
     }
   },
   "labelSettings": {

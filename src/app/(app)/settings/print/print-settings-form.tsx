@@ -5,12 +5,13 @@ import { Select } from "@/components/ui/select";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Copy, EyeOff, Loader2, Maximize2, Minimize2, Plus, Save, Star } from "lucide-react";
+import { Copy, Loader2, Maximize2, Minimize2, Plus, Save, Star, Trash2 } from "lucide-react";
 import { PrintDoc } from "@/components/print/print-doc";
 import { PrintRichTextEditor } from "@/components/print/print-rich-text-editor";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
+import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import {
-  deactivatePrintTemplate,
+  deletePrintTemplate,
   duplicatePrintTemplate,
   savePrintTemplate,
   setDefaultPrintTemplate,
@@ -56,11 +57,12 @@ const VIETQR_BANKS = [
 type ToggleOptionKey = (typeof OPTION_GROUPS)[number]["options"][number];
 type BooleanOptionKey = ToggleOptionKey | (typeof QR_VISIBILITY_OPTIONS)[number];
 type TextOptionKey = (typeof SIGNATURE_LABELS)[number] | "taxLabel" | "paymentQrTitle" | "paymentQrContentTemplate" | "paymentQrCustomAccountNumber" | "paymentQrCustomAccountName";
-type PendingAction = "save" | "duplicate" | "setDefault" | "deactivate";
+type PendingAction = "save" | "duplicate" | "setDefault" | "delete";
 
 export function PrintSettingsForm({ templates, storeDefaults }: { templates: PrintTemplate[]; storeDefaults: PrintTemplateStoreInfo }) {
   const t = useTranslations();
   const router = useRouter();
+  const dialog = useConfirmDialog();
   const [drafts, setDrafts] = useState<PrintTemplate[]>(templates);
   const [docType, setDocType] = useState<PrintDocType>("order");
   const visible = useMemo(() => drafts.filter((item) => item.docType === docType), [drafts, docType]);
@@ -183,6 +185,34 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
     );
   }
 
+  async function removeTemplate() {
+    if (!persisted || selected.isDefault || actionPending) return;
+    const confirmed = await dialog.confirm({
+      title: t("printSettings.deleteTitle"),
+      description: t("printSettings.deleteConfirm", { name: selected.name }),
+      confirmLabel: t("printSettings.deleteTemplate"),
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
+    const deletedId = selected.id;
+    const deletedDocType = selected.docType;
+    runAction("delete", () => deletePrintTemplate(deletedId), "printSettings.deletedTemplate", (data) => {
+      const defaultId = (data as { defaultId?: string | null } | undefined)?.defaultId ?? null;
+      setDrafts((current) => {
+        const remaining = current
+          .filter((item) => item.id !== deletedId)
+          .map((item) => item.docType !== deletedDocType || !defaultId
+            ? item
+            : { ...item, isDefault: item.id === defaultId, isActive: item.id === defaultId ? true : item.isActive });
+        return defaultId || remaining.some((item) => item.docType === deletedDocType)
+          ? remaining
+          : [defaultTemplate(deletedDocType, storeDefaults), ...remaining];
+      });
+      setSelectedId(defaultId ?? defaultTemplate(deletedDocType, storeDefaults).id);
+    });
+  }
+
   const inputCls = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm lg:min-h-10";
   const actionPending = isPending || pendingAction !== null;
   const previewQrReference = formatPrintPaymentReference(selected.options.paymentQrContentTemplate, "XX-000");
@@ -280,13 +310,12 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                     options={visible.map((item) => ({
                       value: item.id,
                       label: item.name,
-                      description: `${item.isDefault ? "★ · " : ""}${item.paperDefault.toUpperCase()} · ${item.isActive ? t("printSettings.active") : t("printSettings.inactive")}`,
                     }))}
                     rootClassName="w-full min-w-0"
-                    wrapLabel
+                    className="h-11 lg:h-11"
                   />
                 </div>
-                <button type="button" onClick={addTemplate} aria-label={t("common.add")} className="inline-flex min-h-11 shrink-0 self-end items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white min-w-11 lg:min-h-10">
+                <button type="button" onClick={addTemplate} aria-label={t("common.add")} className="inline-flex h-11 min-h-11 shrink-0 self-end items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white min-w-11 lg:h-11">
                   <Plus className="h-4 w-4" />
                   {t("common.add")}
                 </button>
@@ -468,24 +497,22 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
               <PrintRichTextEditor key={selected.id} value={selected.footerNote} onChange={(footerNote) => patch({ footerNote })} />
             </Panel>
 
-            <div className="sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center gap-2 border-t border-border bg-surface/95 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
-              <button type="button" onClick={save} disabled={actionPending || customQrAccountInvalid} aria-label={t("common.save")} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50 min-w-11">
-                {pendingAction === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                {t("common.save")}
-              </button>
-              <button type="button" onClick={() => persisted && runAction("duplicate", () => duplicatePrintTemplate(selected.id), "printSettings.duplicated")} disabled={!persisted || actionPending} aria-label={t("printSettings.duplicate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
-                {pendingAction === "duplicate" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
-                {t("printSettings.duplicate")}
-              </button>
-              <button type="button" onClick={() => persisted && runAction("setDefault", () => setDefaultPrintTemplate(selected.id), "printSettings.defaultSaved")} disabled={!persisted || selected.isDefault || actionPending} aria-label={t("printSettings.setDefault")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
-                {pendingAction === "setDefault" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Star className="h-4 w-4" />}
-                {t("printSettings.setDefault")}
-              </button>
-              <button type="button" onClick={() => persisted && runAction("deactivate", () => deactivatePrintTemplate(selected.id), "printSettings.deactivated")} disabled={!persisted || actionPending} aria-label={t("printSettings.deactivate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-er/40 px-4 text-sm font-semibold text-er disabled:opacity-50 min-w-11">
-                {pendingAction === "deactivate" ? <Loader2 className="h-4 w-4 animate-spin" /> : <EyeOff className="h-4 w-4" />}
-                {t("printSettings.deactivate")}
-              </button>
-              {msg && <span className={cn("text-sm font-medium", msg.ok ? "text-ok" : "text-er")}>{msg.text}</span>}
+            <div className="sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface/95 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+              {msg && <span role="status" aria-live="polite" className={cn("text-sm font-medium", msg.ok ? "text-ok" : "text-er")}>{msg.text}</span>}
+              <div role="group" aria-label={t("printSettings.templateActions")} className="ml-auto flex items-center gap-2">
+                <button type="button" onClick={save} disabled={actionPending || customQrAccountInvalid} title={t("common.save")} aria-label={t("common.save")} className="grid h-12 w-12 place-items-center rounded-full bg-primary-600 text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
+                  {pendingAction === "save" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                </button>
+                <button type="button" onClick={() => persisted && runAction("duplicate", () => duplicatePrintTemplate(selected.id), "printSettings.duplicated")} disabled={!persisted || actionPending} title={t("printSettings.duplicate")} aria-label={t("printSettings.duplicate")} className="grid h-12 w-12 place-items-center rounded-full border border-border bg-surface shadow-md transition hover:-translate-y-0.5 hover:bg-surface-2 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
+                  {pendingAction === "duplicate" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Copy className="h-5 w-5" />}
+                </button>
+                <button type="button" onClick={() => persisted && runAction("setDefault", () => setDefaultPrintTemplate(selected.id), "printSettings.defaultSaved")} disabled={!persisted || selected.isDefault || actionPending} title={t("printSettings.setDefault")} aria-label={t("printSettings.setDefault")} className="grid h-12 w-12 place-items-center rounded-full border border-border bg-surface shadow-md transition hover:-translate-y-0.5 hover:bg-surface-2 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
+                  {pendingAction === "setDefault" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Star className="h-5 w-5" />}
+                </button>
+                <button type="button" onClick={removeTemplate} disabled={!persisted || selected.isDefault || actionPending} title={t(selected.isDefault ? "printSettings.errors.cannotDeleteDefault" : "printSettings.deleteTemplate")} aria-label={t("printSettings.deleteTemplate")} className="grid h-12 w-12 place-items-center rounded-full border border-er/40 bg-surface text-er shadow-md transition hover:-translate-y-0.5 hover:bg-red-50 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-er disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-red-950/30">
+                  {pendingAction === "delete" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Trash2 className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
         </section>
 

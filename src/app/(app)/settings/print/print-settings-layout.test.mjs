@@ -15,10 +15,11 @@ test("template selection is combined with the invoice settings panel", () => {
   expect(form).not.toContain("xl:grid-cols-[320px_minmax(0,1fr)]");
 });
 
-test("the combined panel keeps template creation and status context", () => {
+test("the template picker keeps creation controls without the active-status subtitle", () => {
   expect(form).toContain("onClick={addTemplate}");
-  expect(form).toContain("item.isDefault ? \"★ · \" : \"\"");
-  expect(form).toContain('item.isActive ? t("printSettings.active") : t("printSettings.inactive")');
+  expect(form).toContain('className="h-11 lg:h-11"');
+  expect(form).not.toContain('t("printSettings.active")');
+  expect(form).not.toContain('t("printSettings.inactive")');
 });
 
 test("settings and preview use a vertical layout with a fullscreen preview action", () => {
@@ -43,8 +44,18 @@ test("tax visibility exposes a custom document label", () => {
 });
 
 test("each template action shows loading on the button that triggered it", () => {
-  for (const action of ["save", "duplicate", "setDefault", "deactivate"]) {
+  for (const action of ["save", "duplicate", "setDefault", "delete"]) {
     expect(form).toContain(`pendingAction === "${action}"`);
   }
   expect(form).not.toContain("{isPending ? <Loader2");
+});
+
+test("template actions are icon FABs below the footer and protect the default template", () => {
+  const footerIndex = form.indexOf('<Panel title={t("printSettings.footerNote")}>');
+  const actionsIndex = form.indexOf('aria-label={t("printSettings.templateActions")}');
+  expect(footerIndex).toBeGreaterThan(-1);
+  expect(actionsIndex).toBeGreaterThan(footerIndex);
+  expect(form).toContain('disabled={!persisted || selected.isDefault || actionPending} title={t(selected.isDefault ? "printSettings.errors.cannotDeleteDefault" : "printSettings.deleteTemplate")}');
+  expect(form).toContain("deletePrintTemplate(deletedId)");
+  expect(form).toContain("setSelectedId(defaultId ?? defaultTemplate(deletedDocType, storeDefaults).id)");
 });
