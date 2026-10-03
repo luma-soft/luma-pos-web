@@ -1,4 +1,5 @@
 import { and, or, sql, type SQL, type AnyColumn } from "drizzle-orm";
+import { productUnits } from "@/db/schema";
 import { normalizeSearch, searchTokens } from "./normalize";
 
 export { normalizeSearch };
@@ -44,9 +45,12 @@ export function productSearchCondition(columns: readonly (AnyColumn | SQL)[], qu
 }
 
 type ProductSearchFields = {
+  id: AnyColumn | SQL;
+  storeId: AnyColumn | SQL;
   name: AnyColumn | SQL;
   sku: AnyColumn | SQL;
   barcode: AnyColumn | SQL;
+  baseUnit: AnyColumn | SQL;
   variantName: AnyColumn | SQL;
   specs: AnyColumn | SQL;
 };
@@ -57,10 +61,18 @@ export function catalogProductSearchCondition(
   query: string,
   extraColumns: readonly (AnyColumn | SQL)[] = [],
 ): SQL {
+  const unitIdentifiers = sql<string | null>`(
+    select string_agg(concat_ws(' ', ${productUnits.unitName}, ${productUnits.sku}, ${productUnits.barcode}), ' ')
+    from ${productUnits}
+    where ${productUnits.productId} = ${fields.id}
+      and ${productUnits.storeId} = ${fields.storeId}
+  )`;
   return productSearchCondition([
     fields.name,
     fields.sku,
     fields.barcode,
+    fields.baseUnit,
+    unitIdentifiers,
     fields.variantName,
     sql`${fields.specs}::text`,
     ...extraColumns,

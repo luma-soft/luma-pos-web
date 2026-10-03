@@ -21,6 +21,8 @@ export function catalogItemToPurchaseProduct(
     units: product.units.map((unit) => ({
       unitName: unit.unitName,
       multiplier: unit.multiplier,
+      sku: unit.sku ?? null,
+      barcode: unit.barcode,
     })),
   };
 }

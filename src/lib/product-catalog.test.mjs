@@ -36,8 +36,18 @@ describe("product catalog keyword search", () => {
     for (const query of ["SKU-27", "8934567890123", "góc SKU-27"]) {
       expect(searchProductCatalog(catalog, query).map((item) => item.id)).toEqual(["27"]);
     }
-    const rows = [product("unit", "Ống", { units: [{ unitName: "Cuộn", multiplier: "10", barcode: "UNIT-001", priceOverride: null }] })];
+    const rows = [product("unit", "Ống", { units: [{ unitName: "Cuộn", multiplier: "10", sku: "ROLL-001", barcode: "UNIT-001", priceOverride: null }] })];
     expect(searchProductCatalog(rows, "ống UNIT-001").map((item) => item.id)).toEqual(["unit"]);
+    expect(searchProductCatalog(rows, "ROLL-001").map((item) => item.id)).toEqual(["unit"]);
+  });
+
+  test("finds products by their base and alternate unit names", () => {
+    const rows = [product("pipe", "Ống Nhựa PVC Tiền Phong - 110 - C2", {
+      baseUnit: "m",
+      units: [{ unitName: "Cây", multiplier: "6", barcode: null, priceOverride: null }],
+    })];
+    expect(searchProductCatalog(rows, "Ống Nhựa PVC Tiền Phong - 110 - C2 (Cây)").map((item) => item.id)).toEqual(["pipe"]);
+    expect(searchProductCatalog(rows, "m").map((item) => item.id)).toEqual(["pipe"]);
   });
 
   test("finds variants by their variant label and specification values", () => {

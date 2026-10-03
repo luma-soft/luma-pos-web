@@ -4,6 +4,13 @@ type VariantSummary = {
   id: string;
   name: string;
   sku: string;
+  baseUnit?: string | null;
+  unitNames?: string | null;
+  unitDefinitions?: Array<{
+    unitName?: string | null;
+    sku?: string | null;
+    barcode?: string | null;
+  }>;
   variantName?: string | null;
   specs?: unknown;
 };
@@ -43,6 +50,9 @@ export function matchesProductVariant(product: VariantSummary, query: string, op
   if (!search) return true;
   const text = normalizeSearch([
     product.sku,
+    product.baseUnit,
+    product.unitNames,
+    ...(product.unitDefinitions ?? []).flatMap((unit) => [unit.unitName, unit.sku, unit.barcode]),
     ...(options.includeProductName === false ? [] : [product.name]),
     productVariantLabel(product),
     ...(options.includeProductName === false

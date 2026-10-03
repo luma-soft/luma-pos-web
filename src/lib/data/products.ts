@@ -113,9 +113,12 @@ function productFilterPredicate(alias: "member" | "products", storeId: string, f
   else if (hasCompliance && (status === "draft" || status === "archived")) conditions.push(sql`${field("lifecycle_status")} = ${status}`);
   const q = filters.q?.trim();
   if (q) conditions.push(catalogProductSearchCondition({
+    id: field("id"),
+    storeId: field("store_id"),
     name: field("name"),
     sku: field("sku"),
     barcode: field("barcode"),
+    baseUnit: field("base_unit"),
     variantName: field("variant_name"),
     specs: field("specs"),
   }, q, groupSearchFields));
@@ -299,11 +302,15 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
         unitDefinitions: sql<Array<{
           unitName: string;
           multiplier: string;
+          sku: string | null;
+          barcode: string | null;
           priceOverride: string | null;
         }>>`coalesce((
           select json_agg(json_build_object(
             'unitName', ${productUnits.unitName},
             'multiplier', ${productUnits.multiplier},
+            'sku', ${productUnits.sku},
+            'barcode', ${productUnits.barcode},
             'priceOverride', ${productUnits.priceOverride}
           ) order by ${productUnits.sortOrder})
           from ${productUnits}
@@ -391,11 +398,15 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
             unitDefinitions: sql<Array<{
               unitName: string;
               multiplier: string;
+              sku: string | null;
+              barcode: string | null;
               priceOverride: string | null;
             }>>`coalesce((
               select json_agg(json_build_object(
                 'unitName', ${productUnits.unitName},
                 'multiplier', ${productUnits.multiplier},
+                'sku', ${productUnits.sku},
+                'barcode', ${productUnits.barcode},
                 'priceOverride', ${productUnits.priceOverride}
               ) order by ${productUnits.sortOrder})
               from ${productUnits}

@@ -2,9 +2,11 @@ import { afterAll, beforeAll, expect, mock, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
+import { alias } from "drizzle-orm/pg-core";
 import { SQL } from "drizzle-orm";
 import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
 import * as schema from "../../db/schema";
+import { catalogProductSearchCondition } from "../search";
 
 const pg = new PGlite();
 const database = drizzle(pg, { schema });
@@ -264,4 +266,44 @@ test("web and mobile product search match separated keywords and Vietnamese tone
   expect(await searchPosProductRows(storeId, "cút 99")).toEqual([]);
   expect(await searchPosProductRows(otherStoreId, "cút 27")).toEqual([]);
   expect(await searchPosProductRows(storeId, "% _")).toEqual([]);
+});
+
+test("web and mobile POS search match base and alternate product units", async () => {
+  const id = randomUUID();
+  await database.insert(schema.products).values({
+    id,
+    storeId,
+    sku: "SP000059",
+    name: "Ống Nhựa PVC Tiền Phong - 110 - C2",
+    baseUnit: "m",
+  });
+  await database.insert(schema.productUnits).values({
+    storeId,
+    productId: id,
+    sku: "SP000059-CAY",
+    unitName: "Cây",
+    multiplier: "6",
+    barcode: "CAY-059",
+  });
+
+  accessRole = "owner";
+  for (const query of [
+    "Ống Nhựa PVC Tiền Phong - 110 - C2 (Cây)",
+    "m",
+    "SP000059-CAY",
+    "CAY-059",
+  ]) {
+    const web = await searchPosProducts(query);
+    const response = await GET(new Request(`http://localhost/api/mobile/pos/search?q=${encodeURIComponent(query)}`));
+    expect(response.status).toBe(200);
+    const mobile = (await response.json()).data;
+    expect(web.map((row) => row.id)).toContain(id);
+    expect(mobile.map((row) => row.id)).toContain(id);
+  }
+  const member = alias(schema.products, "member");
+  const inventoryRows = await database
+    .select({ id: member.id })
+    .from(member)
+    .where(catalogProductSearchCondition(member, "SP000059-CAY"));
+  expect(inventoryRows.map((row) => row.id)).toContain(id);
 });

@@ -66,6 +66,8 @@ export function catalogItemToPosProduct(
     units: product.units.map((unit) => ({
       unitName: unit.unitName,
       multiplier: unit.multiplier,
+      sku: unit.sku ?? null,
+      barcode: unit.barcode,
       priceOverride: unit.priceOverride,
     })),
     priceBookTypes: product.priceBookTypes,

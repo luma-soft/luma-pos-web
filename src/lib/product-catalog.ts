@@ -5,6 +5,7 @@ export const PRODUCT_CATALOG_SCHEMA_VERSION = 8;
 export type CatalogUnit = {
   unitName: string;
   multiplier: string;
+  sku?: string | null;
   barcode: string | null;
   priceOverride: string | null;
 };
@@ -113,8 +114,9 @@ export function searchProductCatalog(
       product.model ?? "",
       product.brandName ?? "",
       product.categoryName ?? "",
+      product.baseUnit ?? "",
       JSON.stringify(product.specs ?? {}),
-      ...product.units.flatMap((unit) => [unit.unitName, unit.barcode ?? ""]),
+      ...product.units.flatMap((unit) => [unit.unitName, unit.sku ?? "", unit.barcode ?? ""]),
     ].join(" "));
     if (!matchesSearchTokens(searchable, normalizedQuery)) continue;
 

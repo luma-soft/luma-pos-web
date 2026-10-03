@@ -27,6 +27,18 @@ describe("variant presentation", () => {
     assert.equal(matchesProductVariant(f, "F", { includeProductName: false }), true);
   });
 
+  test("variant search includes base and alternate unit identifiers", () => {
+    const product = {
+      ...e,
+      baseUnit: "m",
+      unitDefinitions: [{ unitName: "Cây", sku: "PIPE-CANE", barcode: "CANE-001" }],
+    };
+    assert.equal(matchesProductVariant(product, "Ruijie Cây"), true);
+    assert.equal(matchesProductVariant(product, "PIPE-CANE"), true);
+    assert.equal(matchesProductVariant(product, "CANE-001"), true);
+    assert.equal(matchesProductVariant(product, "m"), true);
+  });
+
   test("group selection excludes synthetic parent and deduplicates real imported root", () => {
     assert.deepEqual(selectableProductIds({ id: "parent", isVariantParent: true, variantGroup: { members: [e, f] } }), ["e", "f"]);
     assert.deepEqual(selectableProductIds({ ...e, variantGroup: { members: [e, e, f] } }), ["e", "f"]);

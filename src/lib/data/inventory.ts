@@ -112,8 +112,8 @@ export async function getInventory(storeId: string, filters: { q?: string; low?:
         totalStock,
         minLevel: products.minStock,
         stockValue: sql<string>`${totalStock} * ${products.costPrice}`,
-        units: sql<{ unitName: string; multiplier: string; barcode: string | null }[]>`coalesce((
-          select json_agg(json_build_object('unitName', pu.unit_name, 'multiplier', pu.multiplier, 'barcode', pu.barcode) order by pu.sort_order)
+        units: sql<{ unitName: string; multiplier: string; sku: string | null; barcode: string | null }[]>`coalesce((
+          select json_agg(json_build_object('unitName', pu.unit_name, 'multiplier', pu.multiplier, 'sku', pu.sku, 'barcode', pu.barcode) order by pu.sort_order)
           from product_units pu where pu.product_id = ${products.id}
         ), '[]')`,
       })
@@ -363,8 +363,8 @@ const purchaseProductSelection = {
   baseUnit: products.baseUnit,
   costPrice: products.costPrice,
   totalStock: products.totalStock,
-  units: sql<{ unitName: string; multiplier: string }[]>`coalesce((
-    select json_agg(json_build_object('unitName', pu.unit_name, 'multiplier', pu.multiplier) order by pu.sort_order)
+  units: sql<{ unitName: string; multiplier: string; sku: string | null; barcode: string | null }[]>`coalesce((
+    select json_agg(json_build_object('unitName', pu.unit_name, 'multiplier', pu.multiplier, 'sku', pu.sku, 'barcode', pu.barcode) order by pu.sort_order)
     from product_units pu where pu.product_id = ${products.id}
   ), '[]')`,
 };

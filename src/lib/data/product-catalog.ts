@@ -103,6 +103,7 @@ async function buildProductCatalogSnapshot(
           select json_agg(json_build_object(
             'unitName', ${productUnits.unitName},
             'multiplier', ${productUnits.multiplier},
+            'sku', ${productUnits.sku},
             'barcode', ${productUnits.barcode},
             'priceOverride', ${productUnits.priceOverride}
           ) order by ${productUnits.sortOrder})

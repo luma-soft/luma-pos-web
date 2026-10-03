@@ -16,6 +16,8 @@ import { lastCompletedProductSaleAt, recentProductSaleOrder } from "@/lib/data/r
 export interface PosUnit {
   unitName: string;
   multiplier: string;
+  sku: string | null;
+  barcode: string | null;
   priceOverride: string | null;
 }
 
@@ -111,6 +113,8 @@ function posProductSelect(
       select json_agg(json_build_object(
         'unitName', ${productUnits.unitName},
         'multiplier', ${productUnits.multiplier},
+        'sku', ${productUnits.sku},
+        'barcode', ${productUnits.barcode},
         'priceOverride', ${productUnits.priceOverride}
       ) order by ${productUnits.sortOrder})
       from ${productUnits} where ${productUnits.productId} = ${products.id}

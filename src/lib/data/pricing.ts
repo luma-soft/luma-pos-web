@@ -226,6 +226,7 @@ export async function getPricingPage(storeId: string, query: PricingQuery = {}):
             id: string;
             unitName: string;
             multiplier: string;
+            sku: string | null;
             barcode: string | null;
             priceOverride: string | null;
           }>
@@ -234,6 +235,7 @@ export async function getPricingPage(storeId: string, query: PricingQuery = {}):
             'id', pu.id,
             'unitName', pu.unit_name,
             'multiplier', pu.multiplier,
+            'sku', pu.sku,
             'barcode', pu.barcode,
             'priceOverride', pu.price_override
           ) order by pu.sort_order)
