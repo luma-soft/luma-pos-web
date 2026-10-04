@@ -62,7 +62,7 @@ test("template actions are icon FABs below the footer and protect the default te
 
 test("template action FABs stay fixed to the viewport above mobile navigation", () => {
   expect(form).toContain('className="fixed bottom-[calc(8.75rem+env(safe-area-inset-bottom))] right-4 z-50');
-  expect(form).toContain("lg:bottom-24 lg:right-6");
+  expect(form).toContain("lg:bottom-6 lg:right-6");
   expect(form).not.toContain("sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center justify-between gap-3");
 });
 

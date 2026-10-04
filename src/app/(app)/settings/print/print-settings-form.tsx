@@ -504,7 +504,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
               <PrintRichTextEditor key={selected.id} value={selected.footerNote} onChange={(footerNote) => patch({ footerNote })} />
             </Panel>
 
-            <div className="fixed bottom-[calc(8.75rem+env(safe-area-inset-bottom))] right-4 z-50 flex flex-col items-end gap-3 lg:bottom-24 lg:right-6">
+            <div className="fixed bottom-[calc(8.75rem+env(safe-area-inset-bottom))] right-4 z-50 flex flex-col items-end gap-3 lg:bottom-6 lg:right-6">
               {msg && <span role="status" aria-live="polite" className={cn("max-w-[min(90vw,28rem)] rounded-xl border border-border bg-surface/95 px-3 py-2 text-sm font-medium shadow-e2 backdrop-blur", msg.ok ? "text-ok" : "text-er")}>{msg.text}</span>}
               <div role="group" aria-label={t("printSettings.templateActions")} className="flex items-center gap-2 rounded-2xl border border-border bg-surface/95 p-2 shadow-xl backdrop-blur">
                 <button type="button" onClick={save} disabled={actionPending || customQrAccountInvalid} title={t("common.save")} aria-label={t("common.save")} className="grid h-12 w-12 place-items-center rounded-full bg-primary-600 text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
