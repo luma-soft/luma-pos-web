@@ -504,9 +504,9 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
               <PrintRichTextEditor key={selected.id} value={selected.footerNote} onChange={(footerNote) => patch({ footerNote })} />
             </Panel>
 
-            <div className="sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface/95 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
-              {msg && <span role="status" aria-live="polite" className={cn("text-sm font-medium", msg.ok ? "text-ok" : "text-er")}>{msg.text}</span>}
-              <div role="group" aria-label={t("printSettings.templateActions")} className="ml-auto flex items-center gap-2">
+            <div className="fixed bottom-[calc(8.75rem+env(safe-area-inset-bottom))] right-4 z-50 flex flex-col items-end gap-3 lg:bottom-24 lg:right-6">
+              {msg && <span role="status" aria-live="polite" className={cn("max-w-[min(90vw,28rem)] rounded-xl border border-border bg-surface/95 px-3 py-2 text-sm font-medium shadow-e2 backdrop-blur", msg.ok ? "text-ok" : "text-er")}>{msg.text}</span>}
+              <div role="group" aria-label={t("printSettings.templateActions")} className="flex items-center gap-2 rounded-2xl border border-border bg-surface/95 p-2 shadow-xl backdrop-blur">
                 <button type="button" onClick={save} disabled={actionPending || customQrAccountInvalid} title={t("common.save")} aria-label={t("common.save")} className="grid h-12 w-12 place-items-center rounded-full bg-primary-600 text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
                   {pendingAction === "save" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                 </button>
