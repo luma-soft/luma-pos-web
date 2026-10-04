@@ -361,6 +361,9 @@ input[type="number"] {
     overflow: visible !important;
     background: #fff !important;
   }
+  /* Keep the POS print context on the same named page as its document. */
+  body.pos-printing:has(.print-document--a4) { page: print-a4; }
+  body.pos-printing:has(.print-document--a5) { page: print-a5; }
   body.pos-printing > *:not(.pos-print-root) { display: none !important; }
   body.pos-printing .pos-print-root {
     display: block !important;
