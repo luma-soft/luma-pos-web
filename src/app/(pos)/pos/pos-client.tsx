@@ -2445,7 +2445,6 @@ export function PosClient({
                               className={cn("w-full", stockInsufficient && "border-er text-er focus-within:border-er")}
                               inputClassName={cn(stockInsufficient && "border-er text-er")}
                             />
-                            {stockManaged && <PosStockQuantityTooltip stock={stock} ordered={ordered} reserved={Number(p.booked)} unit={p.baseUnit} />}
                           </PosQuantitySlot>
                         )}
                         <div className="w-24 text-right text-sm font-semibold text-primary-600 tabular-nums sm:w-32">{resultPriceLabel}</div>
