@@ -580,14 +580,32 @@ export function PosClient({
   // In phiếu tạm: ẩn app, chỉ hiện phiếu, gọi in trình duyệt rồi khôi phục.
   useEffect(() => {
     if (!printSize) return;
+    const pageStyle = document.createElement("style");
+    pageStyle.dataset.posPrintPage = "true";
+    pageStyle.textContent = printSize === "a4"
+      ? "@page { size: A4 portrait; margin: 12mm; }"
+      : printSize === "a5"
+        ? "@page { size: A5 portrait; margin: 10mm; }"
+        : "@page { margin: 0; }";
+    document.head.appendChild(pageStyle);
     document.body.classList.add("pos-printing");
-    const restore = () => { document.body.classList.remove("pos-printing"); setPrintSize(null); setPrintJob(null); };
+    const restore = () => {
+      document.body.classList.remove("pos-printing");
+      pageStyle.remove();
+      setPrintSize(null);
+      setPrintJob(null);
+    };
     window.addEventListener("afterprint", restore, { once: true });
     let cancelled = false;
     void waitForPrintImages(document.querySelectorAll<HTMLImageElement>(".pos-print-root img")).then(() => {
       if (!cancelled) window.print();
     });
-    return () => { cancelled = true; window.removeEventListener("afterprint", restore); document.body.classList.remove("pos-printing"); };
+    return () => {
+      cancelled = true;
+      window.removeEventListener("afterprint", restore);
+      document.body.classList.remove("pos-printing");
+      pageStyle.remove();
+    };
   }, [printSize]);
   const [editKey, setEditKey] = useState<string | null>(null); // dòng đang mở popup sửa giá
   const [renameDraftId, setRenameDraftId] = useState<string | null>(null);

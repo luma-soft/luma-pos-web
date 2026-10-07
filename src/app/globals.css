@@ -365,9 +365,13 @@ input[type="number"] {
   body.pos-printing {
     display: block !important;
   }
-  /* Keep the POS print context on the same named page as its document. */
-  body.pos-printing:has(.print-document--a4) { page: print-a4; }
-  body.pos-printing:has(.print-document--a5) { page: print-a5; }
+  /* POS injects an unnamed @page rule for the selected paper size. Keep the
+     whole portal on that page context instead of switching named pages mid-flow. */
+  body.pos-printing,
+  body.pos-printing .pos-print-root,
+  body.pos-printing .print-document {
+    page: auto !important;
+  }
   body.pos-printing > *:not(.pos-print-root) { display: none !important; }
   body.pos-printing .pos-print-root {
     display: block !important;
