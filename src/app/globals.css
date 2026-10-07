@@ -361,6 +361,10 @@ input[type="number"] {
     overflow: visible !important;
     background: #fff !important;
   }
+  /* RootLayout makes body a flex column; use normal block flow for print pagination. */
+  body.pos-printing {
+    display: block !important;
+  }
   /* Keep the POS print context on the same named page as its document. */
   body.pos-printing:has(.print-document--a4) { page: print-a4; }
   body.pos-printing:has(.print-document--a5) { page: print-a5; }
