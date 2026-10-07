@@ -3776,7 +3776,6 @@
       "qtyExceeds": "Return quantity exceeds purchased quantity.",
       "orderCancelled": "Order is cancelled — cannot return.",
       "debtNeedsCustomer": "Debt deduction requires a customer on the order.",
-      "debtTooSmall": "Current debt is less than the refund — use cash/bank instead.",
       "notFound": "Return not found.",
       "alreadyCancelled": "This return has already been cancelled.",
       "notEditable": "Only active returns can be edited.",

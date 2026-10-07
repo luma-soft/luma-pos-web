@@ -3776,7 +3776,6 @@
       "qtyExceeds": "Số lượng trả vượt quá số đã mua.",
       "orderCancelled": "Đơn đã hủy — không thể trả hàng.",
       "debtNeedsCustomer": "Trừ công nợ cần đơn có khách hàng.",
-      "debtTooSmall": "Công nợ hiện tại nhỏ hơn số tiền hoàn — chọn hoàn tiền mặt/CK.",
       "notFound": "Không tìm thấy phiếu trả hàng.",
       "alreadyCancelled": "Phiếu trả hàng đã được hủy trước đó.",
       "notEditable": "Chỉ có thể sửa phiếu trả hàng đang hoạt động.",

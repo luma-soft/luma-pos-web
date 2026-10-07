@@ -331,11 +331,9 @@ export async function createExchangeForUser(
 
       if (difference < -1e-9 && v.refundMethod === "debt_deduct") {
         if (!order.customerId) throw new Error("DEBT_NEEDS_CUSTOMER");
-        const [customer] = await tx.select({ debt: customers.currentDebt })
+        const [customer] = await tx.select({ id: customers.id })
           .from(customers).where(and(eq(customers.storeId, storeId), eq(customers.id, order.customerId))).limit(1).for("update");
-        if (!customer || Number(customer.debt) + 1e-9 < -difference) {
-          throw new Error("DEBT_TOO_SMALL");
-        }
+        if (!customer) throw new Error("DEBT_NEEDS_CUSTOMER");
       }
 
       const [exchangeOrder] = await tx.insert(orders).values({
@@ -539,7 +537,7 @@ export async function createExchangeForUser(
 
       if (order.customerId) {
         await tx.update(customers).set({
-          currentDebt: sql`greatest(${customers.currentDebt} + ${toMoney(settlement.debtDelta)}, 0)`,
+          currentDebt: sql`${customers.currentDebt} + ${toMoney(settlement.debtDelta)}`,
           totalSpent: sql`greatest(${customers.totalSpent} - ${toMoney(returnTotal)} + ${toMoney(replacementTotal)}, 0)`,
         }).where(and(eq(customers.storeId, storeId), eq(customers.id, order.customerId)));
       }
@@ -644,7 +642,6 @@ export async function createExchangeForUser(
       INSUFFICIENT_STOCK: "returns.errors.insufficientExchangeStock",
       INSUFFICIENT_BATCH_STOCK: "returns.errors.insufficientExchangeStock",
       DEBT_NEEDS_CUSTOMER: "returns.errors.debtNeedsCustomer",
-      DEBT_TOO_SMALL: "returns.errors.debtTooSmall",
       REFUND_SOURCE_NOT_FOUND: "payments.errors.refundSourceNotFound",
       REFUND_PROVIDER_NOT_CONFIGURED: "payments.errors.providerNotConfigured",
     };
@@ -755,18 +752,18 @@ export async function createReturnForUser(
         : null;
       if (gatewayPayment && !gatewayReference) throw new Error("REFUND_PROVIDER_NOT_CONFIGURED");
 
-      // Trừ nợ không vượt quá nợ hiện tại của khách
+      // Trừ toàn bộ tiền hoàn khỏi công nợ; số dư âm biểu thị cửa hàng đang nợ khách.
       let debtDelta = 0;
       if (v.refundMethod === "debt_deduct") {
         if (!order.customerId) throw new Error("DEBT_NEEDS_CUSTOMER");
         const [cust] = await tx
-          .select({ debt: customers.currentDebt })
+          .select({ id: customers.id })
           .from(customers)
           .where(and(eq(customers.storeId, storeId), eq(customers.id, order.customerId)))
           .limit(1)
           .for("update");
-        if (Number(cust.debt) < totalRefund - 1e-9) throw new Error("DEBT_TOO_SMALL");
-        debtDelta = -Math.min(Number(cust.debt), totalRefund);
+        if (!cust) throw new Error("DEBT_NEEDS_CUSTOMER");
+        debtDelta = -totalRefund;
       }
 
       const [ret] = await tx.insert(returns).values({
@@ -858,7 +855,7 @@ export async function createReturnForUser(
       if (order.customerId) {
         if (v.refundMethod === "debt_deduct") {
           await tx.update(customers).set({
-            currentDebt: sql`greatest(${customers.currentDebt} - ${toMoney(totalRefund)}, 0)`,
+            currentDebt: sql`${customers.currentDebt} - ${toMoney(totalRefund)}`,
             totalSpent: sql`greatest(${customers.totalSpent} - ${toMoney(totalRefund)}, 0)`,
           }).where(and(eq(customers.storeId, storeId), eq(customers.id, order.customerId)));
         } else {
@@ -943,7 +940,6 @@ export async function createReturnForUser(
       ITEM_NOT_IN_ORDER: "errors.invalidData",
       QTY_EXCEEDS: "returns.errors.qtyExceeds",
       DEBT_NEEDS_CUSTOMER: "returns.errors.debtNeedsCustomer",
-      DEBT_TOO_SMALL: "returns.errors.debtTooSmall",
       REFUND_SOURCE_NOT_FOUND: "payments.errors.refundSourceNotFound",
       REFUND_PROVIDER_NOT_CONFIGURED: "payments.errors.providerNotConfigured",
     };
@@ -1237,13 +1233,13 @@ export async function createPosReturn(
       if (v.refundMethod === "debt_deduct") {
         if (!customerId) throw new Error("DEBT_NEEDS_CUSTOMER");
         const [cust] = await tx
-          .select({ debt: customers.currentDebt })
+          .select({ id: customers.id })
           .from(customers)
           .where(and(eq(customers.storeId, gate.storeId), eq(customers.id, customerId)))
           .limit(1)
           .for("update");
-        if (!cust || Number(cust.debt) < totalRefund - 1e-9) throw new Error("DEBT_TOO_SMALL");
-        debtDelta = -Math.min(Number(cust.debt), totalRefund);
+        if (!cust) throw new Error("DEBT_NEEDS_CUSTOMER");
+        debtDelta = -totalRefund;
       }
 
       const [ret] = await tx.insert(returns).values({
@@ -1336,7 +1332,7 @@ export async function createPosReturn(
       if (customerId) {
         await tx.update(customers).set({
           currentDebt: v.refundMethod === "debt_deduct"
-            ? sql`greatest(${customers.currentDebt} - ${toMoney(totalRefund)}, 0)`
+            ? sql`${customers.currentDebt} - ${toMoney(totalRefund)}`
             : customers.currentDebt,
           totalSpent: sql`greatest(${customers.totalSpent} - ${toMoney(totalRefund)}, 0)`,
         }).where(and(eq(customers.storeId, gate.storeId), eq(customers.id, customerId)));
@@ -1402,7 +1398,6 @@ export async function createPosReturn(
       ORDER_CANCELLED: "returns.errors.orderCancelled",
       QTY_EXCEEDS: "returns.errors.qtyExceeds",
       DEBT_NEEDS_CUSTOMER: "returns.errors.debtNeedsCustomer",
-      DEBT_TOO_SMALL: "returns.errors.debtTooSmall",
     };
     if (known[msg]) return { ok: false, error: known[msg] };
     if (msg === "PRICE_BOOK_FORBIDDEN") return { ok: false, error: "errors.forbidden" };
