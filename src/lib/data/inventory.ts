@@ -362,6 +362,7 @@ const purchaseProductSelection = {
   sku: products.sku,
   baseUnit: products.baseUnit,
   costPrice: products.costPrice,
+  lastPurchasePrice: products.lastPurchasePrice,
   totalStock: products.totalStock,
   units: sql<{ unitName: string; multiplier: string; sku: string | null; barcode: string | null }[]>`coalesce((
     select json_agg(json_build_object('unitName', pu.unit_name, 'multiplier', pu.multiplier, 'sku', pu.sku, 'barcode', pu.barcode) order by pu.sort_order)
@@ -372,11 +373,14 @@ const purchaseProductSelection = {
 export async function getPurchaseProductRowsByIds(
   storeId: string,
   ids: string[],
-  { includeInactive = false }: { includeInactive?: boolean } = {},
+  { includeInactive = false, includeLastPurchasePrice = false }: {
+    includeInactive?: boolean;
+    includeLastPurchasePrice?: boolean;
+  } = {},
 ) {
   const uniqueIds = [...new Set(ids)].filter(Boolean);
   if (uniqueIds.length === 0) return [];
-  return db
+  const rows = await db
     .select(purchaseProductSelection)
     .from(products)
     .where(
@@ -389,12 +393,19 @@ export async function getPurchaseProductRowsByIds(
         ),
     )
     .orderBy(asc(products.name));
+  return includeLastPurchasePrice
+    ? rows
+    : rows.map((product) => ({ ...product, lastPurchasePrice: null }));
 }
 
-export async function searchPurchaseProductRows(storeId: string, q: string) {
+export async function searchPurchaseProductRows(
+  storeId: string,
+  q: string,
+  { includeLastPurchasePrice = false }: { includeLastPurchasePrice?: boolean } = {},
+) {
   if (!q.trim()) return [];
   const term = q.trim();
-  return db
+  const rows = await db
     .select(purchaseProductSelection)
     .from(products)
     .where(and(
@@ -404,5 +415,8 @@ export async function searchPurchaseProductRows(storeId: string, q: string) {
     ))
     .orderBy(asc(products.name))
     .limit(30);
+  return includeLastPurchasePrice
+    ? rows
+    : rows.map((product) => ({ ...product, lastPurchasePrice: null }));
 }
 export type PurchaseProductRow = Awaited<ReturnType<typeof searchPurchaseProductRows>>[number];

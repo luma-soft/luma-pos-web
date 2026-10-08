@@ -14,6 +14,7 @@ export function catalogItemToPurchaseProduct(
     sku: product.sku,
     baseUnit: product.baseUnit,
     costPrice: product.costPrice ?? "0",
+    lastPurchasePrice: product.lastPurchasePrice ?? null,
     totalStock: String(product.warehouseStock.reduce(
       (total, stock) => total + Number(stock.quantity),
       0,

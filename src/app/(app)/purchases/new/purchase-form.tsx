@@ -175,7 +175,8 @@ function productToLine(
   p: PurchaseProductRow,
   seed?: PurchaseFormInitialValues["items"][number]
 ): Line {
-  const baseCost = Number(p.costPrice) || 0;
+  // Start from the latest receipt gross price; average cost is only a fallback.
+  const baseCost = Number(p.lastPurchasePrice ?? p.costPrice) || 0;
   const units: PUnit[] = (p.units ?? []).map((u) => ({ unitName: u.unitName, multiplier: Number(u.multiplier) || 1 }));
   return {
     productId: p.id,
@@ -556,7 +557,7 @@ export function PurchaseForm({
                           inputLabel={t("common.productQuantity", { product: product.name })}
                         />
                       </div>
-                    ) : <span className="shrink-0 text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.costPrice ?? 0))}/{product.baseUnit}</span>}
+                    ) : <span className="shrink-0 text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.lastPurchasePrice ?? product.costPrice ?? 0))}/{product.baseUnit}</span>}
                   />
                 )}
               />

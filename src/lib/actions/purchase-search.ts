@@ -4,6 +4,7 @@ import { positiveQuantityOrDefault } from "@/lib/quantity";
 import { getPurchaseProductRowsByIds, searchPurchaseProductRows, type PurchaseProductRow } from "@/lib/data/inventory";
 import { resolveAiProductUnit } from "@/lib/ai/entity-matching";
 import { requireStockAccess } from "./common";
+import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 
 export type PurchaseDraftProductLookup = {
   productId?: string | null;
@@ -71,7 +72,9 @@ export async function searchPurchaseProducts(q: string): Promise<PurchaseProduct
   if (!q.trim()) return [];
   const gate = await requireStockAccess();
   if (!gate.ok) return [];
-  return searchPurchaseProductRows(gate.storeId, q.trim());
+  return searchPurchaseProductRows(gate.storeId, q.trim(), {
+    includeLastPurchasePrice: canViewPurchasePrices(gate.role),
+  });
 }
 
 export async function getPurchaseProductsByIds(ids: string[]): Promise<PurchaseProductRow[]> {
@@ -79,7 +82,9 @@ export async function getPurchaseProductsByIds(ids: string[]): Promise<PurchaseP
   if (safeIds.length === 0) return [];
   const gate = await requireStockAccess();
   if (!gate.ok) return [];
-  return getPurchaseProductRowsByIds(gate.storeId, safeIds);
+  return getPurchaseProductRowsByIds(gate.storeId, safeIds, {
+    includeLastPurchasePrice: canViewPurchasePrices(gate.role),
+  });
 }
 
 export async function resolvePurchaseDraftProducts(
@@ -92,13 +97,18 @@ export async function resolvePurchaseDraftProducts(
   const ids = items
     .map((item) => textValue(item.productId))
     .filter((id) => UUID_RE.test(id));
-  const byId = new Map((await getPurchaseProductRowsByIds(storeId, ids)).map((product) => [product.id, product]));
+  const canViewLastPurchasePrice = canViewPurchasePrices(gate.role);
+  const byId = new Map((await getPurchaseProductRowsByIds(storeId, ids, {
+    includeLastPurchasePrice: canViewLastPurchasePrice,
+  })).map((product) => [product.id, product]));
 
   const resolvedByQuery = new Map<string, PurchaseProductRow | null>();
   async function resolveByQuery(query: string, mode: "sku" | "name") {
     const key = `${mode}:${normalize(query)}`;
     if (resolvedByQuery.has(key)) return resolvedByQuery.get(key) ?? null;
-    const rows = await searchPurchaseProductRows(storeId, query);
+    const rows = await searchPurchaseProductRows(storeId, query, {
+      includeLastPurchasePrice: canViewLastPurchasePrice,
+    });
     const normalized = normalize(query);
     const exact = rows.find((product) =>
       mode === "sku"

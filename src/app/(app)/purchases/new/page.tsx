@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getPurchase, getPurchaseFormOptions, getPurchaseProductRowsByIds } from "@/lib/data/inventory";
 import { PurchaseForm } from "./purchase-form";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 
 export const dynamic = "force-dynamic"; // không prerender (query DB lúc build → timeout)
 
@@ -46,7 +47,10 @@ export default async function NewPurchasePage({ searchParams }: Props) {
   const [options, initialProducts] = await Promise.all([
     getPurchaseFormOptions(context.storeId),
     seedProductIds.length > 0
-      ? getPurchaseProductRowsByIds(context.storeId, seedProductIds, { includeInactive: Boolean(source) })
+      ? getPurchaseProductRowsByIds(context.storeId, seedProductIds, {
+          includeInactive: Boolean(source),
+          includeLastPurchasePrice: canViewPurchasePrices(context.role),
+        })
       : Promise.resolve([]),
   ]);
   const productsById = new Map(initialProducts.map((product) => [product.id, product]));

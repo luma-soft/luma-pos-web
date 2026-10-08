@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getPurchase, getPurchaseFormOptions, getPurchaseProductRowsByIds } from "@/lib/data/inventory";
 import { PurchaseForm } from "../../new/purchase-form";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,10 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
     getPurchaseProductRowsByIds(
       context.storeId,
       purchase.items.map((i) => i.productId),
-      { includeInactive: true },
+      {
+        includeInactive: true,
+        includeLastPurchasePrice: canViewPurchasePrices(context.role),
+      },
     ),
   ]);
 
