@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
   customerConsents,
@@ -8,6 +8,7 @@ import {
   orders,
   payments,
   profiles,
+  purchaseOrders,
   returnItems,
   returns,
   suppliers,
@@ -640,15 +641,41 @@ export async function getSuppliers(storeId: string, filters: { q?: string; owing
   else if (filters.owing === "clear") conditions.push(sql`${suppliers.currentDebt} <= 0`);
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [rows, [{ total }], [{ totalDebt }]] = await Promise.all([
-    db.select().from(suppliers).where(where)
+  const purchaseStatusWhere = and(
+    ...conditions,
+    eq(purchaseOrders.storeId, storeId),
+    eq(purchaseOrders.status, "received"),
+  );
+  const [rows, [{ total }], [{ totalDebt }], [{ totalPurchase }]] = await Promise.all([
+    db.select({
+      ...getTableColumns(suppliers),
+      totalPurchase: sql<string>`coalesce((
+        select sum(${purchaseOrders.total})
+        from ${purchaseOrders}
+        where ${purchaseOrders.supplierId} = ${suppliers.id}
+          and ${purchaseOrders.storeId} = ${storeId}
+          and ${purchaseOrders.status} = 'received'
+      ), 0)::text`,
+    }).from(suppliers).where(where)
       .orderBy(desc(suppliers.currentDebt), desc(suppliers.createdAt))
       .limit(size).offset((page - 1) * size),
     db.select({ total: count() }).from(suppliers).where(where),
     db.select({ totalDebt: sql<string>`coalesce(sum(${suppliers.currentDebt}), 0)` }).from(suppliers).where(where),
+    db.select({ totalPurchase: sql<string>`coalesce(sum(${purchaseOrders.total}), 0)` })
+      .from(purchaseOrders)
+      .innerJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+      .where(purchaseStatusWhere),
   ]);
 
-  return { rows, total, totalDebt: Number(totalDebt), page, pageSize: size, pageCount: Math.max(1, Math.ceil(total / size)) };
+  return {
+    rows,
+    total,
+    totalDebt: Number(totalDebt),
+    totalPurchase: Number(totalPurchase),
+    page,
+    pageSize: size,
+    pageCount: Math.max(1, Math.ceil(total / size)),
+  };
 }
 
 export type CustomerDetail = NonNullable<Awaited<ReturnType<typeof getCustomer>>>;

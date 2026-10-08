@@ -3344,6 +3344,7 @@
     "empty": "No suppliers yet",
     "cols": {
       "name": "Supplier",
+      "totalPurchase": "Total purchases",
       "debt": "Payable"
     },
     "fields": {

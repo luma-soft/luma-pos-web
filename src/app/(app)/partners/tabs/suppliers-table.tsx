@@ -107,6 +107,7 @@ async function loadSupplierPreview(id: string, signal: AbortSignal): Promise<Sup
 export function SuppliersTable({
   rows,
   totalDebt,
+  totalPurchase,
   query,
   owing,
   pageSize,
@@ -115,6 +116,7 @@ export function SuppliersTable({
 }: {
   rows: SupplierRow[];
   totalDebt: number;
+  totalPurchase: number;
   query: string;
   owing: SupplierDebtFilter;
   pageSize: number;
@@ -164,6 +166,14 @@ export function SuppliersTable({
     { key: "code", label: t("customers.cols.code"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.code}</span> },
     { key: "phone", label: t("customers.cols.phone"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.phone ?? "—"}</span> },
     { key: "tax", label: t("customers.fields.taxCode"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.taxCode ?? "—"}</span> },
+    {
+      key: "totalPurchase",
+      label: t("suppliers.cols.totalPurchase"),
+      defaultVisible: true,
+      align: "right",
+      width: "180px",
+      render: (row) => formatCurrency(Number(row.totalPurchase)),
+    },
     {
       key: "debt",
       label: t("suppliers.cols.debt"),
@@ -250,8 +260,11 @@ export function SuppliersTable({
         rows={rows}
         columns={columns}
         getRowId={(row) => row.id}
-        minWidth="860px"
-        summaryCells={[{ key: "debt", content: formatCurrency(totalDebt) }]}
+        minWidth="1040px"
+        summaryCells={[
+          { key: "totalPurchase", content: formatCurrency(totalPurchase) },
+          { key: "debt", content: formatCurrency(totalDebt) },
+        ]}
         empty={(
           <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
             <Truck className="mx-auto mb-3 h-10 w-10 opacity-60" />
@@ -291,6 +304,7 @@ export function SuppliersTable({
         onRowClick={openSupplier}
         renderMobileRow={({ row }) => {
           const debt = Number(row.currentDebt);
+          const purchase = Number(row.totalPurchase);
           return (
             <article className="w-full p-3 text-left min-h-11">
               <div className="flex items-start justify-between gap-3">
@@ -298,7 +312,14 @@ export function SuppliersTable({
                   <div className="truncate font-semibold"><PartnerDetailLink kind="supplier" partnerId={row.id} name={row.name} /></div>
                   <button type="button" onClick={() => openSupplier(row)} className="inline-flex min-h-11 min-w-11 items-center text-xs text-slate-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{row.phone ?? row.code ?? t("suppliers.title")}</button>
                 </div>
-                {debt > 0 ? <span className="shrink-0 text-sm font-semibold tabular-nums text-warn">{formatCurrency(debt)}</span> : <span className="text-slate-300">—</span>}
+                <div className="shrink-0 space-y-1 text-right">
+                  <div className="text-xs text-slate-500">
+                    {t("suppliers.cols.totalPurchase")} <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-200">{formatCurrency(purchase)}</span>
+                  </div>
+                  <div className={cn("text-xs tabular-nums", debt > 0 ? "font-semibold text-warn" : "text-slate-400")}>
+                    {t("suppliers.cols.debt")} {debt > 0 ? formatCurrency(debt) : "—"}
+                  </div>
+                </div>
               </div>
             </article>
           );

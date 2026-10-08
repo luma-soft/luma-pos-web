@@ -3344,6 +3344,7 @@
     "empty": "Chưa có nhà cung cấp nào",
     "cols": {
       "name": "Nhà cung cấp",
+      "totalPurchase": "Tổng mua",
       "debt": "Nợ phải trả"
     },
     "fields": {

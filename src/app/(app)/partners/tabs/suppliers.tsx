@@ -18,7 +18,7 @@ export async function SuppliersTab({ searchParams }: { searchParams: SP }) {
   const pageSize = parsePageSize(params.size);
   const owing: Owing = OWING.includes(params.owing as Owing) ? (params.owing as Owing) : "";
   const detailSupplierId = params.detailSupplierId || null;
-  const [{ rows, total, totalDebt, pageCount }, detailSupplier] = await Promise.all([
+  const [{ rows, total, totalDebt, totalPurchase, pageCount }, detailSupplier] = await Promise.all([
     getSuppliers(context.storeId, { q: params.q, owing: owing === "" ? undefined : owing, page, pageSize }),
     detailSupplierId && z.uuid().safeParse(detailSupplierId).success ? getSupplier(context.storeId, detailSupplierId) : null,
   ]);
@@ -29,6 +29,7 @@ export async function SuppliersTab({ searchParams }: { searchParams: SP }) {
         key={detailSupplierId ?? "suppliers"}
         rows={rows}
         totalDebt={totalDebt}
+        totalPurchase={totalPurchase}
         query={params.q ?? ""}
         owing={owing}
         pageSize={pageSize}
