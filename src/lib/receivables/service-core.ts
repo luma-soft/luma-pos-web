@@ -37,7 +37,7 @@ export type ReceivableEntryInput = {
   amount?: number;
   targetDebt?: number;
   type: "adjustment_debit" | "adjustment_credit" | "settlement_discount";
-  reason: string;
+  reason?: string;
   clientRequestId: string;
   reference?: string;
   note?: string;
@@ -219,7 +219,9 @@ export async function createCustomerReceivableEntry(
 ): Promise<ReceivableResult<{ entryId: string; replayed: boolean; notificationEventId?: string }>> {
   const requestedAmount = input.amount == null ? Number.NaN : money(input.amount);
   const targetDebt = input.targetDebt == null ? null : money(input.targetDebt);
-  if (!input.customerId || !validRequestId(input.clientRequestId) || !input.reason.trim() ||
+  const reason = input.reason?.trim() ?? "";
+  if (!input.customerId || !validRequestId(input.clientRequestId) ||
+    (input.type === "settlement_discount" && !reason) ||
     (targetDebt == null && (!Number.isFinite(requestedAmount) || requestedAmount === 0)) ||
     (targetDebt != null && !Number.isFinite(targetDebt)) ||
     !["adjustment_debit", "adjustment_credit", "settlement_discount"].includes(input.type) ||
@@ -248,7 +250,7 @@ export async function createCustomerReceivableEntry(
       const [entry] = await tx.insert(customerReceivableEntries).values({
         storeId: actor.storeId,
         code: generateCode(entryType === "settlement_discount" ? "CKTT" : "DCN"), customerId: input.customerId,
-        orderId: input.orderId || null, type: entryType, amount: amount.toFixed(2), reason: input.reason.trim(),
+        orderId: input.orderId || null, type: entryType, amount: amount.toFixed(2), reason,
         reference: input.reference?.trim() || null, note: input.note?.trim() || null,
         clientRequestId: input.clientRequestId.trim(), createdBy: actor.profileId, approvedBy: actor.profileId,
       }).returning({ id: customerReceivableEntries.id, code: customerReceivableEntries.code });
@@ -258,7 +260,7 @@ export async function createCustomerReceivableEntry(
         storeId: actor.storeId, actorId: actor.profileId,
         action: "customer.receivable.adjusted", entityType: "customer_receivable_entry", entityId: entry.id,
         before: { currentDebt: Number(customer.currentDebt) },
-        after: { code: entry.code, customerName: customer.name, amount, targetDebt: targetDebt ?? undefined, type: entryType, reason: input.reason.trim(), currentDebt: money(Number(customer.currentDebt) + amount) },
+        after: { code: entry.code, customerName: customer.name, amount, targetDebt: targetDebt ?? undefined, type: entryType, reason: reason || undefined, currentDebt: money(Number(customer.currentDebt) + amount) },
         affectedRecords: [{ type: "customer", id: customer.id, code: customer.code, name: customer.name }],
       });
       const notification = await createDebtChangedEventInTx(tx, {

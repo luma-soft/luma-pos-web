@@ -44,7 +44,7 @@ export type SupplierPayableEntryInput = {
   /** Legacy delta semantics. Prefer targetDebt for adjustments. */
   amount?: number;
   targetDebt?: number;
-  reason: string;
+  reason?: string;
   clientRequestId: string;
   reference?: string;
   note?: string;
@@ -322,9 +322,9 @@ export async function createSupplierPayableEntry(
 ): Promise<PayableResult<{ entryId: string; replayed: boolean; notificationEventId?: string }>> {
   const requestedAmount = input.amount == null ? Number.NaN : money(input.amount);
   const targetDebt = input.targetDebt == null ? null : money(input.targetDebt);
+  const reason = input.reason?.trim() ?? "";
   if (
     !input.supplierId || !validRequestId(input.clientRequestId) ||
-    !input.reason.trim() ||
     (targetDebt == null && (!Number.isFinite(requestedAmount) || requestedAmount === 0)) ||
     (targetDebt != null && !Number.isFinite(targetDebt))
   ) return { ok: false, error: "errors.invalidData" };
@@ -361,7 +361,7 @@ export async function createSupplierPayableEntry(
         if (
           existing.supplierId !== input.supplierId ||
           Math.abs(Number(existing.amount) - amount) > 1e-9 ||
-          existing.reason !== input.reason.trim() ||
+          existing.reason !== reason ||
           existing.purchaseOrderId !== (input.purchaseOrderId || null) ||
           existing.reference !== (input.reference?.trim() || null) ||
           existing.note !== (input.note?.trim() || null)
@@ -396,7 +396,7 @@ export async function createSupplierPayableEntry(
           purchaseOrderId: input.purchaseOrderId || null,
           type,
           amount: amount.toFixed(2),
-          reason: input.reason.trim(),
+          reason,
           reference: input.reference?.trim() || null,
           note: input.note?.trim() || null,
           clientRequestId: input.clientRequestId.trim(),
@@ -423,7 +423,7 @@ export async function createSupplierPayableEntry(
           targetDebt: targetDebt ?? undefined,
           currentDebt: money(Number(supplier.currentDebt) + amount),
           amount,
-          reason: input.reason.trim(),
+          reason: reason || undefined,
         },
         affectedRecords: [
           { type: "supplier", id: input.supplierId, code: supplier.code, name: supplier.name },

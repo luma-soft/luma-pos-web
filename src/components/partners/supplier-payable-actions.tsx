@@ -170,7 +170,7 @@ function SupplierAdjustmentDialog({
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const [clientRequestId] = useState(() => requestId("web-supplier-payable-entry"));
-  const valid = amount != null && amount !== currentDebt && reason.trim().length > 0;
+  const valid = amount != null && amount !== currentDebt;
 
   function submit() {
     if (!valid || pending || amount == null) return;
@@ -202,7 +202,7 @@ function SupplierAdjustmentDialog({
           <span className="mt-1 block text-xs text-slate-500">Nhập số âm nếu nhà cung cấp đang có số dư/trả trước.</span>
         </label>
         <label className="block text-sm font-medium">
-          Lý do
+          Lý do (không bắt buộc)
           <textarea value={reason} maxLength={200} onChange={(event) => setReason(event.target.value)} className="mt-1 min-h-24 w-full rounded-lg border border-border p-2" />
           <span className="mt-1 block text-right text-xs text-slate-400">{reason.length}/200</span>
         </label>
