@@ -735,6 +735,7 @@ export async function getProduct(storeId: string, id: string) {
     }
   }
   return { ...product, description, relatedProductId: listRow?.relatedProductId ?? null,
+    lastPurchasePrice: listRow?.lastPurchasePrice ?? null,
     variantGroup: listRow?.variantGroup, combinationKey: listRow?.combinationKey, optionValueIds: listRow?.optionValueIds };
 }
 export type ProductDetail = NonNullable<Awaited<ReturnType<typeof getProduct>>>;
