@@ -24,6 +24,7 @@ import {
 } from "@/components/partners/partner-debt-filter";
 
 type SupplierRow = Awaited<ReturnType<typeof getSuppliers>>["rows"][number];
+type SupplierSelectionRow = Pick<SupplierRow, "id" | "name" | "code" | "currentDebt">;
 type SupplierDetailTab = "info" | "history" | "debt";
 type SupplierPreview = {
   supplier: {
@@ -121,7 +122,7 @@ export function SuppliersTable({
   owing: SupplierDebtFilter;
   pageSize: number;
   initialDetailId?: string | null;
-  initialDetailSupplier?: SupplierRow | null;
+  initialDetailSupplier?: SupplierSelectionRow | null;
 }) {
   const t = useTranslations();
   const router = useRouter();
