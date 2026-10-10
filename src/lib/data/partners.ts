@@ -641,6 +641,18 @@ export async function getSuppliers(storeId: string, filters: { q?: string; owing
   else if (filters.owing === "clear") conditions.push(sql`${suppliers.currentDebt} <= 0`);
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
+  const purchaseTotals = db.select({
+    supplierId: purchaseOrders.supplierId,
+    total: sql<string>`sum(${purchaseOrders.total})`.as("total"),
+  })
+    .from(purchaseOrders)
+    .where(and(
+      eq(purchaseOrders.storeId, storeId),
+      eq(purchaseOrders.status, "received"),
+    ))
+    .groupBy(purchaseOrders.supplierId)
+    .as("supplier_purchase_totals");
+
   const purchaseStatusWhere = and(
     ...conditions,
     eq(purchaseOrders.storeId, storeId),
@@ -649,14 +661,10 @@ export async function getSuppliers(storeId: string, filters: { q?: string; owing
   const [rows, [{ total }], [{ totalDebt }], [{ totalPurchase }]] = await Promise.all([
     db.select({
       ...getTableColumns(suppliers),
-      totalPurchase: sql<string>`coalesce((
-        select sum(${purchaseOrders.total})
-        from ${purchaseOrders}
-        where ${purchaseOrders.supplierId} = ${suppliers.id}
-          and ${purchaseOrders.storeId} = ${storeId}
-          and ${purchaseOrders.status} = 'received'
-      ), 0)::text`,
-    }).from(suppliers).where(where)
+      totalPurchase: sql<string>`coalesce(${purchaseTotals.total}, 0)::text`,
+    }).from(suppliers)
+      .leftJoin(purchaseTotals, eq(purchaseTotals.supplierId, suppliers.id))
+      .where(where)
       .orderBy(desc(suppliers.currentDebt), desc(suppliers.createdAt))
       .limit(size).offset((page - 1) * size),
     db.select({ total: count() }).from(suppliers).where(where),
