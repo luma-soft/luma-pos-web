@@ -27,6 +27,8 @@ import { CategoriesManager } from "../../products/categories/categories-manager"
 import { ProductCatalogSwitcher } from "./product-catalog-switcher";
 import { ListSearchFilterBar } from "@/components/list-search-filter";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
+import { parsePriceComparisonParams } from "@/lib/pricing/price-comparison";
 import { getPublicMediaConfig } from "@/lib/media/config";
 import { ProductModalFrame } from "@/components/product-modal-frame";
 import {
@@ -101,19 +103,21 @@ async function ProductsToolbar({
   brands,
   suppliers,
   resultCount,
+  showPriceComparison,
 }: {
   params: SP;
   categories: Awaited<ReturnType<typeof getProductFormOptions>>["categories"];
   brands: Awaited<ReturnType<typeof getProductFormOptions>>["brands"];
   suppliers: Awaited<ReturnType<typeof getProductFormOptions>>["suppliers"];
   resultCount: number;
+  showPriceComparison: boolean;
 }) {
   const t = await getTranslations();
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
       <ListSearchFilterBar
         search={<InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
-        filter={<InventoryFilterDrawer title="Bộ lọc sản phẩm" values={params} resultCount={resultCount} defaultSort={DEFAULT_PRODUCT_LIST_SORT} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort", "view"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
+        filter={<InventoryFilterDrawer title="Bộ lọc sản phẩm" values={params} resultCount={resultCount} defaultSort={DEFAULT_PRODUCT_LIST_SORT} showPriceComparison={showPriceComparison} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort", "view", "price"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
       />
       <ProductCreateMenu
         label={t("products.createNew")}
@@ -259,6 +263,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
   const pageSize = parsePageSize(params.size);
   const status: Status = STATUSES.includes(params.status as Status) ? (params.status as Status) : "active";
   const view: View = VIEWS.includes(params.view as View) ? (params.view as View) : "grouped";
+  const showPriceComparison = canViewPurchasePrices(context.role);
 
   const { rows, total, pageCount } = await getProducts(context.storeId, {
     q: params.q,
@@ -274,6 +279,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
     pageSize,
     productSkus: cameraMaterials ? [...CAMERA_QUOTE_MATERIAL_SKUS, ...CAMERA_QUOTE_DETAIL_MATERIAL_SKUS] : undefined,
     cameraMaterial: cameraMaterials,
+    ...(showPriceComparison ? parsePriceComparisonParams(params) : {}),
   });
 
   return (
@@ -285,7 +291,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
           <p className="mt-0.5 text-xs font-medium text-slate-500">{total.toLocaleString("vi-VN")} SKU</p>
         </div>
       )}
-      {!cameraMaterials && <ProductsToolbar params={params} categories={categories} brands={brands} suppliers={suppliers} resultCount={total} />}
+      {!cameraMaterials && <ProductsToolbar params={params} categories={categories} brands={brands} suppliers={suppliers} resultCount={total} showPriceComparison={showPriceComparison} />}
       <ProductsTable
         rows={rows}
         grouped={view === "grouped" && !cameraMaterials}

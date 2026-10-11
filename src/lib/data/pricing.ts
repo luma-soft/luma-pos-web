@@ -28,6 +28,7 @@ import {
 } from "@/lib/pricing/pricing-policy";
 import { pricingStockCondition } from "@/lib/data/pricing-stock";
 import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
+import { priceComparisonCondition, type PriceComparison } from "@/lib/pricing/price-comparison";
 import { recentProductSaleOrder } from "@/lib/data/recent-product-sales";
 import {
   productCompatibilityImageUrls,
@@ -35,7 +36,7 @@ import {
   type ProductManagedImageDescriptor,
 } from "@/lib/products/product-media-read";
 
-export interface PricingQuery {
+export interface PricingQuery extends PriceComparison {
   q?: string;
   categoryIds?: string[];
   brandIds?: string[];
@@ -172,6 +173,16 @@ export function pricingFilterCondition(storeId: string, query: PricingQuery = {}
   } else if (query.stock === "unmanaged") {
     conditions.push(eq(products.productKind, "service"));
   }
+  const priceCondition = priceComparisonCondition(
+    storeId,
+    query,
+    {
+      id: products.id,
+      retailPrice: products.retailPrice,
+      costPrice: products.costPrice,
+    },
+  );
+  if (priceCondition) conditions.push(priceCondition);
   return and(...conditions)!;
 }
 

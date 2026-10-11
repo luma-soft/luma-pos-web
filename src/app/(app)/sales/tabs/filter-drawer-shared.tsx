@@ -210,6 +210,7 @@ export function LumaWebPicker({
           open={open}
           anchorRef={triggerRef}
           onDismiss={() => setOpen(false)}
+          data-luma-picker-surface={name}
           side="bottom"
           matchAnchorWidth
           maxMenuHeight={288}
@@ -575,6 +576,7 @@ export function LumaEntityPicker({
         open={open}
         anchorRef={triggerRef}
         onDismiss={() => setOpen(false)}
+        data-luma-picker-surface={name}
         side="bottom"
         matchAnchorWidth
         maxMenuHeight={360}

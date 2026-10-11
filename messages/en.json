@@ -3527,6 +3527,20 @@
   },
   "inventory": {
     "title": "Inventory",
+    "priceFilter": {
+      "title": "Selling price",
+      "condition": "Comparison condition",
+      "against": "Compare against",
+      "chooseCondition": "Choose a condition",
+      "chooseAgainst": "Choose a reference price",
+      "lt": "Less than",
+      "lte": "Less than or equal to",
+      "eq": "Equal to",
+      "gte": "Greater than or equal to",
+      "gt": "Greater than",
+      "cost": "Cost price",
+      "lastPurchase": "Last purchase price"
+    },
     "warehouseTab": "Warehouse",
     "cameraMaterials": "Camera materials",
     "totalValue": "Stock value",

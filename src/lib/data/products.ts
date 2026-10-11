@@ -25,6 +25,10 @@ import {
 } from "@/db/schema";
 import { catalogProductSearchCondition } from "@/lib/search";
 import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
+import {
+  priceComparisonCondition,
+  type PriceComparison,
+} from "@/lib/pricing/price-comparison";
 import { coercePageSize, DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import {
   hasProductComplianceColumns,
@@ -51,7 +55,7 @@ export const PRODUCTS_PAGE_SIZE = 20;
 export type ProductStatusFilter = "active" | "inactive" | "draft" | "archived" | "all";
 export type ProductListView = "grouped" | "flat";
 
-export interface ProductListFilters {
+export interface ProductListFilters extends PriceComparison {
   exactProductId?: string;
   q?: string;
   categoryId?: string;
@@ -131,6 +135,16 @@ function productFilterPredicate(alias: "member" | "products", storeId: string, f
     if (ids?.length) conditions.push(inArray(field(column), [...ids]));
   }
   if (filters.productKind) conditions.push(sql`${field("product_kind")} = ${filters.productKind}`);
+  const priceCondition = priceComparisonCondition(
+    storeId,
+    filters,
+    {
+      id: field("id"),
+      retailPrice: field("retail_price"),
+      costPrice: field("cost_price"),
+    },
+  );
+  if (priceCondition) conditions.push(priceCondition);
   const quantity = sql`coalesce((select sum(filter_stock.quantity) from stock_levels filter_stock
     where filter_stock.store_id = ${storeId} and filter_stock.product_id = ${field("id")}
       ${filters.warehouseId ? sql`and filter_stock.warehouse_id = ${filters.warehouseId}` : sql``}), 0)`;

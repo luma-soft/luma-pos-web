@@ -11,7 +11,13 @@ export const priceFormulaFiltersSchema = z.object({
   productKind: z.enum(["all", "variant", "product", "service", "combo"]).optional(),
   lifecycle: z.enum(["all", "active", "paused", "draft", "archived"]).optional(),
   warehouseId: z.uuid().optional(),
-}).strict();
+  priceBookId: z.uuid().optional(),
+  priceCondition: z.enum(["lt", "lte", "eq", "gte", "gt"]).optional(),
+  priceAgainst: z.enum(["cost", "lastPurchase"]).optional(),
+}).strict().refine(
+  (filters) => Boolean(filters.priceCondition) === Boolean(filters.priceAgainst),
+  { path: ["priceAgainst"], message: "errors.invalidData" },
+);
 export type PriceFormulaFilters = z.infer<typeof priceFormulaFiltersSchema>;
 export type PriceUnit = { id?: string; unitName: string; multiplier: number; priceOverride: number | null };
 export type PriceEditProduct = { baseUnit: string; retailPrice: number; units: PriceUnit[] };

@@ -37,9 +37,14 @@ type Field =
   | "department"
   | "brand"
   | "kind"
-  | "sort";
+  | "sort"
+  | "price"
+  | "priceBookId"
+  | "priceCondition"
+  | "priceAgainst";
 
-type FilterDraft = Record<Field | "from" | "to", string>;
+type DraftField = Exclude<Field, "price">;
+type FilterDraft = Record<DraftField | "from" | "to", string>;
 
 type Props = {
   title: string;
@@ -48,6 +53,7 @@ type Props = {
   resultCount?: number;
   resultLabel?: string;
   countEndpoint?: string;
+  showPriceComparison?: boolean;
   defaultSort?: string;
   categories?: Option[];
   warehouses?: Option[];
@@ -85,6 +91,7 @@ export function InventoryFilterDrawer({
   resultCount: initialResultCount,
   resultLabel = "sản phẩm",
   countEndpoint,
+  showPriceComparison = false,
   defaultSort = "",
   categories = [],
   warehouses = [],
@@ -125,6 +132,9 @@ export function InventoryFilterDrawer({
       brand: values.brandId ?? "",
       kind: values.productKind ?? "",
       sort: values.sort ?? defaultSort,
+      priceCondition: values.priceCondition ?? "",
+      priceAgainst: values.priceAgainst ?? "",
+      priceBookId: values.priceBookId ?? "",
     }),
     [defaultSort, fields, values],
   );
@@ -148,12 +158,15 @@ export function InventoryFilterDrawer({
       : "";
   const active = Object.entries(draft).filter(([key, value]) =>
     key !== "view" &&
+    key !== "priceCondition" &&
+    key !== "priceAgainst" &&
+    key !== "priceBookId" &&
     key !== "from" &&
     key !== "to" &&
     Boolean(value) &&
     !(key === "time" && value === "all") &&
     !(key === "sort" && value === defaultSort),
-  ).length;
+  ).length + (showPriceComparison && draft.priceCondition && draft.priceAgainst ? 1 : 0);
 
   const close = useCallback(() => {
     setDraft(initial);
@@ -197,8 +210,10 @@ export function InventoryFilterDrawer({
     if (!open || !activeCountEndpoint || customDateError) return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
+      const isPricingCount = activeCountEndpoint.includes("/pricing/count");
+      const isProductCount = isPricingCount || activeCountEndpoint.includes("/products/count");
       const query = new URLSearchParams(
-        activeCountEndpoint.includes("products")
+        isProductCount
           ? {
               q: params.get("q") ?? "",
               categoryId: draft.category,
@@ -209,6 +224,13 @@ export function InventoryFilterDrawer({
               stock: draft.stock,
               sort: draft.sort,
               view: draft.view,
+              ...(showPriceComparison && draft.priceCondition && draft.priceAgainst
+                ? {
+                    priceCondition: draft.priceCondition,
+                    priceAgainst: draft.priceAgainst,
+                    priceBookId: draft.priceBookId,
+                  }
+                : {}),
             }
           : isInternalUseFilter
             ? {
@@ -251,13 +273,13 @@ export function InventoryFilterDrawer({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [activeCountEndpoint, customDateError, draft, isInternalUseFilter, open, params, range.from, range.to]);
+  }, [activeCountEndpoint, customDateError, draft, isInternalUseFilter, open, params, range.from, range.to, showPriceComparison]);
 
-  function update(field: Field, value: string) {
+  function update(field: DraftField, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
   }
 
-  function optionLabel(field: Field, options: Option[]) {
+  function optionLabel(field: DraftField, options: Option[]) {
     const value = draft[field];
     return entityLabels[field] ?? options.find((option) => option.value === value)?.label ?? "";
   }
@@ -287,7 +309,7 @@ export function InventoryFilterDrawer({
     );
   }
 
-  function picker(field: Field, label: string, options: Option[]) {
+  function picker(field: DraftField, label: string, options: Option[]) {
     return (
       <LumaWebPicker
         ariaLabel={label}
@@ -318,6 +340,9 @@ export function InventoryFilterDrawer({
       brand: "",
       kind: "",
       sort: defaultSort,
+      priceCondition: "",
+      priceAgainst: "",
+      priceBookId: initial.priceBookId,
     });
     setEntityLabels({});
   }
@@ -342,6 +367,8 @@ export function InventoryFilterDrawer({
       "brandId",
       "productKind",
       "sort",
+      "priceCondition",
+      "priceAgainst",
     ]) next.delete(key);
     const map: Record<string, string> = {
       category: draft.category,
@@ -369,6 +396,10 @@ export function InventoryFilterDrawer({
       ) {
         next.set(key, value);
       }
+    }
+    if (showPriceComparison && draft.priceCondition && draft.priceAgainst) {
+      next.set("priceCondition", draft.priceCondition);
+      next.set("priceAgainst", draft.priceAgainst);
     }
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
     setOpen(false);
@@ -433,6 +464,26 @@ export function InventoryFilterDrawer({
               {fields.includes("sort") && <section><h3 className="mb-3 font-bold">Sắp xếp</h3>{picker("sort", "Sắp xếp", [all, { value: "name", label: "Tên sản phẩm" }, { value: "stock", label: "Tồn kho" }, { value: "updated", label: "Cập nhật gần nhất" }])}</section>}
               {fields.includes("view") && <section><h3 className="mb-3 font-bold">Hiển thị</h3>{picker("view", "Hiển thị", [{ value: "grouped", label: "Nhóm sản phẩm" }, { value: "flat", label: "Danh sách phẳng" }])}</section>}
               {fields.includes("stock") && <section><h3 className="mb-3 font-bold">Tình trạng tồn</h3>{picker("stock", "Tình trạng tồn", stockOptions)}</section>}
+              {showPriceComparison && fields.includes("price") && (
+                <section>
+                  <h3 className="mb-3 font-bold">{t("inventory.priceFilter.title")}</h3>
+                  <div className="space-y-3">
+                    {picker("priceCondition", t("inventory.priceFilter.condition"), [
+                      { value: "", label: t("inventory.priceFilter.chooseCondition") },
+                      { value: "lt", label: t("inventory.priceFilter.lt") },
+                      { value: "lte", label: t("inventory.priceFilter.lte") },
+                      { value: "eq", label: t("inventory.priceFilter.eq") },
+                      { value: "gte", label: t("inventory.priceFilter.gte") },
+                      { value: "gt", label: t("inventory.priceFilter.gt") },
+                    ])}
+                    {picker("priceAgainst", t("inventory.priceFilter.against"), [
+                      { value: "", label: t("inventory.priceFilter.chooseAgainst") },
+                      { value: "cost", label: t("inventory.priceFilter.cost") },
+                      { value: "lastPurchase", label: t("inventory.priceFilter.lastPurchase") },
+                    ])}
+                  </div>
+                </section>
+              )}
               {!isPurchaseFilter && fields.includes("category") && <section><h3 className="mb-3 font-bold">Danh mục</h3>{asyncPicker("category", "Danh mục", categories, "category")}</section>}
               {!isPurchaseFilter && fields.includes("brand") && <section><h3 className="mb-3 font-bold">Thương hiệu</h3>{asyncPicker("brand", "Thương hiệu", brands, "brand")}</section>}
               {!isPurchaseFilter && fields.includes("supplier") && <section><h3 className="mb-3 font-bold">Nhà cung cấp</h3>{asyncPicker("supplier", "Nhà cung cấp", suppliers, "supplier")}</section>}

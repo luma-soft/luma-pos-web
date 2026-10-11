@@ -10,6 +10,7 @@ import {
   getPriceBooks,
   getPriceOverridesForProducts,
 } from "@/lib/data/price-books";
+import { parsePriceComparisonParams } from "@/lib/pricing/price-comparison";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import {
   mobileGate,
@@ -28,8 +29,12 @@ export async function GET(request: Request) {
   const requestedSort = parsePricingSort(searchParam(request, "sort"));
   const sort = !includePurchasePrices && requestedSort === "cost" ? "updated" : requestedSort;
   const priceBookId = searchParam(request, "priceBookId");
+  const requestedComparison = parsePriceComparisonParams(new URL(request.url).searchParams);
   const books = await getPriceBooks(gate.storeId, { includeManagerOnly: includePurchasePrices });
   const visiblePriceBookId = books.some((book) => book.id === priceBookId) ? priceBookId : undefined;
+  const priceComparison = includePurchasePrices
+    ? { ...requestedComparison, priceBookId: visiblePriceBookId }
+    : {};
   const [categories, brands, suppliers, products] = await Promise.all([
     getPricingCategories(gate.storeId),
     getPricingBrands(gate.storeId),
@@ -43,7 +48,10 @@ export async function GET(request: Request) {
       productKind: searchParam(request, "productKind"),
       lifecycle: searchParam(request, "lifecycle", "active"),
       sort,
-      priceBookId: sort === "retail" ? visiblePriceBookId : undefined,
+      priceBookId: requestedComparison.priceCondition
+        ? visiblePriceBookId
+        : sort === "retail" ? visiblePriceBookId : undefined,
+      ...priceComparison,
       page,
       pageSize,
     }),
@@ -90,6 +98,7 @@ export async function GET(request: Request) {
     page: products.page,
     pageSize: products.pageSize,
     pageCount: products.pageCount,
+    canCompareSellingPrice: includePurchasePrices,
   });
 }
 

@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ShieldCheck } from "lucide-react";
+import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { searchTokens } from "@/lib/normalize";
 import { createPortal } from "react-dom";
@@ -51,6 +51,7 @@ import {
   posUnitSuffix,
 } from "@/components/pos/pos-mobile-layout";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
+import { LumaWebPicker } from "@/app/(app)/sales/tabs/filter-drawer-shared";
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductCreateMenu, type ProductKind } from "@/app/(app)/inventory/tabs/product-create-menu";
 import type { PaperSize, PrintTemplate } from "@/lib/print/template-shared";
@@ -495,6 +496,10 @@ export function PosClient({
     : 0;
 
   const [search, setSearch] = useState("");
+  const [posPriceCondition, setPosPriceCondition] = useState("");
+  const [posPriceAgainst, setPosPriceAgainst] = useState("");
+  const [posPriceFilterOpen, setPosPriceFilterOpen] = useState(false);
+  const posPriceFilterRef = useRef<HTMLDivElement>(null);
   const [submittingMode, setSubmittingMode] = useState<"sale" | "quote" | "booking" | "return" | null>(null);
   const submitting = submittingMode !== null;
   const [error, setError] = useState("");
@@ -771,6 +776,34 @@ export function PosClient({
   const priceBook: PriceBook = active.priceBook ?? ""; // "" = bảng giá mặc định
   const defaultBook = data.priceBooks.find((b) => b.isDefault) ?? data.priceBooks[0];
   const isDefaultBook = !priceBook || priceBook === defaultBook?.id;
+  const showPriceComparison = data.priceBooks.some((book) =>
+    book.managerOnly || book.systemType === "cost" || book.systemType === "purchase",
+  );
+  const effectivePosPriceBookId = priceBook || defaultBook?.id;
+  const hasPosPriceComparison =
+    showPriceComparison && Boolean(posPriceCondition && posPriceAgainst);
+
+  useEffect(() => {
+    if (!posPriceFilterOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest("[data-luma-picker-surface]")) {
+        return;
+      }
+      if (!posPriceFilterRef.current?.contains(event.target as Node)) {
+        setPosPriceFilterOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPosPriceFilterOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [posPriceFilterOpen]);
 
   /** Patch hóa đơn đang mở (nhận object hoặc hàm cập nhật). */
   const patchActive = useCallback((patch: Partial<PosDraft> | ((inv: PosDraft) => Partial<PosDraft>)) => {
@@ -1106,16 +1139,20 @@ export function PosClient({
       );
       let products: PosProduct[];
       if (typeof navigator !== "undefined" && !navigator.onLine) {
-        products = cachedResults();
+        products = hasPosPriceComparison ? [] : cachedResults();
       } else {
         try {
-          products = await searchPosProducts(query);
+          products = await searchPosProducts(query, {
+            priceCondition: hasPosPriceComparison ? posPriceCondition : undefined,
+            priceAgainst: hasPosPriceComparison ? posPriceAgainst : undefined,
+            priceBookId: hasPosPriceComparison ? effectivePosPriceBookId : undefined,
+          });
         } catch {
-          products = cachedResults();
+          products = hasPosPriceComparison ? [] : cachedResults();
         }
       }
       return rankPosSearchResults(expandPosSearchUnitResults(sortSearchProducts(products)), query);
-  }, [data.priceBooks, data.warehouse?.id, productCatalog, rankPosSearchResults, sortSearchProducts]);
+  }, [data.priceBooks, data.warehouse?.id, effectivePosPriceBookId, hasPosPriceComparison, posPriceAgainst, posPriceCondition, productCatalog, rankPosSearchResults, sortSearchProducts]);
 
   const syncingRef = useRef(false);
   async function flushOutbox() {
@@ -2520,6 +2557,81 @@ export function PosClient({
                 );
               }}
             />
+            {showPriceComparison && (
+              <div ref={posPriceFilterRef} className="relative shrink-0">
+                <button
+                  type="button"
+                  aria-label={t("inventory.priceFilter.title")}
+                  aria-haspopup="dialog"
+                  aria-expanded={posPriceFilterOpen}
+                  onClick={() => setPosPriceFilterOpen((open) => !open)}
+                  className={cn(
+                    "flex h-11 w-11 items-center justify-center rounded-xl border transition-colors lg:h-10 lg:w-10",
+                    hasPosPriceComparison
+                      ? "border-primary-500 bg-primary-50 text-primary-700"
+                      : "border-border bg-surface text-slate-500 hover:bg-surface-2",
+                  )}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                </button>
+                {posPriceFilterOpen && (
+                  <div
+                    role="dialog"
+                    aria-label={t("inventory.priceFilter.title")}
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-border bg-surface p-4 shadow-2xl"
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <h3 className="font-bold">{t("inventory.priceFilter.title")}</h3>
+                      <button
+                        type="button"
+                        aria-label={t("common.close")}
+                        onClick={() => setPosPriceFilterOpen(false)}
+                        className="rounded-lg p-2 text-slate-500 hover:bg-surface-2"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      <LumaWebPicker
+                        ariaLabel={t("inventory.priceFilter.condition")}
+                        name="pos-price-condition"
+                        value={posPriceCondition}
+                        options={[
+                          { value: "", label: t("inventory.priceFilter.chooseCondition") },
+                          { value: "lt", label: t("inventory.priceFilter.lt") },
+                          { value: "lte", label: t("inventory.priceFilter.lte") },
+                          { value: "eq", label: t("inventory.priceFilter.eq") },
+                          { value: "gte", label: t("inventory.priceFilter.gte") },
+                          { value: "gt", label: t("inventory.priceFilter.gt") },
+                        ]}
+                        onChange={setPosPriceCondition}
+                      />
+                      <LumaWebPicker
+                        ariaLabel={t("inventory.priceFilter.against")}
+                        name="pos-price-against"
+                        value={posPriceAgainst}
+                        options={[
+                          { value: "", label: t("inventory.priceFilter.chooseAgainst") },
+                          { value: "cost", label: t("inventory.priceFilter.cost") },
+                          { value: "lastPurchase", label: t("inventory.priceFilter.lastPurchase") },
+                        ]}
+                        onChange={setPosPriceAgainst}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPosPriceCondition("");
+                        setPosPriceAgainst("");
+                      }}
+                      className="mt-4 min-h-10 w-full rounded-lg border border-primary-500 font-semibold text-primary-700 hover:bg-primary-50"
+                    >
+                      {t("common.clear")}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             <ProductCreateMenu
               label={t("pos.addProduct")}
               showLabel={false}

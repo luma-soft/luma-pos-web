@@ -6,6 +6,7 @@ import {
 import type { ProductListView, ProductStatusFilter } from "@/lib/data/products";
 import { parseProductListSort } from "@/lib/inventory/product-list-policy";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
+import { parsePriceComparisonParams } from "@/lib/pricing/price-comparison";
 import { getPriceBooks } from "@/lib/data/price-books";
 import { getActivePromotions } from "@/lib/data/active-promotions";
 import {
@@ -25,7 +26,19 @@ export async function GET(request: Request) {
   const gate = await requireMobileStockReadAccess();
   if (!gate.ok) return mobileGate(gate)!;
 
-  const [products, options, priceBooks, promoByProduct] = await Promise.all([
+  const includePurchasePrices = canViewPurchasePrices(gate.role);
+  const requestedComparison = parsePriceComparisonParams(new URL(request.url).searchParams);
+  const priceBooks = await getPriceBooks(gate.storeId, { includeManagerOnly: includePurchasePrices });
+  const requestedBookId = requestedComparison.priceBookId;
+  const priceComparison = includePurchasePrices
+    ? {
+        ...requestedComparison,
+        priceBookId: priceBooks.some((book) => book.id === requestedBookId)
+          ? requestedBookId
+          : undefined,
+      }
+    : {};
+  const [products, options, promoByProduct] = await Promise.all([
     getMobileProducts(gate.storeId, {
       q: searchParam(request, "q"),
       categoryId: searchParam(request, "categoryId"),
@@ -35,6 +48,7 @@ export async function GET(request: Request) {
       brandIds: searchParam(request, "brandIds")?.split(",").filter(Boolean),
       supplierIds: searchParam(request, "supplierIds")?.split(",").filter(Boolean),
       warehouseId: searchParam(request, "warehouseId"),
+      ...priceComparison,
       stock: searchParam(request, "stock") as "instock" | "low" | "out" | undefined,
       sort: parseProductListSort(searchParam(request, "sort")),
       productKind: searchParam(request, "productKind") as "product" | "service" | "combo" | undefined,
@@ -46,12 +60,11 @@ export async function GET(request: Request) {
       pageSize: numberParam(request, "pageSize", 50),
     }),
     getMobileProductOptions(gate.storeId),
-    getPriceBooks(gate.storeId, { includeManagerOnly: canViewPurchasePrices(gate.role) }),
     getActivePromotions(gate.storeId),
   ]);
 
-  const includeNetPurchase = canViewPurchasePrices(gate.role);
-  return mobileOk({ products: {
+  const includeNetPurchase = includePurchasePrices;
+  return mobileOk({ canCompareSellingPrice: includePurchasePrices, products: {
     ...products,
     rows: products.rows.map((row) => ({
       ...row,

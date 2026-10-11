@@ -10,6 +10,7 @@ import { catalogProductSearchCondition } from "@/lib/search";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 import { applySystemPriceBooks } from "@/lib/pos/system-price-projection";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
+import { priceComparisonCondition, type PriceComparison } from "@/lib/pricing/price-comparison";
 import { getRawStorePrefs } from "@/lib/data/settings";
 import { lastCompletedProductSaleAt, recentProductSaleOrder } from "@/lib/data/recent-product-sales";
 
@@ -326,7 +327,13 @@ export async function getMobilePosData(
 export async function searchPosProductRows(
   storeId: string,
   q: string,
-  options?: { role?: Role },
+  options?: {
+    role?: Role;
+    priceComparison?: PriceComparison;
+    categoryNames?: string[];
+    stock?: "all" | "available" | "outOfStock";
+    productKind?: "all" | "product" | "service" | "combo";
+  },
 ): Promise<PosProduct[]> {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const [defaultWh] = await db
@@ -337,6 +344,60 @@ export async function searchPosProductRows(
     .limit(1);
 
   const match: SQL | undefined = catalogProductSearchCondition(products, q);
+  const canCompareSellingPrice = canViewPurchasePrices(options?.role);
+  const visibleBooks = await getPriceBooks(storeId, {
+    includeManagerOnly: canCompareSellingPrice,
+  });
+  const requestedBookId = options?.priceComparison?.priceBookId;
+  const comparison: PriceComparison = canCompareSellingPrice
+    ? {
+        ...options?.priceComparison,
+        priceBookId: visibleBooks.some((book) => book.id === requestedBookId)
+          ? requestedBookId
+          : undefined,
+      }
+    : {};
+  const pricePredicate = priceComparisonCondition(storeId, comparison, {
+    id: products.id,
+    retailPrice: products.retailPrice,
+    costPrice: products.costPrice,
+  });
+  const categoryPredicate = options?.categoryNames?.length
+    ? inArray(categories.name, options.categoryNames)
+    : undefined;
+  const kindPredicate = options?.productKind && options.productKind !== "all"
+    ? eq(products.productKind, options.productKind)
+    : undefined;
+  const stockQuantity = sql`coalesce((select sum(pos_filter_stock.quantity)
+    from stock_levels pos_filter_stock
+    where pos_filter_stock.store_id = ${storeId}
+      and pos_filter_stock.product_id = ${products.id}
+      and pos_filter_stock.warehouse_id = ${defaultWh?.id ?? ""}), 0)`;
+  const stockPredicate = options?.stock === "available"
+    ? sql`${stockQuantity} > 0`
+    : options?.stock === "outOfStock"
+      ? sql`${stockQuantity} <= 0`
+      : undefined;
+  const directFilters = and(categoryPredicate, kindPredicate, stockPredicate, pricePredicate);
+  const variantMemberFilters = (alias: string) => {
+    const id = sql.raw(`"${alias}"."id"`);
+    const categoryId = sql.raw(`"${alias}"."category_id"`);
+    const productKind = sql.raw(`"${alias}"."product_kind"`);
+    const retailPrice = sql.raw(`"${alias}"."retail_price"`);
+    const costPrice = sql.raw(`"${alias}"."cost_price"`);
+    const quantity = sql`coalesce((select sum(pos_member_stock.quantity)
+      from stock_levels pos_member_stock
+      where pos_member_stock.store_id = ${storeId}
+        and pos_member_stock.product_id = ${id}
+        and pos_member_stock.warehouse_id = ${defaultWh?.id ?? ""}), 0)`;
+    return and(
+      categoryPredicate ? sql`${categoryId} in (select id from categories where name in (${sql.join(options!.categoryNames!.map((name) => sql`${name}`), sql`, `)}))` : undefined,
+      kindPredicate ? sql`${productKind} = ${options?.productKind}` : undefined,
+      options?.stock === "available" ? sql`${quantity} > 0` : undefined,
+      options?.stock === "outOfStock" ? sql`${quantity} <= 0` : undefined,
+      priceComparisonCondition(storeId, comparison, { id, retailPrice, costPrice }),
+    );
+  };
 
   const [childRows, rootRows] = await Promise.all([
     db
@@ -348,13 +409,31 @@ export async function searchPosProductRows(
         eq(products.isActive, true),
         eq(products.isVariantParent, false),
         match,
+        directFilters,
       ))
       .orderBy(...recentProductSaleOrder()),
     db
       .select(posProductSelect(storeId, defaultWh?.id ?? null, hasComplianceColumns))
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(and(activeRootCondition(storeId), match))
+      .where(and(
+        activeRootCondition(storeId),
+        match,
+        or(
+          and(eq(products.isVariantParent, false), directFilters),
+          and(
+            eq(products.isVariantParent, true),
+            sql`exists (
+              select 1 from products pos_filter_member
+              left join categories pos_filter_category on pos_filter_category.id = pos_filter_member.category_id
+              where pos_filter_member.store_id = ${storeId}
+                and pos_filter_member.parent_product_id = ${products.id}
+                and pos_filter_member.is_active = true
+                ${variantMemberFilters("pos_filter_member") ? sql`and ${variantMemberFilters("pos_filter_member")}` : sql``}
+            )`,
+          ),
+        ),
+      ))
       .orderBy(...recentProductSaleOrder()),
   ]);
 
@@ -368,6 +447,7 @@ export async function searchPosProductRows(
           eq(products.storeId, storeId),
           eq(products.isActive, true),
           inArray(products.parentProductId, parentIds),
+          directFilters,
         ))
       .orderBy(...recentProductSaleOrder())
     : [];
@@ -380,8 +460,7 @@ export async function searchPosProductRows(
     return true;
   }));
   // Kết quả tìm kiếm phải có cùng map bảng giá và quyền đọc giá vốn như lưới POS.
-  const books = await getPriceBooks(storeId, { includeManagerOnly: canViewPurchasePrices(options?.role) });
-  applySystemPriceBooks(rows as Parameters<typeof applySystemPriceBooks>[0], books);
+  applySystemPriceBooks(rows as Parameters<typeof applySystemPriceBooks>[0], visibleBooks);
   return rows;
 }
 

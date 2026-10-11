@@ -3527,6 +3527,20 @@
   },
   "inventory": {
     "title": "Tồn kho",
+    "priceFilter": {
+      "title": "Giá bán",
+      "condition": "Điều kiện so sánh",
+      "against": "Giá dùng để đối chiếu",
+      "chooseCondition": "Chọn điều kiện",
+      "chooseAgainst": "Chọn giá so sánh",
+      "lt": "Nhỏ hơn",
+      "lte": "Nhỏ hơn hoặc bằng",
+      "eq": "Bằng",
+      "gte": "Lớn hơn hoặc bằng",
+      "gt": "Lớn hơn",
+      "cost": "Giá vốn",
+      "lastPurchase": "Giá nhập cuối"
+    },
     "warehouseTab": "Kho hàng",
     "cameraMaterials": "Vật tư lắp camera",
     "totalValue": "Giá trị tồn kho",

@@ -3,11 +3,21 @@
 import { searchPosProductRows } from "@/lib/data/pos";
 import type { PosProduct } from "@/lib/data/pos";
 import { requireSalesAccess } from "./common";
+import { parsePriceComparisonParams } from "@/lib/pricing/price-comparison";
+
+type PosSearchFilters = {
+  priceCondition?: string;
+  priceAgainst?: string;
+  priceBookId?: string;
+};
 
 /** Tìm sản phẩm cho POS (server-side, bỏ dấu). Trả [] nếu query rỗng. */
-export async function searchPosProducts(q: string): Promise<PosProduct[]> {
+export async function searchPosProducts(q: string, filters: PosSearchFilters = {}): Promise<PosProduct[]> {
   if (!q.trim()) return [];
   const gate = await requireSalesAccess();
   if (!gate.ok) return [];
-  return searchPosProductRows(gate.storeId, q.trim(), { role: gate.role });
+  return searchPosProductRows(gate.storeId, q.trim(), {
+    role: gate.role,
+    priceComparison: parsePriceComparisonParams(filters),
+  });
 }

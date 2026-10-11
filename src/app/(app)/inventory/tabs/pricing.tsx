@@ -13,6 +13,7 @@ import { ListSearchFilterBar } from "@/components/list-search-filter";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { canViewPurchasePrices, comparePriceBooks, isSystemPriceBook, resolvePriceBookPrice } from "@/lib/pricing/system-price-books";
 import { priceFormulaFiltersSchema } from "@/lib/pricing/price-edit";
+import { parsePriceComparisonParams } from "@/lib/pricing/price-comparison";
 import type { PricingSort } from "@/lib/pricing/pricing-policy";
 
 type SP = Record<string, string | undefined>;
@@ -27,6 +28,7 @@ export function inventoryPricingFilters(params: SP) {
     q: params.q, categoryIds: ids(params.categoryIds ?? params.category),
     brandIds: ids(params.brandIds ?? params.brandId), supplierIds: ids(params.supplierIds ?? params.supplierId),
     productKind: params.productKind || undefined, stock, lifecycle, warehouseId: params.warehouseId || undefined,
+    ...parsePriceComparisonParams(params),
   });
 }
 
@@ -67,7 +69,10 @@ async function PricingContent({
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
 
-  const filters = inventoryPricingFilters(params);
+  const requestedFilters = inventoryPricingFilters(params);
+  const filters = includePurchasePrices
+    ? requestedFilters
+    : { ...requestedFilters, priceCondition: undefined, priceAgainst: undefined };
   const { rows, total, pageCount } = await getPricingPage(context.storeId, { ...filters, sort: (params.sort ?? "name") as PricingSort, page, pageSize });
 
   const visibleIds = rows.map((p) => p.id);
@@ -97,7 +102,7 @@ async function PricingContent({
         <h2 className="shrink-0 text-sm font-bold">{t("pricing.booksCount", { n: books.length })}</h2>
         <ListSearchFilterBar
           search={<InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
-          filter={<InventoryFilterDrawer title="Bộ lọc thiết lập giá" values={params} defaultSort="name" countEndpoint="" fields={["category", "brand", "supplier", "kind", "status", "stock", "sort"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
+          filter={<InventoryFilterDrawer title="Bộ lọc thiết lập giá" values={params} defaultSort="name" countEndpoint="/api/inventory/pricing/count" showPriceComparison={includePurchasePrices} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort", "price"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
         />
       </div>
       <PricingTable

@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { sql, type SQLWrapper } from "drizzle-orm";
 
 /**
  * Latest received document, after line and allocated invoice discounts, before
@@ -6,7 +6,10 @@ import { sql } from "drizzle-orm";
  * Multiple lines for one SKU are quantity-weighted in its base unit. Reading the
  * current document means edits/cancellations cannot leave a stale cached price.
  */
-export function lastPurchaseNetPriceSql(storeId: string) {
+export function lastPurchaseNetPriceSql(
+  storeId: string,
+  productId: SQLWrapper = sql.raw('"products"."id"'),
+) {
   return sql<string | null>`(
     select round(
       sum(greatest(item.total, 0))
@@ -21,7 +24,7 @@ export function lastPurchaseNetPriceSql(storeId: string) {
       from purchase_order_items all_items
       where all_items.store_id = po.store_id and all_items.purchase_order_id = po.id
     ) receipt_total
-    where item.store_id = ${storeId} and item.product_id = ${sql.raw('"products"."id"')}
+    where item.store_id = ${storeId} and item.product_id = ${productId}
       and po.status = 'received' and item.quantity > 0 and item.unit_multiplier > 0
     group by po.id, po.discount, po.cost_effective_at, po.created_at, receipt_total.amount
     order by coalesce(po.cost_effective_at, po.created_at) desc, po.id desc

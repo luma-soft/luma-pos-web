@@ -6,6 +6,8 @@ import {
 } from "@/lib/data/pricing";
 import { parsePricingSort } from "@/lib/pricing/pricing-policy";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
+import { parsePriceComparisonParams } from "@/lib/pricing/price-comparison";
+import { getPriceBooks } from "@/lib/data/price-books";
 import { requireMobileStockReadAccess } from "@/lib/mobile/auth";
 import {
   mobileGate,
@@ -17,6 +19,20 @@ import {
 export async function GET(request: Request) {
   const gate = await requireMobileStockReadAccess();
   if (!gate.ok) return mobileGate(gate)!;
+
+  const includePurchasePrices = canViewPurchasePrices(gate.role);
+  const params = new URL(request.url).searchParams;
+  const requestedComparison = parsePriceComparisonParams(params);
+  const requestedBookId = params.get("priceBookId");
+  const books = requestedBookId
+    ? await getPriceBooks(gate.storeId, { includeManagerOnly: includePurchasePrices })
+    : [];
+  const visiblePriceBookId = books.some((book) => book.id === requestedBookId)
+    ? requestedBookId ?? undefined
+    : undefined;
+  const priceComparison = includePurchasePrices
+    ? { ...requestedComparison, priceBookId: visiblePriceBookId }
+    : {};
 
   const [categories, brands, suppliers, products] = await Promise.all([
     getPricingCategories(gate.storeId),
@@ -30,6 +46,7 @@ export async function GET(request: Request) {
       stock: searchParam(request, "stock"),
       productKind: searchParam(request, "productKind"),
       lifecycle: searchParam(request, "lifecycle", "active"),
+      ...priceComparison,
       sort: parsePricingSort(searchParam(request, "sort")),
       warehouseId: searchParam(request, "warehouseId"),
       page: numberParam(request, "page", 1),
@@ -40,7 +57,7 @@ export async function GET(request: Request) {
   return mobileOk({
     rows: products.rows.map((product) => ({
       ...product,
-      lastPurchaseNetPrice: canViewPurchasePrices(gate.role) ? product.lastPurchaseNetPrice : null,
+      lastPurchaseNetPrice: includePurchasePrices ? product.lastPurchaseNetPrice : null,
       imageUrl: product.imageUrls[0] ?? null,
     })),
     categories,
@@ -50,6 +67,7 @@ export async function GET(request: Request) {
     page: products.page,
     pageSize: products.pageSize,
     pageCount: products.pageCount,
+    canCompareSellingPrice: includePurchasePrices,
   });
 }
 
