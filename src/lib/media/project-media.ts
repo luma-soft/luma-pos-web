@@ -988,16 +988,17 @@ export type ProjectMediaInternalRecord = {
   provider: "r2" | "supabase";
   bucket: string;
   objectKey: string;
+  thumbnailObjectKey?: string | null;
 };
 
 export type ProjectMediaDescriptor = Omit<
   ProjectMediaInternalRecord,
-  "provider" | "bucket" | "objectKey"
-> & { signedUrl: string };
+  "provider" | "bucket" | "objectKey" | "thumbnailObjectKey"
+> & { signedUrl: string; thumbnailUrl?: string | null };
 
 export type ProjectAttachmentSummary = Omit<
   ProjectMediaInternalRecord,
-  "provider" | "bucket" | "objectKey"
+  "provider" | "bucket" | "objectKey" | "thumbnailObjectKey"
 > & { documentIds: string[] };
 
 export type ProjectMediaIdempotencyRecord = {
@@ -1448,6 +1449,7 @@ export function createDatabaseProjectMediaRepository(
         provider: mediaObjects.provider,
         bucket: mediaObjects.bucket,
         objectKey: mediaObjects.objectKey,
+        thumbnailObjectKey: mediaObjects.thumbnailObjectKey,
       }).from(serviceAttachments).innerJoin(mediaObjects, and(
         eq(mediaObjects.storeId, serviceAttachments.storeId),
         eq(mediaObjects.id, serviceAttachments.mediaObjectId),
@@ -1491,6 +1493,7 @@ export function createDatabaseProjectMediaRepository(
         provider: mediaObjects.provider,
         bucket: mediaObjects.bucket,
         objectKey: mediaObjects.objectKey,
+        thumbnailObjectKey: mediaObjects.thumbnailObjectKey,
       }).from(serviceAttachments).innerJoin(mediaObjects, and(
         eq(mediaObjects.storeId, serviceAttachments.storeId),
         eq(mediaObjects.id, serviceAttachments.mediaObjectId),
@@ -1538,6 +1541,7 @@ export function createDatabaseProjectMediaRepository(
           provider: row.provider,
           bucket: row.bucket,
           objectKey: row.objectKey,
+          thumbnailObjectKey: row.thumbnailObjectKey,
         },
         documentIds: links.map((link: { documentId: string }) => link.documentId),
         sha256: row.sha256,
@@ -1883,6 +1887,7 @@ export function createDatabaseProjectMediaRepository(
           provider: mediaObjects.provider,
           bucket: mediaObjects.bucket,
           objectKey: mediaObjects.objectKey,
+          thumbnailObjectKey: mediaObjects.thumbnailObjectKey,
         }).from(serviceAttachments).innerJoin(mediaObjects, and(
           eq(mediaObjects.storeId, serviceAttachments.storeId),
           eq(mediaObjects.id, serviceAttachments.mediaObjectId),
@@ -1930,6 +1935,7 @@ export function createDatabaseProjectMediaRepository(
               provider: existing.provider,
               bucket: existing.bucket,
               objectKey: existing.objectKey,
+              thumbnailObjectKey: existing.thumbnailObjectKey,
             },
             documentIds: links.map((link: { documentId: string }) => link.documentId),
             sha256: existing.sha256,
@@ -2260,9 +2266,16 @@ export function createProjectMediaManager(dependencies: {
   async function descriptor(
     record: ProjectMediaInternalRecord,
     existingSignedUrl?: string,
+    existingThumbnailUrl?: string | null,
   ) {
     const signedUrl = existingSignedUrl
       ?? await dependencies.sign(record, PROJECT_MEDIA_SIGNED_URL_SECONDS);
+    const thumbnailUrl = existingThumbnailUrl ?? (record.thumbnailObjectKey
+      ? await dependencies.sign(
+        { ...record, objectKey: record.thumbnailObjectKey },
+        PROJECT_MEDIA_SIGNED_URL_SECONDS,
+      )
+      : null);
     return {
       id: record.id,
       mediaId: record.mediaId,
@@ -2273,6 +2286,7 @@ export function createProjectMediaManager(dependencies: {
       sizeBytes: record.sizeBytes,
       createdAt: record.createdAt,
       signedUrl,
+      thumbnailUrl,
     } satisfies ProjectMediaDescriptor;
   }
 
@@ -2448,7 +2462,7 @@ export function createProjectMediaManager(dependencies: {
       }
       // MediaService already produced a fresh private URL. Re-signing after the
       // association commit could turn a successful write into a retry/duplicate.
-      return descriptor(record, uploaded.url);
+      return descriptor(record, uploaded.url, uploaded.thumbnailUrl);
     },
 
     async download(actor: MediaActor, projectId: string, attachmentId: string) {

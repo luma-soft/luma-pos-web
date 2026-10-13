@@ -70,6 +70,7 @@ export type ProjectMediaItem = {
   sizeBytes: number;
   createdAt: Date | string;
   signedUrl?: string;
+  thumbnailUrl?: string | null;
   documentIds?: string[];
   metadata?: MediaFileMetadata | null;
   creatorName?: string | null;
@@ -314,6 +315,19 @@ export function moveProjectMediaPickerTabFocus(
 export function projectMediaDownloadUrl(projectId: string, attachmentId: string) {
   const params = new URLSearchParams({ attachmentId, download: "1" });
   return `/api/mobile/services/projects/${encodeURIComponent(projectId)}/attachments?${params.toString()}`;
+}
+
+export function projectMediaBrowserPreviewUrl(mediaId: string, size: "thumbnail" | "full" = "full") {
+  const suffix = size === "thumbnail" ? "?size=thumbnail" : "";
+  return `/api/mobile/media/${encodeURIComponent(mediaId)}/preview${suffix}`;
+}
+
+function projectMediaImageUrl(item: ProjectMediaItem, size: "thumbnail" | "full") {
+  const mimeType = item.mimeType.trim().toLowerCase();
+  const isHeic = mimeType === "image/heic" || mimeType === "image/heif";
+  if (!isHeic) return item.signedUrl;
+  if (size === "thumbnail" && item.thumbnailUrl) return item.thumbnailUrl;
+  return projectMediaBrowserPreviewUrl(item.mediaId, size);
 }
 
 export function navigateProjectMediaPreview(
@@ -775,7 +789,7 @@ export function ProjectMediaListView({
               className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-surface-2 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 disabled:opacity-50">
               {image && item.signedUrl ? (
                 <NextImage
-                  src={item.signedUrl}
+                  src={projectMediaImageUrl(item, "thumbnail") ?? item.signedUrl}
                   alt={item.caption || item.fileName}
                   width={480}
                   height={480}
@@ -1350,7 +1364,7 @@ function ProjectMediaPanelBody({
           </div>}>
           <div ref={imageFocusRootRef} className="flex h-full min-h-0 flex-col lg:flex-row">
             <div className="min-h-0 min-w-0 flex-1">
-              <ProjectImageViewport key={imagePreviewRevision} url={imagePreview.signedUrl} fileName={imagePreview.fileName} onRetry={() => void openFresh(imagePreview)} />
+              <ProjectImageViewport key={imagePreviewRevision} url={projectMediaImageUrl(imagePreview, "full") ?? imagePreview.signedUrl} fileName={imagePreview.fileName} onRetry={() => void openFresh(imagePreview)} />
             </div>
             <aside className="max-h-[45dvh] shrink-0 overflow-y-auto overscroll-contain bg-surface px-4 lg:max-h-full lg:w-72 lg:border-l lg:border-border">
               <ProjectFileInfo item={imagePreview} canManage={canManage} />

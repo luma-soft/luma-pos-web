@@ -17,13 +17,22 @@ export function isSafeRasterMimeType(mimeType: string): boolean {
   return SAFE_RASTER_MEDIA_TYPES.has(mimeType.trim().toLowerCase());
 }
 
-export async function createMediaThumbnail(
+export async function createMediaBrowserPreview(
   bytes: Uint8Array,
   mimeType: string,
+  options: { maxDimension?: number; quality?: number } = {},
 ): Promise<Uint8Array> {
   const normalizedMimeType = mimeType.trim().toLowerCase();
+  const maxDimension = options.maxDimension ?? 2560;
+  const quality = options.quality ?? 84;
   if (!isSafeRasterMimeType(normalizedMimeType)) {
     throw new Error("Unsupported raster media type");
+  }
+  if (!Number.isSafeInteger(maxDimension) || maxDimension < 1 || maxDimension > 4096) {
+    throw new Error("Invalid media preview dimensions");
+  }
+  if (!Number.isSafeInteger(quality) || quality < 1 || quality > 100) {
+    throw new Error("Invalid media preview quality");
   }
 
   const heic = normalizedMimeType === "image/heic"
@@ -54,11 +63,21 @@ export async function createMediaThumbnail(
 
   return new Uint8Array(await image
     .resize({
-      width: 640,
-      height: 640,
+      width: maxDimension,
+      height: maxDimension,
       fit: "inside",
       withoutEnlargement: true,
     })
-    .webp({ quality: 78 })
+    .webp({ quality })
     .toBuffer());
+}
+
+export function createMediaThumbnail(
+  bytes: Uint8Array,
+  mimeType: string,
+): Promise<Uint8Array> {
+  return createMediaBrowserPreview(bytes, mimeType, {
+    maxDimension: 640,
+    quality: 78,
+  });
 }

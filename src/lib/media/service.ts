@@ -737,6 +737,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
         mediaId: completed.id,
         path: reservedMedia.objectKey,
         url: completed.url,
+        thumbnailUrl: completed.thumbnailUrl,
       };
     }
 
@@ -889,6 +890,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       mediaId: completed.id,
       path: completedMedia.objectKey,
       url: completed.url,
+      thumbnailUrl: completed.thumbnailUrl,
     };
   }
 
