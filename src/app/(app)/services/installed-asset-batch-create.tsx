@@ -310,7 +310,6 @@ export function InstalledAssetBatchCreate({
   async function submit() {
     if (!canSubmit || busy) return;
     const validation = validateInstalledAssetBatchDrafts({
-      locationLabel,
       installedOn,
       assets: drafts.map((draft) => ({
         clientDraftId: draft.clientDraftId,
@@ -345,7 +344,7 @@ export function InstalledAssetBatchCreate({
         serialNumber: draft.serialNumber || undefined,
         macAddress: draft.macAddress || undefined,
         ipAddress: draft.ipAddress || undefined,
-        locationLabel,
+        locationLabel: locationLabel.trim() || undefined,
         installedAt: new Date(`${installedOn}T09:00:00`).toISOString(),
         customerWarrantyEndsOn: warrantyEndsOn || null,
         note: note || undefined,
@@ -661,7 +660,7 @@ export function InstalledAssetBatchCreate({
                     ]}
                   />
                 </Field>
-                <Field label="Vị trí lắp đặt" required>
+                <Field label="Vị trí lắp đặt (tùy chọn)">
                   <Input value={locationLabel} onChange={(event) => setLocationLabel(event.target.value)} />
                 </Field>
                 <Field label="Ngày lắp đặt" required>
@@ -715,7 +714,6 @@ export function InstalledAssetBatchCreate({
                       expanded={expandedDraftId === draft.clientDraftId}
                       complete={isInstalledAssetBatchDraftReady({
                         clientDraftId: draft.clientDraftId,
-                        locationLabel,
                         installedOn,
                         name: draft.name,
                         assetKind: draft.assetKind,

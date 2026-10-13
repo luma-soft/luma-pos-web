@@ -312,7 +312,7 @@ export type InstalledAssetBatchCreateInput = z.input<typeof installedAssetBatchC
 export type InstalledAssetBatchValidationIssue =
   | {
     scope: "common";
-    field: "locationLabel" | "installedOn";
+    field: "installedOn";
     fieldLabel: string;
   }
   | {
@@ -324,7 +324,6 @@ export type InstalledAssetBatchValidationIssue =
   };
 
 export function validateInstalledAssetBatchDrafts(value: {
-  locationLabel: string;
   installedOn: string;
   assets: Array<{
     clientDraftId: string;
@@ -337,13 +336,6 @@ export function validateInstalledAssetBatchDrafts(value: {
   message: string;
 } {
   const issues: InstalledAssetBatchValidationIssue[] = [];
-  if (!value.locationLabel.trim()) {
-    issues.push({
-      scope: "common",
-      field: "locationLabel",
-      fieldLabel: "Vị trí lắp đặt",
-    });
-  }
   if (!value.installedOn.trim()) {
     issues.push({
       scope: "common",
@@ -397,13 +389,11 @@ export function validateInstalledAssetBatchDrafts(value: {
 
 export function isInstalledAssetBatchDraftReady(value: {
   clientDraftId: string;
-  locationLabel: string;
   installedOn: string;
   name: string;
   assetKind: string;
 }) {
   return validateInstalledAssetBatchDrafts({
-    locationLabel: value.locationLabel,
     installedOn: value.installedOn,
     assets: [{
       clientDraftId: value.clientDraftId,
