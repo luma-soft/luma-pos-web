@@ -86,18 +86,12 @@ export function externalProductImageUrls(
   requestedUrls: readonly string[],
   publicMedia: Pick<PublicMediaConfig, "publicBaseUrl">,
 ) {
-  const configuredHost = new URL(publicMedia.publicBaseUrl).hostname;
   const seen = new Set<string>();
   const ordered: string[] = [];
   for (const raw of requestedUrls) {
     const url = raw.trim();
     if (!url || seen.has(url)) continue;
-    try {
-      const parsed = new URL(url);
-      if (parsed.hostname.replace(/\.$/, "") === configuredHost) continue;
-    } catch {
-      // The product schema retains legacy non-URL values for compatibility.
-    }
+    if (parseProductImagePublicUrl(url, publicMedia)) continue;
     ordered.push(url);
     seen.add(url);
   }
