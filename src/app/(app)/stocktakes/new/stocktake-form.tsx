@@ -23,7 +23,6 @@ import type { AiActionPreview } from "@/lib/ai/actions";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
-import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 
 interface ProductOption {
   id: string;
@@ -135,11 +134,8 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
   }
 
   function setQty(id: string, qty: number) {
-    setLines((ls) => setSelectedProductQuantity(
-      ls,
-      qty,
-      (line) => line.product.id === id,
-      (line, quantity) => ({ ...line, actualQty: quantity }),
+    setLines((ls) => ls.map((line) =>
+      line.product.id === id ? { ...line, actualQty: Math.max(0, qty) } : line,
     ));
   }
 
@@ -328,24 +324,24 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                   );
                 })}
               </div>
-              <div className="hidden overflow-x-auto lg:block">
-                <table className="w-full min-w-[920px] table-fixed text-sm">
+              <div className="hidden lg:block">
+                <table className="w-full table-fixed text-sm">
                 <colgroup>
-                  <col />
-                  <col className="w-24" />
-                  <col className="w-36" />
-                  <col className="w-28" />
-                  <col className="w-48" />
-                  <col className="w-16" />
+                  <col className="w-[35%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[19%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[19%]" />
+                  <col className="w-[5%]" />
                 </colgroup>
                 <thead>
                   <tr className="border-b border-border-soft bg-canvas text-left text-[11px] text-slate-500">
                     <th className="px-4 py-3 font-semibold">{t("orders.cols.product")}</th>
-                    <th className="px-4 py-3 font-semibold text-right">{t("stocktakes.cols.systemQty")}</th>
-                    <th className="px-4 py-3 font-semibold text-right">{t("stocktakes.cols.actualQty")}</th>
-                    <th className="px-4 py-3 font-semibold text-right">{t("stocktakes.cols.diff")}</th>
-                    <th className="px-4 py-3 font-semibold text-right">{t("stocktakes.cols.diffValue")}</th>
-                    <th></th>
+                    <th className="px-2 py-3 font-semibold text-right">{t("stocktakes.cols.systemQty")}</th>
+                    <th className="px-2 py-3 font-semibold text-right">{t("stocktakes.cols.actualQty")}</th>
+                    <th className="px-2 py-3 font-semibold text-right">{t("stocktakes.cols.diff")}</th>
+                    <th className="px-2 py-3 font-semibold text-right">{t("stocktakes.cols.diffValue")}</th>
+                    <th className="px-1 py-3"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-soft">
@@ -357,8 +353,8 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                           <div className="font-semibold">{l.product.name}</div>
                           <div className="font-mono text-xs text-slate-400">{l.product.sku} · {l.product.baseUnit}</div>
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-slate-500 [overflow-wrap:anywhere]">{formatNumber(l.product.stock)}</td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-2 py-3 text-right tabular-nums text-slate-500 [overflow-wrap:anywhere]">{formatNumber(l.product.stock)}</td>
+                        <td className="px-2 py-3 text-right">
                           <QuantityInput
                             min={0}
                             value={l.actualQty}
@@ -367,13 +363,13 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                             className="ml-auto w-28"
                           />
                         </td>
-                        <td className={cn("px-4 py-3 text-right tabular-nums font-semibold [overflow-wrap:anywhere]", diff > 0 ? "text-ok" : diff < 0 ? "text-er" : "text-slate-400")}>
+                        <td className={cn("px-2 py-3 text-right tabular-nums font-semibold [overflow-wrap:anywhere]", diff > 0 ? "text-ok" : diff < 0 ? "text-er" : "text-slate-400")}>
                           {Math.abs(diff) < 1e-9 ? <Check className="inline h-4 w-4 text-ok" /> : `${diff > 0 ? "+" : ""}${formatNumber(diff)}`}
                         </td>
-                        <td className={cn("px-4 py-3 text-right tabular-nums [overflow-wrap:anywhere]", diff !== 0 ? (diff > 0 ? "text-ok" : "text-er") : "text-slate-400")}>
+                        <td className={cn("px-2 py-3 text-right tabular-nums [overflow-wrap:anywhere]", diff !== 0 ? (diff > 0 ? "text-ok" : "text-er") : "text-slate-400")}>
                           {diff !== 0 ? formatCurrency(diff * l.product.costPrice) : "—"}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-1 py-3">
                           <button onClick={() => setLines((ls) => ls.filter((x) => x.product.id !== l.product.id))} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-er-soft hover:text-er active:scale-[0.98]">
                             <Trash2 className="h-4 w-4" />
                           </button>
