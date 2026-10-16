@@ -64,6 +64,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
   // tồn hệ thống hiển thị được load theo kho này — đổi kho sẽ reload trang
   const warehouseId = activeWarehouseId;
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [lines, setLines] = useState<Line[]>([]);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<"draft" | "balance" | null>(null);
@@ -93,6 +94,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
     setLines((ls) => ls.some((line) => line.product.id === p.id)
       ? ls
       : [{ product: p, actualQty: p.stock }, ...ls]);
+    setSearchOpen(true);
     // Keep the query and result list open so several products can be added
     // from one search. Selected rows stay visible with their quantity control.
   }
@@ -224,6 +226,8 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                   onSelect={addLine}
                   isItemSelected={(product) => added.has(product.id)}
                   keepOpenOnSelect
+                  open={searchOpen}
+                  onOpenChange={setSearchOpen}
                   placeholder={t("stocktakes.searchPlaceholder")}
                   emptyMessage={t("common.noResults")}
                   loadingMessage={t("common.loading")}

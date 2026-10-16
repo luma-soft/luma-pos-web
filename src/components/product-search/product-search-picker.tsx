@@ -168,7 +168,10 @@ export function ProductSearchPicker<T>({
     })) return;
     onSelect(item);
     if (!keepOpenOnSelect) close();
-    else setActiveIndex(-1);
+    else {
+      setOpen(true);
+      setActiveIndex(-1);
+    }
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
