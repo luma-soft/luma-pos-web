@@ -93,7 +93,8 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
     setLines((ls) => ls.some((line) => line.product.id === p.id)
       ? ls
       : [{ product: p, actualQty: p.stock }, ...ls]);
-    setSearch("");
+    // Keep the query and result list open so several products can be added
+    // from one search. Selected rows stay visible with their quantity control.
   }
 
   async function applyAiPreview(preview: AiActionPreview, applyMode: AiQuickActionApplyMode) {
@@ -222,6 +223,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                   itemKey={(product) => product.id}
                   onSelect={addLine}
                   isItemSelected={(product) => added.has(product.id)}
+                  keepOpenOnSelect
                   placeholder={t("stocktakes.searchPlaceholder")}
                   emptyMessage={t("common.noResults")}
                   loadingMessage={t("common.loading")}
