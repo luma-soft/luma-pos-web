@@ -14,6 +14,8 @@ import type { ActionResult } from "@/lib/actions/common";
 import { VariantValuesInput } from "./variant-values-input";
 import { variantCombinationKey } from "@/lib/products/variant-model";
 
+import { attributeValueChange } from "./attribute-value-change";
+
 const CREATE_ATTRIBUTE = "__create_attribute__";
 
 export function AttributesField({ locked = false, allowValueEdits = false }: { locked?: boolean; allowValueEdits?: boolean }) {
@@ -129,9 +131,12 @@ export function AttributesField({ locked = false, allowValueEdits = false }: { l
                 values={f.value || []}
                 valueIds={currentAttributes[idx]?.valueIds ?? []}
                 onChange={(values, ids) => {
-                  setValue(`attributes.${idx}.valueIds`, ids, { shouldDirty: true });
-                  setValue(`attributes.${idx}.createsVariants`, true);
-                  f.onChange(values);
+                  const attribute = getValues(`attributes.${idx}`);
+                  if (!attribute) return;
+                  const changed = attributeValueChange(attribute, values, ids, locked);
+                  setValue(`attributes.${idx}.valueIds`, changed.valueIds, { shouldDirty: true });
+                  setValue(`attributes.${idx}.createsVariants`, changed.createsVariants);
+                  f.onChange(changed.values);
                 }}
                 protectedIds={protectedIds}
                 disabled={locked && !(allowValueEdits && (currentAttributes[idx]?.valueIds?.length ?? 0) > 0)}
