@@ -98,7 +98,7 @@ export function VariantChildrenField({ visible, enabled }: { visible: boolean; e
               <td className={tdClass}><Checkbox checked={selected && !awaitingAssignment} disabled={persisted || awaitingAssignment} onChange={(event) => toggle(row.combinationKey, event.target.checked)} aria-label={`Chọn tổ hợp ${row.variantName}`} /></td>
               <td className={tdClass}>
                 <p className="font-medium">{row.variantName}</p>
-                <span className="mt-1 inline-flex rounded-full bg-surface-2 px-2 py-0.5 text-xs text-slate-500">{persisted ? 'Đã có' : awaitingAssignment ? 'Chờ gán' : selected ? 'Mới' : 'Bỏ chọn'}</span>
+                <span className="mt-1 inline-flex whitespace-nowrap rounded-full bg-surface-2 px-2 py-0.5 text-xs text-slate-500">{persisted ? 'Đã có' : awaitingAssignment ? 'Chờ gán' : selected ? 'Mới' : 'Bỏ chọn'}</span>
               </td>
               {selected && child ? <>
                 <td className={tdClass}><label className="mb-1 block text-xs text-slate-500 lg:hidden">SKU</label><Input className={inputClass} {...register(`variantChildren.${index}.sku`)} aria-label={`${row.variantName} — SKU`} placeholder="Tự sinh" /></td>

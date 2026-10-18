@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 const productForm = readFileSync(new URL("./new/product-form.tsx", import.meta.url), "utf8");
+const variantChildrenField = readFileSync(new URL("./new/variant-children-field.tsx", import.meta.url), "utf8");
 const vi = JSON.parse(readFileSync(new URL("../../../../messages/vi.json", import.meta.url), "utf8"));
 
 test("an existing product points users to the safe variant workflow", () => {
@@ -14,4 +15,8 @@ test("an existing product points users to the safe variant workflow", () => {
 test("an existing grouped SKU can edit its value but keeps group structure locked", () => {
   expect(productForm).toContain("allowValueEdits={isEdit && !groupEditing && Boolean(groupId)}");
   expect(vi.products.variants.lockedSkuHint).toContain("không lưu nếu trùng");
+});
+
+test("variant status badges stay on one line inside the table column", () => {
+  expect(variantChildrenField).toContain("inline-flex whitespace-nowrap rounded-full");
 });
