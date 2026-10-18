@@ -316,7 +316,16 @@ export function ProductsTable({
   const groupOf = (product: ProductRow) => grouped ? product.variantGroup : undefined;
   const isExpanded = (product: ProductRow) => expandedGroups[product.id]
     ?? Boolean(query.trim() && groupOf(product)?.members.some((member) => matchesProductVariant(member, query)));
-  const selectionIds = (product: ProductRow) => selectableProductIds(product, grouped);
+  function matchesStatus(member: ProductRow) {
+    const status = params.get("status") || "active";
+    if (status === "active") return member.isActive;
+    if (status === "inactive") return !member.isActive;
+    return true;
+  }
+  const selectionIds = (product: ProductRow) => {
+    const group = groupOf(product);
+    return group ? group.members.filter(matchesStatus).map((member) => member.id) : selectableProductIds(product, grouped);
+  };
   const selected = (product: ProductRow) => {
     const ids = selectionIds(product);
     return ids.length > 0 && ids.every((id) => selectedIds.has(id));
@@ -332,7 +341,7 @@ export function ProductsTable({
   }
 
   function membersFor(product: ProductRow) {
-    const members = [...(groupOf(product)?.members ?? [])];
+    const members = (groupOf(product)?.members ?? []).filter(matchesStatus);
     if (query.trim()) members.sort((a, b) => Number(matchesProductVariant(b, query)) - Number(matchesProductVariant(a, query)));
     return { members: allVariants[product.id] ? members : members.slice(0, 8), total: members.length };
   }
@@ -503,7 +512,7 @@ export function ProductsTable({
             <div className="flex items-start bg-primary-50/70 dark:bg-primary-950/40">
               {selectionEnabled && <div className="pl-3 pt-4"><SelectionCheckbox checked={selected(product)} indeterminate={partiallySelected(product)} onChange={() => toggleProduct(product)} label={t("products.bulk.selectProduct", { name: product.name })} /></div>}
               <button type="button" onClick={() => toggleGroup(product)} aria-expanded={isExpanded(product)} className="min-w-0 flex-1 p-3 text-left">
-                <div className="flex items-center gap-3"><ProductThumbnail product={product} /><div className="min-w-0 flex-1"><div className="text-sm font-semibold">{group.name}</div><div className="mt-1 text-sm font-medium text-primary-700 dark:text-primary-300">{t("products.variants.count", { count: group.count })}</div></div><ChevronDown className={cn("h-5 w-5 shrink-0 text-primary-600", !isExpanded(product) && "-rotate-90")} /></div>
+                <div className="flex items-center gap-3"><ProductThumbnail product={product} /><div className="min-w-0 flex-1"><div className="text-sm font-semibold">{group.name}</div><div className="mt-1 text-sm font-medium text-primary-700 dark:text-primary-300">{t("products.variants.count", { count: membersFor(product).total })}</div></div><ChevronDown className={cn("h-5 w-5 shrink-0 text-primary-600", !isExpanded(product) && "-rotate-90")} /></div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs"><span className="font-semibold">{t("products.variants.fromPrice", { price: formatCurrency(Number(group.minRetailPrice)) })}</span><span className="text-slate-500">{t("products.variants.totalStock")}: {group.totalStock === null ? t("products.variants.multipleUnits") : `${formatNumber(Number(group.totalStock))} ${product.baseUnit}`}</span></div>
               </button>
             </div>
