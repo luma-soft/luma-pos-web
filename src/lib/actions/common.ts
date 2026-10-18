@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
@@ -99,8 +100,16 @@ export function isUniqueViolation(e: unknown): boolean {
   return pgErrorCode(e) === "23505" || (e instanceof Error && e.message.includes("duplicate key"));
 }
 
-/** Mã chứng từ: DH-250607-1432XX */
+/** Mã chứng từ; mã đơn bán hàng mới dùng định dạng ngắn DH-XXXXXXXXXXX. */
 export function generateCode(prefix: string): string {
+  if (prefix === "DH" || prefix === "DHG") {
+    const random = BigInt(`0x${randomBytes(7).toString("hex")}`)
+      .toString(36)
+      .toUpperCase()
+      .padStart(11, "0");
+    return `${prefix}-${random}`;
+  }
+
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   const date = `${String(d.getFullYear()).slice(2)}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
