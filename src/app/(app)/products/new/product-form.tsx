@@ -404,6 +404,12 @@ export function NewProductForm({
           variantIdentity,
           applyToSiblings: values.applyToSiblings,
           units: values.units,
+          weight: values.weight,
+          weightUnit: values.weightUnit,
+          width: values.width,
+          length: values.length,
+          thickness: values.thickness,
+          dimUnit: values.dimUnit,
           stockAdjustment,
         }, { deferInventoryRefresh: isModal });
       if (res.ok) {

@@ -43,6 +43,12 @@ import {
 import { productStockAdjustmentSchema } from "@/lib/products/stock-adjustment";
 import { applyProductStockAdjustment } from "@/lib/products/product-stock-adjustment";
 import { syncProductUnits } from "@/lib/products/product-unit-sync";
+import {
+  buildProductDimensions,
+  computeProductM2PerUnit,
+  normalizeProductWeightKg,
+  productPhysicalMetadataPatch,
+} from "@/lib/products/product-physical-metadata";
 import { getPublicMediaConfig } from "@/lib/media/config";
 import {
   externalProductImageUrls,
@@ -261,14 +267,6 @@ function mergeSpecs(
   return Object.keys(merged).length > 0 ? merged : null;
 }
 
-function buildDimensions(v: CreateProductOutput): string | null {
-  const parts = [v.width, v.length, v.thickness].filter(
-    (n): n is number => n != null && n > 0,
-  );
-  if (parts.length === 0) return null;
-  return `${parts.join("×")}${v.dimUnit}`;
-}
-
 async function syncProductPriceBookPrices(
   storeId: string,
   productId: string,
@@ -321,15 +319,6 @@ async function syncProductPriceBookPrices(
         set: { price: sql`excluded.price` },
       });
   }
-}
-
-/** m²/base-unit từ kích thước (gạch): width × length, đổi về mét. */
-function computeM2PerUnit(v: CreateProductOutput): string | null {
-  if (v.width == null || v.length == null || v.width <= 0 || v.length <= 0)
-    return null;
-  const factor = v.dimUnit === "mm" ? 0.001 : v.dimUnit === "cm" ? 0.01 : 1;
-  const m2 = v.width * factor * (v.length * factor);
-  return m2 > 0 ? m2.toFixed(4) : null;
 }
 
 const updatePricesSchema = z.object({
@@ -414,6 +403,12 @@ const updateProductSchema = z.object({
     .record(z.string(), z.number().min(0).nullable())
     .default({}),
   location: z.string().trim().optional(),
+  weight: z.number().nullable().optional(),
+  weightUnit: z.enum(["g", "kg"]).optional(),
+  width: z.number().nullable().optional(),
+  length: z.number().nullable().optional(),
+  thickness: z.number().nullable().optional(),
+  dimUnit: z.enum(["mm", "cm", "m"]).optional(),
   description: z.string().trim().optional(),
   imageUrls: z.array(z.string()).optional(),
   imageMediaIds: imageMediaIdsSchema.optional(),
@@ -450,6 +445,17 @@ const updateProductSchema = z.object({
       code: "custom",
       path: ["comboItems"],
       message: "products.errors.comboCannotContainItself",
+    });
+  }
+  const dimensionFields = [value.width, value.length, value.thickness, value.dimUnit];
+  const suppliedDimensionFieldCount = dimensionFields.filter(
+    (field) => field !== undefined,
+  ).length;
+  if (suppliedDimensionFieldCount > 0 && suppliedDimensionFieldCount < dimensionFields.length) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["dimUnit"],
+      message: "products.errors.physicalDimensionsIncomplete",
     });
   }
 });
@@ -772,6 +778,7 @@ export async function updateProduct(
   const parsed = updateProductSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  const physicalMetadata = productPhysicalMetadataPatch(v);
   const publicMedia = getPublicMediaConfig();
 
   try {
@@ -928,6 +935,7 @@ export async function updateProduct(
               }
             : { isActive: v.isActive }),
           location: v.location || null,
+          ...physicalMetadata,
           description: v.description || null,
           specs: v.specs && Object.keys(v.specs).length > 0 ? v.specs : null,
           updatedAt: sql`now()`,
@@ -1157,12 +1165,7 @@ export async function createProduct(
   const publicMedia = getPublicMediaConfig();
 
   const sku = v.sku?.trim() || generateSku();
-  const weightKg =
-    v.weight != null
-      ? v.weightUnit === "g"
-        ? v.weight / 1000
-        : v.weight
-      : null;
+  const weightKg = normalizeProductWeightKg(v.weight, v.weightUnit);
   const descriptiveSpecs = specsWithOrderNote(
     specsFromAttributes(v.attributes, { includeVariantAttributes: false }),
     v.invoiceNote,
@@ -1303,10 +1306,10 @@ export async function createProduct(
             trackBatches: v.trackBatches,
             shelfLifeDays: v.shelfLifeDays ?? null,
             lifecycleStatus: v.lifecycleStatus,
-            m2PerUnit: computeM2PerUnit(v),
+            m2PerUnit: computeProductM2PerUnit(v),
             location: v.location?.trim() || null,
             weight: weightKg != null ? String(weightKg) : null,
-            dimensions: buildDimensions(v),
+            dimensions: buildProductDimensions(v),
             specs: singleProductSpecs,
             imageUrls: v.imageUrls,
             isActive: v.lifecycleStatus === "active" && v.directSale,
@@ -1370,10 +1373,10 @@ export async function createProduct(
           trackBatches: v.trackBatches,
           shelfLifeDays: v.shelfLifeDays ?? null,
           lifecycleStatus: v.lifecycleStatus,
-          m2PerUnit: computeM2PerUnit(v),
+          m2PerUnit: computeProductM2PerUnit(v),
           location: v.location?.trim() || null,
           weight: weightKg != null ? String(weightKg) : null,
-          dimensions: buildDimensions(v),
+          dimensions: buildProductDimensions(v),
           specs: descriptiveSpecs,
           imageUrls: v.imageUrls,
           isVariantParent: true,
@@ -1425,10 +1428,10 @@ export async function createProduct(
             trackBatches: v.trackBatches,
             shelfLifeDays: v.shelfLifeDays ?? null,
             lifecycleStatus: v.lifecycleStatus,
-            m2PerUnit: computeM2PerUnit(v),
+            m2PerUnit: computeProductM2PerUnit(v),
             location: v.location?.trim() || null,
             weight: weightKg != null ? String(weightKg) : null,
-            dimensions: buildDimensions(v),
+            dimensions: buildProductDimensions(v),
             specs: mergeSpecs(descriptiveSpecs, child.specs),
             imageUrls:
               child.imageUrls.length > 0
