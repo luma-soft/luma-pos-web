@@ -230,6 +230,7 @@ export async function getProjectDetail(storeId: string, id: string) {
       jobTitle: serviceJobs.title,
       productId: serviceJobMaterials.productId,
       productName: products.name,
+      productVariantName: products.variantName, productSpecs: products.specs,
       sku: products.sku,
       baseUnit: products.baseUnit,
       unitName: serviceJobMaterials.unitName,

@@ -114,7 +114,7 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
 
     db.select({
       id: products.id,
-      name: products.name,
+      name: products.name, variantName: products.variantName, specs: products.specs,
       baseUnit: products.baseUnit,
       categoryName: categories.name,
       totalStock: sql<string>`coalesce(sum(${stockLevels.quantity}), 0)`,

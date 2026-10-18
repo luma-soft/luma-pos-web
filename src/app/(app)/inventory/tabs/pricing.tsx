@@ -1,3 +1,4 @@
+import { productDisplayName } from "@/lib/products/variant-presentation";
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { getProductFormOptions } from "@/lib/data/products";
@@ -78,7 +79,7 @@ async function PricingContent({
   const visibleIds = rows.map((p) => p.id);
   const overrideByBook = await getPriceOverridesForProducts(context.storeId, visibleIds);
   const tableRows = rows.map((p) => ({
-    id: p.id, sku: p.sku, name: p.name, baseUnit: p.baseUnit,
+    id: p.id, sku: p.sku, name: productDisplayName(p), baseUnit: p.baseUnit,
     units: (p.units ?? []).map((unit) => ({
       id: unit.id, unitName: unit.unitName, multiplier: Number(unit.multiplier),
       priceOverride: unit.priceOverride == null ? null : Number(unit.priceOverride),

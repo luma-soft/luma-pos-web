@@ -1,5 +1,7 @@
 "use client";
 
+import { productLineDisplayName } from "@/lib/products/variant-presentation";
+
 import { type ReactNode, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -145,7 +147,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
                     rel="noreferrer"
                     className="inline-flex min-h-11 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11"
                   >
-                    {item.productName}
+                    {productLineDisplayName(item)}
                   </Link>
                   <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.total))}</div>
                 </div>
@@ -181,7 +183,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
                       </Link>
                     </td>
                     <td className="px-3 py-3">
-                      <div className="font-medium">{item.productName}</div>
+                      <div className="font-medium">{productLineDisplayName(item)}</div>
                       <div className="text-xs text-slate-400">{item.baseUnit}</div>
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>

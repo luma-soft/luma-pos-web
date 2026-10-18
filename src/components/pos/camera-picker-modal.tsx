@@ -1,5 +1,7 @@
 "use client";
 
+import { productDisplayName } from "@/lib/products/variant-presentation";
+
 import { matchesSearchTokens } from "@/lib/normalize";
 
 import Image from "next/image";
@@ -34,7 +36,7 @@ export function CameraPickerModal({ open, cameras, selectedCameras = {}, onClose
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("vi");
     if (!query) return cameras;
-    return cameras.filter((product) => matchesSearchTokens(`${product.name} ${product.sku} ${product.description ?? ""}`, query));
+    return cameras.filter((product) => matchesSearchTokens(`${productDisplayName(product)} ${product.sku} ${product.description ?? ""}`, query));
   }, [cameras, search]);
 
   if (!open) return null;
@@ -67,10 +69,10 @@ export function CameraPickerModal({ open, cameras, selectedCameras = {}, onClose
                 <button key={product.id} type="button" onClick={() => { onSelect(product); close(); }} className={`group relative min-h-11 min-w-11 overflow-hidden rounded-xl border bg-canvas/50 text-left transition hover:border-primary-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${selectedCameras[product.id] ? "border-primary-500 ring-2 ring-primary-100 dark:ring-primary-900/40" : "border-border-soft"}`}>
                   {selectedCameras[product.id] ? <span className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-primary-600 px-2 py-1 text-[11px] font-bold text-white"><Check className="h-3 w-3" /> {selectedCameras[product.id]}</span> : null}
                   <div className="flex h-36 items-center justify-center bg-white p-3 dark:bg-slate-950">
-                    {product.imageUrl ? <Image src={product.imageUrl} alt={product.name} width={220} height={140} unoptimized className="h-full w-full object-contain" /> : <Camera className="h-12 w-12 text-slate-300" />}
+                    {product.imageUrl ? <Image src={product.imageUrl} alt={productDisplayName(product)} width={220} height={140} unoptimized className="h-full w-full object-contain" /> : <Camera className="h-12 w-12 text-slate-300" />}
                   </div>
                   <div className="p-3">
-                    <div className="whitespace-normal break-words text-sm font-bold text-slate-900 dark:text-slate-100">{product.name}</div>
+                    <div className="whitespace-normal break-words text-sm font-bold text-slate-900 dark:text-slate-100">{productDisplayName(product)}</div>
                     <div className="mt-1 text-xs text-slate-400">{product.sku}</div>
                     <div className="mt-2 font-black tabular-nums text-primary-700">{formatCurrency(product.retailPrice)}</div>
                     {selectedCameras[product.id] ? <div className="mt-2 text-xs font-semibold text-primary-600">{t("pos.cameraQuote.selectedCount", { count: selectedCameras[product.id] })}</div> : null}

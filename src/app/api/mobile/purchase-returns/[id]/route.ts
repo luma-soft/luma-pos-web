@@ -1,3 +1,4 @@
+import { productLineDisplayName } from "@/lib/products/variant-presentation";
 import { inventoryDocumentCapabilities } from "@/lib/inventory/document-capabilities";
 import { updatePurchaseReturn, deletePurchaseReturn } from "@/lib/actions/purchase-returns";
 import { isMobileEntityId } from "@/lib/mobile/exact-entity";
@@ -16,7 +17,7 @@ export async function GET(
   if (!isMobileEntityId(id)) return mobileError("errors.notFound", 404);
   const purchaseReturn = await getPurchaseReturn(gate.storeId, id);
   return purchaseReturn
-    ? mobileOk({ ...purchaseReturn, ...inventoryDocumentCapabilities("purchase-returns", gate.role) })
+    ? mobileOk({ ...purchaseReturn, items: purchaseReturn.items.map((item) => ({ ...item, productName: productLineDisplayName(item) })), ...inventoryDocumentCapabilities("purchase-returns", gate.role) })
     : mobileError("errors.notFound", 404);
 }
 

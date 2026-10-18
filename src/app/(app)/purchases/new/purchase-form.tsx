@@ -1,5 +1,7 @@
 "use client";
 
+import { productDisplayName } from "@/lib/products/variant-presentation";
+
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -180,7 +182,7 @@ function productToLine(
   const units: PUnit[] = (p.units ?? []).map((u) => ({ unitName: u.unitName, multiplier: Number(u.multiplier) || 1 }));
   return {
     productId: p.id,
-    name: p.name,
+    name: productDisplayName(p),
     sku: p.sku,
     baseUnit: p.baseUnit,
     baseCost,
@@ -545,7 +547,7 @@ export function PurchaseForm({
                   <ProductSearchResultLayout
                     selected={selected}
                     leading={<ProductSearchThumbnail product={product} />}
-                    summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {product.baseUnit}</div></>}
+                    summary={<><div className="text-sm font-semibold">{productDisplayName(product)}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {product.baseUnit}</div></>}
                     controls={selected ? (
                       <div onClick={(event) => event.stopPropagation()}>
                         <QuantityInput

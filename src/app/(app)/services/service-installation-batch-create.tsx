@@ -1,5 +1,7 @@
 "use client";
 
+import { productDisplayName } from "@/lib/products/variant-presentation";
+
 import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -291,7 +293,7 @@ export function ServiceInstallationBatchCreate({
                   >
                     <ProductThumb product={product} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{product.name}</span>
+                      <span className="block truncate text-sm font-semibold">{productDisplayName(product)}</span>
                       <span className="mt-0.5 block truncate text-xs text-slate-500">SKU: {product.sku}</span>
                     </span>
                     <span className={cn(
@@ -347,7 +349,7 @@ export function ServiceInstallationBatchCreate({
                     >
                       <span className="flex min-w-0 items-center gap-3">
                         <ProductThumb product={draft.product} compact />
-                        <span className="min-w-0"><span className="block truncate text-sm font-semibold">{draft.product.name}</span><span className="block truncate text-xs text-slate-500">{draft.product.sku}</span></span>
+                        <span className="min-w-0"><span className="block truncate text-sm font-semibold">{productDisplayName(draft.product)}</span><span className="block truncate text-xs text-slate-500">{draft.product.sku}</span></span>
                       </span>
                       <span className="hidden sm:block" onClick={(event) => event.stopPropagation()}>
                         <QuantityInput
@@ -356,7 +358,7 @@ export function ServiceInstallationBatchCreate({
                           min={draft.tracking === "asset" ? 1 : 0.0001}
                           step={1}
                           decimals={draft.tracking === "asset" ? 0 : 4}
-                          inputLabel={`Số lượng ${draft.product.name}`}
+                          inputLabel={`Số lượng ${productDisplayName(draft.product)}`}
                         />
                       </span>
                       <span className={cn(
@@ -367,7 +369,7 @@ export function ServiceInstallationBatchCreate({
                         <span className="col-span-2 row-start-2 text-right text-xs font-semibold [overflow-wrap:anywhere] sm:hidden">{draft.quantity} {draft.unitName}</span>
                         <button
                           type="button"
-                          aria-label={`Xóa ${draft.product.name}`}
+                          aria-label={`Xóa ${productDisplayName(draft.product)}`}
                           onClick={(event) => { event.stopPropagation(); removeDraft(draft.clientDraftId); }}
                           className="col-start-2 row-start-1 grid h-10 w-10 place-items-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 sm:col-auto sm:row-auto"
                         ><Trash2 className="h-4 w-4" /></button>
@@ -382,7 +384,7 @@ export function ServiceInstallationBatchCreate({
               <section className="border-b border-border-soft p-4 lg:p-5" data-installation-detail="true">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-sm font-bold">3. Chi tiết dòng đang chọn</h3>
-                  <span className="truncate text-xs font-semibold text-primary-700">{activeDraft.product.name}</span>
+                  <span className="truncate text-xs font-semibold text-primary-700">{productDisplayName(activeDraft.product)}</span>
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <Field label="Số lượng">
@@ -392,7 +394,7 @@ export function ServiceInstallationBatchCreate({
                       min={activeDraft.tracking === "asset" ? 1 : 0.0001}
                       step={1}
                       decimals={activeDraft.tracking === "asset" ? 0 : 4}
-                      inputLabel={`Số lượng ${activeDraft.product.name}`}
+                      inputLabel={`Số lượng ${productDisplayName(activeDraft.product)}`}
                     />
                   </Field>
                   <Field label="Phân loại">

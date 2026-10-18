@@ -80,6 +80,7 @@ export interface PricingProductRow {
   }>;
   parentProductId: string | null;
   variantName: string | null;
+  specs: unknown;
   isVariantParent: boolean;
   baseRetailPrice: number;
   costPrice: number;
@@ -255,6 +256,7 @@ export async function getPricingPage(storeId: string, query: PricingQuery = {}):
         ), '[]')`,
         parentProductId: products.parentProductId,
         variantName: products.variantName,
+        specs: products.specs,
         isVariantParent: products.isVariantParent,
         baseRetailPrice: products.retailPrice,
         costPrice: products.costPrice,
@@ -302,6 +304,7 @@ export async function getPricingPage(storeId: string, query: PricingQuery = {}):
       })),
       parentProductId: row.parentProductId,
       variantName: row.variantName,
+      specs: row.specs,
       isVariantParent: row.isVariantParent,
       baseRetailPrice: Number(row.baseRetailPrice),
       costPrice: Number(row.costPrice),

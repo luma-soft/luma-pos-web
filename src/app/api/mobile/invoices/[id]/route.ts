@@ -1,3 +1,4 @@
+import { productLineDisplayName } from "@/lib/products/variant-presentation";
 import { getOrder } from "@/lib/data/orders";
 import { db } from "@/db";
 import { einvoices } from "@/db/schema";
@@ -37,6 +38,7 @@ export async function GET(
     .limit(1);
   return mobileOk({
     ...order,
+    items: order.items.map((item) => ({ ...item, productName: productLineDisplayName(item) })),
     eInvoice: eInvoice ?? null,
     lifecycle: {
       hasReturns: order.returns.length > 0,

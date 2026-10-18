@@ -1,5 +1,7 @@
 "use client";
 
+import { productLineDisplayName } from "@/lib/products/variant-presentation";
+
 import { useLocale, useTranslations } from "next-intl";
 import { catalogText } from "@/lib/i18n/catalog-text";
 import type { ReactNode } from "react";
@@ -107,7 +109,7 @@ function ExpandedIssue({ row }: { row: InternalUseRow }) {
             <article key={item.id} className="space-y-2 p-3 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="break-words font-semibold">{item.productName}</div>
+                  <div className="break-words font-semibold">{productLineDisplayName(item)}</div>
                   <div className="mt-0.5 font-mono text-xs text-primary-600">{item.sku ?? "—"}</div>
                 </div>
                 <div className="shrink-0 font-bold tabular-nums">{formatCurrency(item.total)}</div>
@@ -143,7 +145,7 @@ function ExpandedIssue({ row }: { row: InternalUseRow }) {
             {row.items.map((item) => (
               <tr key={item.id} className="hover:bg-surface-2/70">
                 <td className="px-3 py-3 font-mono font-semibold text-primary-600">{item.sku ?? "—"}</td>
-                <td className="break-words px-3 py-3 font-medium">{item.productName}</td>
+                <td className="break-words px-3 py-3 font-medium">{productLineDisplayName(item)}</td>
                 <td className="px-3 py-3">{item.unitName}</td>
                 <td className="px-3 py-3 text-right font-mono tabular-nums">{formatNumber(item.quantity)}</td>
                 <td className="px-3 py-3 text-right font-mono tabular-nums">{formatCurrency(item.unitCost)}</td>

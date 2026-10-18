@@ -1,3 +1,5 @@
+
+import { productDisplayName } from "@/lib/products/variant-presentation";
 import { notFound } from "next/navigation";
 import { Routes } from "@/lib/routes";
 import { ProductDetailDialog } from "@/components/product-detail-dialog";
@@ -31,7 +33,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
 
   return (
     <ProductDetailDialog
-      title={product.name}
+      title={productDisplayName(product)}
       subtitle={product.sku}
       closeHref={`${Routes.Inventory}?tab=products`}
     >

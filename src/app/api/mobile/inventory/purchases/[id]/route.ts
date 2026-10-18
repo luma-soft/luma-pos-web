@@ -1,3 +1,4 @@
+import { productLineDisplayName } from "@/lib/products/variant-presentation";
 import { updatePurchase, savePurchaseDraft } from "@/lib/actions/purchases";
 import { getPurchase } from "@/lib/data/inventory";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
@@ -43,7 +44,7 @@ export async function GET(
     items: purchase.items.map((item) => ({
       id: item.id,
       productId: item.productId,
-      productName: item.productName,
+      productName: productLineDisplayName(item),
       sku: item.sku,
       baseUnit: item.baseUnit,
       quantity: Number(item.quantity),

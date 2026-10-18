@@ -1,5 +1,7 @@
 "use client";
 
+import { productDisplayName } from "@/lib/products/variant-presentation";
+
 import { posBasePrice } from "@/lib/pos/price-book-price";
 
 import { Minus, Plus, Trash2 } from "lucide-react";
@@ -56,7 +58,7 @@ function isCamera(product: PosProduct) {
 }
 
 function label(product: PosProduct, settings: CameraQuoteSettings) {
-  return `${product.name} · ${formatCurrency(cameraQuotePrice(product.id, Number(product.retailPrice), settings))}`;
+  return `${productDisplayName(product)} · ${formatCurrency(cameraQuotePrice(product.id, Number(product.retailPrice), settings))}`;
 }
 
 function unitLabel(product?: PosProduct) {

@@ -3,7 +3,7 @@ let gate;
 const update = mock(async () => ({ ok:true,data:{id:"saved"} }));
 const remove = mock(async () => ({ ok:true,data:undefined }));
 mock.module("@/lib/actions/purchase-returns",()=>({updatePurchaseReturn:update,deletePurchaseReturn:remove}));
-mock.module("@/lib/data/purchase-returns",()=>({getPurchaseReturn:async()=>({id:"returned"})}));
+mock.module("@/lib/data/purchase-returns",()=>({getPurchaseReturn:async()=>({id:"returned",items:[{productName:"Ống PVC - 110",productVariantName:"110",productSpecs:{"Cấp":["C2"]}}]})}));
 mock.module("@/lib/mobile/auth",()=>({requireMobileManager:async()=>gate,requireMobileStockReadAccess:async()=>gate}));
 const {GET,PATCH,DELETE}=await import("./[id]/route");
 const id="11111111-1111-4111-8111-111111111111";
@@ -33,4 +33,9 @@ test("detail exposes manager-only mutation capabilities",async()=>{
    expect(body.data.canEdit).toBe(["owner","manager"].includes(role));
    expect(body.data.canDelete).toBe(["owner","manager"].includes(role));
  }
+});
+
+test("detail includes product attributes beside snapshot names", async () => {
+ const body=await (await GET(req({}),context)).json();
+ expect(body.data.items[0].productName).toBe("Ống PVC - 110 · C2");
 });

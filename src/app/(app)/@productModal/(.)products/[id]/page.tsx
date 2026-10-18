@@ -1,3 +1,5 @@
+
+import { productDisplayName } from "@/lib/products/variant-presentation";
 import { notFound } from "next/navigation";
 import { ProductDetailDialog } from "@/components/product-detail-dialog";
 import { getProductListItem } from "@/lib/data/products";
@@ -29,7 +31,7 @@ export default async function ProductDetailModalPage({ params, searchParams }: P
   if (!product) notFound();
 
   return (
-    <ProductDetailDialog title={product.name} subtitle={product.sku}>
+    <ProductDetailDialog title={productDisplayName(product)} subtitle={product.sku}>
       <ProductDetailView product={product} />
     </ProductDetailDialog>
   );

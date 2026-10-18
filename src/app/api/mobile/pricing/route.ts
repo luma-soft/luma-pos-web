@@ -72,6 +72,7 @@ export async function GET(request: Request) {
     imageUpdatedAt: product.imageUpdatedAt,
     parentProductId: product.parentProductId,
     variantName: product.variantName,
+    specs: product.specs,
     isVariantParent: product.isVariantParent,
     baseRetailPrice: product.baseRetailPrice,
     costPrice: canViewPurchasePrices(gate.role) ? product.costPrice : null,

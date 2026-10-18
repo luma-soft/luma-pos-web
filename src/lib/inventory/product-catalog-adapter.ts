@@ -11,6 +11,8 @@ export function catalogItemToPurchaseProduct(
   return {
     id: product.id,
     name: product.name,
+    variantName: product.variantName,
+    specs: product.specs,
     sku: product.sku,
     baseUnit: product.baseUnit,
     costPrice: product.costPrice ?? "0",
@@ -35,6 +37,8 @@ export function catalogItemToPurchaseReturnProduct(
   return {
     id: product.id,
     name: product.name,
+    variantName: product.variantName,
+    specs: product.specs,
     sku: product.sku,
     baseUnit: product.baseUnit,
     costPrice: product.costPrice ?? "0",

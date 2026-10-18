@@ -152,6 +152,7 @@ export async function getFieldServiceJobDetail(actor: FieldServiceActor, jobId: 
       id: serviceJobMaterials.id,
       productId: serviceJobMaterials.productId,
       productName: products.name,
+      productVariantName: products.variantName, productSpecs: products.specs,
       unitName: serviceJobMaterials.unitName,
       plannedQuantity: serviceJobMaterials.plannedQuantity,
       usedQuantity: serviceJobMaterials.usedQuantity,

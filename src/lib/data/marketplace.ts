@@ -95,6 +95,7 @@ export async function getShopeeDashboard(storeId: string) {
           id: marketplaceProductMappings.id,
           productId: marketplaceProductMappings.productId,
           productName: products.name,
+      productVariantName: products.variantName, productSpecs: products.specs,
           sku: products.sku,
           status: marketplaceProductMappings.status,
           title: marketplaceProductMappings.title,

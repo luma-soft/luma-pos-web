@@ -1,5 +1,7 @@
 "use client";
 
+import { productDisplayName } from "@/lib/products/variant-presentation";
+
 import { getCatalogWarehouseStock } from "@/lib/product-catalog";
 import { positiveQuantityOrDefault } from "@/lib/quantity";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -54,7 +56,7 @@ function productToLine(product: PurchaseReturnProductRow): Line {
     unitMultiplier: 1,
     productId: product.id,
     sku: product.sku,
-    name: product.name,
+    name: productDisplayName(product),
     unitName: product.baseUnit,
     stock: Number(product.totalStock) || 0,
     quantity: 1,
@@ -260,7 +262,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                     <ProductSearchResultLayout
                       selected={selected}
                       leading={<ProductSearchThumbnail product={product} />}
-                      summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
+                      summary={<><div className="text-sm font-semibold">{productDisplayName(product)}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
                       controls={selected && line ? (
                         <div onClick={(event) => event.stopPropagation()}>
                           <QuantityInput

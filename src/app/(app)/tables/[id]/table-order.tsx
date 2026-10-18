@@ -1,5 +1,7 @@
 "use client";
 
+import { productDisplayName } from "@/lib/products/variant-presentation";
+
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -90,7 +92,7 @@ export function TableOrder({
         return;
       }
     }
-    persist([{ lineId: uid(), productId: p.id, productName: p.name, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, basePrice: base, unitPrice, modifiers, note: note || undefined, course: "asap", courseDelayMinutes: 0, sent: false }, ...cart]);
+    persist([{ lineId: uid(), productId: p.id, productName: productDisplayName(p), unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, basePrice: base, unitPrice, modifiers, note: note || undefined, course: "asap", courseDelayMinutes: 0, sent: false }, ...cart]);
   }
 
   const setQty = (lineId: string, quantity: number) => {
@@ -188,7 +190,7 @@ export function TableOrder({
               <ProductSearchResultLayout
                 selected={selected}
                 leading={<ProductSearchThumbnail product={product} />}
-                summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
+                summary={<><div className="text-sm font-semibold">{productDisplayName(product)}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
                 controls={selected && line ? (
                   <div onClick={(event) => event.stopPropagation()}>
                     <QuantityInput size="sm" className="w-[8.25rem]" min={0} value={line.quantity} onChange={(quantity) => setQty(line.lineId, quantity)} inputLabel={t("common.productQuantity", { product: product.name })} />
@@ -374,7 +376,7 @@ function ModifierPicker({ product, groups, onCancel, onConfirm }: { product: Pos
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-3 sm:p-4" onClick={onCancel}>
       <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-auto rounded-card bg-surface shadow-e2 sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-border sticky top-0 bg-surface">
-          <h2 className="font-bold truncate">{product.name}</h2>
+          <h2 className="font-bold truncate">{productDisplayName(product)}</h2>
           <button onClick={onCancel} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-surface-2"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4">

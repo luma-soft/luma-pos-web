@@ -1,5 +1,7 @@
 "use client";
 
+import { productDisplayName } from "@/lib/products/variant-presentation";
+
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -84,7 +86,7 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
     setItems((ls) => ls.some((line) => line.productId === p.id)
       ? ls
       : [{
-          productId: p.id, productName: p.name,
+          productId: p.id, productName: productDisplayName(p),
           unitName: p.baseUnit, unitMultiplier: 1,
           quantity: 1, unitPrice: Number(p.retailPrice),
         }, ...ls]);
@@ -217,7 +219,7 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
                 <ProductSearchResultLayout
                   selected={selected}
                   leading={<ProductSearchThumbnail product={product} />}
-                  summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {product.baseUnit}</div></>}
+                  summary={<><div className="text-sm font-semibold">{productDisplayName(product)}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {product.baseUnit}</div></>}
                   controls={selected && line ? (
                     <div onClick={(event) => event.stopPropagation()}>
                       <QuantityInput size="sm" className="w-[8.25rem]" min={0} value={line.quantity} onChange={(quantity) => patch(lineIndex, { quantity })} inputLabel={t("common.productQuantity", { product: product.name })} />

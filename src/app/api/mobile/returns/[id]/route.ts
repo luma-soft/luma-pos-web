@@ -1,3 +1,4 @@
+import { productLineDisplayName } from "@/lib/products/variant-presentation";
 import { updateReturnMetadata } from "@/lib/actions/returns";
 import { isMobileEntityId } from "@/lib/mobile/exact-entity";
 import { getReturn } from "@/lib/data/returns";
@@ -17,6 +18,7 @@ export async function GET(
   if (!detail) return mobileError("errors.notFound", 404);
   const manager = gate.role === "owner" || gate.role === "manager";
   return mobileOk({ ...detail,
+    items: detail.items.map((item) => ({ ...item, productName: productLineDisplayName(item) })),
     canEdit: manager && detail.status === "completed",
     canCancel: manager && detail.status === "completed" && !detail.exchangeOrderId,
   });

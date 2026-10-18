@@ -20,6 +20,7 @@ export async function getExpiryStockAlerts(storeId: string, warningDays = 30, li
       id: stockLots.id,
       productId: stockLots.productId,
       productName: products.name,
+      productVariantName: products.variantName, productSpecs: products.specs,
       sku: products.sku,
       warehouseId: stockLots.warehouseId,
       warehouseName: warehouses.name,

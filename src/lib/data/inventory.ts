@@ -104,7 +104,7 @@ export async function getInventory(storeId: string, filters: { q?: string; low?:
       .select({
         id: products.id,
         sku: products.sku,
-        name: products.name,
+        name: products.name, variantName: products.variantName, specs: products.specs,
         baseUnit: products.baseUnit,
         costPrice: products.costPrice,
         trackBatches: hasComplianceColumns ? products.trackBatches : sql<boolean>`false`,
@@ -155,6 +155,7 @@ export const getRecentMovements = unstable_cache(
       note: stockMovements.note,
       createdAt: stockMovements.createdAt,
       productName: products.name,
+      productVariantName: products.variantName, productSpecs: products.specs,
       baseUnit: products.baseUnit,
       warehouseName: warehouses.name,
       byName: profiles.fullName,
@@ -260,6 +261,7 @@ export async function getPurchases(storeId: string, filters: { q?: string; statu
           discount: purchaseOrderItems.discount,
           total: purchaseOrderItems.total,
           productName: products.name,
+      productVariantName: products.variantName, productSpecs: products.specs,
           sku: products.sku,
           baseUnit: products.baseUnit,
         })
@@ -327,6 +329,7 @@ export async function getPurchase(storeId: string, id: string) {
       discount: purchaseOrderItems.discount,
       total: purchaseOrderItems.total,
       productName: products.name,
+      productVariantName: products.variantName, productSpecs: products.specs,
       sku: products.sku,
       baseUnit: products.baseUnit,
       imageUrls: productCompatibilityImageUrls(storeId),
@@ -358,7 +361,7 @@ export type PurchaseFormOptions = Awaited<ReturnType<typeof getPurchaseFormOptio
 /** Tìm SP cho phiếu nhập — query thẳng DB, bỏ dấu, quét toàn bộ (giống POS). */
 const purchaseProductSelection = {
   id: products.id,
-  name: products.name,
+  name: products.name, variantName: products.variantName, specs: products.specs,
   sku: products.sku,
   baseUnit: products.baseUnit,
   costPrice: products.costPrice,

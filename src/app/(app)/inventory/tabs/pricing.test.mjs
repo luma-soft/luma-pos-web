@@ -64,6 +64,15 @@ beforeEach(() => {
 });
 
 describe("pricing server-to-client data", () => {
+  test("renders identifying attributes beside the product name without changing SKU identity", async () => {
+    productRows = [{ ...product, name: "Ống PVC - 110", variantName: "110", specs: { "Cấp": ["C2"], __orderNote: ["private"] } }];
+    const row = (await clientProps()).rows[0];
+    expect(row.name).toBe("Ống PVC - 110 · C2");
+    expect(row.id).toBe(product.id);
+    expect(row.sku).toBe(product.sku);
+    expect(productRows[0].name).toBe("Ống PVC - 110");
+  });
+
   test("passes fixed, zero and linked unit prices to the confirmation boundary", async () => {
     productRows = [{ ...product, units: [
       { id: "cay", unitName: "Cây", multiplier: 4, priceOverride: 60000 },

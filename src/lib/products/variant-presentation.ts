@@ -74,3 +74,8 @@ export function selectableProductIds(product: {
   }
   return product.isVariantParent ? [] : [product.id];
 }
+
+/** Document snapshots may predate attribute metadata. */
+export function productLineDisplayName(product: { productName: string; productVariantName?: string | null; productSpecs?: unknown }) {
+  return productDisplayName({ name: product.productName, variantName: product.productVariantName, specs: product.productSpecs });
+}

@@ -3472,7 +3472,7 @@ function LinePriceEditor({
         needsConfirmation: true,
         confirm: () => confirm({
           title: "Đổi bảng giá dòng hàng?",
-          description: `${line.product.name}\nĐơn giá: ${money(prepared.previous.unitPrice)} → ${money(prepared.nextPrice)}.\n\nDùng “${bookName}” sẽ thay giá nhập tay và xóa chiết khấu của dòng này. Khuyến mại tự động được tính lại theo bảng mới. Các dòng khác giữ nguyên.`,
+          description: `${productDisplayName(line.product)}\nĐơn giá: ${money(prepared.previous.unitPrice)} → ${money(prepared.nextPrice)}.\n\nDùng “${bookName}” sẽ thay giá nhập tay và xóa chiết khấu của dòng này. Khuyến mại tự động được tính lại theo bảng mới. Các dòng khác giữ nguyên.`,
           confirmLabel: "Đổi bảng giá",
           cancelLabel: "Giữ nguyên",
           variant: "warning",
@@ -3537,7 +3537,7 @@ function LinePriceEditor({
         className="fixed left-1/2 top-1/2 z-60 w-100 max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 space-y-3 rounded-xl border border-border bg-surface p-4 text-sm shadow-e2"
       >
         {priceError && <p role="alert" className="text-sm text-red-600">{priceError}</p>}
-        <div id="pos-price-editor-title" className="mb-1 text-base font-semibold">{line.product.name}</div>
+        <div id="pos-price-editor-title" className="mb-1 text-base font-semibold">{productDisplayName(line.product)}</div>
         <div className="flex items-center justify-between gap-2">
           <span className="text-slate-500 shrink-0">{t("pos.priceBook.title")}</span>
           <Select

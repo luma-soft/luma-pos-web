@@ -1,5 +1,7 @@
 "use client";
 
+import { productLineDisplayName } from "@/lib/products/variant-presentation";
+
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
@@ -107,7 +109,7 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
                   rel="noreferrer"
                   className="inline-flex min-h-11 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11"
                 >
-                  {item.productName}
+                  {productLineDisplayName(item)}
                 </Link>
                 <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.total))}</div>
               </div>
@@ -138,7 +140,7 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
                     <Link href={Routes.product(item.productId)} target="_blank" rel="noreferrer" className="font-medium text-primary-600 hover:underline">{item.sku}</Link>
                   </td>
                   <td className="px-3 py-3">
-                    <div className="min-w-40 break-words font-medium">{item.productName}</div>
+                    <div className="min-w-40 break-words font-medium">{productLineDisplayName(item)}</div>
                     <div className="text-xs text-slate-400">{item.unitName}</div>
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>

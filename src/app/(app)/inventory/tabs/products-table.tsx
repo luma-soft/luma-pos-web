@@ -1,4 +1,6 @@
 "use client";
+
+import { productDisplayName } from "@/lib/products/variant-presentation";
 import { legacyText } from "@/lib/i18n/catalog-text";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -180,7 +182,7 @@ export function buildProductUnitColumns({
         <span className="text-slate-500">{product.variantGroup.totalStock === null ? "Nhiều đơn vị" : product.baseUnit}</span>
       ) : (
         <ProductUnitSelector
-          productName={product.name}
+          productName={productDisplayName(product)}
           baseUnit={product.baseUnit}
           units={product.unitDefinitions}
           value={projection(product).unitName}
@@ -423,7 +425,7 @@ export function ProductsTable({
       label: t("products.expand.cols.name"),
       required: true,
       cellClassName: "!whitespace-normal",
-      render: (product) => <div className="space-y-1"><div className="break-words font-medium text-slate-900 dark:text-slate-100">{groupOf(product)?.name ?? product.name}</div>{!groupOf(product) && <ProductKindBadge kind={product.productKind} />}</div>,
+      render: (product) => <div className="space-y-1"><div className="break-words font-medium text-slate-900 dark:text-slate-100">{groupOf(product)?.name ?? productDisplayName(product)}</div>{!groupOf(product) && <ProductKindBadge kind={product.productKind} />}</div>,
     },
     { key: "category", label: t("products.list.colCategory"), defaultVisible: false, width: "130px", render: (product) => <span className="text-slate-500">{product.categoryName ?? "—"}</span> },
     ...buildProductUnitColumns({
@@ -666,7 +668,7 @@ export function ProductMobileRow({
             <div className="flex min-w-0 items-center gap-3">
               <ProductThumbnail product={product} />
               <div className="min-w-0 flex-1">
-                <div className="break-words text-sm font-semibold text-slate-950 dark:text-white">{product.name}</div>
+                <div className="break-words text-sm font-semibold text-slate-950 dark:text-white">{productDisplayName(product)}</div>
                 <div className="mt-0.5 break-words text-xs text-slate-400">
                   {product.sku}{!variantRow && product.categoryName ? ` · ${product.categoryName}` : ""}
                 </div>
@@ -697,7 +699,7 @@ export function ProductMobileRow({
         {!group && unitOptions.length > 1 && (
           <div className="px-3 pb-3">
             <ProductUnitSelector
-              productName={product.name}
+              productName={productDisplayName(product)}
               baseUnit={product.baseUnit}
               units={product.unitDefinitions}
               value={projected.unitName}
@@ -748,7 +750,7 @@ function ProductThumbnail({ product }: { product: ProductRow }) {
       {image ? (
         <Image
           src={image}
-          alt={product.name}
+          alt={productDisplayName(product)}
           fill
           sizes="44px"
           className="object-contain p-1"
@@ -931,7 +933,7 @@ function ProductInfoPanel({
             <>
               <Image
                 src={image}
-                alt={`${product.name} ${activeImage + 1}`}
+                alt={`${productDisplayName(product)} ${activeImage + 1}`}
                 fill
                 sizes="144px"
                 className="object-contain p-2 transition-transform duration-200 group-hover:scale-105"
@@ -970,7 +972,7 @@ function ProductInfoPanel({
 
       {imagePreviewOpen && image && (
         <ProductImageLightbox
-          productName={product.name}
+          productName={productDisplayName(product)}
           imageUrls={imageUrls}
           activeImage={activeImage}
           onActiveImageChange={setActiveImage}
@@ -982,7 +984,7 @@ function ProductInfoPanel({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1 text-center lg:text-left">
             <h3 className="text-balance break-words text-lg font-black leading-snug text-slate-900 lg:font-bold dark:text-slate-100">
-              {product.name}
+              {productDisplayName(product)}
             </h3>
             <div className="mt-1 text-sm text-slate-500">
               {t("products.fields.category")}: {product.categoryName ?? "—"}
@@ -1101,7 +1103,7 @@ function ProductInfoPanel({
                   className="flex items-center justify-between gap-3 rounded-lg bg-surface px-3 py-2 text-sm"
                 >
                   <span className="min-w-0 truncate">
-                    {item.name}
+                    {productDisplayName(item)}
                     <span className="ml-1 text-xs text-slate-400">
                       {item.sku}
                     </span>

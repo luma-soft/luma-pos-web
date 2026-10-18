@@ -1,3 +1,4 @@
+import { productDisplayName, productLineDisplayName } from "@/lib/products/variant-presentation";
 import {
   getInventory,
   getInternalUseCostSummary,
@@ -45,13 +46,13 @@ export async function GET(request: Request) {
       ]);
 
     return mobileOk({
-      inventory: products,
-      movements,
-      purchases,
+      inventory: { ...products, rows: products.rows.map((row) => ({ ...row, name: productDisplayName(row) })) },
+      movements: movements.map((row) => ({ ...row, productName: productLineDisplayName(row) })),
+      purchases: { ...purchases, rows: purchases.rows.map((row) => ({ ...row, items: row.items.map((item) => ({ ...item, productName: productLineDisplayName(item) })) })) },
       purchaseOptions,
       expiry,
       internalUse,
-      internalUseIssues,
+      internalUseIssues: internalUseIssues.map((row) => ({ ...row, items: row.items.map((item) => ({ ...item, productName: productLineDisplayName(item) })) })),
     });
   } catch {
     return mobileError("errors.serverError", 503);

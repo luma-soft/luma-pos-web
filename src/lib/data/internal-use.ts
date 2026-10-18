@@ -86,6 +86,7 @@ export async function getInternalUseIssues(storeId: string, { limit = 50, ...fil
       productId: internalUseItems.productId,
       sku: products.sku,
       productName: internalUseItems.productName,
+      productVariantName: products.variantName, productSpecs: products.specs,
       unitName: internalUseItems.unitName,
       unitMultiplier: internalUseItems.unitMultiplier,
       quantity: internalUseItems.quantity,

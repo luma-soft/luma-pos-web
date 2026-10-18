@@ -1,5 +1,7 @@
 "use client";
 
+import { productDisplayName } from "@/lib/products/variant-presentation";
+
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -696,7 +698,7 @@ function CameraQuoteSettingsSection({
   const ipCameraSkus = new Set<string>(Object.values(CAMERA_IP_QUOTE_LEGACY_SKUS.camera));
   const wifiCameras = options.cameras.filter((product) => !ipCameraSkus.has(product.sku));
   const visibleCameras = wifiCameras.filter((product) =>
-    `${product.name} ${product.sku}`.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi")),
+    `${productDisplayName(product)} ${product.sku}`.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi")),
   );
   const cameraColumns: DataTableColumn<CameraQuoteCamera>[] = [
     {
@@ -705,7 +707,7 @@ function CameraQuoteSettingsSection({
       required: true,
       render: (product) => (
         <div className="min-w-0">
-          <div className="truncate text-xs font-semibold">{product.name}</div>
+          <div className="truncate text-xs font-semibold">{productDisplayName(product)}</div>
           <div className="text-[10px] text-slate-400">{product.sku}</div>
         </div>
       ),

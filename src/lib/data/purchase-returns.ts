@@ -74,6 +74,7 @@ export async function getPurchaseReturns(storeId: string, filters: { q?: string;
           purchaseReturnId: purchaseReturnItems.purchaseReturnId,
           productId: purchaseReturnItems.productId,
           productName: purchaseReturnItems.productName,
+          productVariantName: products.variantName, productSpecs: products.specs,
           sku: purchaseReturnItems.sku,
           unitName: purchaseReturnItems.unitName,
           unitMultiplier: purchaseReturnItems.unitMultiplier,
@@ -147,6 +148,7 @@ export async function getPurchaseReturn(storeId: string, id: string) {
       purchaseReturnId: purchaseReturnItems.purchaseReturnId,
       productId: purchaseReturnItems.productId,
       productName: purchaseReturnItems.productName,
+          productVariantName: products.variantName, productSpecs: products.specs,
       sku: purchaseReturnItems.sku,
       unitName: purchaseReturnItems.unitName,
           unitMultiplier: purchaseReturnItems.unitMultiplier,
@@ -156,6 +158,7 @@ export async function getPurchaseReturn(storeId: string, id: string) {
       total: purchaseReturnItems.total,
     })
     .from(purchaseReturnItems)
+    .leftJoin(products, and(eq(purchaseReturnItems.productId, products.id), eq(products.storeId, storeId)))
     .where(and(
       eq(purchaseReturnItems.purchaseReturnId, id),
       eq(purchaseReturnItems.storeId, storeId),
@@ -172,7 +175,7 @@ export async function searchPurchaseReturnProductRows(storeId: string, q: string
   return db
     .select({
       id: products.id,
-      name: products.name,
+      name: products.name, variantName: products.variantName, specs: products.specs,
       sku: products.sku,
       baseUnit: products.baseUnit,
       costPrice: products.costPrice,

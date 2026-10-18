@@ -1,5 +1,7 @@
 "use client";
 
+import { productDisplayName } from "@/lib/products/variant-presentation";
+
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -46,7 +48,7 @@ function toProductOption(product: ProductCatalogItem, warehouseId: string): Prod
     id: product.id,
     sku: product.sku,
     barcode: product.barcode,
-    name: product.name,
+    name: productDisplayName(product),
     baseUnit: product.baseUnit,
     costPrice: Number(product.costPrice ?? 0),
     stock: getCatalogWarehouseStock(product, warehouseId),
@@ -240,7 +242,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                     <ProductSearchResultLayout
                       selected={selected}
                       leading={<ProductSearchThumbnail product={product} />}
-                      summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
+                      summary={<><div className="text-sm font-semibold">{productDisplayName(product)}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
                       controls={selected ? (
                         <div onClick={(event) => event.stopPropagation()}>
                           <QuantityInput
@@ -286,7 +288,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                   return (
                     <MobileFormLineCard
                       key={l.product.id}
-                      title={l.product.name}
+                      title={productDisplayName(l.product)}
                       subtitle={`${l.product.sku} · ${l.product.baseUnit}`}
                       amount={diff !== 0 ? formatCurrency(diff * l.product.costPrice) : "—"}
                       actions={(
@@ -356,7 +358,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                     return (
                       <tr key={l.product.id} className="transition hover:bg-surface-2/70">
                         <td className="px-4 py-3 [overflow-wrap:anywhere]">
-                          <div className="font-semibold">{l.product.name}</div>
+                          <div className="font-semibold">{productDisplayName(l.product)}</div>
                           <div className="font-mono text-xs text-slate-400">{l.product.sku} · {l.product.baseUnit}</div>
                         </td>
                         <td className="px-2 py-3 text-right tabular-nums text-slate-500 [overflow-wrap:anywhere]">{formatNumber(l.product.stock)}</td>

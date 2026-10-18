@@ -1,3 +1,5 @@
+
+import { productDisplayName } from "@/lib/products/variant-presentation";
 import Link from "next/link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { getLocale, getTranslations } from "next-intl/server";
@@ -292,7 +294,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                         {categoryEmoji(p.categoryName)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-[13px] truncate">{p.name}</div>
+                        <div className="font-semibold text-[13px] truncate">{productDisplayName(p)}</div>
                         <div className="text-xs text-slate-400">
                           {t("dashboard.stockOfMin", { stock: formatNumber(stock), unit: p.baseUnit, min: formatNumber(min) })}
                         </div>

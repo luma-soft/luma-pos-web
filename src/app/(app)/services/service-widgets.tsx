@@ -1,4 +1,6 @@
 "use client";
+
+import { productDisplayName } from "@/lib/products/variant-presentation";
 import { legacyText } from "@/lib/i18n/catalog-text";
 
 import { PartnerDetailLink } from "@/components/partner-detail-link";
@@ -808,7 +810,7 @@ export function InstalledAssetQuickCreate({
             setProductId(nextId);
             const product = products.find((item) => item.id === nextId);
             if (product && !name.trim()) setName(product.name);
-          }} allowClear={false} placeholder={t("services.assets.noProduct")} options={[{ value: "", label: t("services.assets.noProduct") }, ...products.map((product) => ({ value: product.id, label: `${product.brandName ? `${product.brandName} · ` : ""}${product.sku} · ${product.name}`, hint: product.categoryName ?? undefined }))]} /></Field>
+          }} allowClear={false} placeholder={t("services.assets.noProduct")} options={[{ value: "", label: t("services.assets.noProduct") }, ...products.map((product) => ({ value: product.id, label: `${product.brandName ? `${product.brandName} · ` : ""}${product.sku} · ${productDisplayName(product)}`, hint: product.categoryName ?? undefined }))]} /></Field>
           <Field label={t("services.fields.assetKind")} required><Input value={assetKind} onChange={(event) => setAssetKind(event.target.value)} /></Field>
           <Field label={t("services.fields.asset")} required><Input value={name} onChange={(event) => setName(event.target.value)} /></Field>
           <Field label={t("services.fields.brand")}><Input value={brand} onChange={(event) => setBrand(event.target.value)} /></Field>
@@ -1073,7 +1075,7 @@ export function ServiceMaterialEditor({
               setProductId(nextId);
               setUnitName(products.find((product) => product.id === nextId)?.baseUnit ?? "");
             }}
-            options={products.map((product) => ({ value: product.id, label: `${product.brandName ? `${product.brandName} · ` : ""}${product.sku} · ${product.name}`, hint: product.categoryName ?? undefined }))}
+            options={products.map((product) => ({ value: product.id, label: `${product.brandName ? `${product.brandName} · ` : ""}${product.sku} · ${productDisplayName(product)}`, hint: product.categoryName ?? undefined }))}
             disabled={Boolean(initial)}
             placeholder={t("services.materials.product")}
           />

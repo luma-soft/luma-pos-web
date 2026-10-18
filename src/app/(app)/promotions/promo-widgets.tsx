@@ -1,5 +1,7 @@
 "use client";
 
+import { productDisplayName } from "@/lib/products/variant-presentation";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -111,7 +113,7 @@ export function PromoQuickCreate() {
             onChange={(e) => setProductId(e.target.value)}
             options={[
               { value: "", label: t("purchases.pickProduct") },
-              ...products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` })),
+              ...products.map((p) => ({ value: p.id, label: `${productDisplayName(p)} (${p.sku})` })),
             ]}
             className="w-full sm:w-80"
           />

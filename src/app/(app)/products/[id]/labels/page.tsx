@@ -1,3 +1,5 @@
+
+import { productDisplayName } from "@/lib/products/variant-presentation";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import bwipjs from "bwip-js/node";
@@ -208,7 +210,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
                 <ProductLabel
                   key={`${label.product.id}-${index}`}
                   template={template}
-                  name={label.product.name}
+                  name={productDisplayName(label.product)}
                   sku={label.product.sku}
                   unitName={label.product.baseUnit}
                   code={label.code}

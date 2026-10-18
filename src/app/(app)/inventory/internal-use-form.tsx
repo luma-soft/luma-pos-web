@@ -1,4 +1,6 @@
 "use client";
+
+import { productDisplayName } from "@/lib/products/variant-presentation";
 import { catalogTextByFlag, legacyTextByFlag } from "@/lib/i18n/catalog-text";
 
 import { type ReactNode, useCallback, useMemo, useState, useTransition } from "react";
@@ -95,7 +97,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
     setLines((ls) => {
       const ex = ls.findIndex((x) => x.productId === p.id);
       if (ex >= 0) return ls;
-      return [{ key: `${p.id}-${Date.now()}`, productId: p.id, sku: p.sku, productName: p.name, baseUnit: p.baseUnit, costPrice: cost, units, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, unitCost: cost }, ...ls];
+      return [{ key: `${p.id}-${Date.now()}`, productId: p.id, sku: p.sku, productName: productDisplayName(p), baseUnit: p.baseUnit, costPrice: cost, units, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, unitCost: cost }, ...ls];
     });
     setQ("");
   }
@@ -136,7 +138,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
           key: `${product.id}-${Date.now()}-${additions.length}`,
           productId: product.id,
           sku: product.sku,
-          productName: product.name,
+          productName: productDisplayName(product),
           baseUnit: product.baseUnit,
           costPrice: cost,
           units,
@@ -217,7 +219,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                       <ProductSearchResultLayout
                         selected={selected}
                         leading={<ProductSearchThumbnail product={product} />}
-                        summary={<><div className="text-sm font-semibold">{product.name}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {formatNumber(stock)} {product.baseUnit}</div></>}
+                        summary={<><div className="text-sm font-semibold">{productDisplayName(product)}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {formatNumber(stock)} {product.baseUnit}</div></>}
                         controls={selected && line ? (
                           <div onClick={(event) => event.stopPropagation()}>
                             <QuantityInput

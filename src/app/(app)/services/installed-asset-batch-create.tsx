@@ -1,5 +1,7 @@
 "use client";
 
+import { productDisplayName } from "@/lib/products/variant-presentation";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
@@ -865,7 +867,7 @@ function ProductOption({
       </span>
       <CatalogThumb product={product} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-slate-900">{product.name}</span>
+        <span className="block truncate text-sm font-semibold text-slate-900">{productDisplayName(product)}</span>
         <span className="mt-0.5 block truncate text-xs text-slate-500">
           SKU: {product.sku}
           {product.brandName ? ` · Thương hiệu: ${product.brandName}` : ""}

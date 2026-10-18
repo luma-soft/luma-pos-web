@@ -32,7 +32,7 @@ export async function getRestockSuggestions(storeId: string, days = 30): Promise
   const soldMap = new Map(sold.map((r) => [r.productId, Number(r.base)]));
 
   const prods = await db
-    .select({ id: products.id, name: products.name, sku: products.sku, baseUnit: products.baseUnit, totalStock: products.totalStock, minStock: products.minStock, costPrice: products.costPrice, lastPurchasePrice: products.lastPurchasePrice })
+    .select({ id: products.id, name: products.name, variantName: products.variantName, specs: products.specs, sku: products.sku, baseUnit: products.baseUnit, totalStock: products.totalStock, minStock: products.minStock, costPrice: products.costPrice, lastPurchasePrice: products.lastPurchasePrice })
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .where(and(eq(products.storeId, storeId), eq(products.isActive, true), stockManagedCategoryCondition()));

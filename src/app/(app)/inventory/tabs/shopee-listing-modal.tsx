@@ -1,4 +1,6 @@
 "use client";
+
+import { productDisplayName } from "@/lib/products/variant-presentation";
 import { legacyTextByFlag } from "@/lib/i18n/catalog-text";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -182,7 +184,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[280px_1fr]">
           <aside className="border-b border-border bg-canvas p-4 lg:border-b-0 lg:border-r">
             <div className="relative h-52 overflow-hidden rounded-card border border-border bg-surface">
-              {images[0] && product ? <Image src={images[0]} alt={product.name} fill className="object-cover" unoptimized /> : <div className="grid h-full place-items-center text-slate-400"><UploadCloud className="h-9 w-9" /></div>}
+              {images[0] && product ? <Image src={images[0]} alt={productDisplayName(product)} fill className="object-cover" unoptimized /> : <div className="grid h-full place-items-center text-slate-400"><UploadCloud className="h-9 w-9" /></div>}
             </div>
             <div className="mt-3 space-y-2 text-sm">
               {product ? (
@@ -961,7 +963,7 @@ function formFromProduct(product: ProductDetail | null): FormState {
   return {
     title: product.name.slice(0, 120),
     shortDescription: product.description?.slice(0, 300) ?? "",
-    description: product.description || `${product.name}\nSKU: ${product.sku}`,
+    description: product.description || `${productDisplayName(product)}\nSKU: ${product.sku}`,
     categoryId: "",
     categoryPath: product.categoryName ?? "",
     brand: product.brandName ?? "",
@@ -1057,7 +1059,7 @@ function ProductSearchInListing({
                 >
                   <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-lg">{categoryEmoji(product.categoryName)}</div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold">{product.name}</div>
+                    <div className="truncate text-sm font-semibold">{productDisplayName(product)}</div>
                     <div className={cn("text-xs", isProductStockManaged(product.categoryName) && Number(product.stock) <= 0 ? "text-er" : "text-slate-400")}>
                       {product.isVariantParent
                         ? `${product.children.length} SKU con`

@@ -1,5 +1,6 @@
 "use client";
 
+import { productDisplayName } from "@/lib/products/variant-presentation";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,8 @@ type StockRow = {
   id: string;
   sku: string;
   name: string;
+  variantName?: string | null;
+  specs?: unknown;
   baseUnit: string;
   costPrice: string | number;
   totalStock: string | number;
@@ -39,7 +42,7 @@ export function StockTable({ rows }: { rows: StockRow[]; stock?: StockFilter }) 
   const t = useTranslations();
   const router = useRouter();
   const columns: DataTableColumn<StockRow>[] = [
-    { key: "product", label: t("orders.cols.product"), required: true, render: (row) => <span><span className="font-medium">{row.name}</span><span className="ml-2 text-xs text-slate-400">{row.sku}</span></span> },
+    { key: "product", label: t("orders.cols.product"), required: true, render: (row) => <span><span className="font-medium">{productDisplayName(row)}</span><span className="ml-2 text-xs text-slate-400">{row.sku}</span></span> },
     { key: "stock", label: t("inventory.cols.stock"), defaultVisible: true, align: "right", cellClassName: (row) => stockClass(row), render: (row) => `${formatNumber(Number(row.totalStock))} ${row.baseUnit}` },
     { key: "min", label: t("inventory.cols.min"), defaultVisible: true, align: "right", render: (row) => Number(row.minLevel) > 0 ? formatNumber(Number(row.minLevel)) : "—" },
     { key: "level", label: t("inventory.cols.level"), defaultVisible: true, width: "140px", render: (row) => <Level row={row} /> },
@@ -94,7 +97,7 @@ function ExpandedStock({ row }: { row: StockRow }) {
           <div className="space-y-4">
             <div className="min-w-0">
               <h3 className="truncate text-lg font-bold text-slate-900 dark:text-slate-100">
-                {row.name}
+                {productDisplayName(row)}
               </h3>
               <div className="mt-1 text-sm text-slate-500">
                 {t("products.fields.sku")}: {row.sku}
@@ -106,7 +109,7 @@ function ExpandedStock({ row }: { row: StockRow }) {
             </div>
 
             <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
-              <InfoItem label={t("orders.cols.product")} value={row.name} />
+              <InfoItem label={t("orders.cols.product")} value={productDisplayName(row)} />
               <InfoItem label={t("products.fields.sku")} value={row.sku} />
               <InfoItem label={t("products.list.colCost")} value={formatCurrency(Number(row.costPrice))} />
               <InfoItem label={t("inventory.cols.value")} value={formatCurrency(Number(row.stockValue))} />

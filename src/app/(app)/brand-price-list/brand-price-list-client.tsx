@@ -1,5 +1,7 @@
 "use client";
 
+import { productDisplayName } from "@/lib/products/variant-presentation";
+
 import { matchesSearchTokens } from "@/lib/normalize";
 
 import { useMemo, useState } from "react";
@@ -122,7 +124,7 @@ export function BrandPriceListClient({
     const normalized = query.trim().toLocaleLowerCase("vi");
     return normalized
       ? products.filter((product) =>
-          matchesSearchTokens(`${product.name} ${product.sku} ${product.category ?? ""}`, normalized),
+          matchesSearchTokens(`${productDisplayName(product)} ${product.sku} ${product.category ?? ""}`, normalized),
         )
       : products;
   }, [products, query]);
@@ -219,7 +221,7 @@ export function BrandPriceListClient({
     if (!blob) return setNotice("Không tạo được ảnh báo giá.");
     if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      setNotice(`Đã sao chép ảnh báo giá ${product.name}.`);
+      setNotice(`Đã sao chép ảnh báo giá ${productDisplayName(product)}.`);
       return;
     }
     const link = document.createElement("a");
@@ -298,7 +300,7 @@ export function BrandPriceListClient({
                       {product.imageUrl ? (
                         <Image
                           src={product.imageUrl}
-                          alt={product.name}
+                          alt={productDisplayName(product)}
                           width={144}
                           height={144}
                           unoptimized
@@ -310,7 +312,7 @@ export function BrandPriceListClient({
                     </div>
                     <div className="flex min-w-0 flex-col p-4">
                       <p className="text-[11px] font-black uppercase tracking-wider" style={{ color: palette.accent }}>{product.sku}</p>
-                      <h3 className="mt-1 text-base font-black leading-5" style={{ color: palette.ink }}>{product.name}</h3>
+                      <h3 className="mt-1 text-base font-black leading-5" style={{ color: palette.ink }}>{productDisplayName(product)}</h3>
                       <div
                         className="group/description relative mt-2 min-w-0 text-xs leading-5 text-slate-500 outline-none"
                         tabIndex={0}
@@ -347,11 +349,11 @@ export function BrandPriceListClient({
                         </div>
                         <div className="flex gap-1">
                           {canEdit && (
-                            <button onClick={() => openEditor(product)} className="grid h-9 w-9 place-items-center border border-slate-200 text-slate-500 hover:bg-slate-50 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" aria-label={`Sửa giá ${product.name}`}>
+                            <button onClick={() => openEditor(product)} className="grid h-9 w-9 place-items-center border border-slate-200 text-slate-500 hover:bg-slate-50 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" aria-label={`Sửa giá ${productDisplayName(product)}`}>
                               <Edit3 className="h-4 w-4" />
                             </button>
                           )}
-                          <button onClick={() => copyProductImage(product)} className="grid h-9 w-9 place-items-center border text-white min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" style={{ background: palette.accent, borderColor: palette.accent }} aria-label={`Sao chép ảnh ${product.name}`}>
+                          <button onClick={() => copyProductImage(product)} className="grid h-9 w-9 place-items-center border text-white min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" style={{ background: palette.accent, borderColor: palette.accent }} aria-label={`Sao chép ảnh ${productDisplayName(product)}`}>
                             <Copy className="h-4 w-4" />
                           </button>
                         </div>
