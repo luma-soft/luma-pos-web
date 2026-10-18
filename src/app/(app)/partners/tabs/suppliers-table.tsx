@@ -163,7 +163,21 @@ export function SuppliersTable({
     setFilterOpen(false);
   }
   const columns: DataTableColumn<SupplierRow>[] = [
-    { key: "name", label: t("suppliers.cols.name"), required: true, render: (row) => <PartnerDetailLink kind="supplier" partnerId={row.id} name={row.name} className="font-semibold" /> },
+    {
+      key: "name",
+      label: t("suppliers.cols.name"),
+      required: true,
+      width: "360px",
+      wrap: true,
+      render: (row) => (
+        <PartnerDetailLink
+          kind="supplier"
+          partnerId={row.id}
+          name={row.name}
+          className="block w-full whitespace-normal break-words font-semibold"
+        />
+      ),
+    },
     { key: "code", label: t("customers.cols.code"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.code}</span> },
     { key: "phone", label: t("customers.cols.phone"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.phone ?? "—"}</span> },
     { key: "tax", label: t("customers.fields.taxCode"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.taxCode ?? "—"}</span> },
