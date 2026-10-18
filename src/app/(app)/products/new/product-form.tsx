@@ -710,6 +710,7 @@ function FormActions({
           type="submit"
           variant="secondary"
           loading={loading && submitIntent === "sameType"}
+          loadingMode="replace"
           disabled={loading && submitIntent !== "sameType"}
           onClick={() => onIntent("sameType")}
           tx={createVariantAfterSave ? "products.saveAndCreateVariant" : isEdit ? "products.saveAndCreateSameType" : "products.saveAndCreate"}
@@ -718,6 +719,7 @@ function FormActions({
         <Button
           type="submit"
           loading={loading && submitIntent === "save"}
+          loadingMode="replace"
           disabled={loading && submitIntent !== "save"}
           onClick={() => onIntent("save")}
           tx="common.save"
