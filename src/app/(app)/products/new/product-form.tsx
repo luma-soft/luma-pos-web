@@ -153,7 +153,7 @@ export interface NewProductFormProps {
   initialManagedImages?: UploadedProductImage[];
   layout?: "page" | "modal";
   closeHref?: string;
-  closeNavigation?: "push" | "replace";
+  closeNavigation?: "back" | "push" | "replace";
   cancelNavigation?: "back" | "push" | "replace";
   createdProductReturnTo?: string;
   aiPreview?: boolean;
@@ -193,7 +193,10 @@ export function NewProductForm({
   const isModal = layout === "modal";
   const doneHref = closeHref ?? Routes.Products;
   const navigateAfterModal = (href: string) => {
-    if (closeNavigation === "replace") router.replace(href);
+    // Return to the existing detail entry after saving an intercepted editor.
+    // Creating another product has a different destination and must navigate.
+    if (closeNavigation === "back" && href === doneHref) router.back();
+    else if (closeNavigation !== "push") router.replace(href);
     else router.push(href);
   };
   const createdProductHref = (id: string) => {

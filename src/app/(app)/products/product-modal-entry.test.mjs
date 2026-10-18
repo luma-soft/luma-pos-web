@@ -39,7 +39,7 @@ test("editing from detail adds a history entry and cancel returns to detail", ()
   expect(editAction).toContain('?edit=1`');
   expect(editAction).not.toContain("replace=");
   expect(interceptedDetailPage).toContain('cancelNavigation="back"');
-  expect(interceptedDetailPage).toContain('closeNavigation="replace"');
+  expect(interceptedDetailPage).toContain('closeNavigation="back"');
   expect(detailPage).toContain("closeHrefOverride={productEditorCloseHref(id)}");
 });
 
@@ -91,4 +91,51 @@ test("save actions show loading only on the submitted action", () => {
   expect(productForm.match(/submitIntent={submitIntent}/g)?.length).toBe(2);
   expect(formActions).toContain('loading={loading && submitIntent === "sameType"}');
   expect(formActions).toContain('loading={loading && submitIntent === "save"}');
+});
+
+// Replay the navigation callback used by the form with a browser-history model.
+function editorHistory(page) {
+  const inventory = "/inventory?tab=products";
+  const detail = "/products/example";
+  const entries = [inventory, detail, `${detail}?edit=1`];
+  let index = entries.length - 1;
+  const router = {
+    back() { index -= 1; },
+    replace(href) { entries[index] = href; },
+    push(href) { entries.splice(++index, entries.length, href); },
+  };
+  const navigation = page.match(/closeNavigation="(\w+)"/)[1];
+  const callback = productForm.match(/const navigateAfterModal = \(href: string\) => \{([\s\S]*?)\n  \};/)[1];
+  const navigate = new Function("router", "closeNavigation", "doneHref", "href", callback);
+  return { inventory, detail, router, current: () => entries[index], save: (href = detail) => navigate(router, navigation, detail, href) };
+}
+
+test("saving from intercepted detail then closing once returns to inventory", () => {
+  const history = editorHistory(interceptedDetailPage);
+  history.save();
+  expect(history.current()).toBe(history.detail);
+  history.router.back();
+  expect(history.current()).toBe(history.inventory);
+});
+
+test("repeated edit/save cycles do not accumulate detail history entries", () => {
+  const history = editorHistory(interceptedDetailPage);
+  history.save();
+  history.router.push(`${history.detail}?edit=1`);
+  history.save();
+  history.router.back();
+  expect(history.current()).toBe(history.inventory);
+});
+
+test("save and create another still navigates to its new editor", () => {
+  const history = editorHistory(interceptedDetailPage);
+  const next = "/inventory?tab=products&productModal=sameType&sameTypeAs=example";
+  history.save(next);
+  expect(history.current()).toBe(next);
+});
+
+test("hard-loaded editor replaces its URL on save", () => {
+  const history = editorHistory(detailPage);
+  history.save();
+  expect(history.current()).toBe(history.detail);
 });

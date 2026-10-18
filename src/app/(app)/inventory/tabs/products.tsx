@@ -156,7 +156,7 @@ export async function ProductEditorModal({
 }: {
   searchParams: SP;
   closeHrefOverride?: string;
-  closeNavigation?: "push" | "replace";
+  closeNavigation?: "back" | "push" | "replace";
   cancelNavigation?: "back" | "push" | "replace";
 }) {
   const context = await requireStoreContext();

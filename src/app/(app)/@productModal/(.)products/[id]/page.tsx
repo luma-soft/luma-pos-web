@@ -19,7 +19,7 @@ export default async function ProductDetailModalPage({ params, searchParams }: P
       <ProductEditorModal
         searchParams={{ productModal: "edit", productId: id }}
         closeHrefOverride={productEditorCloseHref(id)}
-        closeNavigation="replace"
+        closeNavigation="back"
         cancelNavigation="back"
       />
     );
