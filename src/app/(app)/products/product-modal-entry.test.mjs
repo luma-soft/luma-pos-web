@@ -10,7 +10,6 @@ const productForm = readFileSync(new URL("./new/product-form.tsx", import.meta.u
 const productsModal = readFileSync(new URL("../inventory/tabs/products.tsx", import.meta.url), "utf8");
 const productsTable = readFileSync(new URL("../inventory/tabs/products-table.tsx", import.meta.url), "utf8");
 const interceptedDetailPage = readFileSync(new URL("../@productModal/(.)products/[id]/page.tsx", import.meta.url), "utf8");
-const productModalLoading = readFileSync(new URL("../@productModal/loading.tsx", import.meta.url), "utf8");
 const productDetailDialog = readFileSync(new URL("../../../components/product-detail-dialog.tsx", import.meta.url), "utf8");
 const productActions = readFileSync(new URL("../../../lib/actions/products.ts", import.meta.url), "utf8");
 const productVariantActions = readFileSync(new URL("../../../lib/actions/product-variants.ts", import.meta.url), "utf8");
@@ -35,9 +34,15 @@ test("product detail and editor occupy one modal surface", () => {
   expect(productsModal).not.toContain('className="fixed inset-0 z-[100]');
 });
 
-test("product modal route loading does not render the app page skeleton beside the list", () => {
-  expect(productModalLoading).toContain("export default function ProductModalLoading()");
-  expect(productModalLoading).toMatch(/return\s+null\s*;/);
+test("parallel modal route loading does not render the app page skeleton beside the page", () => {
+  for (const slot of ["productModal", "orderModal", "purchaseModal", "projectModal"]) {
+    const loadingPath = new URL(`../@${slot}/loading.tsx`, import.meta.url);
+    expect(existsSync(loadingPath)).toBe(true);
+
+    const loading = readFileSync(loadingPath, "utf8");
+    expect(loading).toContain("Loading()");
+    expect(loading).toMatch(/return\s+null\s*;/);
+  }
 });
 
 test("editing from detail adds a history entry and cancel returns to detail", () => {
