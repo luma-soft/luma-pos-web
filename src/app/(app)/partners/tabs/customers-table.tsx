@@ -232,15 +232,6 @@ function CustomerRows({
       ),
     },
     {
-      key: "code",
-      label: t("customers.cols.code"),
-      defaultVisible: true,
-      width: "130px",
-      render: (customer) => (
-        <span className="font-medium">{customer.code ?? "—"}</span>
-      ),
-    },
-    {
       key: "name",
       label: t("customers.cols.name"),
       required: true,
@@ -253,6 +244,15 @@ function CustomerRows({
           name={customer.name}
           className="block w-full whitespace-normal break-words font-semibold"
         />
+      ),
+    },
+    {
+      key: "code",
+      label: t("customers.cols.code"),
+      defaultVisible: true,
+      width: "130px",
+      render: (customer) => (
+        <span className="font-medium">{customer.code ?? "—"}</span>
       ),
     },
     {
