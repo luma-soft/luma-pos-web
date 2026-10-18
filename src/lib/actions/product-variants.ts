@@ -7,12 +7,16 @@ import { createProductSchema, type CreateProductInput } from "@/app/(app)/produc
 import { requireStockAccess, pgErrorCode, type ActionResult } from "./common";
 import { saveVariantGroupInTransaction } from "@/lib/products/variant-write";
 import { VariantValidationError } from "@/lib/products/variant-model";
-import { revalidateAppData } from "@/lib/sync/revalidate-app-data";
+import { Routes } from "@/lib/routes";
+import { revalidateAppDataPage } from "@/lib/sync/revalidate-app-data";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { getPublicMediaConfig } from "@/lib/media/config";
 import { replaceProductMediaInTransaction, resolveLegacyProductImageIdsInTransaction, ProductMediaValidationError } from "@/lib/products/product-media";
 
-export async function saveProductVariantGroup(input: CreateProductInput): Promise<ActionResult<{ id: string; createdProductId?: string }>> {
+export async function saveProductVariantGroup(
+  input: CreateProductInput,
+  options: { deferInventoryRefresh?: boolean } = {},
+): Promise<ActionResult<{ id: string; createdProductId?: string }>> {
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
   const parsed = createProductSchema.safeParse(input);
@@ -61,7 +65,11 @@ export async function saveProductVariantGroup(input: CreateProductInput): Promis
       }
       return saved;
     });
-    revalidateAppData("/(app)", "layout");
+    revalidateAppDataPage(Routes.Products);
+    if (!options.deferInventoryRefresh) revalidateAppDataPage(Routes.Inventory);
+    revalidateAppDataPage(Routes.productDetail(result.id));
+    revalidateAppDataPage(Routes.Pricing);
+    revalidateAppDataPage(Routes.POS);
     return {
       ok: true,
       data: {

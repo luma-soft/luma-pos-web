@@ -9,9 +9,18 @@ import { revalidatePath as nextRevalidatePath } from "next/cache";
  * revalidatePath also works in Route Handlers used by mobile/API clients;
  * unlike next/cache refresh(), this helper is not Server-Action-only.
  */
-export function revalidateAppData(path: string, type?: "page" | "layout") {
+export function revalidateAppData(
+  path: string,
+  type?: "page" | "layout",
+  options: { includeAppLayout?: boolean } = {},
+) {
   nextRevalidatePath(path, type);
-  if (path !== "/(app)" || type !== "layout") {
+  if (options.includeAppLayout !== false && (path !== "/(app)" || type !== "layout")) {
     nextRevalidatePath("/(app)", "layout");
   }
+}
+
+/** Invalidate one page without refreshing unrelated client read models mounted in the app layout. */
+export function revalidateAppDataPage(path: string) {
+  revalidateAppData(path, undefined, { includeAppLayout: false });
 }

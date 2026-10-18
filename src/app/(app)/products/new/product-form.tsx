@@ -62,6 +62,7 @@ import type { ProductDetail, ProductFormOptions } from "@/lib/data/products";
 import type { PriceBookRow } from "@/lib/data/price-books";
 import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai-assistant/utils";
 import { useTenantClientScope } from "@/components/tenant-client-scope";
+import { useRefreshAppDataOnReturn } from "@/components/app-data-sync-provider";
 import {
   changedProductStock,
   MIN_STOCK_QUANTITY,
@@ -185,6 +186,7 @@ export function NewProductForm({
   creationKind = "product",
 }: NewProductFormProps) {
   const storageScope = useTenantClientScope();
+  const scheduleAppDataRefreshOnReturn = useRefreshAppDataOnReturn();
   const t = useTranslations();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialValues?.variantOperation === "add" ? "variants" : "info");
@@ -324,8 +326,11 @@ export function NewProductForm({
 
   async function saveValues(values: CreateProductOutput) {
     if (values.variantGroupId || values.variantChildren.length > 0) {
-      const result = await saveProductVariantGroup(values);
+      const result = await saveProductVariantGroup(values, { deferInventoryRefresh: isModal });
       if (!result.ok) { form.setError("root", { message: result.error }); return; }
+      if (isModal && !createdProductReturnTo) {
+        scheduleAppDataRefreshOnReturn(Routes.Inventory);
+      }
       if (!isEdit && submitIntent === "sameType") {
         navigateAfterModal(sameTypeHref(result.data.createdProductId ?? result.data.id));
         return;
@@ -372,7 +377,7 @@ export function NewProductForm({
         ? { groupId: variantGroup.id, revision: variantGroup.revision, values: variantIdentityValues }
         : undefined;
       const res = stockOnly
-        ? await updateProductStock({ id: productId, stockAdjustment })
+        ? await updateProductStock({ id: productId, stockAdjustment }, { deferInventoryRefresh: isModal })
         : await updateProduct({
           id: productId,
           productKind: values.productKind,
@@ -400,8 +405,11 @@ export function NewProductForm({
           applyToSiblings: values.applyToSiblings,
           units: values.units,
           stockAdjustment,
-        });
+        }, { deferInventoryRefresh: isModal });
       if (res.ok) {
+        if (isModal) {
+          scheduleAppDataRefreshOnReturn(Routes.Inventory);
+        }
         const href =
           submitIntent === "sameType"
             ? sameTypeHref(productId)

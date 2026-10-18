@@ -11,6 +11,10 @@ const productsModal = readFileSync(new URL("../inventory/tabs/products.tsx", imp
 const productsTable = readFileSync(new URL("../inventory/tabs/products-table.tsx", import.meta.url), "utf8");
 const interceptedDetailPage = readFileSync(new URL("../@productModal/(.)products/[id]/page.tsx", import.meta.url), "utf8");
 const productDetailDialog = readFileSync(new URL("../../../components/product-detail-dialog.tsx", import.meta.url), "utf8");
+const productActions = readFileSync(new URL("../../../lib/actions/products.ts", import.meta.url), "utf8");
+const productVariantActions = readFileSync(new URL("../../../lib/actions/product-variants.ts", import.meta.url), "utf8");
+const appDataSyncProvider = readFileSync(new URL("../../../components/app-data-sync-provider.tsx", import.meta.url), "utf8");
+const deferredAppRouteRefresh = readFileSync(new URL("../../../lib/sync/deferred-app-route-refresh.ts", import.meta.url), "utf8");
 
 test("hard-loaded product detail keeps the detail inside a dialog", () => {
   expect(detailPage).toContain("<ProductDetailDialog");
@@ -125,6 +129,30 @@ test("repeated edit/save cycles do not accumulate detail history entries", () =>
   history.save();
   history.router.back();
   expect(history.current()).toBe(history.inventory);
+});
+
+test("saving a product does not revalidate the whole app layout", () => {
+  const updateProduct = productActions.slice(
+    productActions.indexOf("export async function updateProduct("),
+    productActions.indexOf("export async function createProduct(", productActions.indexOf("export async function updateProduct(")),
+  );
+
+  expect(updateProduct.match(/revalidateProductPage\(/g)?.length).toBe(5);
+  expect(updateProduct).toContain("if (!options.deferInventoryRefresh) revalidateProductPage(Routes.Inventory);");
+
+  const updateProductStock = productActions.slice(
+    productActions.indexOf("export async function updateProductStock("),
+    productActions.indexOf("/** Cập nhật SP", productActions.indexOf("export async function updateProductStock(")),
+  );
+  expect(updateProductStock.match(/revalidateProductPage\(/g)?.length).toBe(4);
+  expect(productVariantActions.match(/revalidateAppDataPage\(/g)?.length).toBe(5);
+  expect(productVariantActions).toContain("if (!options.deferInventoryRefresh) revalidateAppDataPage(Routes.Inventory);");
+  expect(productVariantActions).not.toContain('revalidateAppData("/(app)", "layout")');
+  expect(productForm).toContain("scheduleAppDataRefreshOnReturn(Routes.Inventory)");
+  expect(appDataSyncProvider).toContain("startTransition(() => {");
+  expect(appDataSyncProvider).toContain("router.refresh();");
+  expect(appDataSyncProvider).toContain("shouldRefreshDeferredAppPath({");
+  expect(deferredAppRouteRefresh).toContain("pendingPath === currentPath && !modalOpen");
 });
 
 test("save and create another still navigates to its new editor", () => {

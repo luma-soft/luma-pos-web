@@ -2,7 +2,10 @@
 
 import { recordManualInventoryCost } from "@/lib/inventory/cost-valuation";
 
-import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
+import {
+  revalidateAppData as revalidatePath,
+  revalidateAppDataPage as revalidateProductPage,
+} from "@/lib/sync/revalidate-app-data";
 import { z } from "zod";
 import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -709,9 +712,12 @@ const updateProductStockSchema = z.object({
   ),
 }).strict();
 
+type ProductRefreshOptions = { deferInventoryRefresh?: boolean };
+
 /** Stock-only save: keep metadata/media/unit work out of the locked transaction. */
 export async function updateProductStock(
   input: z.input<typeof updateProductStockSchema>,
+  options: ProductRefreshOptions = {},
 ): Promise<ActionResult> {
   // Managers are a subset of stock-access roles; the actor/store stay server-derived.
   const gate = await requireManager();
@@ -745,14 +751,17 @@ export async function updateProductStock(
     return { ok: false, error: "errors.serverError" };
   }
 
-  // One layout invalidation covers detail, list, inventory and POS consumers.
-  revalidatePath("/(app)", "layout");
+  revalidateProductPage(Routes.Products);
+  if (!options.deferInventoryRefresh) revalidateProductPage(Routes.Inventory);
+  revalidateProductPage(`/products/${id}`);
+  revalidateProductPage(Routes.POS);
   return { ok: true, data: undefined };
 }
 
 /** Cập nhật SP; chỉ điều chỉnh tồn khi gửi kèm số lượng mới và mốc tồn đã đọc. */
 export async function updateProduct(
   input: UpdateProductInput,
+  options: ProductRefreshOptions = {},
 ): Promise<ActionResult> {
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
@@ -1091,11 +1100,11 @@ export async function updateProduct(
       });
     }, v.stockAdjustment ? { isolationLevel: "serializable" } : undefined);
 
-    revalidatePath(Routes.Products);
-    revalidatePath(Routes.Inventory);
-    revalidatePath(`/products/${v.id}`);
-    revalidatePath(Routes.Pricing);
-    revalidatePath(Routes.POS);
+    revalidateProductPage(Routes.Products);
+    if (!options.deferInventoryRefresh) revalidateProductPage(Routes.Inventory);
+    revalidateProductPage(`/products/${v.id}`);
+    revalidateProductPage(Routes.Pricing);
+    revalidateProductPage(Routes.POS);
     return { ok: true, data: undefined };
   } catch (e) {
     if (e instanceof VariantValidationError) return { ok: false, error: e.code };
