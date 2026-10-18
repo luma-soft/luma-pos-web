@@ -44,6 +44,27 @@ type View = (typeof VIEWS)[number];
 const PRODUCT_MODAL_KEYS = ["productModal", "productId", "copyFrom", "copyGroup", "sameTypeAs", "productKind", "returnTo", "onlineListing", "onlineProductId", "shopeeProductId"] as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+export function ProductsTabLoading() {
+  return (
+    <div className="space-y-4" aria-hidden="true">
+      <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="m-1 h-9 animate-pulse rounded-lg bg-surface-2" />
+        <div className="m-1 h-9 animate-pulse rounded-lg bg-surface-2" />
+      </div>
+      <div className="space-y-2 lg:hidden">
+        <div className="h-6 w-40 animate-pulse rounded bg-surface-2" />
+        <div className="h-3 w-16 animate-pulse rounded bg-surface-2" />
+      </div>
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="h-9 w-full max-w-sm animate-pulse rounded-lg bg-surface-2" />
+        <div className="h-9 w-24 animate-pulse rounded-lg bg-surface-2" />
+        <div className="h-9 w-28 animate-pulse rounded-lg bg-surface-2" />
+      </div>
+      <TableSkeleton cols={8} rows={10} />
+    </div>
+  );
+}
+
 export async function ProductsTab({ searchParams }: { searchParams: SP }) {
   const context = await requireStoreContext();
   const t = await getTranslations();

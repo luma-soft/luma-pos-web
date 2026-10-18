@@ -1,7 +1,8 @@
+import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { Text } from "@/components/ui/text";
 import { StockTab } from "./tabs/stock";
-import { ProductsTab } from "./tabs/products";
+import { ProductsTab, ProductsTabLoading } from "./tabs/products";
 import { PricingTab } from "./tabs/pricing";
 import { PurchasesTab } from "./tabs/purchases";
 import { PurchaseReturnsTab } from "./tabs/purchase-returns";
@@ -37,6 +38,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           : tab === "internal" ? <InternalUseTab searchParams={params} />
             : tab === "stocktakes" ? <StocktakesTab searchParams={params} />
               : <StockTab searchParams={params} />;
+  const showProductListLoadingBoundary =
+    tab === "products" && !effectiveParams.productModal && effectiveParams.catalog !== "categories";
 
   return (
     <div className="p-4 sm:p-6">
@@ -51,7 +54,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         <div className="overflow-x-auto px-4 pb-2 sm:px-6"><InventoryNavigation activeTab={tab} /></div>
       </div>
 
-      <InventoryTabErrorBoundary tabTitle={tabTitle}>{tabContent}</InventoryTabErrorBoundary>
+      <InventoryTabErrorBoundary tabTitle={tabTitle}>
+        {showProductListLoadingBoundary ? (
+          <Suspense fallback={<ProductsTabLoading />}>{tabContent}</Suspense>
+        ) : tabContent}
+      </InventoryTabErrorBoundary>
     </div>
   );
 }
