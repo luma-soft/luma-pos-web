@@ -9,6 +9,7 @@ export const productUnitSchema = z.object({
   multiplier: z.number().positive(),
   barcode: z.string().optional(),
   priceOverride: z.number().min(0).nullable().optional(),
+  directSale: z.boolean().optional(),
 });
 
 export const productAttributeSchema = z.object({
@@ -111,6 +112,7 @@ export const createProductSchema = z.object({
 
   // Units
   baseUnit: z.string().trim().default("cái"),
+  baseUnitDirectSale: z.boolean().default(true),
   units: z.array(productUnitSchema).default([]),
 
   // Attributes (replaces VLXD section)

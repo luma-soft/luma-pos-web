@@ -396,6 +396,7 @@ const updateProductSchema = z.object({
   brandId: z.string().optional(),
   supplierIds: z.array(z.string()).optional(), // không gửi → giữ nguyên NCC hiện có
   baseUnit: z.string().trim().min(1),
+  baseUnitDirectSale: z.boolean().optional(),
   costPrice: z.number().min(0),
   retailPrice: z.number().min(0),
   wholesalePrice: z.number().min(0).nullable(),
@@ -895,6 +896,9 @@ export async function updateProduct(
           brandId: v.brandId || null,
           ...(v.supplierIds ? { supplierId: v.supplierIds[0] || null } : {}),
           baseUnit: v.baseUnit,
+          ...(v.baseUnitDirectSale !== undefined
+            ? { baseUnitDirectSale: v.baseUnitDirectSale }
+            : {}),
           costPrice: String(v.costPrice),
           retailPrice: String(v.retailPrice),
           wholesalePrice:
@@ -1007,7 +1011,12 @@ export async function updateProduct(
             v.contractorPrice != null ? String(v.contractorPrice) : null;
           patch.agentPrice = v.agentPrice != null ? String(v.agentPrice) : null;
         }
-        if (fields.has("units")) patch.baseUnit = v.baseUnit;
+        if (fields.has("units")) {
+          patch.baseUnit = v.baseUnit;
+          if (v.baseUnitDirectSale !== undefined) {
+            patch.baseUnitDirectSale = v.baseUnitDirectSale;
+          }
+        }
 
         const baseName = fields.has("name")
           ? baseNameFromChildName(v.name, current.variantName)
@@ -1060,6 +1069,7 @@ export async function updateProduct(
                 multiplier: unit.multiplier,
                 barcode: unit.barcode,
                 priceOverride: unit.priceOverride,
+                directSale: unit.directSale,
               })),
             });
           }
@@ -1173,6 +1183,7 @@ export async function createProduct(
             barcode: u.barcode?.trim() || null,
             priceOverride:
               u.priceOverride != null ? String(u.priceOverride) : null,
+            directSale: u.directSale ?? true,
             sortOrder: i,
           })),
         );
@@ -1270,6 +1281,7 @@ export async function createProduct(
             brandId: v.brandId || null,
             supplierId: v.supplierIds[0] || null, // NCC chính = phần tử đầu
             baseUnit: v.baseUnit || "cái",
+            baseUnitDirectSale: v.baseUnitDirectSale,
             costPrice: String(v.costPrice),
             retailPrice: String(v.retailPrice),
             wholesalePrice:
@@ -1336,6 +1348,7 @@ export async function createProduct(
           brandId: v.brandId || null,
           supplierId: v.supplierIds[0] || null,
           baseUnit: v.baseUnit || "cái",
+          baseUnitDirectSale: v.baseUnitDirectSale,
           costPrice: String(v.costPrice),
           retailPrice: String(v.retailPrice),
           wholesalePrice:
@@ -1390,6 +1403,7 @@ export async function createProduct(
             brandId: v.brandId || null,
             supplierId: v.supplierIds[0] || null,
             baseUnit: child.baseUnit || v.baseUnit || "cái",
+            baseUnitDirectSale: v.baseUnitDirectSale,
             costPrice: String(child.costPrice),
             retailPrice: String(child.retailPrice),
             wholesalePrice:

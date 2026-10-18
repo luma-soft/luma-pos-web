@@ -67,6 +67,7 @@ async function buildProductCatalogSnapshot(
         categoryId: products.categoryId,
         categoryName: categories.name,
         baseUnit: products.baseUnit,
+        baseUnitDirectSale: products.baseUnitDirectSale,
         costPrice: products.costPrice,
         lastPurchasePrice: products.lastPurchasePrice,
         lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),

@@ -466,6 +466,7 @@ export const products = pgTable("products", {
 
   // Multi-unit: base unit is the smallest (viên, cái, m)
   baseUnit: varchar("base_unit", { length: 20 }).notNull().default("cái"), // viên, cái, m, kg
+  baseUnitDirectSale: boolean("base_unit_direct_sale").notNull().default(true),
 
   // Pricing (giá vốn = giá nhập sau chiết khấu; giá nhập cuối = giá trên phiếu chưa chiết khấu)
   costPrice: decimal("cost_price", { precision: 14, scale: 2 }).notNull().default("0"),
@@ -637,6 +638,7 @@ export const productUnits = pgTable("product_units", {
   multiplier: decimal("multiplier", { precision: 14, scale: 4 }).notNull(), // 1 unitName = N base units
   barcode: varchar("barcode", { length: 50 }),
   priceOverride: decimal("price_override", { precision: 14, scale: 2 }),
+  directSale: boolean("direct_sale").notNull().default(true),
   sortOrder: integer("sort_order").default(0),
 }, (t) => [
   index("product_units_product_idx").on(t.productId),

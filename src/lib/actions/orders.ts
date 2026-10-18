@@ -53,6 +53,7 @@ export async function createOrder(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
+    if (message === "UNIT_NOT_SELLABLE") return { ok: false, error: "pos.errors.unitUnavailable" };
     if (parsed.data.expectedPricing && ["PRICE_BOOK_PRICE_UNAVAILABLE", "PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "PRICE_BOOK_NOT_FOUND"].includes(message)) {
       return { ok: false, error: "pos.errors.pricingChanged" };
     }

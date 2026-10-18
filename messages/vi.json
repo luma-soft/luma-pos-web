@@ -1776,6 +1776,7 @@
     "errors": {
       "creditNeedsCustomer": "Ghi nợ cần chọn khách hàng có hồ sơ.",
       "pricingChanged": "Giá bán, khuyến mại hoặc quy đổi đơn vị đã thay đổi. Đơn chưa được lưu/thanh toán; giỏ hàng vẫn được giữ. Hãy làm mới và kiểm tra lại giá trước khi chốt.",
+      "unitUnavailable": "Đơn vị này đã ngừng bán trực tiếp. Hãy chọn đơn vị khác đang bán.",
       "emptyCart": "Giỏ hàng trống."
     },
     "pricingConflict": {
@@ -2181,7 +2182,9 @@
       "multiplier": "Quy đổi",
       "multiplierHint": "1 {unit} = {count} {base}",
       "barcode": "Mã vạch riêng",
-      "priceOverride": "Giá riêng (tùy chọn)"
+      "priceOverride": "Giá riêng (tùy chọn)",
+      "directSale": "Bán trực tiếp",
+      "stoppedSale": "Ngừng bán"
     },
     "description": {
       "main": "Mô tả",

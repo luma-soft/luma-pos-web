@@ -20,6 +20,18 @@ export interface PosUnit {
   sku: string | null;
   barcode: string | null;
   priceOverride: string | null;
+  directSale: boolean;
+}
+
+function sellableUnitCondition() {
+  return sql`(
+    ${products.baseUnitDirectSale} = true
+    or exists (
+      select 1 from product_units sellable_unit
+      where sellable_unit.product_id = ${products.id}
+        and sellable_unit.direct_sale = true
+    )
+  )`;
 }
 
 function sortByRecentSale<T extends { lastSoldAt: Date | string | null; name: string }>(
@@ -51,6 +63,7 @@ function posProductSelect(
     variantName: products.variantName,
     isVariantParent: products.isVariantParent,
     baseUnit: products.baseUnit,
+    baseUnitDirectSale: products.baseUnitDirectSale,
     // Chỉ dùng nội bộ để gắn vào bảng giá vốn cho owner/manager bên dưới.
     // Không trả trực tiếp trường này ra client.
     costPrice: products.costPrice,
@@ -116,7 +129,8 @@ function posProductSelect(
         'multiplier', ${productUnits.multiplier},
         'sku', ${productUnits.sku},
         'barcode', ${productUnits.barcode},
-        'priceOverride', ${productUnits.priceOverride}
+        'priceOverride', ${productUnits.priceOverride},
+        'directSale', ${productUnits.directSale}
       ) order by ${productUnits.sortOrder})
       from ${productUnits} where ${productUnits.productId} = ${products.id}
     ), '[]')`,
@@ -151,11 +165,19 @@ function activeRootCondition(storeId: string) {
     eq(products.storeId, storeId),
     sql`${products.parentProductId} is null`,
     or(
-      eq(products.isActive, true),
+      and(eq(products.isActive, true), sellableUnitCondition()),
       sql`exists (
         select 1 from products child
         where child.parent_product_id = ${products.id}
           and child.is_active = true
+          and (
+            child.base_unit_direct_sale = true
+            or exists (
+              select 1 from product_units child_unit
+              where child_unit.product_id = child.id
+                and child_unit.direct_sale = true
+            )
+          )
       )`
     )
   );
@@ -229,6 +251,7 @@ export async function getPosData(storeId: string, options?: {
         .where(and(
           eq(products.storeId, storeId),
           eq(products.isActive, true),
+          sellableUnitCondition(),
           inArray(products.parentProductId, parentIds),
         ))
         .orderBy(...recentProductSaleOrder())
@@ -408,6 +431,7 @@ export async function searchPosProductRows(
         eq(products.storeId, storeId),
         eq(products.isActive, true),
         eq(products.isVariantParent, false),
+        sellableUnitCondition(),
         match,
         directFilters,
       ))
@@ -429,6 +453,14 @@ export async function searchPosProductRows(
               where pos_filter_member.store_id = ${storeId}
                 and pos_filter_member.parent_product_id = ${products.id}
                 and pos_filter_member.is_active = true
+                and (
+                  pos_filter_member.base_unit_direct_sale = true
+                  or exists (
+                    select 1 from product_units pos_filter_unit
+                    where pos_filter_unit.product_id = pos_filter_member.id
+                      and pos_filter_unit.direct_sale = true
+                  )
+                )
                 ${variantMemberFilters("pos_filter_member") ? sql`and ${variantMemberFilters("pos_filter_member")}` : sql``}
             )`,
           ),
@@ -446,6 +478,7 @@ export async function searchPosProductRows(
         .where(and(
           eq(products.storeId, storeId),
           eq(products.isActive, true),
+          sellableUnitCondition(),
           inArray(products.parentProductId, parentIds),
           directFilters,
         ))

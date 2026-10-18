@@ -3,7 +3,7 @@
 import { useFieldArray, useFormContext } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import { Plus, Trash2 } from "lucide-react";
-import { Button, Input, NumberInput, MoneyInput, Field } from "@/components/ui";
+import { Button, Checkbox, Input, NumberInput, MoneyInput, Field } from "@/components/ui";
 import { formatNumber } from "@/lib/utils";
 import type { CreateProductInput } from "./schema";
 
@@ -22,11 +22,17 @@ export function MultiUnitField() {
   return (
     <div className="space-y-3">
       <Field labelTx="products.units.baseUnit" required>
-        <Input
-          {...register("baseUnit")}
-          placeholderTx="products.units.baseUnitPlaceholder"
-          className="max-w-xs"
-        />
+        <div className="flex flex-wrap items-center gap-4">
+          <Input
+            {...register("baseUnit")}
+            placeholderTx="products.units.baseUnitPlaceholder"
+            className="max-w-xs"
+          />
+          <label className="inline-flex min-h-11 items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <Checkbox {...register("baseUnitDirectSale")} />
+            <span>{t("products.units.directSale")}</span>
+          </label>
+        </div>
       </Field>
 
       {fields.length > 0 && (
@@ -34,7 +40,7 @@ export function MultiUnitField() {
           {fields.map((field, idx) => (
             <div
               key={field.fieldKey}
-              className="grid grid-cols-1 md:grid-cols-[1fr_140px_1fr_1fr_auto] gap-2 items-start p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
+              className="grid grid-cols-1 md:grid-cols-[1fr_140px_1fr_1fr_auto_auto] gap-2 items-start p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
             >
               <Field labelTx="products.units.unitName" className="min-w-0">
                 <Input
@@ -86,6 +92,11 @@ export function MultiUnitField() {
                 <p className="text-xs leading-5 text-slate-500">Để trống để dùng giá quy đổi.</p>
               </Field>
 
+              <label className="inline-flex min-h-11 items-center gap-2 text-sm text-slate-700 dark:text-slate-200 md:mt-[26px]">
+                <Checkbox {...register(`units.${idx}.directSale`)} />
+                <span>{t("products.units.directSale")}</span>
+              </label>
+
               <Button
                 type="button"
                 variant="ghost"
@@ -111,6 +122,7 @@ export function MultiUnitField() {
             multiplier: 1,
             barcode: "",
             priceOverride: null,
+            directSale: true,
           })
         }
       >

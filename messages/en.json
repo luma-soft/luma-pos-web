@@ -1776,6 +1776,7 @@
     "errors": {
       "creditNeedsCustomer": "Credit sales require a saved customer.",
       "pricingChanged": "Prices, promotions or unit conversions changed. The order has not been saved or paid; your cart is preserved. Refresh and review the prices before submitting again.",
+      "unitUnavailable": "This unit is no longer available for direct sale. Choose another unit that is for sale.",
       "emptyCart": "Cart is empty."
     },
     "pricingConflict": {
@@ -2181,7 +2182,9 @@
       "multiplier": "Conversion",
       "multiplierHint": "1 {unit} = {count} {base}",
       "barcode": "Unit barcode",
-      "priceOverride": "Override price (optional)"
+      "priceOverride": "Override price (optional)",
+      "directSale": "Sell directly",
+      "stoppedSale": "Stop sale"
     },
     "description": {
       "main": "Description",

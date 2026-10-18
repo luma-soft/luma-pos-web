@@ -71,6 +71,7 @@ export async function normalizeOrderItems(
         id: products.id,
         name: products.name,
         baseUnit: products.baseUnit,
+        baseUnitDirectSale: products.baseUnitDirectSale,
         costPrice: products.costPrice,
         lastPurchasePrice: products.lastPurchasePrice,
         lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
@@ -86,6 +87,7 @@ export async function normalizeOrderItems(
         unitName: productUnits.unitName,
         multiplier: productUnits.multiplier,
         priceOverride: productUnits.priceOverride,
+        directSale: productUnits.directSale,
       })
       .from(productUnits)
       .where(inArray(productUnits.productId, productIds)),
@@ -158,6 +160,9 @@ export async function normalizeOrderItems(
         ? null
         : unitsByProduct.get(product.id)?.find((u) => u.unitName === item.unitName) ?? undefined;
     if (unit === undefined) throw new Error("UNIT_NOT_FOUND");
+    if (unit ? !unit.directSale : !product.baseUnitDirectSale) {
+      throw new Error("UNIT_NOT_SELLABLE");
+    }
 
     const multiplier = unit ? Number(unit.multiplier) : 1;
     const itemPriceBookId = item.priceBookId === undefined ? invoicePriceBookId ?? null : item.priceBookId;

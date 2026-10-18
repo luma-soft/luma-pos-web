@@ -41,6 +41,7 @@ export function catalogItemToPosProduct(
     variantName: product.variantName,
     isVariantParent: product.isVariantParent,
     baseUnit: product.baseUnit,
+    baseUnitDirectSale: product.baseUnitDirectSale,
     // POS chỉ dùng giá vốn khi bảng giá nội bộ đã được server cho phép.
     costPrice: product.costPrice ?? "0",
     lastPurchasePrice: product.lastPurchasePrice ?? null,
@@ -69,6 +70,7 @@ export function catalogItemToPosProduct(
       sku: unit.sku ?? null,
       barcode: unit.barcode,
       priceOverride: unit.priceOverride,
+      directSale: unit.directSale,
     })),
     priceBookTypes: product.priceBookTypes,
     prices: {

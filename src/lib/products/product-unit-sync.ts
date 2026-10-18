@@ -13,6 +13,7 @@ export type ProductUnitSyncValue = {
   multiplier: number;
   barcode?: string;
   priceOverride?: number | null;
+  directSale?: boolean;
 };
 
 function sameNullableText(current: string | null, next: string | null) {
@@ -44,6 +45,7 @@ export async function syncProductUnits(
       multiplier: productUnits.multiplier,
       barcode: productUnits.barcode,
       priceOverride: productUnits.priceOverride,
+      directSale: productUnits.directSale,
       sortOrder: productUnits.sortOrder,
     })
     .from(productUnits)
@@ -80,6 +82,7 @@ export async function syncProductUnits(
       : current?.priceOverride != null
         ? Number(current.priceOverride)
         : null;
+    const directSale = unit.directSale ?? current?.directSale ?? true;
 
     if (!current) {
       await tx.insert(productUnits).values({
@@ -90,6 +93,7 @@ export async function syncProductUnits(
         barcode,
         priceOverride:
           priceOverride != null ? String(priceOverride) : null,
+        directSale,
         sortOrder: index,
       });
       continue;
@@ -101,6 +105,7 @@ export async function syncProductUnits(
       Number(current.multiplier) === unit.multiplier &&
       sameNullableText(current.barcode, barcode) &&
       sameNullableNumber(current.priceOverride, priceOverride) &&
+      current.directSale === directSale &&
       (current.sortOrder ?? 0) === index;
     if (unchanged) continue;
 
@@ -112,6 +117,7 @@ export async function syncProductUnits(
         barcode,
         priceOverride:
           priceOverride != null ? String(priceOverride) : null,
+        directSale,
         sortOrder: index,
       })
       .where(

@@ -224,6 +224,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
         brandId: products.brandId,
         supplierId: products.supplierId,
         baseUnit: products.baseUnit,
+        baseUnitDirectSale: products.baseUnitDirectSale,
         costPrice: products.costPrice,
         lastPurchasePrice: products.lastPurchasePrice,
         lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
@@ -319,13 +320,15 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
           sku: string | null;
           barcode: string | null;
           priceOverride: string | null;
+          directSale: boolean;
         }>>`coalesce((
           select json_agg(json_build_object(
             'unitName', ${productUnits.unitName},
             'multiplier', ${productUnits.multiplier},
             'sku', ${productUnits.sku},
             'barcode', ${productUnits.barcode},
-            'priceOverride', ${productUnits.priceOverride}
+            'priceOverride', ${productUnits.priceOverride},
+            'directSale', ${productUnits.directSale}
           ) order by ${productUnits.sortOrder})
           from ${productUnits}
           where ${productUnits.productId} = ${products.id}
@@ -368,6 +371,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
             brandId: products.brandId,
             supplierId: products.supplierId,
             baseUnit: products.baseUnit,
+            baseUnitDirectSale: products.baseUnitDirectSale,
             costPrice: products.costPrice,
             lastPurchasePrice: products.lastPurchasePrice,
             lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
@@ -415,13 +419,15 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
               sku: string | null;
               barcode: string | null;
               priceOverride: string | null;
+              directSale: boolean;
             }>>`coalesce((
               select json_agg(json_build_object(
                 'unitName', ${productUnits.unitName},
                 'multiplier', ${productUnits.multiplier},
                 'sku', ${productUnits.sku},
                 'barcode', ${productUnits.barcode},
-                'priceOverride', ${productUnits.priceOverride}
+                'priceOverride', ${productUnits.priceOverride},
+                'directSale', ${productUnits.directSale}
               ) order by ${productUnits.sortOrder})
               from ${productUnits}
               where ${productUnits.productId} = ${products.id}
@@ -811,6 +817,7 @@ async function getBaseProduct(storeId: string, id: string) {
       brandName: brands.name,
       supplierName: suppliers.name,
       baseUnit: products.baseUnit,
+      baseUnitDirectSale: products.baseUnitDirectSale,
       costPrice: products.costPrice,
       retailPrice: products.retailPrice,
       wholesalePrice: products.wholesalePrice,
@@ -855,6 +862,7 @@ async function getBaseProduct(storeId: string, id: string) {
       multiplier: productUnits.multiplier,
       barcode: productUnits.barcode,
       priceOverride: productUnits.priceOverride,
+      directSale: productUnits.directSale,
     })
     .from(productUnits)
     .where(and(eq(productUnits.storeId, storeId), eq(productUnits.productId, id)))
@@ -922,6 +930,7 @@ async function getBaseProduct(storeId: string, id: string) {
           specs: products.specs,
           retailPrice: products.retailPrice,
           baseUnit: products.baseUnit,
+          baseUnitDirectSale: products.baseUnitDirectSale,
           totalStock: sql<string>`(select coalesce(sum(${stockLevels.quantity}),0) from ${stockLevels} where ${stockLevels.productId} = ${products.id})`,
           imageUrls: productCompatibilityImageUrls(storeId),
           imageUpdatedAt: products.imageUpdatedAt,
@@ -941,6 +950,7 @@ async function getBaseProduct(storeId: string, id: string) {
           multiplier: productUnits.multiplier,
           barcode: productUnits.barcode,
           priceOverride: productUnits.priceOverride,
+          directSale: productUnits.directSale,
         })
         .from(productUnits)
         .where(and(
@@ -999,6 +1009,7 @@ export const getProductFormOptions = unstable_cache(
           specs: products.specs,
           sku: products.sku,
           baseUnit: products.baseUnit,
+          baseUnitDirectSale: products.baseUnitDirectSale,
           productKind: products.productKind,
           costPrice: products.costPrice,
           retailPrice: products.retailPrice,

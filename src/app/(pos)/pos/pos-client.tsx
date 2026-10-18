@@ -84,7 +84,7 @@ import {
 } from "@/lib/pos/draft-kind-switch";
 import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
 import { buildExpectedPosPricing, countPosPricingConflicts, requestPosOrder } from "@/lib/pos/checkout-pricing";
-import { resolvePosCartUnit } from "@/lib/pos/cart-unit";
+import { defaultPosSellableUnitName, isPosUnitSellable, resolvePosCartUnit } from "@/lib/pos/cart-unit";
 import { upsertPosCartLine } from "@/lib/pos/cart-line-order";
 import { canAddCatalogProductsToPosDraft, canEditPriceBookForPosDraft } from "@/lib/pos/catalog-add-policy";
 import { expandPosSearchUnitResults, type PosSearchUnitResult } from "@/lib/pos/search-unit-results";
@@ -1097,12 +1097,11 @@ export function PosClient({
       const visibleTokens = new Set([...productTokens, ...unitTokens]);
       const metadataTokens = new Set(searchTokens([
         result.product.sku,
-        result.product.barcode,
-        result.product.baseUnit,
-        ...result.product.units.flatMap((unit) => [unit.unitName, unit.sku, unit.barcode]),
+        ...(!result.product.isVariantParent && result.product.baseUnitDirectSale ? [result.product.barcode, result.product.baseUnit] : []),
+        ...result.product.units.filter((unit) => unit.directSale).flatMap((unit) => [unit.unitName, unit.sku, unit.barcode]),
       ].filter(Boolean).join(" ")));
       const countMatches = (candidateTokens: ReadonlySet<string>) =>
-        tokens.filter((token) => candidateTokens.has(token)).length;
+        tokens.filter((token) => [...candidateTokens].some((candidate) => candidate.includes(token))).length;
       const rowLabel = searchTokens(`${productLabel} ${result.unitName ?? ""}`).join(" ");
 
       return {
@@ -1126,7 +1125,7 @@ export function PosClient({
       return left.index - right.index;
     });
 
-    return ranked.map(({ result }) => result);
+    return ranked.filter(({ rank }) => rank.some((value) => value > 0)).map(({ result }) => result);
   }, []);
   const browseSearchResults = useMemo(
     () => expandPosSearchUnitResults(sortSearchProducts(data.products)),
@@ -1366,10 +1365,17 @@ export function PosClient({
     };
   }
 
-  const addToCart = useCallback((p: PosProduct, selectedUnitName = p.baseUnit) => {
+  const addToCart = useCallback((p: PosProduct, selectedUnitName?: string | null) => {
     if (!canAddCatalogProducts) return;
     if (p.isVariantParent) {
       setVariantParent(p);
+      return;
+    }
+    const unitName = selectedUnitName == null
+      ? defaultPosSellableUnitName(p.baseUnit, p.baseUnitDirectSale, p.units)
+      : selectedUnitName;
+    if (!unitName || !isPosUnitSellable(p.baseUnit, p.baseUnitDirectSale, p.units, unitName)) {
+      setError(t("pos.errors.unitUnavailable"));
       return;
     }
     if (!Number.isFinite(basePriceFor(p, priceBook, data.priceBooks))) {
@@ -1377,7 +1383,7 @@ export function PosClient({
       return;
     }
     setCart((c) => {
-      const unit = resolvePosCartUnit(p.baseUnit, p.units, selectedUnitName);
+      const unit = resolvePosCartUnit(p.baseUnit, p.units, unitName);
       return upsertPosCartLine<CartLine>(
         c,
         (line) => line.product.id === p.id && line.unitName === unit.unitName && line.priceBook === undefined,
@@ -1397,12 +1403,17 @@ export function PosClient({
   const addQuantityToCart = useCallback((p: PosProduct, quantity: number) => {
     if (!canAddCatalogProducts) return;
     const safeQuantity = positiveQuantityOrDefault(quantity);
+    const unitName = defaultPosSellableUnitName(p.baseUnit, p.baseUnitDirectSale, p.units);
+    if (!unitName) {
+      setError(t("pos.errors.unitUnavailable"));
+      return;
+    }
     if (!Number.isFinite(basePriceFor(p, priceBook, data.priceBooks))) {
       setError(t("pricing.errors.priceUnavailable"));
       return;
     }
     setCart((c) => {
-      const unit = resolvePosCartUnit(p.baseUnit, p.units);
+      const unit = resolvePosCartUnit(p.baseUnit, p.units, unitName);
       return upsertPosCartLine<CartLine>(
         c,
         (line) => line.product.id === p.id,
@@ -1511,7 +1522,7 @@ export function PosClient({
       setVariantParent(p);
       return;
     }
-    addToCart(p, unitName ?? p.baseUnit);
+    addToCart(p, unitName);
   }
 
   function openProductCreator(productKind: ProductKind) {
@@ -1555,6 +1566,10 @@ export function PosClient({
 
   function changeUnit(key: string, unitName: string) {
     const line = cart.find((item) => item.key === key);
+    if (line && !isPosUnitSellable(line.product.baseUnit, line.product.baseUnitDirectSale, line.product.units, unitName)) {
+      setError(t("pos.errors.unitUnavailable"));
+      return;
+    }
     if (line && !Number.isFinite(basePriceFor(line.product, line.priceBook ?? priceBook, data.priceBooks))) {
       setError(t("pricing.errors.priceUnavailable"));
       return;
@@ -2114,7 +2129,11 @@ export function PosClient({
           const stockManaged = isProductStockManaged(l.product.categoryName);
           const ordered = orderedBaseQuantityByProduct.get(l.product.id) ?? 0;
           const stockInsufficient = exceedsAvailableStock(stockManaged, Number(l.product.stock), ordered + Number(l.product.booked), isReturnDraft);
-          const unitOptions = buildPosUnitOptions(l.product.baseUnit, l.product.units);
+          const unitOptions = buildPosUnitOptions(l.product.baseUnit, l.product.units, {
+            baseUnitDirectSale: l.product.baseUnitDirectSale,
+            selectedUnitName: l.unitName,
+            unavailableLabel: t("products.units.stoppedSale"),
+          });
           const linePriceBookName = l.priceBook === undefined
             ? null
             : data.priceBooks.find((book) => (book.isDefault ? "" : book.id) === l.priceBook)?.name ?? "Giá Chung";

@@ -52,6 +52,7 @@ export function productToFormInitialValues(
     brandId: product.brandId ?? "",
     supplierIds: product.suppliers.map((s) => s.id),
     baseUnit: product.baseUnit,
+    baseUnitDirectSale: product.baseUnitDirectSale,
     costPrice: Number(product.costPrice),
     retailPrice: Number(product.retailPrice),
     wholesalePrice:
@@ -71,6 +72,7 @@ export function productToFormInitialValues(
       multiplier: Number(u.multiplier),
       barcode: clearsIdentity ? "" : (u.barcode ?? ""),
       priceOverride: u.priceOverride != null ? Number(u.priceOverride) : null,
+      directSale: u.directSale,
     })),
     comboItems: product.comboItems.map((item) => ({
       productId: item.productId,

@@ -510,6 +510,7 @@ export async function createOrderForUser(
     if (msg === CHECKOUT_PRICING_CHANGED || ["40001", "40P01", "55P03"].includes(pgErrorCode(e) ?? "")) {
       return { ok: false, error: CHECKOUT_PRICING_CHANGED };
     }
+    if (msg === "UNIT_NOT_SELLABLE") return { ok: false, error: "pos.errors.unitUnavailable" };
     if (msg === "PRICE_BOOK_FORBIDDEN") return { ok: false, error: "errors.forbidden" };
     if (["PRICE_BOOK_PRICE_UNAVAILABLE", "PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "PRICE_BOOK_NOT_FOUND"].includes(msg)) {
       return { ok: false, error: v.expectedPricing ? CHECKOUT_PRICING_CHANGED : msg === "PRICE_BOOK_PRICE_UNAVAILABLE" ? "pricing.errors.priceUnavailable" : "errors.invalidData" };

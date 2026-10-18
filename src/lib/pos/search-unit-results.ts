@@ -1,9 +1,11 @@
 export type PosSearchUnitLike = {
   unitName: string;
+  directSale?: boolean;
 };
 
 export type PosSearchProductLike = {
   baseUnit: string;
+  baseUnitDirectSale?: boolean;
   isVariantParent: boolean;
   units: readonly PosSearchUnitLike[];
 };
@@ -29,12 +31,14 @@ export function expandPosSearchUnitResults<TProduct extends PosSearchProductLike
     const seen = new Set<string>();
     const results: PosSearchUnitResult<TProduct>[] = [];
     const baseUnit = product.baseUnit.trim();
-    seen.add(baseUnit);
-    results.push({ product, unitName: product.baseUnit, alternateUnit: null });
+    if (product.baseUnitDirectSale !== false) {
+      seen.add(baseUnit);
+      results.push({ product, unitName: product.baseUnit, alternateUnit: null });
+    }
 
     for (const unit of product.units) {
       const unitName = unit.unitName.trim();
-      if (!unitName || seen.has(unitName)) continue;
+      if (!unitName || unit.directSale === false || seen.has(unitName)) continue;
       seen.add(unitName);
       results.push({ product, unitName: unit.unitName, alternateUnit: unit });
     }

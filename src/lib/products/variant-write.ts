@@ -132,7 +132,7 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
   const rootSku = existingRootSku || v.sku?.trim() || `SP${randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`;
   const common = {
     storeId, productKind: "product" as const, categoryId: v.categoryId, brandId: v.brandId || null, supplierId: supplierIds[0] || null,
-    baseUnit: v.baseUnit || "cái", description: v.description || null, imageUrls: v.imageUrls,
+    baseUnit: v.baseUnit || "cái", baseUnitDirectSale: v.baseUnitDirectSale, description: v.description || null, imageUrls: v.imageUrls,
     costPrice: String(v.costPrice), retailPrice: String(v.retailPrice), wholesalePrice: numberText(v.wholesalePrice),
     contractorPrice: numberText(v.contractorPrice), agentPrice: numberText(v.agentPrice), vatRate: numberText(v.vatRate),
     priceByWeight: v.priceByWeight, trackBatches: v.trackBatches, shelfLifeDays: v.shelfLifeDays ?? null,
@@ -178,6 +178,7 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
     } else {
       await tx.insert(products).values({ ...common, ...commercial, id,
         name: child.name?.trim() || `${v.name.trim()} - ${child.variantName}`, baseUnit: child.baseUnit || v.baseUnit,
+        baseUnitDirectSale: v.baseUnitDirectSale,
         parentProductId: kind === "native" ? groupId : null,
         relatedProductId: kind === "related" && id !== groupId ? groupId : null,
         // Native children inherit common description dynamically; separate overrides can be edited later.
@@ -207,7 +208,7 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
   for (const id of createdIds) {
     if (v.units.length) await tx.insert(productUnits).values(v.units.map((unit, index) => ({ storeId, productId: id,
       unitName: unit.unitName.trim(), multiplier: String(unit.multiplier), barcode: id === groupId && kind === "native" ? null : unit.barcode?.trim() || null,
-      priceOverride: numberText(unit.priceOverride), sortOrder: index })));
+      priceOverride: numberText(unit.priceOverride), directSale: unit.directSale ?? true, sortOrder: index })));
     if (supplierIds.length) await tx.insert(productSuppliers).values(supplierIds.map((supplierId, index) => ({ storeId, productId: id, supplierId, isPrimary: index === 0 })));
   }
   const bookIds = Object.keys(v.priceBookPrices);

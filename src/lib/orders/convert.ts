@@ -1,7 +1,7 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { db } from "@/db";
-import { orders, orderItems, customers, stockLevels, stockMovements } from "@/db/schema";
+import { orders, orderItems, customers, products, productUnits, stockLevels, stockMovements } from "@/db/schema";
 import { type ActionResult, getProfileId, generateCode, toQty } from "@/lib/actions/common";
 import { Routes } from "@/lib/routes";
 import { createNotificationEventInTx } from "@/lib/notifications/events-core";
@@ -28,6 +28,23 @@ export async function convertQuoteToOrderForUser(
       if (!order.warehouseId) throw new Error("NO_WAREHOUSE");
 
       const items = await tx.select().from(orderItems).where(and(eq(orderItems.orderId, quoteId), eq(orderItems.storeId, storeId)));
+      const productIds = [...new Set(items.map((item) => item.productId))];
+      const productRows = productIds.length
+        ? await tx.select({ id: products.id, baseUnit: products.baseUnit, baseUnitDirectSale: products.baseUnitDirectSale })
+          .from(products).where(and(eq(products.storeId, storeId), inArray(products.id, productIds))).for("share")
+        : [];
+      const unitRows = productIds.length
+        ? await tx.select({ productId: productUnits.productId, unitName: productUnits.unitName, directSale: productUnits.directSale })
+          .from(productUnits).where(and(eq(productUnits.storeId, storeId), inArray(productUnits.productId, productIds))).for("share")
+        : [];
+      const productById = new Map(productRows.map((product) => [product.id, product]));
+      for (const item of items) {
+        const product = productById.get(item.productId);
+        const available = item.unitName === product?.baseUnit
+          ? product.baseUnitDirectSale
+          : unitRows.find((unit) => unit.productId === item.productId && unit.unitName === item.unitName)?.directSale;
+        if (available === false) throw new Error("UNIT_NOT_SELLABLE");
+      }
       const sourceWasBooking = order.status === "confirmed";
 
       const newCode = generateCode("DH");
@@ -115,6 +132,7 @@ export async function convertQuoteToOrderForUser(
     const msg = e instanceof Error ? e.message : "";
     if (msg === "NOT_CONVERTIBLE") return { ok: false, error: "orders.errors.notConvertible" };
     if (msg === "ORDER_NOT_FOUND") return { ok: false, error: "orders.errors.notFound" };
+    if (msg === "UNIT_NOT_SELLABLE") return { ok: false, error: "pos.errors.unitUnavailable" };
     console.error("convertQuoteToOrderForUser failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
