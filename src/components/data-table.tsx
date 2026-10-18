@@ -437,7 +437,7 @@ export function DataTableShell<T>({
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0 space-y-1">
                           {visibleColumns.slice(0, 3).map((column) => (
-                            <div key={column.key} className={cn("truncate", column.align === "right" && "text-right")}>
+                            <div key={column.key} className={cn(column.wrap ? "whitespace-normal break-words" : "truncate", column.align === "right" && "text-right")}>
                               {column.mobileRender ? column.mobileRender(row) : column.render(row)}
                             </div>
                           ))}

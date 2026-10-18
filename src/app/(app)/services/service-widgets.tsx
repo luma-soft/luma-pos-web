@@ -220,7 +220,7 @@ export function ServiceProjectMobileRow({
                 {row.name}
               </Link>
             </h3>
-            <p className="mt-1 break-words text-xs text-slate-500"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("projects.noCustomer")} /></p>
+          <p className="mt-1 break-words text-xs text-slate-500"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("projects.noCustomer")} className="block w-full whitespace-normal break-words" /></p>
           </div>
         </div>
         <ChevronRight aria-hidden="true" className="mt-2 h-5 w-5 shrink-0 text-slate-400" />
@@ -266,13 +266,14 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
       label: t("projects.cols.name"),
       required: true,
       width: "28%",
+      wrap: true,
       render: (row) => (
         <div className="flex min-w-0 items-center gap-2.5">
           <ProjectTradeIcon type={row.serviceType} />
           <Link
             href={Routes.project(row.id)}
             onClick={stopRowToggle}
-            className="min-w-0 whitespace-normal break-words font-semibold text-primary-600 hover:underline"
+            className="min-w-0 flex-1 whitespace-normal break-words font-semibold text-primary-600 hover:underline"
           >
             {row.name}
           </Link>
@@ -290,7 +291,7 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
         </span>
       ),
     },
-    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} /> },
+    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, wrap: true, render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} className="block w-full whitespace-normal break-words" /> },
     { key: "assets", label: "Thiết bị", defaultVisible: true, align: "right", render: (row) => row.assetCount },
     {
       key: "status",
@@ -377,7 +378,7 @@ export function ServiceJobsTable({ rows }: { rows: ServiceJobRow[] }) {
   const t = useTranslations();
   const columns: DataTableColumn<ServiceJobRow>[] = [
     { key: "code", label: t("orders.cols.code"), required: true, render: (row) => <span className="font-mono text-xs font-semibold">{row.code}</span> },
-    { key: "project", label: t("projects.cols.name"), defaultVisible: true, render: (row) => <Link href={Routes.project(row.projectId)} className="font-medium text-primary-600 hover:underline">{row.projectName}</Link> },
+    { key: "project", label: t("projects.cols.name"), defaultVisible: true, wrap: true, render: (row) => <Link href={Routes.project(row.projectId)} className="block whitespace-normal break-words font-medium text-primary-600 hover:underline">{row.projectName}</Link> },
     { key: "title", label: t("services.fields.job"), defaultVisible: true, render: (row) => row.title },
     { key: "type", label: t("services.fields.type"), defaultVisible: false, render: (row) => serviceTypeLabel(t, row.serviceType) },
     { key: "assignee", label: t("services.fields.assignee"), defaultVisible: true, render: (row) => row.assignedToName ?? "—" },

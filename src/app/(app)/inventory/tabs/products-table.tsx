@@ -433,6 +433,7 @@ export function ProductsTable({
       key: "product",
       label: t("products.expand.cols.name"),
       required: true,
+      wrap: true,
       cellClassName: "!whitespace-normal",
       render: (product) => <div className="space-y-1"><div className="break-words font-medium text-slate-900 dark:text-slate-100">{groupOf(product)?.name ?? productDisplayName(product)}</div>{!groupOf(product) && <ProductKindBadge kind={product.productKind} />}</div>,
     },

@@ -392,7 +392,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                           {initials}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <PartnerDetailLink kind="customer" partnerId={c.id} name={c.name} className="font-semibold text-[13px] truncate" />
+                          <PartnerDetailLink kind="customer" partnerId={c.id} name={c.name} className="block whitespace-normal break-words font-semibold text-[13px]" />
                           <div className={cn("text-xs", pct != null && pct > 85 ? "text-er" : "text-slate-400")}>
                             {pct != null ? t("dashboard.pctOfLimit", { pct }) : t("dashboard.noLimit")}
                           </div>

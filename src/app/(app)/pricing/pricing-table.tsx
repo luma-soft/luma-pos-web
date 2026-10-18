@@ -465,9 +465,10 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
       label: t("orders.cols.product"),
       required: true,
       width: "280px",
+      wrap: true,
       cellClassName: "whitespace-normal",
       render: (r) => (
-        <div>
+        <div className="whitespace-normal break-words">
           <div className="font-medium">{r.name}</div>
           <div className="text-xs text-slate-400">{r.sku} · {[r.baseUnit, ...(r.units ?? []).filter((unit) => unit.unitName !== r.baseUnit).map((unit) => unit.unitName)].join(" / ")}</div>
         </div>

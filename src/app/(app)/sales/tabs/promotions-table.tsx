@@ -58,7 +58,7 @@ export function PromotionsTable({ rows }: { rows: PromotionRow[] }) {
   const t = useTranslations();
   const columns: DataTableColumn<PromotionRow>[] = [
     { key: "name", label: t("promos.cols.name"), required: true, render: (row) => <span className="font-medium">{row.name}</span> },
-    { key: "product", label: t("orders.cols.product"), defaultVisible: true, render: (row) => row.productName },
+    { key: "product", label: t("orders.cols.product"), defaultVisible: true, wrap: true, render: (row) => <span className="whitespace-normal break-words">{row.productName}</span> },
     { key: "tiers", label: t("promos.cols.tiers"), defaultVisible: true, render: (row) => <TierList row={row} /> },
     {
       key: "period",

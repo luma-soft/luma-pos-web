@@ -31,7 +31,7 @@ export function PurchaseReturnsTable({ rows, capabilities }: { rows: PurchaseRet
   const columns: DataTableColumn<PurchaseReturnRow>[] = [
     { key: "code", label: t("purchaseReturns.cols.code"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "time", label: t("purchaseReturns.cols.time"), defaultVisible: true, render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
-    { key: "supplier", label: t("purchaseReturns.cols.supplier"), defaultVisible: true, render: (row) => <PartnerDetailLink kind="supplier" partnerId={row.supplierId} name={row.supplierName} /> },
+    { key: "supplier", label: t("purchaseReturns.cols.supplier"), defaultVisible: true, wrap: true, render: (row) => <PartnerDetailLink kind="supplier" partnerId={row.supplierId} name={row.supplierName} className="block w-full whitespace-normal break-words" /> },
     { key: "subtotal", label: t("purchaseReturns.cols.subtotal"), defaultVisible: true, align: "right", render: (row) => formatCurrency(Number(row.subtotal)) },
     { key: "discount", label: t("purchaseReturns.cols.discount"), defaultVisible: true, align: "right", render: (row) => Number(row.discount) > 0 ? formatCurrency(Number(row.discount)) : "—" },
     { key: "tax", label: t("purchaseReturns.cols.tax"), defaultVisible: true, align: "right", render: (row) => Number(row.tax) > 0 ? formatCurrency(Number(row.tax)) : "—" },
@@ -63,7 +63,7 @@ export function PurchaseReturnsTable({ rows, capabilities }: { rows: PurchaseRet
           <div className="pointer-events-none flex items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="font-semibold text-primary-600">{row.code}</div>
-              <div className="text-xs text-slate-400">{formatDate(row.createdAt)} · <PartnerDetailLink kind="supplier" partnerId={row.supplierId} name={row.supplierName} className="pointer-events-auto relative z-10" /></div>
+              <div className="text-xs text-slate-400">{formatDate(row.createdAt)} · <PartnerDetailLink kind="supplier" partnerId={row.supplierId} name={row.supplierName} className="pointer-events-auto relative z-10 max-w-full whitespace-normal break-words" /></div>
             </div>
             <StatusBadge status={row.status} />
           </div>

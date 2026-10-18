@@ -29,7 +29,7 @@ const PILL: Record<RestockPriority, string> = {
 export function RestockTable({ rows }: { rows: RestockRow[] }) {
   const t = useTranslations();
   const columns: DataTableColumn<RestockRow>[] = [
-    { key: "product", label: t("orders.cols.product"), required: true, render: (row) => <span><span className="font-medium">{row.name}</span><span className="ml-2 text-xs text-slate-400">{row.sku}</span></span> },
+    { key: "product", label: t("orders.cols.product"), required: true, wrap: true, render: (row) => <span className="whitespace-normal break-words"><span className="font-medium">{row.name}</span><span className="ml-2 text-xs text-slate-400">{row.sku}</span></span> },
     { key: "onHand", label: t("ai.cols.onHand"), defaultVisible: true, align: "right", render: (row) => `${formatNumber(row.stock)} ${row.baseUnit}` },
     { key: "velocity", label: t("ai.cols.velocity"), defaultVisible: true, align: "right", render: (row) => `${row.velocity.toFixed(1)}/${t("ai.perDay")}` },
     { key: "daysLeft", label: t("ai.cols.daysLeft"), defaultVisible: true, align: "right", cellClassName: (row) => daysOfStockTone(row.daysOfStock), render: (row) => formatDaysOfStock(row.daysOfStock) },

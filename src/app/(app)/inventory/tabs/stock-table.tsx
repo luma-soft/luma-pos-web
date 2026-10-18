@@ -42,7 +42,7 @@ export function StockTable({ rows }: { rows: StockRow[]; stock?: StockFilter }) 
   const t = useTranslations();
   const router = useRouter();
   const columns: DataTableColumn<StockRow>[] = [
-    { key: "product", label: t("orders.cols.product"), required: true, render: (row) => <span><span className="font-medium">{productDisplayName(row)}</span><span className="ml-2 text-xs text-slate-400">{row.sku}</span></span> },
+    { key: "product", label: t("orders.cols.product"), required: true, width: "300px", wrap: true, render: (row) => <span className="whitespace-normal break-words"><span className="font-medium">{productDisplayName(row)}</span><span className="ml-2 text-xs text-slate-400">{row.sku}</span></span> },
     { key: "stock", label: t("inventory.cols.stock"), defaultVisible: true, align: "right", cellClassName: (row) => stockClass(row), render: (row) => `${formatNumber(Number(row.totalStock))} ${row.baseUnit}` },
     { key: "min", label: t("inventory.cols.min"), defaultVisible: true, align: "right", render: (row) => Number(row.minLevel) > 0 ? formatNumber(Number(row.minLevel)) : "—" },
     { key: "level", label: t("inventory.cols.level"), defaultVisible: true, width: "140px", render: (row) => <Level row={row} /> },

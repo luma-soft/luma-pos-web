@@ -482,8 +482,8 @@ function InboxSection({ threads, L }: { threads: Awaited<ReturnType<typeof getSh
           <div className="border-b border-border-soft px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="truncate text-sm font-extrabold">{thread.buyerName || thread.externalThreadId}</h2>
-                <p className="truncate text-xs text-slate-500">Shopee · <PartnerDetailLink kind="customer" partnerId={thread.customerId} name={thread.customerName || (legacyTextByFlag(L, "0d79442a277a"))} />{thread.orderCode ? ` · ${thread.orderCode}` : ""}</p>
+                <h2 className="whitespace-normal break-words text-sm font-extrabold">{thread.buyerName || thread.externalThreadId}</h2>
+                <p className="whitespace-normal break-words text-xs text-slate-500">Shopee · <PartnerDetailLink kind="customer" partnerId={thread.customerId} name={thread.customerName || (legacyTextByFlag(L, "0d79442a277a"))} className="max-w-full whitespace-normal break-words" />{thread.orderCode ? ` · ${thread.orderCode}` : ""}</p>
               </div>
               <Badge value={thread.status} />
             </div>

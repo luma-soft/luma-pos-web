@@ -30,7 +30,9 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
       key: "customer",
       label: t("orders.cols.customer"),
       defaultVisible: true,
-      render: (invoice) => <PartnerDetailLink kind="customer" partnerId={invoice.customerId} name={invoice.customerName} className="font-medium" />,
+      width: "280px",
+      wrap: true,
+      render: (invoice) => <PartnerDetailLink kind="customer" partnerId={invoice.customerId} name={invoice.customerName} className="block w-full whitespace-normal break-words font-medium" />,
     },
     {
       key: "status",
@@ -104,8 +106,8 @@ export function ReportInvoiceMobileRow({ row }: { row: ReportInvoiceRow }) {
   return (
     <div className="p-3">
       <OrderSummaryLink row={row} mobile />
-      <div className="text-xs font-medium text-slate-400">
-        {formatDate(row.createdAt)} · <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} />
+      <div className="break-words text-xs font-medium text-slate-400">
+        {formatDate(row.createdAt)} · <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} className="max-w-full whitespace-normal break-words" />
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-2">
         <MobileRecordField

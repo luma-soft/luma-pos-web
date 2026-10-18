@@ -83,8 +83,8 @@ export async function OrderDetailPanel({
       <div className={cn("mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between", compact && "mb-4")}>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100">
-              <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} />
+            <h2 className="min-w-0 max-w-full break-words text-xl font-bold text-slate-900 dark:text-slate-100">
+              <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} className="block whitespace-normal break-words" />
             </h2>
             <span className="text-sm font-semibold text-slate-500">{order.code}</span>
             <OrderStatusBadge status={order.status} />

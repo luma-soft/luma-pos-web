@@ -28,8 +28,9 @@ export function PurchasesTable({ rows, printTemplates, detailPurchase = null }: 
       label: t("purchases.cols.supplier"),
       defaultVisible: true,
       width: "30%",
+      wrap: true,
       cellClassName: "overflow-visible whitespace-normal text-clip break-words",
-      render: (purchase) => <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} />,
+      render: (purchase) => <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} className="block w-full whitespace-normal break-words" />,
     },
     { key: "total", label: t("orders.cols.total"), defaultVisible: true, align: "right", cellClassName: "font-semibold", render: (purchase) => formatCurrency(Number(purchase.total)) },
     { key: "owed", label: t("purchases.cols.owed"), defaultVisible: true, align: "right", cellClassName: (purchase) => purchaseOwed(purchase) > 0 ? "font-semibold text-warn" : "text-slate-400", render: (purchase) => purchaseOwed(purchase) > 0 ? formatCurrency(purchaseOwed(purchase)) : "—" },
@@ -52,7 +53,7 @@ export function PurchasesTable({ rows, printTemplates, detailPurchase = null }: 
               <div className="pointer-events-none flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-semibold text-primary-600">{purchase.code}</div>
-                  <div className="text-xs text-slate-400">{formatDate(purchase.createdAt)} · <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} className="pointer-events-auto relative z-10" /></div>
+                  <div className="text-xs text-slate-400">{formatDate(purchase.createdAt)} · <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} className="pointer-events-auto relative z-10 max-w-full whitespace-normal break-words" /></div>
                 </div>
                   <PurchaseStatusBadge status={purchase.status} />
               </div>

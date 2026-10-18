@@ -244,13 +244,14 @@ function CustomerRows({
       key: "name",
       label: t("customers.cols.name"),
       required: true,
-      width: "200px",
+      width: "300px",
+      wrap: true,
       render: (customer) => (
         <PartnerDetailLink
           kind="customer"
           partnerId={customer.id}
           name={customer.name}
-          className="font-semibold"
+          className="block w-full whitespace-normal break-words font-semibold"
         />
       ),
     },
@@ -354,11 +355,12 @@ function CustomerRows({
           <article className="w-full p-3 text-left min-h-11">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="truncate font-semibold">
+                <div className="min-w-0 whitespace-normal break-words font-semibold">
                   <PartnerDetailLink
                     kind="customer"
                     partnerId={customer.id}
                     name={customer.name}
+                    className="block w-full whitespace-normal break-words"
                   />
                 </div>
                 <button

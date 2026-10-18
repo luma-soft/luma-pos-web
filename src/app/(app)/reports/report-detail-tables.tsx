@@ -17,7 +17,9 @@ export function ReportProductsTable({ rows }: { rows: ReportProductRow[] }) {
       key: "product",
       label: t("orders.cols.product"),
       required: true,
-      render: (row) => <span className="font-medium">{row.productName}</span>,
+      width: "320px",
+      wrap: true,
+      render: (row) => <span className="whitespace-normal break-words font-medium">{row.productName}</span>,
     },
     {
       key: "quantity",
@@ -115,11 +117,13 @@ export function ReportCustomersTable({ rows }: { rows: ReportCustomerRow[] }) {
       key: "customer",
       label: t("orders.cols.customer"),
       required: true,
+      width: "300px",
+      wrap: true,
       render: (row) => (
-        <span className="font-medium">
-          <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} />
+        <div className="whitespace-normal break-words font-medium">
+          <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} className="block w-full whitespace-normal break-words" />
           {row.customerType && row.customerType !== "retail" ? ` (${t(`customers.types.${row.customerType}` as never)})` : ""}
-        </span>
+        </div>
       ),
     },
     {
@@ -190,7 +194,7 @@ export function ReportCustomerMobileRow({ row }: { row: ReportCustomerRow }) {
   return (
     <div className="p-3">
       <div className="break-words text-sm font-black leading-snug">
-        <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} />
+        <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} className="max-w-full whitespace-normal break-words" />
         {row.customerType && row.customerType !== "retail" ? ` (${t(`customers.types.${row.customerType}` as never)})` : ""}
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-2">

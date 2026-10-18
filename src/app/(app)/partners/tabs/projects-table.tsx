@@ -24,7 +24,7 @@ export function ProjectMobileRow({
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="break-words text-sm font-semibold text-primary-600">{row.name}</h3>
-          <p className="mt-1 break-words text-xs text-slate-500"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} /></p>
+          <p className="mt-1 break-words text-xs text-slate-500"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} className="block w-full whitespace-normal break-words" /></p>
         </div>
         <Status row={row} />
       </div>
@@ -58,8 +58,8 @@ export function ProjectMobileRow({
 export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; customers: { id: string; name: string }[] }) {
   const t = useTranslations();
   const columns: DataTableColumn<ProjectRow>[] = [
-    { key: "name", label: t("projects.cols.name"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.name}</span> },
-    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} /> },
+    { key: "name", label: t("projects.cols.name"), required: true, wrap: true, render: (row) => <span className="whitespace-normal break-words font-semibold text-primary-600">{row.name}</span> },
+    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, wrap: true, render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} className="block w-full whitespace-normal break-words" /> },
     { key: "address", label: t("customers.fields.address"), defaultVisible: false, render: (row) => <span className="text-slate-500">{row.address ?? "—"}</span> },
     { key: "orders", label: t("projects.cols.orders"), defaultVisible: true, align: "right", width: "110px", render: (row) => row.orderCount },
     { key: "value", label: t("projects.cols.value"), defaultVisible: true, align: "right", render: (row) => formatCurrency(Number(row.totalValue)) },

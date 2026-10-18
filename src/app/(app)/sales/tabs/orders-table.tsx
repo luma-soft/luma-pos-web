@@ -218,7 +218,7 @@ export function OrderMobileRow({
                 kind="customer"
                 partnerId={order.customerId}
                 name={order.customerName ?? labels.walkIn}
-                className="pointer-events-auto relative inline-flex min-h-11 items-center"
+                className="pointer-events-auto relative max-w-full whitespace-normal break-words"
               /> ·{" "}
               {channelLabel(order.sourceMode)}
             </div>
@@ -380,14 +380,16 @@ export function OrdersTable({
       key: "customer",
       label: t("orders.cols.customer"),
       defaultVisible: true,
-      render: (order) => <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} />,
+      wrap: true,
+      render: (order) => <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} className="block w-full whitespace-normal break-words" />,
     },
     {
       key: "project",
       label: t("orders.cols.project"),
       defaultVisible: false,
+      wrap: true,
       render: (order) => (
-        <span className="text-slate-500">{order.projectName ?? "—"}</span>
+        <span className="whitespace-normal break-words text-slate-500">{order.projectName ?? "—"}</span>
       ),
     },
     {

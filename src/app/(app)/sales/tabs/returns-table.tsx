@@ -50,7 +50,8 @@ export function ReturnsTable({
       key: "customer",
       label: t("orders.cols.customer"),
       defaultVisible: true,
-      render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} />,
+      wrap: true,
+      render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} className="block w-full whitespace-normal break-words" />,
     },
     {
       key: "reason",
@@ -130,7 +131,7 @@ export function ReturnsTable({
               {row.orderCode}
             </OrderDetailLink>
           )}
-          <p className="text-sm font-medium"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} className="inline-flex min-h-11 items-center" /></p>
+          <p className="text-sm font-medium"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} className="block w-full whitespace-normal break-words" /></p>
           <p className="text-xs text-slate-500">
             {row.reason ? t(`returns.reasons.${row.reason}` as never) : "—"} · {t(`returns.refundMethods.${row.refundMethod}`)}
           </p>
