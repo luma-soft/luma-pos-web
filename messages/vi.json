@@ -2344,6 +2344,7 @@
       },
       "invalidAttributes": "Thuộc tính bị trùng hoặc không hợp lệ.",
       "invalidValues": "Giá trị thuộc tính trống, bị trùng hoặc không hợp lệ.",
+      "duplicateValue": "Giá trị này đã được dùng cho một biến thể khác. Hãy chọn giá trị khác.",
       "tooMany": "Tối đa 200 tổ hợp mới trong mỗi lần lưu; các SKU đã có được giữ nguyên.",
       "invalidExclusions": "Danh sách tổ hợp bỏ chọn không hợp lệ.",
       "invalidCombination": "Tổ hợp biến thể không khớp thuộc tính hoặc đã bị trùng.",

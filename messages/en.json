@@ -2344,6 +2344,7 @@
       },
       "invalidAttributes": "Attributes are duplicated or invalid.",
       "invalidValues": "Attribute values are empty, duplicated or invalid.",
+      "duplicateValue": "This value is already used by another variant. Choose a different value.",
       "tooMany": "A maximum of 200 new combinations can be saved at once; existing SKUs are retained.",
       "invalidExclusions": "Excluded combinations are invalid.",
       "invalidCombination": "Variant combination does not match the attributes or is duplicated.",

@@ -28,9 +28,12 @@ export function applyVariantValueEdits(
     const edit = editByAttribute.get(attribute.attributeId);
     const index = edit ? attribute.valueIds.indexOf(edit.optionValueId) : -1;
     const value = edit?.value.trim().replace(/\s+/g, " ") ?? "";
-    if (index < 0 || !value || attribute.values.some((existing, valueIndex) =>
-      valueIndex !== index && variantNameKey(existing) === variantNameKey(value))) {
+    if (index < 0 || !value) {
       throw new VariantValidationError("products.variants.invalidValues");
+    }
+    if (attribute.values.some((existing, valueIndex) =>
+      valueIndex !== index && variantNameKey(existing) === variantNameKey(value))) {
+      throw new VariantValidationError("products.variants.duplicateValue");
     }
     return {
       ...attribute,
