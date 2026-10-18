@@ -65,7 +65,7 @@ type Props = {
 
 const all = { value: "", label: "Tất cả" };
 const productStatuses = [
-  all,
+  { value: "all", label: "Tất cả" },
   { value: "active", label: "Đang kinh doanh" },
   { value: "inactive", label: "Ngừng kinh doanh" },
   { value: "draft", label: "Nháp" },
@@ -108,6 +108,7 @@ export function InventoryFilterDrawer({
   const panelRef = useRef<HTMLElement>(null);
   const isPurchaseFilter = title.includes("phiếu nhập");
   const isInternalUseFilter = fields.includes("reason");
+  const defaultStatus = !isPurchaseFilter && !isInternalUseFilter && fields.includes("status") ? "active" : "";
   const internalUseStatuses = [
     all,
     { value: "draft", label: t("internalUse.status.draft") },
@@ -118,7 +119,7 @@ export function InventoryFilterDrawer({
   const initial = useMemo<FilterDraft>(
     () => ({
       category: values.category ?? "",
-      status: values.status ?? "",
+      status: values.status || defaultStatus,
       view: values.view ?? "grouped",
       warehouse: fields.includes("warehouse") ? values.warehouseId ?? values.warehouse ?? "" : "",
       supplier: values.supplierId ?? "",
@@ -136,7 +137,7 @@ export function InventoryFilterDrawer({
       priceAgainst: values.priceAgainst ?? "",
       priceBookId: values.priceBookId ?? "",
     }),
-    [defaultSort, fields, values],
+    [defaultSort, defaultStatus, fields, values],
   );
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(initial);
@@ -164,6 +165,7 @@ export function InventoryFilterDrawer({
     key !== "from" &&
     key !== "to" &&
     Boolean(value) &&
+    !(key === "status" && value === "all") &&
     !(key === "time" && value === "all") &&
     !(key === "sort" && value === defaultSort),
   ).length + (showPriceComparison && draft.priceCondition && draft.priceAgainst ? 1 : 0);
@@ -326,7 +328,7 @@ export function InventoryFilterDrawer({
   function reset() {
     setDraft({
       category: "",
-      status: "",
+      status: defaultStatus,
       view: "grouped",
       warehouse: "",
       supplier: "",
