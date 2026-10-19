@@ -39,6 +39,7 @@ test("opening and closing update the URL while preserving list filters", () => {
   try {
     render();
     expect(modal.open).toBe(false);
+    expect(table.rowClickColumnKey).toBe("code");
     table.onRowClick(row);
     expect(params.get("detailPurchaseId")).toBe(row.id);
     render();

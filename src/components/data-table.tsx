@@ -191,6 +191,7 @@ export function DataTableShell<T>({
   empty,
   rowClassName,
   onRowClick,
+  rowClickColumnKey,
   toolbar,
   toolbarFloating = false,
   showColumnMenu = true,
@@ -230,6 +231,8 @@ export function DataTableShell<T>({
   empty?: ReactNode;
   rowClassName?: (row: T, expanded: boolean) => string | undefined;
   onRowClick?: (row: T) => void;
+  /** Restricts a row action to its primary data column instead of the whole row. */
+  rowClickColumnKey?: string;
   toolbar?: ReactNode;
   /** Đặt toolbar ở góc trên bảng mà không chiếm chiều cao dòng (desktop). */
   toolbarFloating?: boolean;
@@ -420,6 +423,16 @@ export function DataTableShell<T>({
               const toggle = () => {
                 if (expandable || detailOpenable) setExpanded(expanded ? null : id);
               };
+              const mobileFields = () => visibleColumns.slice(0, 3).map((column) => {
+                const content = column.mobileRender ? column.mobileRender(row) : column.render(row);
+                return (
+                  <div key={column.key} className={cn(column.wrap ? "whitespace-normal break-words" : "truncate", column.align === "right" && "text-right")}>
+                    {onRowClick && rowClickColumnKey === column.key
+                      ? <button type="button" onClick={() => onRowClick(row)} className="min-h-11 w-full rounded-sm text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{content}</button>
+                      : content}
+                  </div>
+                );
+              });
               return (
                 <div
                   key={id}
@@ -432,15 +445,17 @@ export function DataTableShell<T>({
                 >
                   {renderMobileRow ? (
                     renderMobileRow({ row, expanded, toggle })
+                  ) : onRowClick ? (
+                    <div className="min-h-11 w-full p-3 text-left">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 space-y-1">{mobileFields()}</div>
+                      </div>
+                    </div>
                   ) : (
-                    <button type="button" onClick={() => onRowClick ? onRowClick(row) : toggle()} className="min-h-11 w-full p-3 text-left">
+                    <button type="button" onClick={toggle} className="min-h-11 w-full p-3 text-left">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0 space-y-1">
-                          {visibleColumns.slice(0, 3).map((column) => (
-                            <div key={column.key} className={cn(column.wrap ? "whitespace-normal break-words" : "truncate", column.align === "right" && "text-right")}>
-                              {column.mobileRender ? column.mobileRender(row) : column.render(row)}
-                            </div>
-                          ))}
+                          {mobileFields()}
                         </div>
                         {expandable && <ChevronDown className={cn("h-4 w-4 shrink-0 text-slate-400 transition-transform", expanded && "rotate-180")} />}
                       </div>
@@ -571,14 +586,11 @@ export function DataTableShell<T>({
                       <tr
                         className={cn(
                           "border-t border-border-soft transition-colors",
-                          (expandable || detailOpenable || onRowClick) && "cursor-pointer",
+                          (expandable || detailOpenable) && "cursor-pointer",
                           expanded ? "bg-primary-50/45 dark:bg-primary-950/15" : "hover:bg-surface-2",
                           rowClassName?.(row, expanded),
                         )}
-                        onClick={() => {
-                          if (onRowClick) onRowClick(row);
-                          else if (expandable || detailOpenable) setExpanded(expanded ? null : id);
-                        }}
+                        onClick={!onRowClick && (expandable || detailOpenable) ? () => setExpanded(expanded ? null : id) : undefined}
                       >
                         {visibleColumns.map((column, index) => {
                           const cellClassName = typeof column.cellClassName === "function" ? column.cellClassName(row) : column.cellClassName;
@@ -591,10 +603,13 @@ export function DataTableShell<T>({
                                 column.align === "right" && "text-right tabular-nums",
                                 column.align === "center" && "text-center",
                                 hasFloatingColumnMenu && index === visibleColumns.length - 1 && "pr-14",
+                                onRowClick && rowClickColumnKey === column.key && "cursor-pointer",
                                 cellClassName,
                               )}
                             >
-                              {column.render(row)}
+                              {onRowClick && rowClickColumnKey === column.key
+                                ? <button type="button" onClick={() => onRowClick?.(row)} className="min-h-11 w-full rounded-sm text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{column.render(row)}</button>
+                                : column.render(row)}
                             </td>
                           );
                         })}

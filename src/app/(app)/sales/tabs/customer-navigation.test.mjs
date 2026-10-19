@@ -48,8 +48,7 @@ function assertCustomerLinks(html, count) {
   expect(links).toHaveLength(count);
   for (const link of links) {
     expect(link).toContain("Anh Nhật");
-    expect(link).toContain('target="_blank"');
-    expect(link).toContain('rel="noopener noreferrer"');
+    expect(link).not.toContain('target="_blank"');
   }
   for (const button of html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? []) {
     expect(button).not.toContain("detailCustomerId=");
@@ -58,7 +57,7 @@ function assertCustomerLinks(html, count) {
 
 describe("sales customer detail navigation", () => {
   for (const [name, Table] of [["orders", OrdersTable], ["quotes", QuotesTable], ["bookings", BookingsTable], ["returns", ReturnsTable]]) {
-    test(`${name}: desktop and mobile customer names are safe new-tab links outside document buttons`, () => {
+    test(`${name}: desktop and mobile customer names open the detail modal without activating the document`, () => {
       assertCustomerLinks(render(createElement(Table, { rows: [row], printTemplates: [] })), 2);
     });
 

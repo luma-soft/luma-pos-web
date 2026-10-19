@@ -7,11 +7,18 @@ describe("partner detail links", () => {
   for (const kind of ["customer", "supplier"]) {
     const queryKey = kind === "customer" ? "detailCustomerId" : "detailSupplierId";
 
-    test(`${kind} opens the correct modal URL in a new tab`, () => {
+    test(`${kind} opens the correct detail modal in a new tab by default`, () => {
       const html = renderToStaticMarkup(createElement(PartnerDetailLink, { kind, partnerId: "partner-1", name: "Tên đối tác" }));
       expect(html).toContain(`href="/partners?tab=${kind}s&amp;${queryKey}=partner-1"`);
       expect(html).toContain('target="_blank"');
       expect(html).toContain('rel="noopener noreferrer"');
+      expect(html).toContain("Tên đối tác");
+    });
+
+    test(`${kind} can open its detail modal in the current tab`, () => {
+      const html = renderToStaticMarkup(createElement(PartnerDetailLink, { kind, partnerId: "partner-1", name: "Tên đối tác", openInCurrentTab: true }));
+      expect(html).toContain(`href="/partners?tab=${kind}s&amp;${queryKey}=partner-1"`);
+      expect(html).not.toContain('target="_blank"');
       expect(html).toContain("Tên đối tác");
     });
 

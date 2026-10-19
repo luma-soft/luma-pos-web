@@ -22,7 +22,7 @@ const row = {
 
 describe("inventory supplier navigation", () => {
   for (const Component of [PurchasesTable, PurchaseReturnsTable]) {
-    test(`${Component.name}: desktop and mobile labels open the supplier modal in a new tab`, () => {
+    test(`${Component.name}: desktop and mobile labels open the supplier modal in the current tab`, () => {
       const html = renderToStaticMarkup(createElement(NextIntlClientProvider, {
         locale: "vi", messages, timeZone: "Asia/Ho_Chi_Minh",
       }, createElement(Component, { rows: [{ ...row, status: Component === PurchaseReturnsTable ? "completed" : "received" }], printTemplates: [] })));
@@ -31,8 +31,7 @@ describe("inventory supplier navigation", () => {
       expect(links).toHaveLength(2);
       for (const link of links) {
         expect(link).toContain('href="/partners?tab=suppliers&amp;detailSupplierId=supplier-1"');
-        expect(link).toContain('target="_blank"');
-        expect(link).toContain('rel="noopener noreferrer"');
+        expect(link).not.toContain('target="_blank"');
         expect(link).toContain("Công ty Duy Hòa");
       }
       for (const button of html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? []) {

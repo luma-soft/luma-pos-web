@@ -58,6 +58,7 @@ export function StockTable({ rows }: { rows: StockRow[]; stock?: StockFilter }) 
       getRowId={(row) => row.id}
       minWidth="980px"
       onRowClick={(row) => router.push(Routes.productDetail(row.id), { scroll: false })}
+      rowClickColumnKey="product"
       renderDetail={(row) => <ExpandedStock row={row} />}
       detailPanelClassName="h-auto max-h-[min(720px,calc(100dvh-3rem))] sm:max-w-6xl"
       detailBodyClassName="p-0"

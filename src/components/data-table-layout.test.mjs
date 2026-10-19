@@ -83,6 +83,33 @@ describe("data table utility column", () => {
     expect(html).toContain('colSpan="3"');
   });
 
+  test("limits a row action to its configured primary column", () => {
+    const shell = renderShell({ renderMobileRow: undefined, onRowClick() {}, rowClickColumnKey: "product" });
+    const html = renderTable({ onRowClick() {}, rowClickColumnKey: "product" });
+    const mobile = shell.slice(shell.indexOf("lg:hidden"), shell.indexOf("hidden min-h-0 lg:block"));
+    const body = html.match(/<tbody>([\s\S]*?)<\/tbody>/)[1];
+    const row = body.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/)[0];
+    const cells = row.match(/<td\b[^>]*>[\s\S]*?<\/td>/g);
+
+    expect(mobile.match(/<button\b/g)).toHaveLength(1);
+    expect(mobile).toContain("Ấm siêu tốc");
+    expect(cells[0]).toContain("<button");
+    expect(cells[0]).toContain("Ấm siêu tốc");
+    expect(cells[1]).not.toContain("<button");
+    expect(row.match(/<tr\b[^>]*>/)[0]).not.toContain("cursor-pointer");
+  });
+
+  test("does not make a whole row clickable when no action column is configured", () => {
+    const html = renderTable({ onRowClick() {} });
+    const shell = renderShell({ renderMobileRow: undefined, onRowClick() {} });
+    const mobile = shell.slice(shell.indexOf("lg:hidden"), shell.indexOf("hidden min-h-0 lg:block"));
+    const row = html.match(/<tbody>([\s\S]*?)<\/tbody>/)[1].match(/<tr\b[^>]*>[\s\S]*?<\/tr>/)[0];
+
+    expect(mobile).not.toContain("<button");
+    expect(row.match(/<tr\b[^>]*>/)[0]).not.toContain("cursor-pointer");
+    expect(row).not.toContain("<button");
+  });
+
   test("uses only the outer card's bottom radius when embedded below a toolbar", () => {
     const html = renderShell({ embedded: true });
     expect(html).toContain("rounded-b-[inherit]");

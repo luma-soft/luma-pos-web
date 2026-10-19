@@ -220,7 +220,7 @@ export function ServiceProjectMobileRow({
                 {row.name}
               </Link>
             </h3>
-          <p className="mt-1 break-words text-xs text-slate-500"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("projects.noCustomer")} className="block w-full whitespace-normal break-words" /></p>
+          <p className="mt-1 break-words text-xs text-slate-500"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("projects.noCustomer")} openInCurrentTab className="block w-full whitespace-normal break-words" /></p>
           </div>
         </div>
         <ChevronRight aria-hidden="true" className="mt-2 h-5 w-5 shrink-0 text-slate-400" />
@@ -247,7 +247,6 @@ export function ServiceProjectMobileRow({
 
 export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProjectRow[]; customers: { id: string; name: string }[] }) {
   const t = useTranslations();
-  const router = useRouter();
   const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
   const visibleRows = rows.filter((row) => !deletedIds.has(row.id));
   useEffect(() => {
@@ -291,7 +290,7 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
         </span>
       ),
     },
-    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, wrap: true, render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} className="block w-full whitespace-normal break-words" /> },
+    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, wrap: true, render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} openInCurrentTab className="block w-full whitespace-normal break-words" /> },
     { key: "assets", label: "Thiết bị", defaultVisible: true, align: "right", render: (row) => row.assetCount },
     {
       key: "status",
@@ -317,7 +316,6 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="720px"
-      onRowClick={(row) => router.push(Routes.project(row.id))}
       renderMobileRow={({ row }) => (
         <ServiceProjectMobileRow
           row={row}

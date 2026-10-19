@@ -218,6 +218,7 @@ export function OrderMobileRow({
                 kind="customer"
                 partnerId={order.customerId}
                 name={order.customerName ?? labels.walkIn}
+                openInCurrentTab
                 className="pointer-events-auto relative max-w-full whitespace-normal break-words"
               /> ·{" "}
               {channelLabel(order.sourceMode)}
@@ -381,7 +382,7 @@ export function OrdersTable({
       label: t("orders.cols.customer"),
       defaultVisible: true,
       wrap: true,
-      render: (order) => <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} className="block w-full whitespace-normal break-words" />,
+      render: (order) => <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} openInCurrentTab className="block w-full whitespace-normal break-words" />,
     },
     {
       key: "project",
@@ -448,6 +449,7 @@ export function OrdersTable({
         getRowId={(order) => order.id}
         minWidth="1010px"
         onRowClick={openOrder}
+        rowClickColumnKey="code"
         rowClassName={(order) =>
           cn(
             order.status === "cancelled" && "opacity-60",

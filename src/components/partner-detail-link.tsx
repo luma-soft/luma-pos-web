@@ -9,19 +9,21 @@ export function PartnerDetailLink({
   partnerId,
   name,
   className,
+  openInCurrentTab = false,
 }: {
   kind: "customer" | "supplier";
   partnerId?: string | null;
   name: string;
   className?: string;
+  openInCurrentTab?: boolean;
 }) {
   if (!partnerId) return <>{name}</>;
 
   return (
     <Link
       href={kind === "customer" ? Routes.customerDetail(partnerId) : Routes.supplierDetail(partnerId)}
-      target="_blank"
-      rel="noopener noreferrer"
+      target={openInCurrentTab ? undefined : "_blank"}
+      rel={openInCurrentTab ? undefined : "noopener noreferrer"}
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") event.stopPropagation();

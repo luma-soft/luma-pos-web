@@ -480,6 +480,7 @@ export function ProductsTable({
         mobileListClassName="!space-y-0 overflow-hidden rounded-xl border border-border-soft bg-surface"
         mobileRowClassName="!rounded-none !border-x-0 !border-t-0 last:!border-b-0"
         onRowClick={(product) => groupOf(product) ? toggleGroup(product) : openProduct(product)}
+        rowClickColumnKey="product"
         rowClassName={(product) => cn(
           groupOf(product) && "bg-primary-50/60 hover:bg-primary-50 [&>td:last-child]:bg-primary-50/60 dark:bg-primary-950/40 dark:hover:bg-primary-950/60 dark:[&>td:last-child]:bg-primary-950/40",
           groupOf(product) && isExpanded(product) && "[&>td]:border-t [&>td]:border-primary-600 [&>td:first-child]:border-l [&>td:last-child]:border-r",
@@ -491,7 +492,7 @@ export function ProductsTable({
           return <Fragment>
             {members.map((member) => {
               const child: ProductRow = { ...member, variantGroup: undefined };
-              return <tr key={`${product.id}:${child.id}`} onClick={() => openProduct(child)} className={cn("cursor-pointer border-t border-border-soft bg-surface hover:bg-surface-2 [&>td:first-child]:border-l [&>td:first-child]:border-primary-600 [&>td:last-child]:border-r [&>td:last-child]:border-primary-600", selectedIds.has(child.id) && "bg-primary-50 dark:bg-primary-950/40")}>
+              return <tr key={`${product.id}:${child.id}`} className={cn("border-t border-border-soft bg-surface hover:bg-surface-2 [&>td:first-child]:border-l [&>td:first-child]:border-primary-600 [&>td:last-child]:border-r [&>td:last-child]:border-primary-600", selectedIds.has(child.id) && "bg-primary-50 dark:bg-primary-950/40")}>
                 {visibleColumns.map((column) => <td key={column.key} className={cn("px-3 py-3 align-middle", column.align === "right" && "text-right tabular-nums", column.align === "center" && "text-center", typeof column.cellClassName === "function" ? column.cellClassName(child) : column.cellClassName)}>
                   {column.key === "sku" ? <Link href={Routes.productDetail(child.id)} scroll={false} onClick={stopRowToggle} className="flex min-h-14 items-center gap-2.5 text-sm font-medium hover:text-primary-600"><ProductThumbnail product={child} /><span className="min-w-0 break-words">{child.sku}</span></Link>
                     : column.key === "product" ? <Link href={Routes.productDetail(child.id)} scroll={false} onClick={stopRowToggle} className="block whitespace-normal font-medium hover:text-primary-600">
@@ -1332,7 +1333,7 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
           </div>
           <div className="text-xs text-slate-500">{formatDate(movement.createdAt)} · {t(movementTypeKey(movement.type) as never)}</div>
           <dl className="grid grid-cols-2 gap-2 text-xs">
-            <div><dt className="text-slate-500">{t("products.expand.cols.partner")}</dt><dd className="mt-0.5 break-words"><PartnerDetailLink kind={movement.refType === "purchase" ? "supplier" : "customer"} partnerId={movement.partnerId} name={movement.partnerName || "—"} /></dd></div>
+            <div><dt className="text-slate-500">{t("products.expand.cols.partner")}</dt><dd className="mt-0.5 break-words"><PartnerDetailLink kind={movement.refType === "purchase" ? "supplier" : "customer"} partnerId={movement.partnerId} name={movement.partnerName || "—"} openInCurrentTab /></dd></div>
             <div><dt className="text-right text-slate-500">{t("products.expand.cols.stockAfter")}</dt><dd className="mt-0.5 text-right font-semibold tabular-nums">{formatNumber(Number(movement.stockAfter))}</dd></div>
             <div><dt className="text-slate-500">{t("products.expand.cols.transactionPrice")}</dt><dd className="mt-0.5 tabular-nums">{moneyOrDash(movement.transactionPrice)}</dd></div>
             <div><dt className="text-right text-slate-500">{t("products.expand.cols.costPrice")}</dt><dd className="mt-0.5 text-right tabular-nums">{moneyOrDash(movement.unitCost)}</dd></div>
@@ -1383,7 +1384,7 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
                 {t(movementTypeKey(movement.type) as never)}
               </td>
               <td className="px-3 py-3 text-slate-700 dark:text-slate-200">
-                <PartnerDetailLink kind={movement.refType === "purchase" ? "supplier" : "customer"} partnerId={movement.partnerId} name={movement.partnerName || "—"} />
+                <PartnerDetailLink kind={movement.refType === "purchase" ? "supplier" : "customer"} partnerId={movement.partnerId} name={movement.partnerName || "—"} openInCurrentTab />
               </td>
               <td className="px-3 py-3 text-right tabular-nums">
                 {moneyOrDash(movement.transactionPrice)}

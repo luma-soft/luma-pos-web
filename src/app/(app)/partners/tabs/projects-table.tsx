@@ -24,7 +24,7 @@ export function ProjectMobileRow({
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="break-words text-sm font-semibold text-primary-600">{row.name}</h3>
-          <p className="mt-1 break-words text-xs text-slate-500"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} className="block w-full whitespace-normal break-words" /></p>
+          <p className="mt-1 break-words text-xs text-slate-500"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} openInCurrentTab className="block w-full whitespace-normal break-words" /></p>
         </div>
         <Status row={row} />
       </div>
@@ -59,7 +59,7 @@ export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; custome
   const t = useTranslations();
   const columns: DataTableColumn<ProjectRow>[] = [
     { key: "name", label: t("projects.cols.name"), required: true, wrap: true, render: (row) => <span className="whitespace-normal break-words font-semibold text-primary-600">{row.name}</span> },
-    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, wrap: true, render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} className="block w-full whitespace-normal break-words" /> },
+    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, wrap: true, render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} openInCurrentTab className="block w-full whitespace-normal break-words" /> },
     { key: "address", label: t("customers.fields.address"), defaultVisible: false, render: (row) => <span className="text-slate-500">{row.address ?? "—"}</span> },
     { key: "orders", label: t("projects.cols.orders"), defaultVisible: true, align: "right", width: "110px", render: (row) => row.orderCount },
     { key: "value", label: t("projects.cols.value"), defaultVisible: true, align: "right", render: (row) => formatCurrency(Number(row.totalValue)) },
@@ -110,7 +110,7 @@ export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; custome
         <div className="space-y-4 bg-surface px-4 py-4">
           <div className="grid gap-4 md:grid-cols-4">
             <Info label={t("projects.cols.name")} value={row.name} />
-            <Info label={t("orders.cols.customer")} value={<PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} />} />
+            <Info label={t("orders.cols.customer")} value={<PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} openInCurrentTab />} />
             <Info label={t("projects.cols.orders")} value={String(row.orderCount)} />
             <Info label={t("orders.cols.remaining")} value={formatCurrency(Number(row.remaining))} tone={Number(row.remaining) > 0 ? "danger" : undefined} />
           </div>

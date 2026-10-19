@@ -174,6 +174,7 @@ export function SuppliersTable({
           kind="supplier"
           partnerId={row.id}
           name={row.name}
+          openInCurrentTab
           className="block w-full whitespace-normal break-words font-semibold"
         />
       ),
@@ -198,14 +199,6 @@ export function SuppliersTable({
       render: (row) => Number(row.currentDebt) > 0 ? formatCurrency(Number(row.currentDebt)) : "—",
     },
   ];
-
-  function openSupplier(row: SupplierRow) {
-    setSelectedSupplierId(row.id);
-    setEditing(false);
-    setSaving(false);
-    setSaveError("");
-    setDraft(null);
-  }
 
   function closeSupplier() {
     setSelectedSupplierId(null);
@@ -316,7 +309,6 @@ export function SuppliersTable({
             </div>
           </div>
         )}
-        onRowClick={openSupplier}
         renderMobileRow={({ row }) => {
           const debt = Number(row.currentDebt);
           const purchase = Number(row.totalPurchase);
@@ -324,8 +316,8 @@ export function SuppliersTable({
             <article className="w-full p-3 text-left min-h-11">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="min-w-0 whitespace-normal break-words font-semibold"><PartnerDetailLink kind="supplier" partnerId={row.id} name={row.name} className="block w-full whitespace-normal break-words" /></div>
-                  <button type="button" onClick={() => openSupplier(row)} className="inline-flex min-h-11 min-w-11 items-center text-xs text-slate-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{row.phone ?? row.code ?? t("suppliers.title")}</button>
+                  <div className="min-w-0 whitespace-normal break-words font-semibold"><PartnerDetailLink kind="supplier" partnerId={row.id} name={row.name} openInCurrentTab className="block w-full whitespace-normal break-words" /></div>
+                  <span className="inline-flex min-h-11 items-center text-xs text-slate-400">{row.phone ?? row.code ?? t("suppliers.title")}</span>
                 </div>
                 <div className="shrink-0 space-y-1 text-right">
                   <div className="text-xs text-slate-500">

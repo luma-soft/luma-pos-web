@@ -242,6 +242,7 @@ function CustomerRows({
           kind="customer"
           partnerId={customer.id}
           name={customer.name}
+          openInCurrentTab
           className="block w-full whitespace-normal break-words font-semibold"
         />
       ),
@@ -347,10 +348,6 @@ function CustomerRows({
             </div>
           </div>
         }
-        onRowClick={(customer) => {
-          setSelectedCustomerId(customer.id);
-          setDetailTab("info");
-        }}
         renderMobileRow={({ row: customer }) => (
           <article className="w-full p-3 text-left min-h-11">
             <div className="flex items-start justify-between gap-3">
@@ -360,20 +357,14 @@ function CustomerRows({
                     kind="customer"
                     partnerId={customer.id}
                     name={customer.name}
+                    openInCurrentTab
                     className="block w-full whitespace-normal break-words"
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCustomerId(customer.id);
-                    setDetailTab("info");
-                  }}
-                  className="inline-flex min-h-11 min-w-11 items-center text-xs text-slate-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                >
+                <span className="inline-flex min-h-11 items-center text-xs text-slate-400">
                   {customer.code ?? t("customers.expand.profile")} ·{" "}
                   {customer.phone ?? "—"}
-                </button>
+                </span>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs">

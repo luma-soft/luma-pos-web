@@ -121,7 +121,7 @@ export function ReportCustomersTable({ rows }: { rows: ReportCustomerRow[] }) {
       wrap: true,
       render: (row) => (
         <div className="whitespace-normal break-words font-medium">
-          <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} className="block w-full whitespace-normal break-words" />
+          <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} openInCurrentTab className="block w-full whitespace-normal break-words" />
           {row.customerType && row.customerType !== "retail" ? ` (${t(`customers.types.${row.customerType}` as never)})` : ""}
         </div>
       ),
@@ -194,7 +194,7 @@ export function ReportCustomerMobileRow({ row }: { row: ReportCustomerRow }) {
   return (
     <div className="p-3">
       <div className="break-words text-sm font-black leading-snug">
-        <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} className="max-w-full whitespace-normal break-words" />
+        <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} openInCurrentTab className="max-w-full whitespace-normal break-words" />
         {row.customerType && row.customerType !== "retail" ? ` (${t(`customers.types.${row.customerType}` as never)})` : ""}
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-2">

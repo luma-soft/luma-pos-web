@@ -659,7 +659,7 @@ function RelatedOrders({ orders, t }: Pick<ProjectOverviewDetailsProps, "orders"
                   {order.code}
                 </OrderDetailLink>
               )}
-              subtitle={<>{formatDate(order.createdAt)} · <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} /></>}
+              subtitle={<>{formatDate(order.createdAt)} · <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} openInCurrentTab /></>}
               status={<div className="flex flex-wrap justify-end gap-1.5"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></div>}
             >
               <MobileRecordField label={t("orders.cols.total")} value={formatCurrency(Number(order.total))} />
@@ -691,7 +691,7 @@ function RelatedOrders({ orders, t }: Pick<ProjectOverviewDetailsProps, "orders"
                 <tr key={order.id}>
                   <td className="px-4 py-3"><OrderDetailLink orderId={order.id} className="font-semibold text-primary-600 hover:underline">{order.code}</OrderDetailLink></td>
                   <td className="px-4 py-3 text-slate-500">{formatDate(order.createdAt)}</td>
-                  <td className="px-4 py-3"><PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} /></td>
+                  <td className="px-4 py-3"><PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} openInCurrentTab /></td>
                   <td className="px-4 py-3"><div className="flex flex-wrap gap-1.5"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></div></td>
                   <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatCurrency(Number(order.total))}</td>
                   <td className="px-4 py-3 text-right font-semibold text-er tabular-nums">{remaining > 0 ? formatCurrency(remaining) : "—"}</td>

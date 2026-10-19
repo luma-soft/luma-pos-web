@@ -411,7 +411,7 @@ function OnlineOrdersSection({ rows, L }: { rows: Awaited<ReturnType<typeof getS
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="break-all font-mono text-xs font-semibold">{row.externalOrderSn}</div>
-                  <div className="mt-1 break-words text-slate-600 dark:text-slate-300"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} /></div>
+                  <div className="mt-1 break-words text-slate-600 dark:text-slate-300"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} openInCurrentTab /></div>
                 </div>
                 <Badge value={row.externalStatus} />
               </div>
@@ -457,7 +457,7 @@ function OnlineOrdersSection({ rows, L }: { rows: Awaited<ReturnType<typeof getS
                 <td className="px-4 py-3">
                   {row.orderId && row.orderCode ? <OrderDetailLink orderId={row.orderId} className="font-semibold text-primary-600 hover:underline">{row.orderCode}</OrderDetailLink> : "—"}
                 </td>
-                <td className="px-4 py-3"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} /></td>
+                <td className="px-4 py-3"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} openInCurrentTab /></td>
                 <td className="px-4 py-3"><Badge value={row.externalStatus} /></td>
                 <td className="px-4 py-3 text-right tabular-nums">{row.total ? formatCurrency(Number(row.total)) : "—"}</td>
                 <td className="px-4 py-3 text-slate-500">{formatDate(row.importedAt)}</td>
@@ -483,7 +483,7 @@ function InboxSection({ threads, L }: { threads: Awaited<ReturnType<typeof getSh
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="whitespace-normal break-words text-sm font-extrabold">{thread.buyerName || thread.externalThreadId}</h2>
-                <p className="whitespace-normal break-words text-xs text-slate-500">Shopee · <PartnerDetailLink kind="customer" partnerId={thread.customerId} name={thread.customerName || (legacyTextByFlag(L, "0d79442a277a"))} className="max-w-full whitespace-normal break-words" />{thread.orderCode ? ` · ${thread.orderCode}` : ""}</p>
+                <p className="whitespace-normal break-words text-xs text-slate-500">Shopee · <PartnerDetailLink kind="customer" partnerId={thread.customerId} name={thread.customerName || (legacyTextByFlag(L, "0d79442a277a"))} openInCurrentTab className="max-w-full whitespace-normal break-words" />{thread.orderCode ? ` · ${thread.orderCode}` : ""}</p>
               </div>
               <Badge value={thread.status} />
             </div>

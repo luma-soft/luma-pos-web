@@ -32,15 +32,14 @@ function render(Component, row) {
 
 describe("report partner detail links", () => {
   for (const [name, Component, row] of [["invoices", ReportInvoicesTable, invoice], ["customers", ReportCustomersTable, customer]]) {
-    test(`${name}: desktop and mobile customer names open the detail modal in a new tab`, () => {
+    test(`${name}: desktop and mobile customer names open the detail modal in the current tab`, () => {
       const html = render(Component, row);
       const links = (html.match(/<a\b[^>]*>[\s\S]*?<\/a>/g) ?? [])
         .filter((link) => link.includes(`detailCustomerId=${customerId}`));
       expect(links).toHaveLength(2);
       for (const link of links) {
         expect(link).toContain('href="/partners?tab=customers&amp;detailCustomerId=');
-        expect(link).toContain('target="_blank"');
-        expect(link).toContain('rel="noopener noreferrer"');
+        expect(link).not.toContain('target="_blank"');
         expect(link).toContain("Anh Nhật");
       }
       for (const button of html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? []) {
