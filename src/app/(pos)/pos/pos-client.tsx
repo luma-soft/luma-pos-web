@@ -62,6 +62,7 @@ import { createPosReturn } from "@/lib/actions/returns";
 import { searchPosProducts } from "@/lib/actions/pos-search";
 import { createPosCustomer } from "@/lib/actions/pos-customers";
 import { enqueueOrder, getOutbox, removeOutbox, markFailed } from "@/lib/offline/pos-store";
+import { buildPrintDocumentBaseName } from "@/lib/print/share-document";
 import { applyPromo } from "@/lib/promo";
 import { Routes } from "@/lib/routes";
 import type { PosData, PosProduct, PosUnit } from "@/lib/data/pos";
@@ -579,7 +580,11 @@ export function PosClient({
   }, [storageScope]);
   // In phiếu tạm: ẩn app, chỉ hiện phiếu, gọi in trình duyệt rồi khôi phục.
   useEffect(() => {
-    if (!printSize) return;
+    if (!printSize || !printJob) return;
+    const previousDocumentTitle = document.title;
+    if (printJob.title !== t("pos.tempSlipTitle")) {
+      document.title = buildPrintDocumentBaseName(printJob.template.docType, printJob.code);
+    }
     const pageStyle = document.createElement("style");
     pageStyle.dataset.posPrintPage = "true";
     pageStyle.textContent = printSize === "a4"
@@ -592,6 +597,7 @@ export function PosClient({
     const restore = () => {
       document.body.classList.remove("pos-printing");
       pageStyle.remove();
+      document.title = previousDocumentTitle;
       setPrintSize(null);
       setPrintJob(null);
     };
@@ -604,9 +610,10 @@ export function PosClient({
       cancelled = true;
       window.removeEventListener("afterprint", restore);
       document.body.classList.remove("pos-printing");
+      document.title = previousDocumentTitle;
       pageStyle.remove();
     };
-  }, [printSize]);
+  }, [printJob, printSize, t]);
   const [editKey, setEditKey] = useState<string | null>(null); // dòng đang mở popup sửa giá
   const [renameDraftId, setRenameDraftId] = useState<string | null>(null);
   const [renameDraftValue, setRenameDraftValue] = useState("");

@@ -5,6 +5,7 @@ import { getOrder } from "@/lib/data/orders";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { getDefaultSepayBankAccount } from "@/lib/data/payment-bank-accounts";
 import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
+import { buildPrintDocumentBaseName } from "@/lib/print/share-document";
 import { buildPrintPaymentQr, formatPrintPaymentReference, resolvePrintPaymentQrAccount } from "@/lib/print/payment-qr";
 import { PrintDoc } from "@/components/print/print-doc";
 import { AutoPrint } from "@/components/print/auto-print";
@@ -65,7 +66,7 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
 
   return (
     <>
-      <AutoPrint closeHref={Routes.salesOrder(order.id, order.status)} />
+      <AutoPrint closeHref={Routes.salesOrder(order.id, order.status)} printTitle={buildPrintDocumentBaseName(docType, order.code)} />
       <div className="print-document-root flex min-h-screen items-start justify-center overflow-auto py-8 print:py-0">
         <PrintDoc
           template={template}
