@@ -347,6 +347,11 @@ export function NewProductForm({
       const stockAdjustment = changedProductStock(
         values.currentStock, form.formState.defaultValues?.currentStock,
       );
+      // `dimUnit` has a form default even when no dimensions are set. Do not
+      // let that default turn an unrelated product edit into a partial
+      // dimensions update rejected by the server.
+      const dimensionsEdited = [values.width, values.length, values.thickness]
+        .some((value) => value !== undefined);
       // Compare every parsed field, not dirtyFields (programmatic edits may not
       // mark dirty). Any metadata/image/unit edit keeps the full save path.
       const stockOnly = stockAdjustment && defaults.success &&
@@ -406,10 +411,10 @@ export function NewProductForm({
           units: values.units,
           weight: values.weight,
           weightUnit: values.weightUnit,
-          width: values.width,
-          length: values.length,
-          thickness: values.thickness,
-          dimUnit: values.dimUnit,
+          width: dimensionsEdited ? values.width : undefined,
+          length: dimensionsEdited ? values.length : undefined,
+          thickness: dimensionsEdited ? values.thickness : undefined,
+          dimUnit: dimensionsEdited ? values.dimUnit : undefined,
           stockAdjustment,
         }, { deferInventoryRefresh: isModal });
       if (res.ok) {
