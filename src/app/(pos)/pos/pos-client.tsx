@@ -484,12 +484,6 @@ export function PosClient({
   const t = useTranslations();
   const router = useRouter();
   const { confirm } = useConfirmDialog();
-  const priceBookSwitchPending = useRef(false);
-  const priceBookSwitchMounted = useRef(true);
-  useEffect(() => {
-    priceBookSwitchMounted.current = true;
-    return () => { priceBookSwitchMounted.current = false; };
-  }, []);
   const productCatalog = useProductCatalog();
   const defaultDraftTaxRate = taxPrefs.autoApplyDefaultVat && taxPrefs.vatTreatment === "taxable"
     ? taxPrefs.defaultRate
@@ -1614,42 +1608,18 @@ export function PosClient({
   }
 
   /** Đổi bảng giá cho đơn đang mở, bỏ mọi bảng giá riêng của dòng và tính lại giá niêm yết. */
-  async function changePriceBook(pb: PriceBook) {
-    if (priceBookSwitchPending.current) return;
+  function changePriceBook(pb: PriceBook) {
     const snapshot = active;
+    if (snapshot.priceBook === pb) return;
     const prepared = prepareInvoicePriceBookSwitch(snapshot.cart, pb, data.priceBooks);
     if (!prepared) {
       setError(t("pricing.errors.priceUnavailable"));
       return;
     }
     setError("");
-    priceBookSwitchPending.current = true;
-    const bookName = data.priceBooks.find((book) => (book.isDefault ? "" : book.id) === pb)?.name ?? "Giá chung";
-    try {
-      const outcome = await approvePriceBookSwitch({
-        value: prepared.lines,
-        needsConfirmation: snapshot.cart.length > 0,
-        confirm: () => confirm({
-          title: "Đổi bảng giá hóa đơn?",
-          description: [
-            `Áp dụng “${bookName}” cho ${snapshot.cart.length} dòng hàng và bỏ lựa chọn bảng giá riêng từng dòng.`,
-            `${prepared.changedPriceCount} dòng đổi đơn giá; ${prepared.clearedDiscountCount} dòng không nhập giá tay sẽ xóa chiết khấu.`,
-            `${prepared.preservedManualCount} dòng nhập giá tay/miễn phí giữ giá và chiết khấu hiện tại. Giá khôi phục của dòng miễn phí lấy theo bảng mới.`,
-            "Khuyến mại tự động được tính lại theo bảng giá mới. Chỉ thay đổi hóa đơn đang soạn, không sửa bảng giá sản phẩm.",
-          ].join("\n\n"),
-          confirmLabel: "Đổi bảng giá",
-          cancelLabel: "Giữ nguyên",
-          variant: "warning",
-        }),
-        isCurrent: () => priceBookSwitchMounted.current
-          && latestDraftStateRef.current.activeId === snapshot.id
-          && latestDraftStateRef.current.invoices.find((invoice) => invoice.id === snapshot.id) === snapshot,
-        commit: (lines) => setInvoices((list) => list.map((invoice) => invoice === snapshot ? { ...invoice, priceBook: pb, cart: lines } : invoice)),
-      });
-      if (outcome === "stale" && priceBookSwitchMounted.current) setError("Hóa đơn đã thay đổi. Vui lòng chọn lại bảng giá để xác nhận dữ liệu mới.");
-    } finally {
-      priceBookSwitchPending.current = false;
-    }
+    setInvoices((list) => list.map((invoice) => invoice.id === snapshot.id
+      ? { ...invoice, priceBook: pb, cart: prepared.lines }
+      : invoice));
   }
 
   function setQty(key: string, qty: number) {
@@ -2720,7 +2690,7 @@ export function PosClient({
               value={priceBook || defaultBook?.id || ""}
               onChange={(id) => {
                 const pb = data.priceBooks.find((book) => book.id === id);
-                void changePriceBook(!pb || pb.isDefault ? "" : pb.id);
+                changePriceBook(!pb || pb.isDefault ? "" : pb.id);
               }}
               placeholder={t("pos.priceBook.title")}
               allowClear={false}
