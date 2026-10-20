@@ -38,7 +38,7 @@ export function BookingsTable({
     { key: "code", label: t("bookings.cols.code"), required: true, width: "170px", render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, width: "160px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
     { key: "delivery", label: t("bookings.cols.deliveryDate"), defaultVisible: true, width: "170px", render: (row) => row.deliveryDate ? <span className="text-slate-600">{formatDate(row.deliveryDate)}</span> : <span className="text-slate-400">—</span> },
-    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, wrap: true, render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} openInCurrentTab className="block w-full whitespace-normal break-words" /> },
+    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, wrap: true, render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} openInCurrentTab className="whitespace-normal break-words" /> },
     { key: "project", label: t("orders.cols.project"), defaultVisible: true, wrap: true, render: (row) => <span className="whitespace-normal break-words text-slate-500">{row.projectName ?? "—"}</span> },
     { key: "value", label: t("bookings.cols.value"), defaultVisible: true, align: "right", width: "140px", cellClassName: "font-semibold", render: (row) => formatCurrency(Number(row.total)) },
   ];
@@ -50,15 +50,27 @@ export function BookingsTable({
       getRowId={(row) => row.id}
       minWidth="960px"
       onRowClick={openOrder}
-      rowClickColumnKey="code"
+      rowClickMode="row"
       renderMobileRow={({ row }) => (
-        <div className="p-3">
-          <button type="button" onClick={() => openOrder(row)} className="min-h-11 w-full space-y-1 text-left">
+        <div className="relative p-3">
+          <button
+            type="button"
+            onClick={() => openOrder(row)}
+            aria-label={row.code}
+            className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
+          />
+          <div className="pointer-events-none space-y-1">
             <span className="block font-semibold text-primary-600">{row.code}</span>
             <span className="block text-slate-500">{formatDate(row.createdAt)}</span>
             <span className="block text-slate-600">{row.deliveryDate ? formatDate(row.deliveryDate) : "—"}</span>
-          </button>
-          <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} openInCurrentTab className="block w-full whitespace-normal break-words" />
+            <PartnerDetailLink
+              kind="customer"
+              partnerId={row.customerId}
+              name={row.customerName ?? t("orders.walkIn")}
+              openInCurrentTab
+              className="pointer-events-auto relative z-10 whitespace-normal break-words"
+            />
+          </div>
         </div>
       )}
       empty={(

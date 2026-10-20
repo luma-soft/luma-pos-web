@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PackageOpen } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { MobileRecordField } from "@/components/mobile-ui";
@@ -11,6 +12,16 @@ import type { ReportInvoiceRow } from "@/lib/data/reports";
 
 export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
   const t = useTranslations();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  function openInvoice(row: ReportInvoiceRow) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("detailOrderId", row.id);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  }
+
   const columns: DataTableColumn<ReportInvoiceRow>[] = [
     {
       key: "code",
@@ -32,7 +43,7 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
       defaultVisible: true,
       width: "280px",
       wrap: true,
-      render: (invoice) => <PartnerDetailLink kind="customer" partnerId={invoice.customerId} name={invoice.customerName} openInCurrentTab className="block w-full whitespace-normal break-words font-medium" />,
+      render: (invoice) => <PartnerDetailLink kind="customer" partnerId={invoice.customerId} name={invoice.customerName} openInCurrentTab className="whitespace-normal break-words font-medium" />,
     },
     {
       key: "status",
@@ -93,23 +104,32 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
       getRowId={(invoice) => invoice.id}
       minWidth="900px"
       minHeight={420}
+      onRowClick={openInvoice}
+      rowClickMode="row"
       empty={<div className="rounded-card border border-dashed border-border p-12 text-center text-sm text-slate-400">{t("dashboard.noData")}</div>}
-      renderMobileRow={({ row }) => <ReportInvoiceMobileRow row={row} />}
+      renderMobileRow={({ row }) => <ReportInvoiceMobileRow row={row} onOpen={() => openInvoice(row)} />}
     />
   );
 }
 
-export function ReportInvoiceMobileRow({ row }: { row: ReportInvoiceRow }) {
+export function ReportInvoiceMobileRow({ row, onOpen }: { row: ReportInvoiceRow; onOpen: () => void }) {
   const t = useTranslations();
   const profit = Number(row.profit);
 
   return (
-    <div className="p-3">
-      <OrderSummaryLink row={row} mobile />
-      <div className="break-words text-xs font-medium text-slate-400">
-        {formatDate(row.createdAt)} · <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} openInCurrentTab className="max-w-full whitespace-normal break-words" />
-      </div>
-      <dl className="mt-3 grid grid-cols-2 gap-2">
+    <div className="relative p-3">
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={row.code}
+        className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
+      />
+      <div className="pointer-events-none">
+        <OrderSummaryLink row={row} mobile />
+        <div className="break-words text-xs font-medium text-slate-400">
+          {formatDate(row.createdAt)} · <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} openInCurrentTab className="pointer-events-auto relative z-10 max-w-full whitespace-normal break-words" />
+        </div>
+        <dl className="mt-3 grid grid-cols-2 gap-2">
         <MobileRecordField
           label={t("orders.cols.total")}
           value={formatCurrency(Number(row.total))}
@@ -124,7 +144,8 @@ export function ReportInvoiceMobileRow({ row }: { row: ReportInvoiceRow }) {
           className="[&_dd]:break-words [&_dd]:whitespace-normal"
         />
         <MobileRecordField label="Biên lãi" value={`${row.margin.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`} />
-      </dl>
+        </dl>
+      </div>
     </div>
   );
 }
@@ -136,7 +157,7 @@ function OrderSummaryLink({ row, mobile = false }: { row: ReportInvoiceRow; mobi
       orderId={row.id}
       ariaLabel={`Mở chi tiết đơn ${row.code}, gồm ${count} sản phẩm`}
       className={cn(
-        "inline-flex max-w-full min-w-11 flex-col items-start justify-center rounded-md px-2 -ml-2 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+        "pointer-events-auto relative z-10 inline-flex max-w-full min-w-11 flex-col items-start justify-center rounded-md px-2 -ml-2 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
         mobile ? "min-h-11" : "min-h-10",
       )}
     >

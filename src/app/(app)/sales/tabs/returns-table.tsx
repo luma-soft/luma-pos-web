@@ -51,7 +51,7 @@ export function ReturnsTable({
       label: t("orders.cols.customer"),
       defaultVisible: true,
       wrap: true,
-      render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} openInCurrentTab className="block w-full whitespace-normal break-words" />,
+      render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} openInCurrentTab className="whitespace-normal break-words" />,
     },
     {
       key: "reason",
@@ -111,28 +111,31 @@ export function ReturnsTable({
         />
       )}
       renderMobileRow={({ row, toggle }) => (
-        <div className="space-y-2 p-3">
+        <div className="relative space-y-2 p-3">
           <button
             type="button"
             onClick={toggle}
-            className="flex min-h-11 min-w-11 w-full items-start justify-between gap-3 text-left"
+            aria-label={row.code}
+            className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
           >
+          </button>
+          <div className="pointer-events-none flex min-h-11 items-start justify-between gap-3">
             <span>
               <span className="block font-semibold text-primary-600">{row.code}</span>
               <span className="mt-1 block text-xs text-slate-500">{formatDate(row.createdAt)}</span>
             </span>
             <span className="shrink-0 font-semibold tabular-nums text-er">{formatCurrency(Number(row.totalRefund))}</span>
-          </button>
+          </div>
           {row.orderId && row.orderCode && (
             <OrderDetailLink
               orderId={row.orderId}
-              className="inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-primary-600 hover:underline"
+              className="pointer-events-auto relative z-10 inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-primary-600 hover:underline"
             >
               {row.orderCode}
             </OrderDetailLink>
           )}
-          <p className="text-sm font-medium"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} openInCurrentTab className="block w-full whitespace-normal break-words" /></p>
-          <p className="text-xs text-slate-500">
+          <p className="pointer-events-none text-sm font-medium"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} openInCurrentTab className="pointer-events-auto relative z-10 whitespace-normal break-words" /></p>
+          <p className="pointer-events-none text-xs text-slate-500">
             {row.reason ? t(`returns.reasons.${row.reason}` as never) : "—"} · {t(`returns.refundMethods.${row.refundMethod}`)}
           </p>
         </div>

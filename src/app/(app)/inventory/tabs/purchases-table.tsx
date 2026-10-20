@@ -30,7 +30,7 @@ export function PurchasesTable({ rows, printTemplates, detailPurchase = null }: 
       width: "30%",
       wrap: true,
       cellClassName: "overflow-visible whitespace-normal text-clip break-words",
-      render: (purchase) => <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} openInCurrentTab className="block w-full whitespace-normal break-words" />,
+      render: (purchase) => <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} openInCurrentTab className="whitespace-normal break-words" />,
     },
     { key: "total", label: t("orders.cols.total"), defaultVisible: true, align: "right", cellClassName: "font-semibold", render: (purchase) => formatCurrency(Number(purchase.total)) },
     { key: "owed", label: t("purchases.cols.owed"), defaultVisible: true, align: "right", cellClassName: (purchase) => purchaseOwed(purchase) > 0 ? "font-semibold text-warn" : "text-slate-400", render: (purchase) => purchaseOwed(purchase) > 0 ? formatCurrency(purchaseOwed(purchase)) : "—" },
@@ -45,19 +45,27 @@ export function PurchasesTable({ rows, printTemplates, detailPurchase = null }: 
         getRowId={(purchase) => purchase.id}
         minWidth="1080px"
         onRowClick={(purchase) => setSelectedPurchaseId(purchase.id)}
-        rowClickColumnKey="code"
+        rowClickMode="row"
         renderMobileRow={({ row: purchase }) => {
           const owed = purchaseOwed(purchase);
           return (
-            <div className="w-full p-3 text-left">
-              <div className="flex items-start justify-between gap-2">
+            <div className="relative w-full p-3">
+              <button
+                type="button"
+                onClick={() => setSelectedPurchaseId(purchase.id)}
+                aria-label={purchase.code}
+                className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
+              />
+              <div className="pointer-events-none flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <button type="button" onClick={() => setSelectedPurchaseId(purchase.id)} className="min-h-11 rounded-sm text-left font-semibold text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{purchase.code}</button>
-                  <div className="text-xs text-slate-400">{formatDate(purchase.createdAt)} · <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} openInCurrentTab className="max-w-full whitespace-normal break-words" /></div>
+                  <div className="min-h-11 py-2 font-semibold text-primary-600">{purchase.code}</div>
+                  <div className="text-xs text-slate-400">
+                    {formatDate(purchase.createdAt)} · <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} openInCurrentTab className="pointer-events-auto relative z-10 max-w-full whitespace-normal break-words" />
+                  </div>
                 </div>
                 <PurchaseStatusBadge status={purchase.status} />
               </div>
-              <div className="mt-2 flex items-center justify-between text-sm">
+              <div className="pointer-events-none mt-2 flex items-center justify-between text-sm">
                 <span className="font-semibold tabular-nums">{formatCurrency(Number(purchase.total))}</span>
                 {owed > 0 && <span className="font-semibold tabular-nums text-warn">{formatCurrency(owed)}</span>}
               </div>
