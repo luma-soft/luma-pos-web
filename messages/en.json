@@ -2090,6 +2090,7 @@
       "showAllImages": "View all {count} images",
       "collapseImages": "Show fewer images",
       "imageUrlInvalid": "Invalid image URL",
+      "imageLimitReached": "You can add up to 10 images",
       "baseUnit": "Base unit",
       "unitName": "Unit name",
       "multiplier": "Ratio",

@@ -78,6 +78,7 @@ import {
 
 type Tab = "info" | "description" | "variants";
 
+const MAX_IMAGES = 10;
 const useFormCtx = () => useFormContext<CreateProductInput>();
 const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
 
@@ -239,6 +240,8 @@ export function NewProductForm({
     units: (form.getValues("units") ?? []).map((unit) => ({ ...unit })),
   });
   const [pendingPriceEdit, setPendingPriceEdit] = useState<CreateProductOutput | null>(null);
+  const [imageUrlDraft, setImageUrlDraft] = useState("");
+  const [imageUrlDraftError, setImageUrlDraftError] = useState<"invalid" | "limit" | null>(null);
   const priceEditResolver = useRef<((value: CreateProductOutput | null) => void) | null>(null);
   const submitting = useRef(false);
   const submitFocus = useRef<HTMLElement | null>(null);
@@ -298,6 +301,36 @@ export function NewProductForm({
 
   async function onSubmit(values: CreateProductOutput) {
     if (submitting.current) return;
+
+    const pendingImageUrl = imageUrlDraft.trim();
+    if (pendingImageUrl) {
+      try {
+        const parsedUrl = new URL(pendingImageUrl);
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) throw new Error();
+      } catch {
+        setImageUrlDraftError("invalid");
+        setTab("info");
+        return;
+      }
+
+      if (!values.imageUrls.includes(pendingImageUrl) && values.imageUrls.length >= MAX_IMAGES) {
+        setImageUrlDraftError("limit");
+        setTab("info");
+        return;
+      }
+
+      if (!values.imageUrls.includes(pendingImageUrl)) {
+        values = {
+          ...values,
+          imageUrls: [...values.imageUrls, pendingImageUrl],
+        };
+        form.setValue("imageUrls", values.imageUrls, { shouldDirty: true });
+      }
+      setImageUrlDraftError(null);
+    } else {
+      setImageUrlDraftError(null);
+    }
+
     submitting.current = true;
     try {
       try {
@@ -318,6 +351,7 @@ export function NewProductForm({
         if (!accepted) return;
         values = accepted;
       }
+      if (pendingImageUrl) setImageUrlDraft("");
       await saveValues(values);
     } finally {
       submitting.current = false;
@@ -450,6 +484,8 @@ export function NewProductForm({
   function resetForNextProduct() {
     const nextValues = blankProductValues(creationKind, crypto.randomUUID());
     form.reset(nextValues);
+    setImageUrlDraft("");
+    setImageUrlDraftError(null);
     initialPricing.current = {
       baseUnit: nextValues.baseUnit ?? "cái",
       retailPrice: 0,
@@ -638,6 +674,12 @@ export function NewProductForm({
             creationKind={creationKind}
             initialManagedImages={initialManagedImages}
             groupEditing={groupEditing}
+            imageUrlDraft={imageUrlDraft}
+            imageUrlDraftError={imageUrlDraftError}
+            onImageUrlDraftChange={(value) => {
+              setImageUrlDraft(value);
+              setImageUrlDraftError(null);
+            }}
           />
         )}
         {tab === "variants" && (
@@ -758,7 +800,15 @@ function InfoTab({
   comboProducts,
   initialManagedImages,
   groupEditing,
-}: NewProductFormProps & { groupEditing: boolean }) {
+  imageUrlDraft,
+  imageUrlDraftError,
+  onImageUrlDraftChange,
+}: NewProductFormProps & {
+  groupEditing: boolean;
+  imageUrlDraft: string;
+  imageUrlDraftError: "invalid" | "limit" | null;
+  onImageUrlDraftChange: (value: string) => void;
+}) {
   const { watch } = useFormCtx();
   const productKind = watch("productKind") ?? "product";
   const groupAdding = groupEditing && watch("variantOperation") === "add";
@@ -800,6 +850,9 @@ function InfoTab({
           storeId={storeId}
           publicMediaBaseUrl={publicMediaBaseUrl}
           initialManagedImages={initialManagedImages ?? []}
+          imageUrlDraft={imageUrlDraft}
+          imageUrlDraftError={imageUrlDraftError}
+          onImageUrlDraftChange={onImageUrlDraftChange}
         />
       </aside>
     </div>
@@ -1245,20 +1298,25 @@ function BasicInfoSection({
   );
 }
 
-const MAX_IMAGES = 10;
-
 function ImageUploadGrid({
   storeId,
   publicMediaBaseUrl,
   initialManagedImages,
+  imageUrlDraft,
+  imageUrlDraftError,
+  onImageUrlDraftChange,
 }: {
   storeId: string;
   publicMediaBaseUrl: string;
   initialManagedImages: UploadedProductImage[];
+  imageUrlDraft: string;
+  imageUrlDraftError: "invalid" | "limit" | null;
+  onImageUrlDraftChange: (value: string) => void;
 }) {
   const t = useTranslations();
   const { watch, setValue } = useFormCtx();
   const urls: string[] = watch("imageUrls") ?? [];
+  const urlInput = imageUrlDraft;
   const initialMediaIds = useMemo(
     () => new Set(initialManagedImages.map((image) => image.mediaId)),
     [initialManagedImages],
@@ -1267,7 +1325,6 @@ function ImageUploadGrid({
   const [drafts, setDrafts] = useState<ProductImageUploadDraft[]>([]);
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
-  const [urlInput, setUrlInput] = useState("");
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [showAllImages, setShowAllImages] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
@@ -1303,14 +1360,14 @@ function ImageUploadGrid({
     setErr("");
     try {
       const parsed = new URL(value);
-      if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error();
+      if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
       if (urls.includes(value)) {
-        setUrlInput("");
+        onImageUrlDraftChange("");
         return;
       }
       setImageState([...urls, value], managedImages);
       setSelectedUrl(value);
-      setUrlInput("");
+      onImageUrlDraftChange("");
       setShowUrlInput(false);
     } catch {
       setErr(t("products.fields.imageUrlInvalid"));
@@ -1467,21 +1524,24 @@ function ImageUploadGrid({
             variant="ghost"
             className="w-full"
             disabled={uploading}
-            aria-expanded={showUrlInput}
+            aria-expanded={showUrlInput || Boolean(imageUrlDraft)}
             aria-controls={`${galleryId}-url`}
             onClick={() => setShowUrlInput((value) => !value)}
           >
             <Link2 className="h-4 w-4" />
             {t("products.fields.addFromUrl")}
           </Button>
-          {showUrlInput && (
+          {(showUrlInput || Boolean(imageUrlDraft) || Boolean(imageUrlDraftError)) && (
             <div id={`${galleryId}-url`} className="space-y-2">
               <Input
                 type="url"
                 autoFocus
                 value={urlInput}
                 disabled={uploading}
-                onChange={(event) => setUrlInput(event.target.value)}
+                onChange={(event) => {
+                  onImageUrlDraftChange(event.target.value);
+                  setErr("");
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -1490,8 +1550,8 @@ function ImageUploadGrid({
                 }}
                 placeholder={t("products.fields.imageUrlPlaceholder")}
                 aria-label={t("products.fields.imageUrl")}
-                aria-invalid={Boolean(err)}
-                aria-describedby={err ? `${galleryId}-error` : undefined}
+                aria-invalid={Boolean(err || imageUrlDraftError)}
+                aria-describedby={err || imageUrlDraftError ? `${galleryId}-error` : undefined}
               />
               <Button
                 type="button"
@@ -1510,8 +1570,12 @@ function ImageUploadGrid({
           {t("common.retry")}
         </Button>
       )}
-      {err ? (
-        <p id={`${galleryId}-error`} role="alert" className="text-xs text-red-600">{err}</p>
+      {err || imageUrlDraftError ? (
+        <p id={`${galleryId}-error`} role="alert" className="text-xs text-red-600">
+          {err ?? (imageUrlDraftError === "limit"
+            ? t("products.fields.imageLimitReached")
+            : t("products.fields.imageUrlInvalid"))}
+        </p>
       ) : (
         <p className="text-xs leading-relaxed text-slate-500">{t("products.fields.imageHint")}</p>
       )}

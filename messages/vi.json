@@ -2090,6 +2090,7 @@
       "showAllImages": "Xem tất cả {count} ảnh",
       "collapseImages": "Thu gọn ảnh",
       "imageUrlInvalid": "URL ảnh không hợp lệ",
+      "imageLimitReached": "Bạn chỉ có thể thêm tối đa 10 ảnh",
       "baseUnit": "Đơn vị tính",
       "unitName": "Tên đơn vị",
       "multiplier": "Quy đổi",
