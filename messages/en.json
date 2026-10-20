@@ -3895,6 +3895,7 @@
     "newTemplateName": "New {type} template",
     "defaultTemplate": "Default template for this document type",
     "duplicate": "Duplicate",
+    "copySuffix": "copy",
     "duplicated": "Template duplicated",
     "setDefault": "Set default",
     "defaultSaved": "Default template updated",

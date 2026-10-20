@@ -3895,6 +3895,7 @@
     "newTemplateName": "Mẫu {type} mới",
     "defaultTemplate": "Mẫu mặc định cho loại chứng từ này",
     "duplicate": "Nhân bản",
+    "copySuffix": "Bản sao",
     "duplicated": "Đã nhân bản mẫu in",
     "setDefault": "Đặt mặc định",
     "defaultSaved": "Đã đặt làm mẫu mặc định",

@@ -150,6 +150,8 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
         } else {
           setMsg({ ok: false, text: t(result.error as never) });
         }
+      } catch {
+        setMsg({ ok: false, text: t("errors.serverError") });
       } finally {
         setPendingAction(null);
       }
@@ -194,6 +196,24 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
         ? item
         : { ...item, isDefault: item.id === templateId, isActive: item.id === templateId ? true : item.isActive }));
     });
+  }
+
+  function duplicateSelectedTemplate() {
+    if (!persisted || actionPending) return;
+    const source = selected;
+    const copySuffix = t("printSettings.copySuffix");
+    const copyName = `${source.name.slice(0, Math.max(0, 120 - copySuffix.length - 3)).trimEnd()} (${copySuffix})`;
+    runAction(
+      "duplicate",
+      () => duplicatePrintTemplate(source.id, copyName),
+      "printSettings.duplicated",
+      (data) => {
+        const duplicated = data as PrintTemplate | undefined;
+        if (!duplicated?.id) return;
+        setDrafts((current) => [duplicated, ...current]);
+        setSelectedId(duplicated.id);
+      },
+    );
   }
 
   async function removeTemplate() {
@@ -512,7 +532,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                 <button type="button" onClick={save} disabled={actionPending || customQrAccountInvalid} title={t("common.save")} aria-label={t("common.save")} className="grid h-12 w-12 place-items-center rounded-full bg-primary-600 text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
                   {pendingAction === "save" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                 </button>
-                <button type="button" onClick={() => persisted && runAction("duplicate", () => duplicatePrintTemplate(selected.id), "printSettings.duplicated")} disabled={!persisted || actionPending} title={t("printSettings.duplicate")} aria-label={t("printSettings.duplicate")} className="grid h-12 w-12 place-items-center rounded-full border border-border bg-surface shadow-md transition hover:-translate-y-0.5 hover:bg-surface-2 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="button" onClick={duplicateSelectedTemplate} disabled={!persisted || actionPending} title={t("printSettings.duplicate")} aria-label={t("printSettings.duplicate")} className="grid h-12 w-12 place-items-center rounded-full border border-border bg-surface shadow-md transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
                   {pendingAction === "duplicate" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Copy className="h-5 w-5" />}
                 </button>
                 <button type="button" onClick={makeSelectedTemplateDefault} disabled={!persisted || selected.isDefault || actionPending} title={t("printSettings.setDefault")} aria-label={t("printSettings.setDefault")} className="grid h-12 w-12 place-items-center rounded-full border border-border bg-surface shadow-md transition hover:-translate-y-0.5 hover:bg-surface-2 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-50">

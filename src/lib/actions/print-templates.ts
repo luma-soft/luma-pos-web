@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { printTemplates } from "@/db/schema";
 import { type ActionResult, requireManager } from "./common";
-import { isPersistedTemplateId, normalizeLineDiscountOptions, normalizeSignatureOptions, defaultOptionsForDocType, typographyForPaper, type PrintTemplateOptions } from "@/lib/print/template-shared";
+import { isPersistedTemplateId, normalizeLineDiscountOptions, normalizeSignatureOptions, defaultOptionsForDocType, typographyForPaper, type PrintTemplate, type PrintTemplateOptions } from "@/lib/print/template-shared";
 import { sanitizePrintRichText } from "@/lib/print/rich-text";
 
 const saveSchema = z.object({
@@ -182,17 +182,19 @@ export async function savePrintTemplate(input: SavePrintTemplateInput): Promise<
   }
 }
 
-export async function duplicatePrintTemplate(id: string): Promise<ActionResult<{ id: string }>> {
+export async function duplicatePrintTemplate(id: string, name: string): Promise<ActionResult<PrintTemplate>> {
   const gate = await requireManager(); if (!gate.ok) return gate;
   if (!isPersistedTemplateId(id)) return { ok: false, error: "errors.invalidData" };
+  const parsedName = z.string().trim().min(1).max(120).safeParse(name);
+  if (!parsedName.success) return { ok: false, error: "errors.invalidData" };
 
   try {
     const [source] = await db.select().from(printTemplates).where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.id, id))).limit(1);
     if (!source) return { ok: false, error: "errors.notFound" };
-    const row = await db.transaction(async (tx) => {
+    const duplicated = await db.transaction(async (tx): Promise<PrintTemplate> => {
       const [created] = await tx.insert(printTemplates).values({
         storeId: gate.storeId,
-        name: `${source.name} copy`,
+        name: parsedName.data,
         docType: source.docType,
         paperDefault: source.paperDefault,
         isDefault: false,
@@ -210,10 +212,29 @@ export async function duplicatePrintTemplate(id: string): Promise<ActionResult<{
         after: { name: created.name, isDefault: false, isActive: true },
         affectedRecords: [{ type: "print_template", id: source.id, name: source.name }],
       });
-      return created;
+      const sourceOptions = source.options as Partial<PrintTemplateOptions>;
+      return {
+        id: created.id,
+        name: created.name,
+        docType: source.docType,
+        paperDefault: source.paperDefault,
+        isDefault: false,
+        isActive: true,
+        sortOrder: source.sortOrder + 1,
+        storeName: source.storeName,
+        storeAddress: source.storeAddress,
+        storePhone: source.storePhone,
+        storeTaxCode: source.storeTaxCode,
+        footerNote: source.footerNote,
+        options: normalizeSignatureOptions(normalizeLineDiscountOptions({
+          ...defaultOptionsForDocType(source.docType),
+          ...sourceOptions,
+          typography: typographyForPaper(source.paperDefault, sourceOptions.typography),
+        } as PrintTemplateOptions)),
+      };
     });
     revalidatePath("/settings/print");
-    return { ok: true, data: { id: row.id } };
+    return { ok: true, data: duplicated };
   } catch (e) {
     console.error("duplicatePrintTemplate failed:", e);
     return { ok: false, error: "errors.serverError" };
