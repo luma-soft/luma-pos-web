@@ -192,6 +192,7 @@ export function DataTableShell<T>({
   rowClassName,
   onRowClick,
   rowClickColumnKey,
+  rowClickMode = "column",
   toolbar,
   toolbarFloating = false,
   showColumnMenu = true,
@@ -233,6 +234,8 @@ export function DataTableShell<T>({
   onRowClick?: (row: T) => void;
   /** Restricts a row action to its primary data column instead of the whole row. */
   rowClickColumnKey?: string;
+  /** Makes the full desktop row clickable while preserving links and controls inside it. */
+  rowClickMode?: "column" | "row";
   toolbar?: ReactNode;
   /** Đặt toolbar ở góc trên bảng mà không chiếm chiều cao dòng (desktop). */
   toolbarFloating?: boolean;
@@ -581,16 +584,50 @@ export function DataTableShell<T>({
                   const expandable = Boolean(!onRowClick && renderExpanded && (canExpand ? canExpand(row) : true));
                   const detailOpenable = Boolean(!onRowClick && renderDetail && (canExpand ? canExpand(row) : true));
                   const expanded = (expandable || detailOpenable) && expandedId === id;
+                  const wholeRowClickable = Boolean(onRowClick && rowClickMode === "row");
                   return (
                     <Fragment key={id}>
                       <tr
                         className={cn(
                           "border-t border-border-soft transition-colors",
+                          wholeRowClickable && "cursor-pointer",
                           (expandable || detailOpenable) && "cursor-pointer",
                           expanded ? "bg-primary-50/45 dark:bg-primary-950/15" : "hover:bg-surface-2",
                           rowClassName?.(row, expanded),
                         )}
-                        onClick={!onRowClick && (expandable || detailOpenable) ? () => setExpanded(expanded ? null : id) : undefined}
+                        tabIndex={wholeRowClickable ? 0 : undefined}
+                        onClick={
+                          wholeRowClickable
+                            ? (event) => {
+                                const target = event.target;
+                                if (
+                                  target instanceof Element &&
+                                  target.closest(
+                                    "a, button, input, select, textarea, [role='button'], [role='checkbox']",
+                                  )
+                                ) {
+                                  return;
+                                }
+                                onRowClick?.(row);
+                              }
+                            : !onRowClick && (expandable || detailOpenable)
+                              ? () => setExpanded(expanded ? null : id)
+                              : undefined
+                        }
+                        onKeyDown={
+                          wholeRowClickable
+                            ? (event) => {
+                                if (
+                                  (event.key !== "Enter" && event.key !== " ") ||
+                                  event.target !== event.currentTarget
+                                ) {
+                                  return;
+                                }
+                                event.preventDefault();
+                                onRowClick?.(row);
+                              }
+                            : undefined
+                        }
                       >
                         {visibleColumns.map((column, index) => {
                           const cellClassName = typeof column.cellClassName === "function" ? column.cellClassName(row) : column.cellClassName;
