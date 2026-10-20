@@ -104,6 +104,10 @@ export default async function PrintBatchPage({ searchParams }: Props) {
           afterTotals={[
             ...(template.options.showDebt ? [{ label: t("print.paid"), value: paid }] : []),
             ...(template.options.showDebt && remaining > 0 ? [{ label: t("print.remaining"), value: remaining, bold: true }] : []),
+            ...(template.options.showCustomerDebtBalance && order.customerId ? [
+              { label: t("print.customerDebtBefore"), value: Number(order.customerDebt ?? 0) - remaining },
+              { label: t("print.customerDebtAfter"), value: Number(order.customerDebt ?? 0), bold: true },
+            ] : []),
           ]}
           inWordsLabel={t("print.inWords")}
           signatures={[t("print.buyerSign"), t("print.delivererSign"), t("print.sellerSign")]}

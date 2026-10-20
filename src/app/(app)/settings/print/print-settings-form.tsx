@@ -41,7 +41,7 @@ const TYPOGRAPHY_KEYS = [
 
 const OPTION_GROUPS = [
   { key: "content", options: ["showSeller", "showProject", "showPartyPhone", "showDeliveryAddress", "showInWords", "showSignatures", "showSignatureLeft", "showSignatureMiddle", "showSignatureRight", "showSku"] },
-  { key: "pricing", options: ["showDebt", "showDiscount", "showLineDiscount", "showLineDiscountPercent", "showLineDiscountAmount", "showTax", "showPaymentQr", "alwaysShowPaymentQr"] },
+  { key: "pricing", options: ["showDebt", "showCustomerDebtBalance", "showDiscount", "showLineDiscount", "showLineDiscountPercent", "showLineDiscountAmount", "showTax", "showPaymentQr", "alwaysShowPaymentQr"] },
   { key: "batch", options: ["showBatchDebtSummary"] },
 ] as const;
 const SIGNATURE_LABELS = ["signatureLeftLabel", "signatureMiddleLabel", "signatureRightLabel"] as const;
@@ -272,6 +272,8 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
     total: selected.docType === "return" ? 190000 : 920000,
   }];
   const previewGrandTotal = selected.docType === "return" ? 190000 : isReceiptPreview ? 500000 : 972000;
+  const previewRemaining = 472000;
+  const previewCustomerDebt = 872000;
   const previewSignatures: [string, string, string] = isReceiptPreview
     ? ["Người nộp tiền", "Người lập phiếu", "Thủ quỹ"]
     : selected.docType === "purchase"
@@ -571,7 +573,13 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   ]}
                   grandTotalLabel={isReceiptPreview ? "SỐ TIỀN" : selected.docType === "return" ? "TỔNG HOÀN" : t("print.grandTotal")}
                   grandTotal={previewGrandTotal}
-                  afterTotals={selected.docType === "order" ? [{ label: t("print.paid"), value: 500000 }, { label: t("print.remaining"), value: 472000, bold: true }] : selected.docType === "booking" ? [{ label: "Đã đặt cọc", value: 500000 }, { label: "Còn lại", value: 472000, bold: true }] : []}
+                  afterTotals={selected.docType === "order" ? [
+                    ...(selected.options.showDebt ? [{ label: t("print.paid"), value: 500000 }, { label: t("print.remaining"), value: previewRemaining, bold: true }] : []),
+                    ...(selected.options.showCustomerDebtBalance ? [
+                      { label: t("print.customerDebtBefore"), value: previewCustomerDebt - previewRemaining },
+                      { label: t("print.customerDebtAfter"), value: previewCustomerDebt, bold: true },
+                    ] : []),
+                  ] : selected.docType === "booking" ? [{ label: "Đã đặt cọc", value: 500000 }, { label: "Còn lại", value: 472000, bold: true }] : []}
                   paymentQr={qrApplies && selected.options.showPaymentQr && previewQrAccount ? {
                     title: t("pos.sepay.title"),
                     qrImageUrl: buildVietQrImageUrl({ bankCode: previewQrAccount.bankCode, accountNumber: previewQrAccount.accountNumber, amount: 420000, reference: previewQrReference }),

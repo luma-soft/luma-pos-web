@@ -13,6 +13,7 @@ export interface PrintTemplateOptions {
   showPartyPhone: boolean;
   showDeliveryAddress: boolean;
   showDebt: boolean;
+  showCustomerDebtBalance: boolean;
   showBatchDebtSummary: boolean;
   showDiscount: boolean;
   showTax: boolean;
@@ -159,6 +160,7 @@ export const DEFAULT_OPTIONS: PrintTemplateOptions = {
   showPartyPhone: true,
   showDeliveryAddress: true,
   showDebt: true,
+  showCustomerDebtBalance: false,
   showBatchDebtSummary: true,
   showDiscount: true,
   showTax: true,
@@ -225,6 +227,7 @@ export function defaultOptionsForDocType(docType: PrintDocType): PrintTemplateOp
 }
 
 export function printOptionApplies(docType: PrintDocType, option: keyof PrintTemplateOptions): boolean {
+  if (option === "showCustomerDebtBalance") return docType === "order";
   if (option === "showBatchDebtSummary") return docType === "order";
   if (["showPaymentQr", "alwaysShowPaymentQr", "paymentQrTitle", "paymentQrSize", "paymentQrContentTemplate", "paymentQrAccountSource", "paymentQrCustomBankCode", "paymentQrCustomBankName", "paymentQrCustomAccountNumber", "paymentQrCustomAccountName", "showPaymentQrBank", "showPaymentQrAccountNumber", "showPaymentQrAccountName", "showPaymentQrReference"].includes(option)) {
     return docType === "order";
