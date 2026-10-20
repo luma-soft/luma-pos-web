@@ -11,7 +11,7 @@ import { Routes } from "@/lib/routes";
 import { revalidateAppDataPage } from "@/lib/sync/revalidate-app-data";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { getPublicMediaConfig } from "@/lib/media/config";
-import { replaceProductMediaInTransaction, resolveLegacyProductImageIdsInTransaction, ProductMediaValidationError } from "@/lib/products/product-media";
+import { replaceProductMediaInTransaction, resolveProductImageMediaIdsInTransaction, ProductMediaValidationError } from "@/lib/products/product-media";
 
 export async function saveProductVariantGroup(
   input: CreateProductInput,
@@ -40,14 +40,16 @@ export async function saveProductVariantGroup(
                 ? [v.variantTemplateProductId]
                 : []),
             ];
-            const imageMediaIds = JSON.stringify(imageUrls) === JSON.stringify(v.imageUrls) && v.imageMediaIds.length
-              ? v.imageMediaIds : await resolveLegacyProductImageIdsInTransaction(tx, {
-                storeId: gate.storeId,
-                productId: record.id,
-                imageUrls,
-                allowedSourceProductIds,
-                publicMedia,
-              });
+            const imageMediaIds = await resolveProductImageMediaIdsInTransaction(tx, {
+              storeId: gate.storeId,
+              productId: record.id,
+              imageMediaIds: JSON.stringify(imageUrls) === JSON.stringify(v.imageUrls)
+                ? v.imageMediaIds
+                : undefined,
+              imageUrls,
+              allowedSourceProductIds,
+              publicMedia,
+            });
             await replaceProductMediaInTransaction(tx, {
               storeId: gate.storeId,
               productId: record.id,

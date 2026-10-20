@@ -54,7 +54,7 @@ import {
   externalProductImageUrls,
   ProductMediaValidationError,
   replaceProductMediaInTransaction,
-  resolveLegacyProductImageIdsInTransaction,
+  resolveProductImageMediaIdsInTransaction,
 } from "@/lib/products/product-media";
 import { imageMediaIdsSchema } from "@/lib/products/product-media-schema";
 import { recordActivity } from "@/lib/audit/activity-log";
@@ -885,13 +885,13 @@ export async function updateProduct(
       });
 
       if (v.imageMediaIds !== undefined || v.imageUrls !== undefined) {
-        const imageMediaIds = v.imageMediaIds
-          ?? await resolveLegacyProductImageIdsInTransaction(tx, {
-            storeId: gate.storeId,
-            productId: v.id,
-            imageUrls: v.imageUrls ?? [],
-            publicMedia,
-          });
+        const imageMediaIds = await resolveProductImageMediaIdsInTransaction(tx, {
+          storeId: gate.storeId,
+          productId: v.id,
+          imageMediaIds: v.imageMediaIds,
+          imageUrls: v.imageUrls ?? [],
+          publicMedia,
+        });
         await replaceProductMediaInTransaction(tx, {
           storeId: gate.storeId,
           productId: v.id,
@@ -1216,15 +1216,14 @@ export async function createProduct(
       }
 
       async function associateImages(productId: string) {
-        const imageMediaIds = v.imageMediaIds.length > 0
-          ? v.imageMediaIds
-          : await resolveLegacyProductImageIdsInTransaction(tx, {
-            storeId,
-            productId,
-            imageUrls: v.imageUrls,
-            allowedSourceProductIds: v.imageSourceProductIds,
-            publicMedia,
-          });
+        const imageMediaIds = await resolveProductImageMediaIdsInTransaction(tx, {
+          storeId,
+          productId,
+          imageMediaIds: v.imageMediaIds,
+          imageUrls: v.imageUrls,
+          allowedSourceProductIds: v.imageSourceProductIds,
+          publicMedia,
+        });
         return replaceProductMediaInTransaction(tx, {
           storeId,
           productId,

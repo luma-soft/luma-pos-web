@@ -82,6 +82,37 @@ export async function resolveLegacyProductImageIdsInTransaction(
   return ids.filter((id) => ownedIds.has(id));
 }
 
+export async function resolveProductImageMediaIdsInTransaction(
+  transaction: ProductMediaTransaction,
+  input: {
+    storeId: string;
+    productId: string;
+    imageMediaIds?: readonly string[];
+    imageUrls: readonly string[];
+    allowedSourceProductIds?: readonly string[];
+    publicMedia: PublicMediaConfig;
+  },
+): Promise<string[]> {
+  const parsedIds = imageMediaIdsSchema.safeParse(input.imageMediaIds ?? []);
+  if (!parsedIds.success) throw new ProductMediaValidationError();
+
+  // The form always sends imageMediaIds, including [] when a user pasted a
+  // URL. Resolve URLs as well so a missing explicit ID cannot hide a valid
+  // managed image from the write.
+  const seen = new Set(parsedIds.data);
+  const ids = [...parsedIds.data];
+  const resolvedIds = await resolveLegacyProductImageIdsInTransaction(
+    transaction,
+    input,
+  );
+  for (const mediaId of resolvedIds) {
+    if (seen.has(mediaId)) continue;
+    seen.add(mediaId);
+    ids.push(mediaId);
+  }
+  return ids;
+}
+
 export function externalProductImageUrls(
   requestedUrls: readonly string[],
   publicMedia: Pick<PublicMediaConfig, "publicBaseUrl">,
@@ -104,6 +135,38 @@ function sameOrderedUrls(left: unknown, right: unknown): boolean {
   }
   return left.length === right.length
     && left.every((value, index) => value === right[index]);
+}
+
+function externalProductImageUrlsForSelection(
+  requestedUrls: readonly string[],
+  input: {
+    storeId: string;
+    publicMedia: PublicMediaConfig;
+    media: readonly ProductManagedImage[];
+  },
+) {
+  const storeId = canonicalizeUuidCoordinate(input.storeId);
+  const selectedCoordinates = new Set(
+    input.media.map((image) => `${image.mediaId}:${image.path}`),
+  );
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const raw of requestedUrls) {
+    const url = raw.trim();
+    if (!url || seen.has(url)) continue;
+    const coordinate = parseProductImagePublicUrl(url, input.publicMedia);
+    if (coordinate) {
+      if (!uuidCoordinatesEqual(coordinate.storeId, storeId)) continue;
+      if (selectedCoordinates.has(`${coordinate.mediaId}:${coordinate.path}`)) {
+        continue;
+      }
+      // Same-store public URLs pasted directly into the form remain usable
+      // even when they cannot be linked as managed media for this product.
+    }
+    ordered.push(url);
+    seen.add(url);
+  }
+  return ordered;
 }
 
 export async function replaceProductMediaInTransaction(
@@ -295,9 +358,9 @@ export async function replaceProductMediaInTransaction(
           }),
         ))
         .orderBy(asc(productMedia.sortOrder));
-  const storedExternalImageUrls = externalProductImageUrls(
+  const storedExternalImageUrls = externalProductImageUrlsForSelection(
     input.imageUrls,
-    input.publicMedia,
+    { storeId, publicMedia: input.publicMedia, media },
   );
   const compatibilityMediaUrls = media.length > 0
     ? media.map((image) => image.url)
