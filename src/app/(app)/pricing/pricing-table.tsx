@@ -138,8 +138,9 @@ function PriceBookBaseEditor({
             onCommit(next);
           }}
           className={cn(
-            "w-full border bg-surface pl-7 text-right text-sm tabular-nums",
-            mobile ? "rounded-lg pr-3" : "rounded-md py-1.5 pr-2",
+            "w-full border bg-surface text-right text-sm tabular-nums",
+            mobile ? "rounded-lg pl-2 pr-3" : "rounded-md py-1.5 pl-2 pr-2",
+            (saving || saved) && "pl-7",
             belowCost ? "border-red-400 text-er" : "border-slate-200 dark:border-slate-700",
             fallback && "text-slate-400",
           )}
