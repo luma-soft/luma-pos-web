@@ -299,7 +299,12 @@ function makeDraftFromContext(context: PosInitialContext, products: PosProduct[]
   };
 }
 
-function makeDraftFromSource(source: PosSourceInvoice, products: PosProduct[], id = FIRST_INV_ID): PosDraft {
+function makeDraftFromSource(
+  source: PosSourceInvoice,
+  products: PosProduct[],
+  id = FIRST_INV_ID,
+  priceBooks?: PosData["priceBooks"],
+): PosDraft {
   const afterDiscount = Math.max(0, (source.subtotal ?? 0) - (source.discount ?? 0));
   const taxRate = afterDiscount > 0 && source.tax ? Math.round(((source.tax / afterDiscount) * 100) * 100) / 100 : 0;
   const paymentDraft = unpaidSourceInvoicePaymentDraft(source);
@@ -343,18 +348,20 @@ function makeDraftFromSource(source: PosSourceInvoice, products: PosProduct[], i
       const product = products.find((p) => p.id === item.productId);
       if (!product) return [];
       const unit = item.unitName === product.baseUnit ? null : product.units.find((u) => u.unitName === item.unitName) ?? null;
+      const listedPrice = selectedPosUnitPrice(product, item.unitName, item.priceBookId ?? "", priceBooks);
+      const unitPrice = Math.max(0, item.unitPrice);
       return [{
         key: `${item.productId}-${item.unitName}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
         product,
         unitName: item.unitName,
         unitMultiplier: unit ? Number(unit.multiplier) : 1,
-        unitPrice: Math.max(0, item.unitPrice),
+        unitPrice,
         quantity: item.quantity,
         lineDiscount: Math.max(0, item.lineDiscount ?? 0),
         lineDiscountMode: item.lineDiscountMode,
         lineDiscountValue: item.lineDiscountValue,
         priceBook: item.priceBookId ?? "",
-        manualPrice: true,
+        manualPrice: listedPrice == null || Math.abs(unitPrice - listedPrice) > 0.0001,
         note: item.note || undefined,
       }];
     }),
@@ -625,7 +632,7 @@ export function PosClient({
   const [invoices, setInvoices] = useState<PosDraft[]>(() => [
     makeInvoice(FIRST_INV_ID, defaultDraftTaxRate),
     ...(initialSourceInvoice
-      ? [makeDraftFromSource(initialSourceInvoice, data.products, SOURCE_INV_ID)]
+      ? [makeDraftFromSource(initialSourceInvoice, data.products, SOURCE_INV_ID, data.priceBooks)]
       : initialContext
         ? [makeDraftFromContext(initialContext, data.products, SOURCE_INV_ID, defaultDraftTaxRate)]
         : []),
