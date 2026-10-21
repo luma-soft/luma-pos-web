@@ -572,9 +572,9 @@ export function DataTableShell<T>({
               <tbody>
                 {summaryCells && (
                   <tr className="border-t border-border-soft bg-surface text-right font-bold tabular-nums">
-                    {visibleColumns.map((column, index) => {
+                    {visibleColumns.map((column) => {
                       const cell = summaryCells.find((item) => item.key === column.key);
-                      return <td key={column.key} className={cn("px-3 py-3", hasFloatingColumnMenu && index === visibleColumns.length - 1 && "pr-14", cell?.className)}>{cell?.content}</td>;
+                      return <td key={column.key} className={cn("px-3 py-3", cell?.className)}>{cell?.content}</td>;
                     })}
                     {hasUtilityColumn && <td className="sticky right-0 z-10 bg-surface px-3 py-3" />}
                   </tr>
@@ -629,7 +629,7 @@ export function DataTableShell<T>({
                             : undefined
                         }
                       >
-                        {visibleColumns.map((column, index) => {
+                        {visibleColumns.map((column) => {
                           const cellClassName = typeof column.cellClassName === "function" ? column.cellClassName(row) : column.cellClassName;
                           return (
                             <td
@@ -639,7 +639,6 @@ export function DataTableShell<T>({
                                 column.wrap ? "whitespace-normal break-words" : "truncate",
                                 column.align === "right" && "text-right tabular-nums",
                                 column.align === "center" && "text-center",
-                                hasFloatingColumnMenu && index === visibleColumns.length - 1 && "pr-14",
                                 onRowClick && rowClickColumnKey === column.key && "cursor-pointer",
                                 cellClassName,
                               )}
