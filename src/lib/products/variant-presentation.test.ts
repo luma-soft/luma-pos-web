@@ -18,6 +18,16 @@ describe("variant presentation", () => {
     assert.equal(productDisplayName({ ...tile, name: "Ruijie RAP2200 34601" }), "Ruijie RAP2200 34601 · m2");
   });
 
+  test("composite variant labels do not repeat their individual attribute values", () => {
+    const product = {
+      ...e,
+      name: "Ống Nhựa PVC Tiền Phong",
+      variantName: "140 / C2",
+      specs: { SIZE: ["140"], "LOẠI ỐNG": ["C2"], "Đơn vị": ["m2"] },
+    };
+    assert.equal(productDisplayName(product), "Ống Nhựa PVC Tiền Phong · 140 / C2 · m2");
+  });
+
   test("document names retain public attributes and support older snapshots", () => {
     assert.equal(productLineDisplayName({ productName: "Ống PVC - 110", productVariantName: "110", productSpecs: { "Cấp": ["C2"], __orderNote: ["private"] } }), "Ống PVC - 110 · C2");
     assert.equal(productLineDisplayName({ productName: "Ống PVC" }), "Ống PVC");

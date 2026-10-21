@@ -17,6 +17,11 @@ type VariantSummary = {
 
 export function productVariantValues(product: Pick<VariantSummary, "variantName" | "specs">) {
   const values: string[] = [];
+  const normalize = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+  const variantParts = new Set((product.variantName ?? "")
+    .split(/\s*\/\s*/)
+    .map(normalize)
+    .filter(Boolean));
   const add = (value: unknown) => {
     const text = String(value ?? "").trim();
     if (!text || values.some((item) => item.toLocaleLowerCase() === text.toLocaleLowerCase())) return;
@@ -26,7 +31,10 @@ export function productVariantValues(product: Pick<VariantSummary, "variantName"
   if (product.specs && typeof product.specs === "object" && !Array.isArray(product.specs)) {
     for (const [key, raw] of Object.entries(product.specs as Record<string, unknown>)) {
       if (key.startsWith("__")) continue;
-      for (const value of Array.isArray(raw) ? raw : [raw]) add(value);
+      for (const value of Array.isArray(raw) ? raw : [raw]) {
+        if (variantParts.has(normalize(String(value ?? "")))) continue;
+        add(value);
+      }
     }
   }
   return values;
