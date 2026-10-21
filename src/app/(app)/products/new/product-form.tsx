@@ -1723,7 +1723,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
                             decimals={2}
                             aria-label={`${book.name} mỗi ${baseUnit}`}
                             min={0}
-                            className="min-h-11 w-full lg:ml-auto lg:max-w-[260px] lg:min-h-0"
+                            className="min-h-11 w-full lg:ml-auto lg:block lg:max-w-[260px] lg:min-h-0"
                           />
                         </td>
                         <td className="block p-0 text-right lg:table-cell lg:px-4 lg:py-3">
