@@ -1,5 +1,5 @@
 import type { CreateProductOutput } from "./schema";
-import { buildVariantCombinations, normalizeVariantAttributes, variantNameKey, VariantValidationError } from "@/lib/products/variant-model";
+import { buildVariantCombinations, normalizeVariantAttributes, variantCombinationKey, variantNameKey, VariantValidationError } from "@/lib/products/variant-model";
 
 export function variantAddFieldLabel(attributeName: string): string {
   const name = attributeName.trim();
@@ -13,26 +13,32 @@ export function prepareVariantAddition(values: CreateProductOutput): CreateProdu
   const axes = normalizeVariantAttributes(values.attributes);
   const additions = axes.map((axis) => {
     const value = values.variantAddValues[axis.attributeId]?.trim() ?? "";
-    if (!value || axis.values.some((existing) => variantNameKey(existing) === variantNameKey(value))) {
-      throw new VariantValidationError("products.variants.invalidValues");
-    }
-    return { value, id: crypto.randomUUID() };
+    if (!value) throw new VariantValidationError("products.variants.invalidValues");
+    const existingIndex = axis.values.findIndex((existing) => variantNameKey(existing) === variantNameKey(value));
+    return existingIndex >= 0
+      ? { value: axis.values[existingIndex], id: axis.valueIds[existingIndex] }
+      : { value, id: crypto.randomUUID() };
   });
   if (!axes.length) throw new VariantValidationError("products.variants.invalidAttributes");
 
   const expanded = axes.map((axis, index) => ({
     ...axis,
-    values: [...axis.values, additions[index].value],
-    valueIds: [...axis.valueIds, additions[index].id],
+    ...(axis.valueIds.includes(additions[index].id)
+      ? {}
+      : {
+          values: [...axis.values, additions[index].value],
+          valueIds: [...axis.valueIds, additions[index].id],
+        }),
   }));
   const combinations = buildVariantCombinations(expanded, {
     maxCombinations: combinationsBudget(values),
   });
-  const addedIds = new Set(additions.map((addition) => addition.id));
-  const added = combinations.find((combination) => combination.optionValueIds.every((id) => addedIds.has(id)));
+  const addedKey = variantCombinationKey(axes.map((axis, index) => [axis.attributeId, additions[index].id]));
+  const added = combinations.find((combination) => combination.combinationKey === addedKey);
   if (!added) throw new VariantValidationError("products.variants.invalidCombination");
 
   const existing = new Set(values.variantExistingCombinationKeys);
+  if (existing.has(added.combinationKey)) throw new VariantValidationError("products.variants.invalidCombination");
   return {
     ...values,
     attributes: expanded,

@@ -45,10 +45,54 @@ test("compact group addition creates exactly one new SKU and preserves existing 
   assert.deepEqual(result.excludedCombinationKeys, []);
 });
 
-test("compact group addition rejects a value already present in the locked attribute", () => {
+test("compact group addition reuses existing attribute values for a new combination", () => {
+  const sizeId = "00000000-0000-4000-8000-000000000010";
+  const size140Id = "00000000-0000-4000-8000-000000000011";
+  const size150Id = "00000000-0000-4000-8000-000000000012";
+  const pipeTypeId = "00000000-0000-4000-8000-000000000013";
+  const pipeC2Id = "00000000-0000-4000-8000-000000000014";
+  const pipeC3Id = "00000000-0000-4000-8000-000000000015";
+  const result = prepareVariantAddition({
+    ...base,
+    attributes: [
+      {
+        attributeId: sizeId,
+        name: "SIZE",
+        values: ["140", "150"],
+        valueIds: [size140Id, size150Id],
+        createsVariants: true,
+      },
+      {
+        attributeId: pipeTypeId,
+        name: "LOẠI ỐNG",
+        values: ["C2", "C3"],
+        valueIds: [pipeC2Id, pipeC3Id],
+        createsVariants: true,
+      },
+    ],
+    variantAddValues: { [sizeId]: "140", [pipeTypeId]: "C2" },
+    variantExistingCombinationKeys: [
+      JSON.stringify([[sizeId, size140Id], [pipeTypeId, pipeC3Id]]),
+      JSON.stringify([[sizeId, size150Id], [pipeTypeId, pipeC2Id]]),
+    ],
+  });
+
+  assert.equal(result.variantChildren.length, 1);
+  assert.equal(result.variantChildren[0].variantName, "140 / C2");
+  assert.deepEqual(result.variantChildren[0].optionValueIds, [size140Id, pipeC2Id]);
+  assert.deepEqual(result.attributes[0].values, ["140", "150"]);
+  assert.deepEqual(result.attributes[1].values, ["C2", "C3"]);
+  assert.deepEqual(result.excludedCombinationKeys, [
+    JSON.stringify([[sizeId, size150Id], [pipeTypeId, pipeC3Id]]),
+  ]);
+  const parsed = createProductSchema.safeParse(result);
+  assert.equal(parsed.success, true, parsed.success ? undefined : parsed.error.issues[0]?.message);
+});
+
+test("compact group addition rejects a combination already assigned to a SKU", () => {
   assert.throws(
     () => prepareVariantAddition({ ...base, variantAddValues: { "00000000-0000-4000-8000-000000000005": " 10122 " } }),
-    /products\.variants\.invalidValues/,
+    /products\.variants\.invalidCombination/,
   );
 });
 
