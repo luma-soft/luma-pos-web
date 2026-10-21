@@ -7,7 +7,7 @@ import { approvePriceBookSwitch, prepareInvoicePriceBookSwitch, prepareLinePrice
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 
 import { DateInput } from "@/components/ui/date-input";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -632,20 +632,20 @@ export function PosClient({
   ]);
   const [activeId, setActiveId] = useState(initialSourceInvoice || initialContext ? SOURCE_INV_ID : FIRST_INV_ID);
   const hydratedScopeRef = useRef<string | null>(null);
-  const [draftHydrated, setDraftHydrated] = useState(Boolean(initialSourceInvoice || initialContext));
+  const [draftHydrated, setDraftHydrated] = useState(Boolean(initialSourceInvoice));
   const latestDraftStateRef = useRef({ invoices, activeId });
-  useEffect(() => {
+  useLayoutEffect(() => {
     latestDraftStateRef.current = { invoices, activeId };
   }, [activeId, invoices]);
 
   // load đơn đang soạn sau khi mount (tránh lệch SSR; defer cho react-compiler)
   useEffect(() => {
-    if (initialSourceInvoice || initialContext) return;
+    if (initialSourceInvoice) return;
     // Route refresh must not rehydrate an older saved snapshot over a live cart.
     if (hydratedScopeRef.current === storageScope) return;
     let cancelled = false;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("aiDraft") === "1") {
+    if (params.get("aiDraft") === "1" && !initialContext) {
       hydratedScopeRef.current = storageScope;
       queueMicrotask(() => {
         if (!cancelled) setDraftHydrated(true);
@@ -657,26 +657,63 @@ export function PosClient({
       // Legacy unscoped drafts cannot be assigned to a tenant safely.
       localStorage.removeItem(INV_KEY);
       localStorage.removeItem(ACT_KEY);
-      localStorage.removeItem(AI_POS_DRAFT_KEY);
+      if (params.get("aiDraft") !== "1") localStorage.removeItem(AI_POS_DRAFT_KEY);
       const snapshot = loadPosDraftSnapshot(localStorage, storageScope);
-      if (snapshot) {
-        const saved = ensureInvoiceFirst(snapshot.drafts.map(normalizeInvoice));
-        const currentProducts = flattenProducts(data.products);
-        const refreshed = reconcilePosDraftTaxDefaults(
-          saved.map((draft) => ({
-            ...draft,
-            cart: rehydrateCartProducts(draft.cart, currentProducts),
-          })),
-          {
-            previousDefaultRate: snapshot.taxDefaultRate,
-            currentDefaultRate: defaultDraftTaxRate,
-          },
-        );
-        setInvoices(refreshed);
-        const savedActive = snapshot.activeId;
-        setActiveId(savedActive && refreshed.some((i) => i.id === savedActive) ? savedActive : refreshed[0].id);
+      const currentProducts = flattenProducts(data.products);
+      const saved = snapshot
+        ? ensureInvoiceFirst(snapshot.drafts.map(normalizeInvoice))
+        : [];
+      const refreshed = snapshot
+        ? reconcilePosDraftTaxDefaults(
+            saved.map((draft) => ({
+              ...draft,
+              cart: rehydrateCartProducts(draft.cart, currentProducts),
+            })),
+            {
+              previousDefaultRate: snapshot.taxDefaultRate,
+              currentDefaultRate: defaultDraftTaxRate,
+            },
+          )
+        : [];
+      let nextInvoices = snapshot ? refreshed : invoices;
+      let nextActiveId = snapshot?.activeId && refreshed.some((draft) => draft.id === snapshot.activeId)
+        ? snapshot.activeId
+        : nextInvoices[0].id;
+
+      if (initialContext) {
+        const baseDrafts = snapshot
+          ? nextInvoices
+          : nextInvoices.filter((draft) => draft.id !== SOURCE_INV_ID);
+        const usedIds = new Set(baseDrafts.map((draft) => draft.id));
+        let contextId = SOURCE_INV_ID;
+        while (usedIds.has(contextId)) contextId = makeDraft().id;
+        const contextDraft = invoices.find((draft) => draft.id === SOURCE_INV_ID)
+          ?? makeDraftFromContext(initialContext, data.products, SOURCE_INV_ID, defaultDraftTaxRate);
+        const restoredContextDraft = { ...contextDraft, id: contextId };
+        nextInvoices = ensureInvoiceFirst([...baseDrafts, restoredContextDraft]);
+        nextActiveId = contextId;
       }
+
+      latestDraftStateRef.current = { invoices: nextInvoices, activeId: nextActiveId };
+      setInvoices(nextInvoices);
+      setActiveId(nextActiveId);
       hydratedScopeRef.current = storageScope;
+      if (initialContext) {
+        const saved = savePosDraftSnapshot(localStorage, storageScope, nextInvoices, nextActiveId, {
+          taxDefaultRate: defaultDraftTaxRate,
+        });
+        if (saved) {
+          for (const key of ["draft", "projectId", "projectName", "customerId", "item", "productIds"]) {
+            params.delete(key);
+          }
+          const query = params.toString();
+          window.history.replaceState(
+            null,
+            "",
+            `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+          );
+        }
+      }
       setDraftHydrated(true);
     });
     return () => { cancelled = true; };
@@ -684,16 +721,16 @@ export function PosClient({
 
   // Ghi atomically cả danh sách và tab active sau khi đã đọc snapshot cũ.
   useEffect(() => {
-    if (initialSourceInvoice || initialContext) return;
+    if (initialSourceInvoice) return;
     if (hydratedScopeRef.current !== storageScope) return;
     savePosDraftSnapshot(localStorage, storageScope, invoices, activeId, {
       taxDefaultRate: defaultDraftTaxRate,
     });
-  }, [activeId, defaultDraftTaxRate, initialContext, invoices, initialSourceInvoice, storageScope]);
+  }, [activeId, defaultDraftTaxRate, invoices, initialSourceInvoice, storageScope]);
 
   // Flush snapshot mới nhất khi rời POS hoặc browser đưa trang xuống nền.
   useEffect(() => {
-    if (initialSourceInvoice || initialContext) return;
+    if (initialSourceInvoice) return;
     const flush = () => {
       if (hydratedScopeRef.current !== storageScope) return;
       const latest = latestDraftStateRef.current;
@@ -715,7 +752,7 @@ export function PosClient({
       window.removeEventListener("pagehide", flush);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [defaultDraftTaxRate, initialContext, initialSourceInvoice, storageScope]);
+  }, [defaultDraftTaxRate, initialSourceInvoice, storageScope]);
 
   useEffect(() => {
     if (!sepayCheckout || sepayCheckout.status !== "pending") return;
