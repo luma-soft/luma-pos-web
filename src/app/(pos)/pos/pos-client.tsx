@@ -1,9 +1,9 @@
 "use client";
 
 import { positiveQuantityOrDefault } from "@/lib/quantity";
-import { posBasePrice, posUnitPrice } from "@/lib/pos/price-book-price";
+import { resolvePosBasePrice, resolvePosUnitPrice } from "@/lib/pos/price-book-price";
 import { unpaidSourceInvoicePaymentDraft } from "@/lib/pos/source-invoice-payment";
-import { approvePriceBookSwitch, prepareInvoicePriceBookSwitch, prepareLinePriceBookSwitch, selectedPosUnitPrice } from "@/lib/pos/price-book-switch";
+import { approvePriceBookSwitch, prepareInvoicePriceBookSwitch, prepareLinePriceBookSwitch, resolveSelectedPosUnitPrice, selectedPosUnitPrice } from "@/lib/pos/price-book-switch";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 
 import { DateInput } from "@/components/ui/date-input";
@@ -414,11 +414,11 @@ function aiProductDraftItemsFromQuery(params: URLSearchParams) {
 }
 
 function basePriceFor(p: PosProduct, priceBook: PriceBook = "", books?: PosData["priceBooks"]): number {
-  return posBasePrice(p, priceBook, books) ?? Number.NaN;
+  return resolvePosBasePrice(p, priceBook, books)?.price ?? Number.NaN;
 }
 
 function unitPriceFor(p: PosProduct, unit: PosUnit | null, priceBook: PriceBook = "", books?: PosData["priceBooks"]): number {
-  return posUnitPrice(p, unit, priceBook, books) ?? Number.NaN;
+  return resolvePosUnitPrice(p, unit, priceBook, books)?.price ?? Number.NaN;
 }
 
 function productChildren(p: PosProduct): PosProduct[] {
@@ -1262,20 +1262,26 @@ export function PosClient({
   /** Sửa giá/giảm giá 1 dòng (từ popup). */
   function applyLinePrice(key: string, linePriceBook: PriceBook | undefined, unitPrice: number, lineDiscount: number, free: boolean, lineDiscountMode: LineDiscountMode, lineDiscountValue: number) {
     const target = cart.find((line) => line.key === key);
-    if (target && !Number.isFinite(basePriceFor(target.product, linePriceBook ?? priceBook, data.priceBooks))) {
+    const requestedPriceBook = linePriceBook ?? priceBook;
+    const selectedPrice = target
+      ? resolveSelectedPosUnitPrice(target.product, target.unitName, requestedPriceBook, data.priceBooks)
+      : null;
+    if (target && !selectedPrice) {
       setError(t("pricing.errors.priceUnavailable"));
       return;
     }
     setCart((c) => c.map((l) =>
       {
         if (l.key !== key) return l;
-        const listedPrice = selectedPosUnitPrice(l.product, l.unitName, linePriceBook ?? priceBook, data.priceBooks) ?? Number.NaN;
+        const listing = selectedPrice!;
+        const listedPrice = listing.price;
+        const effectiveLinePriceBook = listing.priceBookId === requestedPriceBook ? linePriceBook : listing.priceBookId;
         const nextUnitPrice = Math.max(0, unitPrice);
         const nextDiscount = Math.max(0, lineDiscount);
         if (free) {
           return {
             ...l,
-            priceBook: linePriceBook,
+            priceBook: effectiveLinePriceBook,
             unitPrice: 0,
             lineDiscount: 0,
             lineDiscountMode: "vnd",
@@ -1292,7 +1298,7 @@ export function PosClient({
         }
         return {
           ...l,
-          priceBook: linePriceBook,
+          priceBook: effectiveLinePriceBook,
           unitPrice: nextUnitPrice,
           lineDiscount: nextDiscount,
           lineDiscountMode,
@@ -1423,22 +1429,24 @@ export function PosClient({
       setError(t("pos.errors.unitUnavailable"));
       return;
     }
-    if (!Number.isFinite(basePriceFor(p, priceBook, data.priceBooks))) {
+    const unit = resolvePosCartUnit(p.baseUnit, p.units, unitName);
+    const selectedPrice = resolvePosUnitPrice(p, unit.alternateUnit, priceBook, data.priceBooks);
+    if (!selectedPrice) {
       setError(t("pricing.errors.priceUnavailable"));
       return;
     }
     setCart((c) => {
-      const unit = resolvePosCartUnit(p.baseUnit, p.units, unitName);
       return upsertPosCartLine<CartLine>(
         c,
-        (line) => line.product.id === p.id && line.unitName === unit.unitName && line.priceBook === undefined,
+        (line) => line.product.id === p.id && line.unitName === unit.unitName && (line.priceBook ?? priceBook) === selectedPrice.priceBookId,
         () => ({
           key: `${p.id}-${Date.now()}`,
           product: p,
           unitName: unit.unitName,
           unitMultiplier: unit.unitMultiplier,
-          unitPrice: unitPriceFor(p, unit.alternateUnit, priceBook, data.priceBooks),
+          unitPrice: selectedPrice.price,
           quantity: 1,
+          priceBook: selectedPrice.priceBookId === priceBook ? undefined : selectedPrice.priceBookId,
         }),
         (line) => ({ ...line, quantity: line.quantity + 1 }),
       );
@@ -1453,22 +1461,24 @@ export function PosClient({
       setError(t("pos.errors.unitUnavailable"));
       return;
     }
-    if (!Number.isFinite(basePriceFor(p, priceBook, data.priceBooks))) {
+    const unit = resolvePosCartUnit(p.baseUnit, p.units, unitName);
+    const selectedPrice = resolvePosUnitPrice(p, unit.alternateUnit, priceBook, data.priceBooks);
+    if (!selectedPrice) {
       setError(t("pricing.errors.priceUnavailable"));
       return;
     }
     setCart((c) => {
-      const unit = resolvePosCartUnit(p.baseUnit, p.units, unitName);
       return upsertPosCartLine<CartLine>(
         c,
-        (line) => line.product.id === p.id,
+        (line) => line.product.id === p.id && (line.priceBook ?? priceBook) === selectedPrice.priceBookId,
         () => ({
           key: `${p.id}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
           product: p,
           unitName: unit.unitName,
           unitMultiplier: unit.unitMultiplier,
-          unitPrice: unitPriceFor(p, unit.alternateUnit, priceBook, data.priceBooks),
+          unitPrice: selectedPrice.price,
           quantity: safeQuantity,
+          priceBook: selectedPrice.priceBookId === priceBook ? undefined : selectedPrice.priceBookId,
         }),
         (line) => ({ ...line, quantity: line.quantity + safeQuantity }),
       );
@@ -1615,19 +1625,26 @@ export function PosClient({
       setError(t("pos.errors.unitUnavailable"));
       return;
     }
-    if (line && !Number.isFinite(basePriceFor(line.product, line.priceBook ?? priceBook, data.priceBooks))) {
+    const selectedUnit = line ? resolvePosCartUnit(line.product.baseUnit, line.product.units, unitName) : null;
+    const requestedPriceBook = line ? line.priceBook ?? priceBook : priceBook;
+    const selectedPrice = line && selectedUnit
+      ? resolvePosUnitPrice(line.product, selectedUnit.alternateUnit, requestedPriceBook, data.priceBooks)
+      : null;
+    if (line && !selectedPrice) {
       setError(t("pricing.errors.priceUnavailable"));
       return;
     }
     setCart((c) => c.map((l) => {
       if (l.key !== key) return l;
       const unit = resolvePosCartUnit(l.product.baseUnit, l.product.units, unitName);
+      const listing = selectedPrice!;
       // đổi đơn vị → tính lại giá niêm yết, bỏ sửa giá tay cũ
       return {
         ...l,
         unitName: unit.unitName,
         unitMultiplier: unit.unitMultiplier,
-        unitPrice: unitPriceFor(l.product, unit.alternateUnit, l.priceBook ?? priceBook, data.priceBooks),
+        unitPrice: listing.price,
+        priceBook: listing.priceBookId === requestedPriceBook ? l.priceBook : listing.priceBookId,
         lineDiscount: 0,
         lineDiscountMode: "vnd",
         lineDiscountValue: 0,
@@ -3504,7 +3521,9 @@ function LinePriceEditor({
     setPriceError("");
     switchPending.current = true;
     const snapshot = latestEditor.current;
-    const bookName = priceBooks.find((book) => (book.isDefault ? "" : book.id) === (selected ?? invoicePriceBook))?.name ?? "Giá chung";
+    const bookName = prepared.priceBookId === ""
+      ? "Giá chung"
+      : priceBooks.find((book) => (book.isDefault ? "" : book.id) === prepared.priceBookId)?.name ?? "Giá chung";
     const money = (amount: number) => `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(amount)} đ/${line.unitName}`;
     try {
       const outcome = await approvePriceBookSwitch({
@@ -3520,7 +3539,7 @@ function LinePriceEditor({
         isCurrent: () => mounted.current && latestEditor.current === snapshot,
         commit: (nextEditor) => {
           markChanged();
-          setSelectedBook(value);
+          setSelectedBook(prepared.priceBookId === "" ? defaultBook?.id ?? inheritedValue : value);
           setEditor(nextEditor);
         },
       });

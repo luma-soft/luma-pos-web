@@ -2,7 +2,7 @@
 
 import { productDisplayName } from "@/lib/products/variant-presentation";
 
-import { posBasePrice } from "@/lib/pos/price-book-price";
+import { resolvePosBasePrice } from "@/lib/pos/price-book-price";
 
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -175,7 +175,7 @@ export function CameraQuotePanel({ products, packages, priceBook, cameraQuoteSet
       if (!id) return 0;
       const product = byId.get(id);
       if (!product) return 0;
-      const price = posBasePrice(product, priceBook) ?? Number.NaN;
+      const price = resolvePosBasePrice(product, priceBook)?.price ?? Number.NaN;
       return cameraQuotePrice(id, price, cameraQuoteSettings);
     };
     const base = getPrice(pkg.cameraId) + getPrice(pkg.cardId) + getPrice(pkg.installationId);

@@ -20,6 +20,22 @@ export function posBasePrice(product: PriceProduct, bookId = "", books?: readonl
   return Number.isFinite(price) && price >= 0 ? price : null;
 }
 
+export function resolvePosBasePrice(product: PriceProduct, bookId = "", books?: readonly Book[]) {
+  const book = books?.find((candidate) => candidate.id === bookId);
+  if (bookId && books && !book) return null;
+  const source = book ? systemPriceBookType(book) : product.priceBookTypes?.[bookId];
+  const selectedPrice = posBasePrice(product, bookId, books);
+  const hasCustomPrice = !bookId || source != null || product.prices?.[bookId] != null;
+  if (selectedPrice != null && hasCustomPrice) return { price: selectedPrice, priceBookId: bookId };
+  if (!bookId) return null;
+
+  // Internal books represent cost inputs. Never replace missing cost data with a sell price.
+  if (source === "cost" || source === "purchase" || book?.managerOnly) return null;
+
+  const commonPrice = posBasePrice(product, "", books);
+  return commonPrice == null ? null : { price: commonPrice, priceBookId: "" };
+}
+
 export function posUnitPrice(
   product: PriceProduct,
   unit: { multiplier: string; priceOverride: string | null } | null,
@@ -35,4 +51,16 @@ export function posUnitPrice(
     return Math.round(Number(unit.priceOverride) * (retail > 0 ? base / retail : 1));
   }
   return Math.round(base * Number(unit.multiplier));
+}
+
+export function resolvePosUnitPrice(
+  product: PriceProduct,
+  unit: { multiplier: string; priceOverride: string | null } | null,
+  bookId = "",
+  books?: readonly Book[],
+) {
+  const resolvedBase = resolvePosBasePrice(product, bookId, books);
+  if (!resolvedBase) return null;
+  const price = posUnitPrice(product, unit, resolvedBase.priceBookId, books);
+  return price == null ? null : { price, priceBookId: resolvedBase.priceBookId };
 }

@@ -1,12 +1,12 @@
-import { posUnitPrice } from "./price-book-price";
+import { resolvePosUnitPrice } from "./price-book-price";
 import { resolvePosCartUnit } from "./cart-unit";
 import { createLinePriceEditorState, resolveLinePriceEditor, type LineDiscountMode, type LinePriceEditorState } from "./line-price-editor";
 
-type PriceProduct = Parameters<typeof posUnitPrice>[0] & {
+type PriceProduct = Parameters<typeof resolvePosUnitPrice>[0] & {
   baseUnit: string;
   units: { unitName: string; multiplier: string; priceOverride: string | null }[];
 };
-type Books = Parameters<typeof posUnitPrice>[3];
+type Books = Parameters<typeof resolvePosUnitPrice>[3];
 
 export type PriceBookSwitchLine = {
   product: PriceProduct;
@@ -21,27 +21,33 @@ export type PriceBookSwitchLine = {
 };
 
 /** The selected base unit must retain its decimal price even if the catalog has a redundant base row. */
-export function selectedPosUnitPrice(product: PriceProduct, unitName: string, bookId = "", books?: Books) {
+export function resolveSelectedPosUnitPrice(product: PriceProduct, unitName: string, bookId = "", books?: Books) {
   const unit = resolvePosCartUnit(product.baseUnit, product.units, unitName);
-  return posUnitPrice(product, unit.alternateUnit, bookId, books);
+  return resolvePosUnitPrice(product, unit.alternateUnit, bookId, books);
 }
 
-/** Prepare the whole invoice first: a missing source must not partially reprice its cart. */
+export function selectedPosUnitPrice(product: PriceProduct, unitName: string, bookId = "", books?: Books) {
+  return resolveSelectedPosUnitPrice(product, unitName, bookId, books)?.price ?? null;
+}
+
+/** Prepare the whole invoice before repricing; missing sale prices use the common price per line. */
 export function prepareInvoicePriceBookSwitch<T extends PriceBookSwitchLine>(cart: readonly T[], bookId: string, books?: Books) {
-  const prices = cart.map((line) => selectedPosUnitPrice(line.product, line.unitName, bookId, books));
-  if (prices.some((price) => price == null || !Number.isFinite(price))) return null;
+  const prices = cart.map((line) => resolveSelectedPosUnitPrice(line.product, line.unitName, bookId, books));
+  if (prices.some((selection) => selection == null || !Number.isFinite(selection.price))) return null;
   let changedPriceCount = 0;
   let clearedDiscountCount = 0;
   let preservedManualCount = 0;
   const lines = cart.map((line, index): T => {
-    const listedPrice = prices[index]!;
+    const selection = prices[index]!;
+    const listedPrice = selection.price;
+    const linePriceBook = selection.priceBookId === bookId ? undefined : selection.priceBookId;
     if (line.manualPrice) {
       preservedManualCount += 1;
       return {
         ...line,
-        priceBook: undefined,
+        priceBook: linePriceBook,
         freeRestore: line.freeRestore
-          ? { unitPrice: listedPrice, lineDiscount: 0, priceBook: undefined }
+          ? { unitPrice: listedPrice, lineDiscount: 0, priceBook: linePriceBook }
           : undefined,
       };
     }
@@ -49,7 +55,7 @@ export function prepareInvoicePriceBookSwitch<T extends PriceBookSwitchLine>(car
     if ((line.lineDiscount ?? 0) > 0 || (line.lineDiscountValue ?? 0) > 0) clearedDiscountCount += 1;
     return {
       ...line,
-      priceBook: undefined,
+      priceBook: linePriceBook,
       unitPrice: listedPrice,
       lineDiscount: 0,
       lineDiscountMode: "vnd",
@@ -62,13 +68,14 @@ export function prepareInvoicePriceBookSwitch<T extends PriceBookSwitchLine>(car
 
 /** Selecting a book on one line intentionally resets that line's price and discount. */
 export function prepareLinePriceBookSwitch(line: Pick<PriceBookSwitchLine, "product" | "unitName">, bookId: string, current: LinePriceEditorState, books?: Books) {
-  const price = selectedPosUnitPrice(line.product, line.unitName, bookId, books);
-  if (price == null || !Number.isFinite(price)) return null;
+  const selection = resolveSelectedPosUnitPrice(line.product, line.unitName, bookId, books);
+  if (!selection || !Number.isFinite(selection.price)) return null;
   const previous = resolveLinePriceEditor(current);
   return {
-    editor: createLinePriceEditorState(price, 0),
+    editor: createLinePriceEditorState(selection.price, 0),
     previous,
-    nextPrice: price,
+    nextPrice: selection.price,
+    priceBookId: selection.priceBookId,
   };
 }
 

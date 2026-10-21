@@ -78,13 +78,21 @@ describe("POS price-book switching", () => {
     assert.deepEqual(result.lines[0].freeRestore, { unitPrice: 12345.67, lineDiscount: 0, priceBook: undefined });
   });
 
-  it("a missing or unauthorized source rejects the entire switch without changing the original cart", () => {
+  it("uses the common price for a product missing from the selected book and rejects unauthorized books", () => {
     const missing = { ...line, key: "missing", product: { ...product, prices: { trade: "12345.67", list: null } } };
     const cart = [line, missing];
     const snapshot = structuredClone(cart);
-    assert.equal(prepareInvoicePriceBookSwitch(cart, "list", books), null);
+    const result = prepareInvoicePriceBookSwitch(cart, "list", books);
+    assert.ok(result);
+    assert.equal(result.lines[0].unitPrice, 0);
+    assert.equal(result.lines[0].priceBook, undefined);
+    assert.equal(result.lines[1].unitPrice, 10000.25);
+    assert.equal(result.lines[1].priceBook, "");
     assert.equal(prepareInvoicePriceBookSwitch(cart, "list", [books[0]]), null);
-    assert.equal(prepareLinePriceBookSwitch(missing, "list", createLinePriceEditorState(10000, 0), books), null);
+    const lineResult = prepareLinePriceBookSwitch(missing, "list", createLinePriceEditorState(10000, 0), books);
+    assert.ok(lineResult);
+    assert.equal(lineResult.nextPrice, 10000.25);
+    assert.equal(lineResult.priceBookId, "");
     assert.deepEqual(cart, snapshot);
   });
 
