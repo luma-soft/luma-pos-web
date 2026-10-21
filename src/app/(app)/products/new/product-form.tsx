@@ -176,7 +176,7 @@ export function NewProductForm({
   siblingCount = 0,
   initialValues,
   variantGroup,
-  variantTemplateName,
+  variantTemplateName: sourceVariantTemplateName,
   initialManagedImages = [],
   layout = "page",
   closeHref,
@@ -517,6 +517,9 @@ export function NewProductForm({
   const productKind = form.watch("productKind") ?? "product";
   const groupEditing = Boolean(form.watch("variantGroupId"));
   const groupAdding = groupEditing && form.watch("variantOperation") === "add";
+  const variantTemplateName = groupAdding
+    ? form.watch("name") || sourceVariantTemplateName
+    : sourceVariantTemplateName;
   const groupManaging = groupEditing && !groupAdding;
   const variantEnabled = productKind === "product" && (!isEdit || groupEditing);
   const hasVariants = variantEnabled && (form.watch("attributes") ?? []).some((attribute) => attribute.createsVariants !== false);

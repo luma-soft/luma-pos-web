@@ -5,6 +5,14 @@ import { buildVariantCombinations, normalizeVariantAttributes, variantCombinatio
 export type ProductSeedMode = "edit" | "copy" | "groupCopy" | "sameType" | "groupEdit" | "groupAdd";
 const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
 
+function variantBaseName(name: string, variantName: string | null | undefined) {
+  const normalizedName = name.trim();
+  const suffix = variantName?.trim() ? ` - ${variantName.trim()}` : "";
+  return suffix && normalizedName.endsWith(suffix)
+    ? normalizedName.slice(0, -suffix.length).trim()
+    : normalizedName;
+}
+
 export function latestVariantMemberId(product: ProductDetail): string | undefined {
   return product.variantGroup?.members
     .filter((member) => !member.isVariantParent)
@@ -142,7 +150,7 @@ export function productToFormInitialValues(
       excludedCombinationKeys: group?.excludedCombinationKeys ?? combinations.filter((combo) => !children.some((child) => child.combinationKey === combo.combinationKey)).map((combo) => combo.combinationKey),
       sku: clearsIdentity ? "" : product.sku,
       barcode: clearsIdentity ? "" : product.barcode ?? "",
-      name: addingOne ? product.name : group?.name ?? product.name,
+      name: addingOne ? variantBaseName(product.name, product.variantName) : group?.name ?? product.name,
       imageUrls: product.imageUrls ?? [],
       imageMediaIds: imageMedia.map((image) => image.mediaId),
       imageSourceProductIds,
