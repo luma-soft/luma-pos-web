@@ -366,7 +366,11 @@ export async function searchPosProductRows(
     .orderBy(desc(warehouses.isDefault))
     .limit(1);
 
-  const match: SQL | undefined = catalogProductSearchCondition(products, q);
+  // A blank query is valid for filter-only POS browsing. Omitting the text
+  // predicate lets category, stock, kind, and price filters select products.
+  const match: SQL | undefined = q.trim()
+    ? catalogProductSearchCondition(products, q)
+    : undefined;
   const canCompareSellingPrice = canViewPurchasePrices(options?.role);
   const visibleBooks = await getPriceBooks(storeId, {
     includeManagerOnly: canCompareSellingPrice,
