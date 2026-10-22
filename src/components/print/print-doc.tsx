@@ -1,10 +1,13 @@
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { moneyToWords, printOptionApplies, resolveLineDiscountColumns, resolveSignaturePositions, typographyForPaper, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
 import { isPrintRichTextEmpty, sanitizePrintRichText } from "@/lib/print/rich-text";
+import { productLineDisplayName } from "@/lib/products/variant-presentation";
 
 export interface PrintLine {
   id: string;
   name: string;
+  variantName?: string | null;
+  specs?: unknown;
   sku?: string | null;
   unitName: string;
   quantity: number;
@@ -13,6 +16,14 @@ export interface PrintLine {
   lineDiscountMode?: "pct" | "vnd";
   lineDiscountValue?: number;
   total: number;
+}
+
+function printLineDisplayName(item: PrintLine) {
+  return productLineDisplayName({
+    productName: item.name,
+    productVariantName: item.variantName,
+    productSpecs: item.specs,
+  });
 }
 
 export interface PrintTotalRow {
@@ -175,7 +186,7 @@ export function PrintDoc(p: PrintDocProps) {
           <tr key={i.id} className="break-inside-avoid">
               <td className="border border-slate-400 px-1 py-1.5 text-center tabular-nums">{index + 1}</td>
               <td className="border border-slate-400 px-2 py-1.5">
-                <span style={{ fontSize: ty.productName }}>{i.name}</span>
+                <span style={{ fontSize: ty.productName }}>{printLineDisplayName(i)}</span>
                 {t.options.showSku && i.sku && <span className="text-slate-500" style={{ fontSize: ty.productMeta }}> ({i.sku})</span>}
               </td>
               <td className="border border-slate-400 px-2 py-1.5 text-center">{i.unitName}</td>
@@ -308,7 +319,7 @@ function K80Doc(p: PrintDocProps) {
           {p.items.map((i) => (
             <tr key={i.id} className="break-inside-avoid border-b border-dashed border-slate-400">
               <td className="py-1.5 pr-1 align-top">
-                <div className="break-words font-bold leading-snug" style={{ fontSize: ty.productName }}>{i.name}</div>
+                <div className="break-words font-bold leading-snug" style={{ fontSize: ty.productName }}>{printLineDisplayName(i)}</div>
                 <div className="mt-0.5 text-slate-600" style={{ fontSize: ty.productMeta }}>
                   {i.unitName}
                   {t.options.showSku && i.sku && <> · {i.sku}</>}

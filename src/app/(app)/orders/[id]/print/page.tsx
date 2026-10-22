@@ -89,6 +89,8 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
           items={order.items.map((i) => ({
             id: i.id,
             name: i.productName,
+            variantName: i.productVariantName,
+            specs: i.productSpecs,
             unitName: i.unitName,
             quantity: Number(i.quantity),
             ...readOrderLinePricing(i),

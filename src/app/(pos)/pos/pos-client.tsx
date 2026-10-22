@@ -1379,6 +1379,8 @@ export function PosClient({
         return {
           id: line.key,
           name: line.product.name,
+          variantName: line.product.variantName,
+          specs: line.product.specs,
           unitName: line.unitName,
           quantity: line.quantity,
           unitPrice: line.unitPrice,
