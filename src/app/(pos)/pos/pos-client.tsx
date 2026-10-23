@@ -3,7 +3,7 @@
 import { positiveQuantityOrDefault } from "@/lib/quantity";
 import { resolvePosBasePrice, resolvePosUnitPrice } from "@/lib/pos/price-book-price";
 import { unpaidSourceInvoicePaymentDraft } from "@/lib/pos/source-invoice-payment";
-import { approvePriceBookSwitch, prepareInvoicePriceBookSwitch, prepareLinePriceBookSwitch, resolveSelectedPosUnitPrice, selectedPosUnitPrice } from "@/lib/pos/price-book-switch";
+import { prepareInvoicePriceBookSwitch, prepareLinePriceBookSwitch, resolveSelectedPosUnitPrice, selectedPosUnitPrice } from "@/lib/pos/price-book-switch";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 
 import { DateInput } from "@/components/ui/date-input";
@@ -3449,7 +3449,6 @@ function LinePriceEditor({
   onClose: () => void;
 }) {
   const t = useTranslations();
-  const { confirm } = useConfirmDialog();
   const defaultBook = priceBooks.find((book) => book.isDefault) ?? priceBooks[0];
   const inheritedValue = "__invoice_price_book__";
   const [selectedBook, setSelectedBook] = useState(
@@ -3473,16 +3472,6 @@ function LinePriceEditor({
     };
   });
   const [priceError, setPriceError] = useState("");
-  const switchPending = useRef(false);
-  const mounted = useRef(true);
-  const latestEditor = useRef({ line, editor, selectedBook, invoicePriceBook, priceBooks });
-  useEffect(() => {
-    latestEditor.current = { line, editor, selectedBook, invoicePriceBook, priceBooks };
-  }, [line, editor, selectedBook, invoicePriceBook, priceBooks]);
-  useEffect(() => {
-    mounted.current = true;
-    return () => { mounted.current = false; };
-  }, []);
   const changedRef = useRef(false);
   const onChangeRef = useRef(onChange);
   useEffect(() => {
@@ -3510,8 +3499,8 @@ function LinePriceEditor({
     changedRef.current = true;
   }
 
-  async function changeBook(value: string) {
-    if (switchPending.current || value === selectedBook) return;
+  function changeBook(value: string) {
+    if (value === selectedBook) return;
     const selected = value === inheritedValue
       ? undefined
       : value === defaultBook?.id ? "" : value;
@@ -3521,34 +3510,9 @@ function LinePriceEditor({
       return;
     }
     setPriceError("");
-    switchPending.current = true;
-    const snapshot = latestEditor.current;
-    const bookName = prepared.priceBookId === ""
-      ? "Giá chung"
-      : priceBooks.find((book) => (book.isDefault ? "" : book.id) === prepared.priceBookId)?.name ?? "Giá chung";
-    const money = (amount: number) => `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(amount)} đ/${line.unitName}`;
-    try {
-      const outcome = await approvePriceBookSwitch({
-        value: prepared.editor,
-        needsConfirmation: true,
-        confirm: () => confirm({
-          title: "Đổi bảng giá dòng hàng?",
-          description: `${productDisplayName(line.product)}\nĐơn giá: ${money(prepared.previous.unitPrice)} → ${money(prepared.nextPrice)}.\n\nDùng “${bookName}” sẽ thay giá nhập tay và xóa chiết khấu của dòng này. Khuyến mại tự động được tính lại theo bảng mới. Các dòng khác giữ nguyên.`,
-          confirmLabel: "Đổi bảng giá",
-          cancelLabel: "Giữ nguyên",
-          variant: "warning",
-        }),
-        isCurrent: () => mounted.current && latestEditor.current === snapshot,
-        commit: (nextEditor) => {
-          markChanged();
-          setSelectedBook(prepared.priceBookId === "" ? defaultBook?.id ?? inheritedValue : value);
-          setEditor(nextEditor);
-        },
-      });
-      if (outcome === "stale" && mounted.current) setPriceError("Dòng hàng đã thay đổi. Vui lòng chọn lại bảng giá để xác nhận dữ liệu mới.");
-    } finally {
-      switchPending.current = false;
-    }
+    markChanged();
+    setSelectedBook(prepared.priceBookId === "" ? defaultBook?.id ?? inheritedValue : value);
+    setEditor(prepared.editor);
   }
 
   function changeFree(free: boolean) {
