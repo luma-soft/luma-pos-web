@@ -110,7 +110,7 @@ async function buildProductCatalogSnapshot(
           ) order by ${productUnits.sortOrder})
           from ${productUnits}
           where ${productUnits.storeId} = ${storeId}::uuid
-            and ${productUnits.productId} = ${products.id}
+            and ${productUnits.productId} = products.id
         ), '[]')`,
         prices: sql<Record<string, string>>`coalesce((
           select json_object_agg(${productPrices.priceBookId}, ${productPrices.price})

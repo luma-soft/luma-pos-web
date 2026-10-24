@@ -114,7 +114,7 @@ export async function getInventory(storeId: string, filters: { q?: string; low?:
         stockValue: sql<string>`${totalStock} * ${products.costPrice}`,
         units: sql<{ unitName: string; multiplier: string; sku: string | null; barcode: string | null }[]>`coalesce((
           select json_agg(json_build_object('unitName', pu.unit_name, 'multiplier', pu.multiplier, 'sku', pu.sku, 'barcode', pu.barcode) order by pu.sort_order)
-          from product_units pu where pu.product_id = ${products.id}
+          from product_units pu where pu.product_id = products.id
         ), '[]')`,
       })
       .from(products)
@@ -371,7 +371,7 @@ const purchaseProductSelection = {
   totalStock: products.totalStock,
   units: sql<{ unitName: string; multiplier: string; sku: string | null; barcode: string | null }[]>`coalesce((
     select json_agg(json_build_object('unitName', pu.unit_name, 'multiplier', pu.multiplier, 'sku', pu.sku, 'barcode', pu.barcode) order by pu.sort_order)
-    from product_units pu where pu.product_id = ${products.id}
+    from product_units pu where pu.product_id = products.id
   ), '[]')`,
 };
 
