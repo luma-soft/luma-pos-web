@@ -272,7 +272,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
     bankCode: "VCB",
     gateway: "Vietcombank",
     accountNumber: "0123456789",
-    accountName: "LumaPOS",
+    accountName: "Hải Đăng POS",
   });
   const isReceiptPreview = selected.docType === "receipt";
   const previewPartyLabel = selected.docType === "purchase"
@@ -584,7 +584,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   projectName="Nha Q.7"
                   deliveryAddress="12 Nguyen Trai"
                   sellerLabel={t("orders.detail.seller")}
-                  sellerName="LumaPOS"
+                  sellerName="Hải Đăng POS"
                   items={previewItems}
                   totals={isReceiptPreview || selected.docType === "return" ? [] : [
                     { label: t("pos.subtotal"), value: 920000, kind: "subtotal" },

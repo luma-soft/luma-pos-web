@@ -9,10 +9,10 @@ import { DismissKeyboardOnOutsidePress } from "@/components/dismiss-keyboard-on-
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Hải Đăng",
-  description: "Hải Đăng — Quản lý bán hàng",
+  title: "Hải Đăng POS",
+  description: "Hải Đăng POS — Quản lý bán hàng",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Hải Đăng" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Hải Đăng POS" },
   icons: { icon: "/icon-192.png", apple: "/icon-180.png" },
 };
 

@@ -45,7 +45,7 @@ export function OnboardingWizard({ initial }: { initial: StoreSettings }) {
       <div className="px-6 pt-6 pb-4 border-b border-border">
         <div className="flex items-center gap-2.5 mb-3">
           <div className="w-9 h-9 rounded-xl grid place-items-center text-white font-extrabold bg-gradient-to-br from-primary-600 to-primary-400">H</div>
-          <div className="font-bold text-lg">Hải Đăng</div>
+          <div className="font-bold text-lg">Hải Đăng POS</div>
         </div>
         <div className="text-xl font-extrabold">{legacyTextByFlag(L, "b1e156ded83e")}</div>
         <div className="text-xs text-slate-500 mt-0.5">{legacyTextByFlag(L, "c65f2dd0e89f")}</div>

@@ -67,7 +67,7 @@ function fallbackListingSuggestion(product: {
 }) {
   const title = product.name.slice(0, 120);
   const baseDescription = product.description?.trim()
-    || `${product.name} - SKU ${product.sku}. Phù hợp đăng bán trên Shopee với thông tin sản phẩm được lấy từ LumaPOS.`;
+    || `${product.name} - SKU ${product.sku}. Phù hợp đăng bán trên Shopee với thông tin sản phẩm được lấy từ Hải Đăng POS.`;
   return {
     title,
     shortDescription: baseDescription.slice(0, 280),
@@ -75,7 +75,7 @@ function fallbackListingSuggestion(product: {
     bulletHighlights: [
       `SKU ${product.sku}`,
       product.brandName ? `Thương hiệu ${product.brandName}` : "Thông tin thương hiệu có thể chỉnh sửa",
-      "Tồn kho và giá được đồng bộ từ LumaPOS",
+      "Tồn kho và giá được đồng bộ từ Hải Đăng POS",
     ],
     category: { id: "", path: product.categoryName || "", confidence: 0.45 },
     attributes: {
@@ -87,7 +87,7 @@ function fallbackListingSuggestion(product: {
     stock: numberFrom(product.totalStock),
     weight: product.weight ? numberFrom(product.weight) : undefined,
     tags: [product.categoryName, product.brandName, product.sku].filter(Boolean),
-    shippingNotes: product.weight ? `Weight from LumaPOS: ${product.weight}` : "Check weight before publishing.",
+    shippingNotes: product.weight ? `Weight from Hải Đăng POS: ${product.weight}` : "Check weight before publishing.",
   };
 }
 

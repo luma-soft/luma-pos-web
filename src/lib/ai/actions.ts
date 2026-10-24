@@ -312,7 +312,7 @@ export function buildGeneralAssistantResponse(input: {
     q === "hi" ||
     q.startsWith("xin chao ");
   const text = asksIdentity
-    ? "Mình là trợ lý AI trong LumaPOS. Mình đọc ngữ cảnh bán hàng, kho, sản phẩm, khách/NCC và tạo bản nháp thao tác để bạn kiểm tra trước khi lưu dữ liệu."
+    ? "Mình là trợ lý AI trong Hải Đăng POS. Mình đọc ngữ cảnh bán hàng, kho, sản phẩm, khách/NCC và tạo bản nháp thao tác để bạn kiểm tra trước khi lưu dữ liệu."
     : asksStrength
       ? "Mình hữu ích nhất khi biến yêu cầu vận hành thành việc làm được ngay: tạo nháp hóa đơn/báo giá/phiếu nhập, kiểm tồn theo SKU, tìm đơn hàng, xem doanh số và mở đúng màn nghiệp vụ để bạn duyệt."
       : greets

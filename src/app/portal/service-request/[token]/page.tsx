@@ -67,7 +67,7 @@ export default async function ServiceRequestPage({
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-950">
       <div className="mx-auto max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">LumaPOS Service</p>
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Hải Đăng POS Service</p>
         <h1 className="mt-2 text-2xl font-black">{t("title")}</h1>
         <p className="mt-2 text-sm text-slate-600">{request.projectName}</p>
         <ServiceRequestForm

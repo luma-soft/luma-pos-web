@@ -1,6 +1,6 @@
 export async function GET() {
   return new Response(
-    "<!doctype html><html lang=\"vi\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>LumaPOS Payment</title><body style=\"font-family:system-ui;padding:32px;max-width:560px;margin:auto\"><h1>Đang xác minh thanh toán</h1><p>Bạn có thể quay lại LumaPOS. Giao dịch chỉ hoàn tất sau khi máy chủ nhận xác nhận hợp lệ từ nhà cung cấp.</p></body></html>",
+    "<!doctype html><html lang=\"vi\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Hải Đăng POS Payment</title><body style=\"font-family:system-ui;padding:32px;max-width:560px;margin:auto\"><h1>Đang xác minh thanh toán</h1><p>Bạn có thể quay lại Hải Đăng POS. Giao dịch chỉ hoàn tất sau khi máy chủ nhận xác nhận hợp lệ từ nhà cung cấp.</p></body></html>",
     {
       status: 200,
       headers: {

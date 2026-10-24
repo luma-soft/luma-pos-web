@@ -1,6 +1,6 @@
 {
-  "name": "Hải Đăng — Quản lý bán hàng",
-  "short_name": "Hải Đăng",
+  "name": "Hải Đăng POS",
+  "short_name": "Hải Đăng POS",
   "description": "Bán hàng, quản lý kho, đơn hàng và công nợ",
   "start_url": "/dashboard",
   "scope": "/",

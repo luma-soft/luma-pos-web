@@ -166,7 +166,7 @@ function legacyFcmMessage(input: LegacyDeviceNotificationInput) {
     message: {
       token: input.token,
       notification: {
-        title: "LumaPOS",
+        title: "Hải Đăng POS",
         body: catalogText(locale, "notifications.operationalAlert"),
       },
       data: {

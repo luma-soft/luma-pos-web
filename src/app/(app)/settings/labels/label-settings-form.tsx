@@ -231,7 +231,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
                 className="overflow-hidden border border-slate-300 bg-white p-[2mm] text-slate-950 shadow-sm"
                 style={{ width: `${selected.widthMm}mm`, height: `${selected.heightMm}mm` }}
               >
-                {selected.showStoreName && <div className="truncate text-center font-bold uppercase tracking-wide text-slate-500" style={{ fontSize: `${6.5 * selected.fontScale}px` }}>LumaPOS</div>}
+                {selected.showStoreName && <div className="truncate text-center font-bold uppercase tracking-wide text-slate-500" style={{ fontSize: `${6.5 * selected.fontScale}px` }}>Hải Đăng POS</div>}
                 {selected.showName && <div className="line-clamp-2 font-bold leading-tight" style={{ fontSize: `${10 * selected.fontScale}px` }}>Xi mang PCB40</div>}
                 <div className="mt-[1mm] flex items-center justify-between gap-1" style={{ fontSize: `${8 * selected.fontScale}px` }}>
                   {selected.showSku && <span className="truncate font-mono text-slate-500">XM-PCB40</span>}

@@ -80,7 +80,7 @@ async function preparePortalLink(input: Extract<ZaloSendInput, { kind: "portal_l
       customer_name: customer.name,
       portal_url: input.url,
     },
-    oaText: `Chào ${customer.name}, LumaPOS gửi link đặt hàng của bạn: ${input.url}`,
+    oaText: `Chào ${customer.name}, Hải Đăng POS gửi link đặt hàng của bạn: ${input.url}`,
     payloadSummary: {
       customerName: customer.name,
       url: input.url,
@@ -114,7 +114,7 @@ async function prepareInvoice(input: Extract<ZaloSendInput, { kind: "invoice" }>
       invoice_number: invoice?.number ?? order.code,
     },
     oaText: [
-      `Chào ${order.customerName ?? "quý khách"}, LumaPOS gửi hóa đơn/đơn hàng ${order.code}.`,
+      `Chào ${order.customerName ?? "quý khách"}, Hải Đăng POS gửi hóa đơn/đơn hàng ${order.code}.`,
       `Tổng tiền: ${formatCurrency(Number(order.total))}.`,
       input.url ? `Xem chi tiết: ${input.url}` : "",
     ].filter(Boolean).join("\n"),
