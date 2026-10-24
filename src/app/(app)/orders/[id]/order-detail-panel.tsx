@@ -312,7 +312,6 @@ export async function OrderDetailPanel({
         </div>
       </div>
 
-      {!isQuote && !cancelled && remaining > 0 && <PaymentForm orderId={order.id} remaining={remaining} />}
       </div>
 
       <div
@@ -326,6 +325,7 @@ export async function OrderDetailPanel({
           {!isQuote && canSendZalo && <SendOrderZaloButton orderId={order.id} />}
         </OrderDetailActionGroup>
         <OrderDetailActionGroup label={t("common.actions")} alignEnd>
+          {!isQuote && !cancelled && remaining > 0 && <PaymentForm key={`${order.id}:${remaining}`} orderId={order.id} remaining={remaining} />}
           {isQuote && !order.hasCreatedOrder && (
             <Link href={posSourceHref("copy", "invoice")} className={cn(buttonVariants({ variant: "default", size: "sm" }), modalActionSizeClassName)}>
               {t("quotes.convert")}
