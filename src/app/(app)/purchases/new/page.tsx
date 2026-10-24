@@ -83,6 +83,8 @@ export default async function NewPurchasePage({ searchParams }: Props) {
             quantity: Number(i.quantity),
             unitCost: Number(i.unitCost),
             discount: Number(i.discount),
+            discountMode: i.discountMode,
+            discountInput: i.discountInput == null ? null : Number(i.discountInput),
           })),
         }}
       />

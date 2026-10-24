@@ -88,6 +88,8 @@ export async function savePurchaseDraft(
       await tx.insert(purchaseOrderItems).values(v.items.map((item, index) => ({
         storeId: gate.storeId, purchaseOrderId: po.id, productId: item.productId,
         quantity: toQty(item.quantity), unitCost: toMoney(item.unitCost), discount: toMoney(item.discount),
+        discountMode: item.discountMode,
+        discountInput: item.discountMode === "pct" ? toMoney(item.discountInput!) : null,
         total: toMoney(totals.lines[index].netTotal), batchNumber: item.batchNumber ?? null,
         expiryDate: item.expiryDate ?? null,
       })));
@@ -175,6 +177,8 @@ export async function createPurchase(
           quantity: toQty(i.quantity),
           unitCost: toMoney(i.unitCost),
           discount: toMoney(i.discount),
+          discountMode: i.discountMode,
+          discountInput: i.discountMode === "pct" ? toMoney(i.discountInput!) : null,
           total: toMoney(totals.lines[index].netTotal),
           batchNumber: i.batchNumber ?? null,
           expiryDate: i.expiryDate ?? null,
@@ -345,8 +349,10 @@ export async function updatePurchase(
         v.items,
         po.status === "draft" ? undefined : oldItems,
       );
-      const comparableItems = (items: { productId: string; quantity: string | number; unitCost: string | number; discount: string | number; batchNumber?: string | null; expiryDate?: string | null }[]) => items.map((item) => ({
-        productId: item.productId, quantity: Number(item.quantity), unitCost: Number(item.unitCost), discount: Number(item.discount), batchNumber: item.batchNumber ?? null, expiryDate: item.expiryDate ?? null,
+      const comparableItems = (items: { productId: string; quantity: string | number; unitCost: string | number; discount: string | number; discountMode?: "vnd" | "pct" | null; discountInput?: string | number | null; batchNumber?: string | null; expiryDate?: string | null }[]) => items.map((item) => ({
+        productId: item.productId, quantity: Number(item.quantity), unitCost: Number(item.unitCost), discount: Number(item.discount),
+        discountMode: item.discountMode ?? "vnd", discountInput: item.discountInput == null ? null : Number(item.discountInput),
+        batchNumber: item.batchNumber ?? null, expiryDate: item.expiryDate ?? null,
       })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
       const stockChanged = po.status !== "received" || po.warehouseId !== v.warehouseId
         || Number(po.discount) !== v.discount || Number(po.vatRate) !== v.vatRate || Number(po.shippingFee) !== v.shippingFee
@@ -415,6 +421,8 @@ export async function updatePurchase(
             quantity: toQty(i.quantity),
             unitCost: toMoney(i.unitCost),
             discount: toMoney(i.discount),
+            discountMode: i.discountMode,
+            discountInput: i.discountMode === "pct" ? toMoney(i.discountInput!) : null,
             total: toMoney(totals.lines[index].netTotal),
             batchNumber: i.batchNumber ?? null,
             expiryDate: i.expiryDate ?? null,

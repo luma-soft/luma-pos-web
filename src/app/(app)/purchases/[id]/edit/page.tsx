@@ -49,6 +49,8 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
           quantity: Number(i.quantity),
           unitCost: Number(i.unitCost),
           discount: Number(i.discount),
+          discountMode: i.discountMode,
+          discountInput: i.discountInput == null ? null : Number(i.discountInput),
         })),
       }}
     />

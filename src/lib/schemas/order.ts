@@ -164,8 +164,14 @@ export const purchaseItemSchema = z.object({
   // Accepted for compatibility with older clients; received prices now sync automatically.
   updateCompanyPrice: z.boolean().optional(),
   discount: z.number().min(0).default(0), // giảm giá dòng (VND)
+  discountMode: z.enum(["vnd", "pct"]).default("vnd"),
+  discountInput: z.number().min(0).optional(),
   batchNumber: z.string().trim().min(1).max(80).optional(),
   expiryDate: z.iso.date().optional(),
+}).superRefine((item, ctx) => {
+  if (item.discountMode === "pct" && item.discountInput === undefined) {
+    ctx.addIssue({ code: "custom", path: ["discountInput"], message: "Percentage discount value is required" });
+  }
 });
 
 export const createPurchaseSchema = z.object({

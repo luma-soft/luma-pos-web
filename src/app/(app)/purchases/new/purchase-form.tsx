@@ -171,6 +171,8 @@ export type PurchaseFormInitialValues = {
     quantity: number;
     unitCost: number;
     discount: number;
+    discountMode?: "vnd" | "pct" | null;
+    discountInput?: number | null;
     unitName?: string | null;
     unitMultiplier?: number | null;
   }[];
@@ -196,8 +198,8 @@ function productToLine(
     multiplier,
     quantity: seed?.quantity ?? 1,
     unitCost: seed?.unitCost ?? Math.round(baseCost * multiplier),
-    discInput: seed?.discount ?? 0,
-    discMode: "vnd",
+    discInput: seed?.discountInput ?? seed?.discount ?? 0,
+    discMode: seed?.discountMode ?? "vnd",
   };
 }
 
@@ -498,6 +500,8 @@ export function PurchaseForm({
         quantity: l.quantity * l.multiplier,
         unitCost: l.multiplier > 0 ? l.unitCost / l.multiplier : l.unitCost,
         discount: purchaseLineDiscount(l),
+        discountMode: l.discMode,
+        ...(l.discMode === "pct" ? { discountInput: l.discInput } : {}),
       })),
     };
 

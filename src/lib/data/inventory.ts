@@ -329,6 +329,8 @@ export async function getPurchase(storeId: string, id: string) {
       quantity: purchaseOrderItems.quantity,
       unitCost: purchaseOrderItems.unitCost,
       discount: purchaseOrderItems.discount,
+      discountMode: purchaseOrderItems.discountMode,
+      discountInput: purchaseOrderItems.discountInput,
       total: purchaseOrderItems.total,
       productName: products.name,
       productVariantName: products.variantName, productSpecs: products.specs,

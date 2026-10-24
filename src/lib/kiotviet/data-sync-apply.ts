@@ -308,7 +308,8 @@ async function applyPurchases(input: ApplyInput & { plan: Extract<KiotVietTypedP
       assertUuid(line.productId, "product reference");
       if (!line.sourceSku.trim() || !line.unitName.trim() || line.unitMultiplier <= 0) throw new Error("KiotViet purchase line source SKU/unit/multiplier must be valid");
       const values = { productId: line.productId, productName: line.productName, sku: line.sourceSku, unitName: line.unitName,
-        unitMultiplier: String(line.unitMultiplier), quantity: String(line.quantity), unitCost: String(line.unitCost), discount: String(line.discount), total: String(line.total) };
+        unitMultiplier: String(line.unitMultiplier), quantity: String(line.quantity), unitCost: String(line.unitCost), discount: String(line.discount),
+        discountMode: "vnd" as const, discountInput: null, total: String(line.total) };
       if (!child.localId) await input.transaction.insert(purchaseOrderItems).values({ id: childId, storeId: input.storeId, purchaseOrderId: localId, ...values });
       else await requireUpdated(await input.transaction.update(purchaseOrderItems).set(values).where(and(
         eq(purchaseOrderItems.storeId, input.storeId), eq(purchaseOrderItems.purchaseOrderId, localId), eq(purchaseOrderItems.id, childId),

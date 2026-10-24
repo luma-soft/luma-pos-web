@@ -1349,6 +1349,8 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull(),
   unitCost: decimal("unit_cost", { precision: 14, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 14, scale: 2 }).notNull().default("0"), // giảm giá dòng
+  discountMode: text("discount_mode").$type<"vnd" | "pct">().notNull().default("vnd"), // đơn vị của giá trị nhập gốc
+  discountInput: decimal("discount_input", { precision: 14, scale: 2 }), // lưu giá trị % gốc; null với dữ liệu cũ/giảm theo tiền
   total: decimal("total", { precision: 14, scale: 2 }).notNull(),
   batchNumber: varchar("batch_number", { length: 80 }),
   expiryDate: date("expiry_date"),
