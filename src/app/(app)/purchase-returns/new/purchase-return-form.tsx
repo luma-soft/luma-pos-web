@@ -35,6 +35,7 @@ import { ProductSearchPicker } from "@/components/product-search/product-search-
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
+import { expandProductSearchUnitResults, rankProductSearchUnitResults } from "@/lib/pos/search-unit-results";
 
 type Line = {
   key: string;
@@ -99,19 +100,19 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   const [error, setError] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
 
-  const selectedProductIds = useMemo(
-    () => new Set(lines.map((line) => line.productId)),
-    [lines],
-  );
   const browseProducts = useMemo(
     () => catalog.products.filter((product) => product.isStockManaged),
     [catalog.products],
   );
+  const browseSearchResults = useMemo(
+    () => expandProductSearchUnitResults(browseProducts),
+    [browseProducts],
+  );
   const searchProducts = useCallback((query: string) => {
-    return catalog.search(query, {
+    return rankProductSearchUnitResults(expandProductSearchUnitResults(catalog.search(query, {
       stockManagedOnly: true,
       limit: catalog.products.length,
-    });
+    })), query, productDisplayName);
   }, [catalog]);
 
   const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.returnUnitCost, 0);
@@ -122,10 +123,25 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   const debtAmount = applyDebt ? Math.min(initial ? editedDebt : Infinity, Math.max(0, totalRefund - clampedRefund)) : 0;
   const unsettled = Math.max(0, totalRefund - clampedRefund - debtAmount);
 
-  function addProduct(product: PurchaseReturnProductRow) {
-    setLines((current) => current.some((line) => line.productId === product.id)
-      ? current
-      : [productToLine(product), ...current]);
+  function addProduct(product: PurchaseReturnProductRow, unitName = product.baseUnit, multiplier = 1) {
+    const line = productToLine(product);
+    setLines((current) => {
+      const existing = current.find((item) => item.productId === product.id);
+      if (existing) {
+        const oldMultiplier = existing.unitMultiplier > 0 ? existing.unitMultiplier : 1;
+        return current.map((item) => item.productId === product.id
+          ? {
+              ...item,
+              unitName,
+              unitMultiplier: multiplier,
+              quantity: Math.round((item.quantity * oldMultiplier / multiplier) * 10_000) / 10_000,
+              unitCost: Math.round((item.unitCost / oldMultiplier) * multiplier),
+              returnUnitCost: Math.round((item.returnUnitCost / oldMultiplier) * multiplier),
+            }
+          : item);
+      }
+      return [{ ...line, unitName, unitMultiplier: multiplier, unitCost: Math.round(line.unitCost * multiplier), returnUnitCost: Math.round(line.returnUnitCost * multiplier) }, ...current];
+    });
     setSearch("");
   }
 
@@ -243,11 +259,17 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
               <ProductSearchPicker
                 query={search}
                 onQueryChange={setSearch}
-                browseItems={browseProducts}
+                browseItems={browseSearchResults}
                 loadItems={searchProducts}
-                itemKey={(product) => product.id}
-                onSelect={(product) => addProduct(catalogItemToPurchaseReturnProduct(product, warehouseId))}
-                isItemSelected={(product) => selectedProductIds.has(product.id)}
+                itemKey={(result) => `${result.product.id}:${result.unitName ?? "variants"}`}
+                onSelect={(result) => addProduct(
+                  catalogItemToPurchaseReturnProduct(result.product, warehouseId),
+                  result.unitName ?? result.product.baseUnit,
+                  Number(result.alternateUnit?.multiplier) || 1,
+                )}
+                isItemSelected={(result) => lines.some((line) =>
+                  line.productId === result.product.id && line.unitName === (result.unitName ?? result.product.baseUnit),
+                )}
                 placeholder={t("purchaseReturns.searchProduct")}
                 emptyMessage={t("common.noResults")}
                 loadingMessage={t("common.loading")}
@@ -255,15 +277,19 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                 closeLabel={t("common.close")}
                 catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                 className="flex-1"
-                renderItem={(product, { selected }) => {
+                renderItem={(result, { selected }) => {
+                  const { product, unitName, alternateUnit } = result;
+                  const selectedUnit = unitName ?? product.baseUnit;
                   const stock = getCatalogWarehouseStock(product, warehouseId);
                   const line = lines.find((item) => item.productId === product.id);
+                  const lineSelected = Boolean(line && line.unitName === selectedUnit);
+                  const multiplier = Number(alternateUnit?.multiplier) || 1;
                   return (
                     <ProductSearchResultLayout
                       selected={selected}
                       leading={<ProductSearchThumbnail product={product} />}
-                      summary={<><div className="text-sm font-semibold">{productDisplayName(product)}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
-                      controls={selected && line ? (
+                      summary={<><div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
+                      controls={lineSelected && line ? (
                         <div onClick={(event) => event.stopPropagation()}>
                           <QuantityInput
                             size="sm"
@@ -275,7 +301,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                             inputLabel={t("common.productQuantity", { product: product.name })}
                           />
                         </div>
-                      ) : <span className="shrink-0 text-sm text-slate-500 tabular-nums">{formatNumber(stock)} {product.baseUnit}</span>}
+                      ) : <span className="shrink-0 text-sm text-slate-500 tabular-nums">{formatNumber(stock)} {product.baseUnit} · {formatCurrency(Number(product.costPrice ?? 0) * multiplier)}/{selectedUnit}</span>}
                     />
                   );
                 }}

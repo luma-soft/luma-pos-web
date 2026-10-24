@@ -39,6 +39,7 @@ import { ProductSearchPicker } from "@/components/product-search/product-search-
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
+import { expandProductSearchUnitResults, rankProductSearchUnitResults } from "@/lib/pos/search-unit-results";
 import { ProductCreateMenu, type ProductKind } from "@/app/(app)/inventory/tabs/product-create-menu";
 
 type PUnit = { unitName: string; multiplier: number };
@@ -197,6 +198,21 @@ function productToLine(
     unitCost: seed?.unitCost ?? Math.round(baseCost * multiplier),
     discInput: seed?.discount ?? 0,
     discMode: "vnd",
+  };
+}
+
+function withPurchaseLineUnit(line: Line, unitName: string): Line {
+  const multiplier = unitName === line.baseUnit
+    ? 1
+    : line.units.find((unit) => unit.unitName === unitName)?.multiplier ?? 1;
+  if (multiplier === line.multiplier) return { ...line, unitName };
+  const oldMultiplier = line.multiplier > 0 ? line.multiplier : 1;
+  return {
+    ...line,
+    unitName,
+    multiplier,
+    quantity: Math.round((line.quantity * oldMultiplier / multiplier) * 10_000) / 10_000,
+    unitCost: Math.round((line.unitCost / oldMultiplier) * multiplier),
   };
 }
 
@@ -389,19 +405,19 @@ export function PurchaseForm({
     if (typeof payload.note === "string" && (applyMode === "replace" || !note)) setNote(payload.note);
   }
 
-  const selectedProductIds = useMemo(
-    () => new Set(lines.map((line) => line.productId)),
-    [lines],
-  );
   const browseProducts = useMemo(
     () => catalog.products.filter((product) => product.isStockManaged),
     [catalog.products],
   );
+  const browseSearchResults = useMemo(
+    () => expandProductSearchUnitResults(browseProducts),
+    [browseProducts],
+  );
   const searchProducts = useCallback((query: string) => {
-    return catalog.search(query, {
+    return rankProductSearchUnitResults(expandProductSearchUnitResults(catalog.search(query, {
       stockManagedOnly: true,
       limit: catalog.products.length,
-    });
+    })), query, productDisplayName);
   }, [catalog]);
 
   const subtotal = lines.reduce((s, l) => s + purchaseLineTotal(l), 0);
@@ -411,19 +427,24 @@ export function PurchaseForm({
   const paid = payFull ? total : Math.min(amountPaid, total);
   const owed = total - paid;
 
-  function addProduct(p: PurchaseProductRow, unit?: PUnit) {
+  function addProduct(p: PurchaseProductRow, unitName = p.baseUnit) {
     const line = productToLine(p);
-    const nextLine = unit
-      ? {
-          ...line,
-          unitName: unit.unitName,
-          multiplier: unit.multiplier,
-          unitCost: Math.round(line.baseCost * unit.multiplier),
-        }
-      : line;
-    setLines((ls) => ls.some((line) => line.productId === p.id)
-      ? ls
-      : [nextLine, ...ls]);
+    const multiplier = unitName === line.baseUnit
+      ? 1
+      : line.units.find((unit) => unit.unitName === unitName)?.multiplier ?? 1;
+    const nextLine = {
+      ...line,
+      unitName,
+      multiplier,
+      quantity: 1,
+      unitCost: Math.round(line.baseCost * multiplier),
+    };
+    setLines((ls) => {
+      const existing = ls.find((item) => item.productId === p.id);
+      return existing
+        ? ls.map((item) => item.productId === p.id ? withPurchaseLineUnit(item, unitName) : item)
+        : [nextLine, ...ls];
+    });
     setAiPendingLines((rows) => rows.filter((row) => row.sku !== p.sku && row.label !== p.name));
     // Keep the query and result popover open so users can add several products
     // from one search. Selected products are excluded by the catalog query.
@@ -452,19 +473,7 @@ export function PurchaseForm({
   }
   /** Đổi đơn vị nhưng giữ nguyên số lượng quy đổi và thành tiền của dòng. */
   function changeUnit(id: string, unitName: string) {
-    setLines((ls) => ls.map((l) => {
-      if (l.productId !== id) return l;
-      const mult = unitName === l.baseUnit ? 1 : (l.units.find((u) => u.unitName === unitName)?.multiplier ?? 1);
-      if (mult === l.multiplier) return { ...l, unitName };
-      const oldMultiplier = l.multiplier > 0 ? l.multiplier : 1;
-      return {
-        ...l,
-        unitName,
-        multiplier: mult,
-        quantity: Math.round((l.quantity * oldMultiplier / mult) * 10_000) / 10_000,
-        unitCost: Math.round((l.unitCost / oldMultiplier) * mult),
-      };
-    }));
+    setLines((ls) => ls.map((line) => line.productId === id ? withPurchaseLineUnit(line, unitName) : line));
   }
 
   const canSaveDraft = mode !== "edit" || purchaseStatus === "draft";
@@ -551,11 +560,13 @@ export function PurchaseForm({
               <ProductSearchPicker
                 query={search}
                 onQueryChange={setSearch}
-                browseItems={browseProducts}
+                browseItems={browseSearchResults}
                 loadItems={searchProducts}
-                itemKey={(product) => product.id}
-                onSelect={(product) => addProduct(catalogItemToPurchaseProduct(product))}
-                isItemSelected={(product) => selectedProductIds.has(product.id)}
+                itemKey={(result) => `${result.product.id}:${result.unitName ?? "variants"}`}
+                onSelect={(result) => addProduct(catalogItemToPurchaseProduct(result.product), result.unitName ?? result.product.baseUnit)}
+                isItemSelected={(result) => lines.some((line) =>
+                  line.productId === result.product.id && line.unitName === (result.unitName ?? result.product.baseUnit),
+                )}
                 keepOpenOnSelect
                 placeholder={t("purchases.searchProduct")}
                 emptyMessage={t("common.noResults")}
@@ -564,69 +575,42 @@ export function PurchaseForm({
                 closeLabel={t("common.close")}
                 catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                 className="flex-1"
-                renderItem={(product, { selected }) => (
-                  <ProductSearchResultLayout
-                    selected={selected}
-                    leading={<ProductSearchThumbnail product={product} />}
-                    summary={(() => {
-                      const line = lines.find((item) => item.productId === product.id);
-                      return (
+                renderItem={(result, { selected }) => {
+                  const { product, unitName, alternateUnit } = result;
+                  const selectedUnit = unitName ?? product.baseUnit;
+                  const line = lines.find((item) => item.productId === product.id);
+                  const lineSelected = Boolean(line && line.unitName === selectedUnit);
+                  const multiplier = Number(alternateUnit?.multiplier) || 1;
+                  const unitCost = Number(product.lastPurchasePrice ?? product.costPrice ?? 0) * multiplier;
+                  return (
+                    <ProductSearchResultLayout
+                      selected={selected}
+                      leading={<ProductSearchThumbnail product={product} />}
+                      summary={(
                         <>
-                          <div className="text-sm font-semibold">{productDisplayName(product)}</div>
-                          <div className="font-mono text-xs text-slate-400">{product.sku} · {line?.unitName ?? product.baseUnit}</div>
-                          {product.units.length > 0 && (
-                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                              <span className="text-[11px] font-medium text-slate-500">{t("purchases.otherUnits")}:</span>
-                              {product.units.map((unit, index) => {
-                                const multiplier = Number(unit.multiplier) || 1;
-                                const label = `${unit.unitName} ×${multiplier}`;
-                                const active = line?.unitName === unit.unitName;
-                                const selectUnitLabel = t("purchases.usePurchaseUnit", {
-                                  product: productDisplayName(product),
-                                  unit: label,
-                                });
-                                return (
-                                  <button
-                                    key={`${unit.unitName}-${multiplier}-${index}`}
-                                    type="button"
-                                    aria-label={selectUnitLabel}
-                                    aria-pressed={active}
-                                    title={selectUnitLabel}
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      if (line) changeUnit(product.id, unit.unitName);
-                                      else addProduct(catalogItemToPurchaseProduct(product), { unitName: unit.unitName, multiplier });
-                                    }}
-                                    className={cn(
-                                      "min-h-8 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
-                                      active
-                                        ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
-                                        : "border-border bg-surface text-slate-600 hover:border-primary-400 hover:text-primary-700 dark:text-slate-300",
-                                    )}
-                                  >
-                                    {label}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
+                          <div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div>
+                          <div className="font-mono text-xs text-slate-400">{product.sku}</div>
                         </>
-                      );
-                    })()}
-                    controls={selected ? (
-                      <div onClick={(event) => event.stopPropagation()}>
-                        <QuantityInput
-                          size="sm"
-                          className="w-[8.25rem]"
-                          min={0}
-                          value={lines.find((line) => line.productId === product.id)?.quantity ?? 0}
-                          onChange={(quantity) => patch(product.id, { quantity })}
-                          inputLabel={t("common.productQuantity", { product: product.name })}
-                        />
-                      </div>
-                    ) : <span className="shrink-0 text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.lastPurchasePrice ?? product.costPrice ?? 0))}/{product.baseUnit}</span>}
-                  />
-                )}
+                      )}
+                      controls={lineSelected && line ? (
+                        <div onClick={(event) => event.stopPropagation()}>
+                          <QuantityInput
+                            size="sm"
+                            className="w-[8.25rem]"
+                            min={0}
+                            value={line.quantity}
+                            onChange={(quantity) => patch(product.id, { quantity })}
+                            inputLabel={t("common.productQuantity", { product: product.name })}
+                          />
+                        </div>
+                      ) : (
+                        <span className="shrink-0 text-sm font-semibold text-primary-600 tabular-nums">
+                          {formatCurrency(unitCost)}/{selectedUnit}
+                        </span>
+                      )}
+                    />
+                  );
+                }}
               />
               {mode !== "edit" && <ProductCreateMenu
                 label={t("purchases.addProduct")}

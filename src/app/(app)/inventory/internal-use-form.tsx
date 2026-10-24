@@ -32,6 +32,7 @@ import { ProductSearchPicker } from "@/components/product-search/product-search-
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
+import { expandProductSearchUnitResults, rankProductSearchUnitResults } from "@/lib/pos/search-unit-results";
 
 const DEPARTMENTS = [
   "kitchen", "office", "marketing", "management", "security", "maintenance",
@@ -86,18 +87,25 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
     () => catalog.products.filter((product) => product.isStockManaged),
     [catalog.products],
   );
+  const browseSearchResults = useMemo(
+    () => expandProductSearchUnitResults(browseProducts),
+    [browseProducts],
+  );
   const searchProducts = useCallback(
-    (query: string) => catalog.search(query, { stockManagedOnly: true, limit: catalog.products.length }),
+    (query: string) => rankProductSearchUnitResults(expandProductSearchUnitResults(catalog.search(query, { stockManagedOnly: true, limit: catalog.products.length })), query, productDisplayName),
     [catalog],
   );
 
-  function addItem(p: PurchaseProductRow) {
+  function addItem(p: PurchaseProductRow, unitName = p.baseUnit) {
     const cost = Number(p.costPrice);
     const units = [{ name: p.baseUnit, mult: 1 }, ...p.units.map((u) => ({ name: u.unitName, mult: Number(u.multiplier) }))];
+    const unit = units.find((candidate) => candidate.name === unitName) ?? units[0];
     setLines((ls) => {
       const ex = ls.findIndex((x) => x.productId === p.id);
-      if (ex >= 0) return ls;
-      return [{ key: `${p.id}-${Date.now()}`, productId: p.id, sku: p.sku, productName: productDisplayName(p), baseUnit: p.baseUnit, costPrice: cost, units, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, unitCost: cost }, ...ls];
+      if (ex >= 0) return ls.map((line) => line.productId === p.id
+        ? { ...line, unitName: unit.name, unitMultiplier: unit.mult, unitCost: Math.round(line.costPrice * unit.mult) }
+        : line);
+      return [{ key: `${p.id}-${Date.now()}`, productId: p.id, sku: p.sku, productName: productDisplayName(p), baseUnit: p.baseUnit, costPrice: cost, units, unitName: unit.name, unitMultiplier: unit.mult, quantity: 1, unitCost: Math.round(cost * unit.mult) }, ...ls];
     });
     setQ("");
   }
@@ -200,11 +208,13 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                 <ProductSearchPicker
                   query={q}
                   onQueryChange={setQ}
-                  browseItems={browseProducts}
+                  browseItems={browseSearchResults}
                   loadItems={searchProducts}
-                  itemKey={(product) => product.id}
-                  onSelect={(product) => addItem(catalogItemToPurchaseProduct(product))}
-                  isItemSelected={(product) => lines.some((line) => line.productId === product.id)}
+                  itemKey={(result) => `${result.product.id}:${result.unitName ?? "variants"}`}
+                  onSelect={(result) => addItem(catalogItemToPurchaseProduct(result.product), result.unitName ?? result.product.baseUnit)}
+                  isItemSelected={(result) => lines.some((line) =>
+                    line.productId === result.product.id && line.unitName === (result.unitName ?? result.product.baseUnit),
+                  )}
                   placeholder={t("internalUse.searchProduct")}
                   emptyMessage={t("common.noResults")}
                   loadingMessage={t("common.loading")}
@@ -212,15 +222,19 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                   closeLabel={t("common.close")}
                   catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
                   className="flex-1"
-                  renderItem={(product, { selected }) => {
-                    const stock = warehouse ? getCatalogWarehouseStock(product, warehouse.id) : Number(product.warehouseStock.reduce((sum, row) => sum + Number(row.quantity), 0));
+                  renderItem={(result, { selected }) => {
+                    const { product, unitName, alternateUnit } = result;
+                    const selectedUnit = unitName ?? product.baseUnit;
                     const line = lines.find((item) => item.productId === product.id);
+                    const lineSelected = Boolean(line && line.unitName === selectedUnit);
+                    const stock = warehouse ? getCatalogWarehouseStock(product, warehouse.id) : Number(product.warehouseStock.reduce((sum, row) => sum + Number(row.quantity), 0));
+                    const multiplier = Number(alternateUnit?.multiplier) || 1;
                     return (
                       <ProductSearchResultLayout
                         selected={selected}
                         leading={<ProductSearchThumbnail product={product} />}
-                        summary={<><div className="text-sm font-semibold">{productDisplayName(product)}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {formatNumber(stock)} {product.baseUnit}</div></>}
-                        controls={selected && line ? (
+                        summary={<><div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {formatNumber(stock)} {product.baseUnit}</div></>}
+                        controls={lineSelected && line ? (
                           <div onClick={(event) => event.stopPropagation()}>
                             <QuantityInput
                               size="sm"
@@ -231,7 +245,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                               inputLabel={t("common.productQuantity", { product: product.name })}
                             />
                           </div>
-                        ) : <span className="text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.costPrice ?? 0))}/{product.baseUnit}</span>}
+                        ) : <span className="text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.costPrice ?? 0) * multiplier)}/{selectedUnit}</span>}
                       />
                     );
                   }}

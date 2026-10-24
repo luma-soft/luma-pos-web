@@ -21,6 +21,8 @@ import { SplitGuestRow } from "./split-guest-row";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
+import { expandPosSearchUnitResults, rankProductSearchUnitResults } from "@/lib/pos/search-unit-results";
+import { resolvePosCartUnit } from "@/lib/pos/cart-unit";
 
 type Method = "cash" | "bank_transfer" | "credit";
 const METHODS: Method[] = ["cash", "bank_transfer", "credit"];
@@ -47,7 +49,7 @@ export function TableOrder({
   const [q, setQ] = useState("");
   const [pending, start] = useTransition();
   const [err, setErr] = useState("");
-  const [picker, setPicker] = useState<{ product: PosResult; groups: ModifierGroup[] } | null>(null);
+  const [picker, setPicker] = useState<{ product: PosResult; groups: ModifierGroup[]; unitName: string } | null>(null);
   const [split, setSplit] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [guests, setGuests] = useState(2);
@@ -65,8 +67,12 @@ export function TableOrder({
     () => catalog.products.map((product) => catalogItemToPosProduct(product, catalog.products, defaultWarehouseId)),
     [catalog.products, defaultWarehouseId],
   );
+  const browseSearchResults = useMemo(
+    () => expandPosSearchUnitResults(browseProducts),
+    [browseProducts],
+  );
   const searchProducts = useCallback(
-    (query: string) => catalog.search(query, { limit: catalog.products.length }).map((product) => catalogItemToPosProduct(product, catalog.products, defaultWarehouseId)),
+    (query: string) => rankProductSearchUnitResults(expandPosSearchUnitResults(catalog.search(query, { limit: catalog.products.length }).map((product) => catalogItemToPosProduct(product, catalog.products, defaultWarehouseId))), query, productDisplayName, { sellableOnly: true }),
     [catalog, defaultWarehouseId],
   );
 
@@ -74,25 +80,29 @@ export function TableOrder({
     return modifierGroups.filter((g) => g.categoryIds.length === 0 || (categoryId && g.categoryIds.includes(categoryId)));
   }
 
-  function choose(p: PosResult) {
+  function choose(p: PosResult, selectedUnitName = p.baseUnit) {
     setQ("");
     const groups = groupsFor(p.categoryId ?? null);
-    if (groups.length === 0) addLine(p, [], "");
-    else setPicker({ product: p, groups });
+    if (groups.length === 0) addLine(p, [], "", selectedUnitName);
+    else setPicker({ product: p, groups, unitName: selectedUnitName });
   }
 
-  function addLine(p: PosResult, modifiers: CartModifier[], note: string) {
+  function addLine(p: PosResult, modifiers: CartModifier[], note: string, selectedUnitName = p.baseUnit) {
+    const unit = resolvePosCartUnit(p.baseUnit, p.units, selectedUnitName);
     const base = Number(p.retailPrice);
-    const unitPrice = base + modifiers.reduce((s, m) => s + m.priceDelta, 0);
+    const basePrice = unit.alternateUnit?.priceOverride == null
+      ? base * unit.unitMultiplier
+      : Number(unit.alternateUnit.priceOverride);
+    const unitPrice = basePrice + modifiers.reduce((s, m) => s + m.priceDelta, 0);
     if (modifiers.length === 0 && !note) {
-      const ex = cart.findIndex((c) => c.productId === p.id && !c.sent && c.modifiers.length === 0 && !c.note);
+      const ex = cart.findIndex((c) => c.productId === p.id && c.unitName === unit.unitName && !c.sent && c.modifiers.length === 0 && !c.note);
       if (ex >= 0) {
         const updated = { ...cart[ex], quantity: cart[ex].quantity + 1 };
         persist([updated, ...cart.slice(0, ex), ...cart.slice(ex + 1)]);
         return;
       }
     }
-    persist([{ lineId: uid(), productId: p.id, productName: productDisplayName(p), unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, basePrice: base, unitPrice, modifiers, note: note || undefined, course: "asap", courseDelayMinutes: 0, sent: false }, ...cart]);
+    persist([{ lineId: uid(), productId: p.id, productName: productDisplayName(p), unitName: unit.unitName, unitMultiplier: unit.unitMultiplier, quantity: 1, basePrice, unitPrice, modifiers, note: note || undefined, course: "asap", courseDelayMinutes: 0, sent: false }, ...cart]);
   }
 
   const setQty = (lineId: string, quantity: number) => {
@@ -172,11 +182,13 @@ export function TableOrder({
           <ProductSearchPicker
             query={q}
             onQueryChange={setQ}
-            browseItems={browseProducts}
+            browseItems={browseSearchResults}
             loadItems={searchProducts}
-            itemKey={(product) => product.id}
-            onSelect={choose}
-            isItemSelected={(product) => cart.some((line) => line.productId === product.id && !line.sent)}
+            itemKey={(result) => `${result.product.id}:${result.unitName ?? "variants"}`}
+            onSelect={(result) => choose(result.product, result.unitName ?? result.product.baseUnit)}
+            isItemSelected={(result) => cart.some((line) =>
+              line.productId === result.product.id && line.unitName === (result.unitName ?? result.product.baseUnit) && !line.sent,
+            )}
             placeholder={t("pos.searchPlaceholder")}
             emptyMessage={t("pos.noSearchResults")}
             loadingMessage={t("common.loading")}
@@ -184,18 +196,24 @@ export function TableOrder({
             closeLabel={t("common.close")}
             catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
             className="mb-3 w-full max-w-md"
-            renderItem={(product, { selected }) => {
-              const line = cart.find((item) => item.productId === product.id && !item.sent && item.modifiers.length === 0 && !item.note);
+            renderItem={(result, { selected }) => {
+              const { product, unitName, alternateUnit } = result;
+              const selectedUnit = unitName ?? product.baseUnit;
+              const line = cart.find((item) => item.productId === product.id && item.unitName === selectedUnit && !item.sent && item.modifiers.length === 0 && !item.note);
+              const multiplier = Number(alternateUnit?.multiplier) || 1;
+              const unitPrice = alternateUnit?.priceOverride == null
+                ? Number(product.retailPrice) * multiplier
+                : Number(alternateUnit.priceOverride);
               return (
               <ProductSearchResultLayout
                 selected={selected}
                 leading={<ProductSearchThumbnail product={product} />}
-                summary={<><div className="text-sm font-semibold">{productDisplayName(product)}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
+                  summary={<><div className="text-sm font-semibold">{productDisplayName(product)}{unitName == null ? "" : ` · ${selectedUnit}`}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
                 controls={selected && line ? (
                   <div onClick={(event) => event.stopPropagation()}>
                     <QuantityInput size="sm" className="w-[8.25rem]" min={0} value={line.quantity} onChange={(quantity) => setQty(line.lineId, quantity)} inputLabel={t("common.productQuantity", { product: product.name })} />
                   </div>
-                ) : <span className="shrink-0 text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.retailPrice))}</span>}
+                  ) : <span className="shrink-0 text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(unitPrice)}/{selectedUnit}</span>}
               />
               );
             }}
@@ -223,7 +241,7 @@ export function TableOrder({
                     </label>
                   )}
                   <div className="min-w-[8rem] flex-1">
-                    <div className="font-medium truncate flex items-center gap-1.5">{c.productName}{c.sent && <ChefHat className="w-3 h-3 text-ok shrink-0" />}</div>
+                    <div className="font-medium truncate flex items-center gap-1.5">{c.productName} · {c.unitName}{c.sent && <ChefHat className="w-3 h-3 text-ok shrink-0" />}</div>
                     {c.modifiers.length > 0 && <div className="text-[11px] text-slate-400 truncate">{c.modifiers.map((m) => m.label).join(", ")}</div>}
                     {c.note && <div className="text-[11px] text-warn truncate">“{c.note}”</div>}
                     <div className="text-xs text-slate-400 font-mono">{formatCurrency(c.unitPrice)}</div>
@@ -294,7 +312,7 @@ export function TableOrder({
         </div>
       </div>
 
-      {picker && <ModifierPicker product={picker.product} groups={picker.groups} onCancel={() => setPicker(null)} onConfirm={(mods, note) => { addLine(picker.product, mods, note); setPicker(null); }} />}
+      {picker && <ModifierPicker product={picker.product} unitName={picker.unitName} groups={picker.groups} onCancel={() => setPicker(null)} onConfirm={(mods, note) => { addLine(picker.product, mods, note, picker.unitName); setPicker(null); }} />}
       {moveOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-3 sm:p-4" onClick={() => setMoveOpen(false)}>
           <section
@@ -346,7 +364,7 @@ export function TableOrder({
   );
 }
 
-function ModifierPicker({ product, groups, onCancel, onConfirm }: { product: PosResult; groups: ModifierGroup[]; onCancel: () => void; onConfirm: (mods: CartModifier[], note: string) => void }) {
+function ModifierPicker({ product, unitName, groups, onCancel, onConfirm }: { product: PosResult; unitName: string; groups: ModifierGroup[]; onCancel: () => void; onConfirm: (mods: CartModifier[], note: string) => void }) {
   const t = useTranslations();
   const [sel, setSel] = useState<Record<string, string[]>>({});
   const [note, setNote] = useState("");
@@ -371,12 +389,16 @@ function ModifierPicker({ product, groups, onCancel, onConfirm }: { product: Pos
   }
 
   const extra = groups.reduce((s, g) => s + (sel[g.id] ?? []).reduce((a, id) => a + (g.options.find((o) => o.id === id)?.priceDelta ?? 0), 0), 0);
+  const unit = resolvePosCartUnit(product.baseUnit, product.units, unitName);
+  const basePrice = unit.alternateUnit?.priceOverride == null
+    ? Number(product.retailPrice) * unit.unitMultiplier
+    : Number(unit.alternateUnit.priceOverride);
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-3 sm:p-4" onClick={onCancel}>
       <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-auto rounded-card bg-surface shadow-e2 sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-border sticky top-0 bg-surface">
-          <h2 className="font-bold truncate">{productDisplayName(product)}</h2>
+          <h2 className="font-bold truncate">{productDisplayName(product)} · {unitName}</h2>
           <button onClick={onCancel} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-surface-2"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4">
@@ -402,7 +424,7 @@ function ModifierPicker({ product, groups, onCancel, onConfirm }: { product: Pos
           {err && <p className="text-sm text-er">{err}</p>}
         </div>
         <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border bg-surface px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-3">
-          <span className="font-mono font-bold">{formatCurrency(Number(product.retailPrice) + extra)}</span>
+          <span className="font-mono font-bold">{formatCurrency(basePrice + extra)}</span>
           <button onClick={confirm} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white min-w-11"><Plus className="w-4 h-4" />{t("tables.addToOrder")}</button>
         </div>
       </div>

@@ -13,7 +13,6 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
-import { searchTokens } from "@/lib/normalize";
 import { createPortal } from "react-dom";
 import { Combobox } from "@/components/combobox";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -88,7 +87,7 @@ import { buildExpectedPosPricing, countPosPricingConflicts, requestPosOrder } fr
 import { defaultPosSellableUnitName, isPosUnitSellable, resolvePosCartUnit } from "@/lib/pos/cart-unit";
 import { upsertPosCartLine } from "@/lib/pos/cart-line-order";
 import { canAddCatalogProductsToPosDraft, canEditPriceBookForPosDraft } from "@/lib/pos/catalog-add-policy";
-import { expandPosSearchUnitResults, type PosSearchUnitResult } from "@/lib/pos/search-unit-results";
+import { expandPosSearchUnitResults, rankProductSearchUnitResults, type PosSearchUnitResult } from "@/lib/pos/search-unit-results";
 import {
   createLinePriceEditorState,
   resolveLinePriceEditor,
@@ -1126,52 +1125,6 @@ export function PosClient({
     const aTime = a.lastSoldAt ? new Date(a.lastSoldAt).getTime() : 0;
     return bTime - aTime || a.name.localeCompare(b.name, "vi");
   }), []);
-  const rankPosSearchResults = useCallback((
-    results: readonly PosSearchUnitResult<PosProduct>[],
-    query: string,
-  ) => {
-    const tokens = searchTokens(query);
-    if (tokens.length === 0) return [...results];
-
-    const queryKey = tokens.join(" ");
-    // Prefer the exact visible product/unit label, then term coverage; the incoming recent-sale order breaks ties.
-    const ranked = results.map((result, index) => {
-      const productLabel = productDisplayName(result.product);
-      const productTokens = new Set(searchTokens(productLabel));
-      const unitTokens = new Set(searchTokens(result.unitName ?? ""));
-      const visibleTokens = new Set([...productTokens, ...unitTokens]);
-      const metadataTokens = new Set(searchTokens([
-        result.product.sku,
-        ...(!result.product.isVariantParent && result.product.baseUnitDirectSale ? [result.product.barcode, result.product.baseUnit] : []),
-        ...result.product.units.filter((unit) => unit.directSale).flatMap((unit) => [unit.unitName, unit.sku, unit.barcode]),
-      ].filter(Boolean).join(" ")));
-      const countMatches = (candidateTokens: ReadonlySet<string>) =>
-        tokens.filter((token) => [...candidateTokens].some((candidate) => candidate.includes(token))).length;
-      const rowLabel = searchTokens(`${productLabel} ${result.unitName ?? ""}`).join(" ");
-
-      return {
-        result,
-        index,
-        rank: [
-          Number(rowLabel === queryKey),
-          countMatches(visibleTokens),
-          countMatches(productTokens),
-          countMatches(unitTokens),
-          countMatches(metadataTokens),
-        ],
-      };
-    });
-
-    ranked.sort((left, right) => {
-      for (let index = 0; index < left.rank.length; index += 1) {
-        const difference = right.rank[index] - left.rank[index];
-        if (difference !== 0) return difference;
-      }
-      return left.index - right.index;
-    });
-
-    return ranked.filter(({ rank }) => rank.some((value) => value > 0)).map(({ result }) => result);
-  }, []);
   const browseSearchResults = useMemo(
     () => expandPosSearchUnitResults(sortSearchProducts(data.products)),
     [data.products, sortSearchProducts],
@@ -1195,8 +1148,8 @@ export function PosClient({
           products = hasPosPriceComparison ? [] : cachedResults();
         }
       }
-      return rankPosSearchResults(expandPosSearchUnitResults(sortSearchProducts(products)), query);
-  }, [data.priceBooks, data.warehouse?.id, effectivePosPriceBookId, hasPosPriceComparison, posPriceAgainst, posPriceCondition, productCatalog, rankPosSearchResults, sortSearchProducts]);
+      return rankProductSearchUnitResults(expandPosSearchUnitResults(sortSearchProducts(products)), query, productDisplayName, { sellableOnly: true });
+  }, [data.priceBooks, data.warehouse?.id, effectivePosPriceBookId, hasPosPriceComparison, posPriceAgainst, posPriceCondition, productCatalog, sortSearchProducts]);
 
   const syncingRef = useRef(false);
   async function flushOutbox() {

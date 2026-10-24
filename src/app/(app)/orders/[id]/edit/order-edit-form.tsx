@@ -2,7 +2,7 @@
 
 import { productDisplayName } from "@/lib/products/variant-presentation";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2, Save, Trash2 } from "lucide-react";
@@ -19,6 +19,7 @@ import { ProductSearchPicker } from "@/components/product-search/product-search-
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
+import { expandPosSearchUnitResults, rankProductSearchUnitResults, type PosSearchUnitResult } from "@/lib/pos/search-unit-results";
 
 interface Line {
   productId: string;
@@ -56,8 +57,12 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [productQuery, setProductQuery] = useState("");
+  const browseSearchResults = useMemo(
+    () => expandPosSearchUnitResults(catalog.products),
+    [catalog.products],
+  );
   const searchProducts = useCallback(
-    (query: string) => catalog.search(query, { limit: catalog.products.length }),
+    (query: string) => rankProductSearchUnitResults(expandPosSearchUnitResults(catalog.search(query, { limit: catalog.products.length })), query, productDisplayName, { sellableOnly: true }),
     [catalog],
   );
 
@@ -82,14 +87,33 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
         ));
   }
 
-  function addProduct(p: ProductCatalogItem) {
-    setItems((ls) => ls.some((line) => line.productId === p.id)
-      ? ls
-      : [{
-          productId: p.id, productName: productDisplayName(p),
-          unitName: p.baseUnit, unitMultiplier: 1,
-          quantity: 1, unitPrice: Number(p.retailPrice),
-        }, ...ls]);
+  function addProduct(result: PosSearchUnitResult<ProductCatalogItem>) {
+    const p = result.product;
+    const unitName = result.unitName ?? p.baseUnit;
+    const multiplier = Number(result.alternateUnit?.multiplier) || 1;
+    const override = result.alternateUnit?.priceOverride;
+    const unitPrice = override == null ? Number(p.retailPrice) * multiplier : Number(override);
+    setItems((ls) => {
+      const existing = ls.find((line) => line.productId === p.id);
+      if (!existing) return [{
+        productId: p.id, productName: productDisplayName(p),
+        unitName, unitMultiplier: multiplier,
+        quantity: 1, unitPrice,
+      }, ...ls];
+      if (existing.unitName === unitName) return ls;
+      const oldMultiplier = existing.unitMultiplier > 0 ? existing.unitMultiplier : 1;
+      return ls.map((line) => line.productId === p.id ? {
+        ...line,
+        unitName,
+        unitMultiplier: multiplier,
+        quantity: Math.round((line.quantity * oldMultiplier / multiplier) * 10_000) / 10_000,
+        unitPrice,
+        preDiscountUnitPrice: unitPrice,
+        lineDiscount: 0,
+        lineDiscountMode: "vnd",
+        lineDiscountValue: 0,
+      } : line);
+    });
   }
 
   async function save() {
@@ -200,11 +224,13 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
           <ProductSearchPicker
             query={productQuery}
             onQueryChange={setProductQuery}
-            browseItems={catalog.products}
+            browseItems={browseSearchResults}
             loadItems={searchProducts}
-            itemKey={(product) => product.id}
+            itemKey={(result) => `${result.product.id}:${result.unitName ?? "variants"}`}
             onSelect={addProduct}
-            isItemSelected={(product) => items.some((line) => line.productId === product.id)}
+            isItemSelected={(result) => items.some((line) =>
+              line.productId === result.product.id && line.unitName === (result.unitName ?? result.product.baseUnit),
+            )}
             placeholder={`＋ ${t("purchases.addProduct")}`}
             emptyMessage={t("pos.noSearchResults")}
             loadingMessage={t("common.loading")}
@@ -212,19 +238,24 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
             closeLabel={t("common.close")}
             catalogStatus={catalog.status === "loading" ? "loading" : catalog.status === "unavailable" ? "unavailable" : "ready"}
             inputClassName="border-dashed bg-transparent"
-            renderItem={(product, { selected }) => {
-              const lineIndex = items.findIndex((line) => line.productId === product.id);
+            renderItem={(result, { selected }) => {
+              const { product, unitName, alternateUnit } = result;
+              const selectedUnit = unitName ?? product.baseUnit;
+              const lineIndex = items.findIndex((item) => item.productId === product.id && item.unitName === selectedUnit);
               const line = lineIndex >= 0 ? items[lineIndex] : null;
+              const multiplier = Number(alternateUnit?.multiplier) || 1;
+              const override = alternateUnit?.priceOverride;
+              const unitPrice = override == null ? Number(product.retailPrice) * multiplier : Number(override);
               return (
                 <ProductSearchResultLayout
                   selected={selected}
                   leading={<ProductSearchThumbnail product={product} />}
-                  summary={<><div className="text-sm font-semibold">{productDisplayName(product)}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {product.baseUnit}</div></>}
+                  summary={<><div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
                   controls={selected && line ? (
                     <div onClick={(event) => event.stopPropagation()}>
                       <QuantityInput size="sm" className="w-[8.25rem]" min={0} value={line.quantity} onChange={(quantity) => patch(lineIndex, { quantity })} inputLabel={t("common.productQuantity", { product: product.name })} />
                     </div>
-                  ) : <span className="text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.retailPrice))}</span>}
+                  ) : <span className="text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(unitPrice)}/{selectedUnit}</span>}
                 />
               );
             }}
