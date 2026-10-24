@@ -17,10 +17,12 @@ function productOptions(
   options: Awaited<ReturnType<typeof getCameraQuoteFormOptions>>,
 ) {
   const map = (products: typeof options.cameras) =>
-    products.map(({ id, sku, name, retailPrice }) => ({
+    products.map(({ id, sku, name, baseUnit, units, retailPrice }) => ({
       id,
       sku,
       name,
+      baseUnit,
+      units,
       retailPrice,
     }));
   return {

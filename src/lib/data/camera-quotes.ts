@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { brands, categories, customers, products, warehouses } from "@/db/schema";
+import { brands, categories, customers, productUnits, products, warehouses } from "@/db/schema";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 import {
   CAMERA_QUOTE_CARD_SKUS,
@@ -37,6 +37,7 @@ export type CameraQuoteProductOption = {
   sku: string;
   name: string;
   baseUnit: string;
+  units: Array<{ unitName: string }>;
   brand: string | null;
   costPrice: number;
   retailPrice: number;
@@ -54,6 +55,12 @@ export async function getCameraQuoteFormOptions(storeId: string, includePrivate 
         sku: products.sku,
         name: products.name,
         baseUnit: products.baseUnit,
+        units: sql<Array<{ unitName: string }>>`coalesce((
+          select json_agg(json_build_object('unitName', ${productUnits.unitName}) order by ${productUnits.sortOrder})
+          from ${productUnits}
+          where ${productUnits.storeId} = ${storeId}
+            and ${productUnits.productId} = ${products.id}
+        ), '[]'::json)`,
         brand: brands.name,
         costPrice: products.costPrice,
         retailPrice: products.retailPrice,
@@ -72,6 +79,12 @@ export async function getCameraQuoteFormOptions(storeId: string, includePrivate 
         sku: products.sku,
         name: products.name,
         baseUnit: products.baseUnit,
+        units: sql<Array<{ unitName: string }>>`coalesce((
+          select json_agg(json_build_object('unitName', ${productUnits.unitName}) order by ${productUnits.sortOrder})
+          from ${productUnits}
+          where ${productUnits.storeId} = ${storeId}
+            and ${productUnits.productId} = ${products.id}
+        ), '[]'::json)`,
         brand: brands.name,
         costPrice: products.costPrice,
         retailPrice: products.retailPrice,
@@ -106,6 +119,7 @@ export async function getCameraQuoteFormOptions(storeId: string, includePrivate 
     sku: row.sku,
     name: row.name,
     baseUnit: row.baseUnit,
+    units: row.units ?? [],
     brand: row.brand,
     costPrice: Number(row.costPrice),
     retailPrice: Number(row.retailPrice),
