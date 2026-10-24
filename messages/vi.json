@@ -3446,6 +3446,8 @@
     "addProduct": "Thêm sản phẩm vào phiếu",
     "pickProduct": "— Chọn sản phẩm —",
     "unitLabel": "phiếu nhập",
+    "otherUnits": "Đơn vị khác",
+    "usePurchaseUnit": "Chọn {unit} cho {product}",
     "noSuppliers": "Chưa có NCC — tạo ở mục Nhà cung cấp",
     "payFull": "Thanh toán đủ cho NCC",
     "amountPaid": "Đã trả NCC",

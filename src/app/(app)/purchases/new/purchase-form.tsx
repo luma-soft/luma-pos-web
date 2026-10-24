@@ -170,6 +170,8 @@ export type PurchaseFormInitialValues = {
     quantity: number;
     unitCost: number;
     discount: number;
+    unitName?: string | null;
+    unitMultiplier?: number | null;
   }[];
 };
 
@@ -180,6 +182,8 @@ function productToLine(
   // Start from the latest receipt gross price; average cost is only a fallback.
   const baseCost = Number(p.lastPurchasePrice ?? p.costPrice) || 0;
   const units: PUnit[] = (p.units ?? []).map((u) => ({ unitName: u.unitName, multiplier: Number(u.multiplier) || 1 }));
+  const multiplier = Number(seed?.unitMultiplier) > 0 ? Number(seed?.unitMultiplier) : 1;
+  const unitName = seed?.unitName || p.baseUnit;
   return {
     productId: p.id,
     name: productDisplayName(p),
@@ -187,10 +191,10 @@ function productToLine(
     baseUnit: p.baseUnit,
     baseCost,
     units,
-    unitName: p.baseUnit,
-    multiplier: 1,
+    unitName,
+    multiplier,
     quantity: seed?.quantity ?? 1,
-    unitCost: seed?.unitCost ?? baseCost,
+    unitCost: seed?.unitCost ?? Math.round(baseCost * multiplier),
     discInput: seed?.discount ?? 0,
     discMode: "vnd",
   };
@@ -407,10 +411,19 @@ export function PurchaseForm({
   const paid = payFull ? total : Math.min(amountPaid, total);
   const owed = total - paid;
 
-  function addProduct(p: PurchaseProductRow) {
+  function addProduct(p: PurchaseProductRow, unit?: PUnit) {
+    const line = productToLine(p);
+    const nextLine = unit
+      ? {
+          ...line,
+          unitName: unit.unitName,
+          multiplier: unit.multiplier,
+          unitCost: Math.round(line.baseCost * unit.multiplier),
+        }
+      : line;
     setLines((ls) => ls.some((line) => line.productId === p.id)
       ? ls
-      : [productToLine(p), ...ls]);
+      : [nextLine, ...ls]);
     setAiPendingLines((rows) => rows.filter((row) => row.sku !== p.sku && row.label !== p.name));
     // Keep the query and result popover open so users can add several products
     // from one search. Selected products are excluded by the catalog query.
@@ -437,12 +450,20 @@ export function PurchaseForm({
       ? { ...line, unitCost: purchaseUnitCostFromTotal(line, desiredTotal) }
       : line));
   }
-  /** Đổi đơn vị tính: cập nhật hệ số + giá nhập theo đơn vị mới (= giá vốn gốc × hệ số). */
+  /** Đổi đơn vị nhưng giữ nguyên số lượng quy đổi và thành tiền của dòng. */
   function changeUnit(id: string, unitName: string) {
     setLines((ls) => ls.map((l) => {
       if (l.productId !== id) return l;
       const mult = unitName === l.baseUnit ? 1 : (l.units.find((u) => u.unitName === unitName)?.multiplier ?? 1);
-      return { ...l, unitName, multiplier: mult, unitCost: Math.round(l.baseCost * mult) };
+      if (mult === l.multiplier) return { ...l, unitName };
+      const oldMultiplier = l.multiplier > 0 ? l.multiplier : 1;
+      return {
+        ...l,
+        unitName,
+        multiplier: mult,
+        quantity: Math.round((l.quantity * oldMultiplier / mult) * 10_000) / 10_000,
+        unitCost: Math.round((l.unitCost / oldMultiplier) * mult),
+      };
     }));
   }
 
@@ -547,7 +568,51 @@ export function PurchaseForm({
                   <ProductSearchResultLayout
                     selected={selected}
                     leading={<ProductSearchThumbnail product={product} />}
-                    summary={<><div className="text-sm font-semibold">{productDisplayName(product)}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {product.baseUnit}</div></>}
+                    summary={(() => {
+                      const line = lines.find((item) => item.productId === product.id);
+                      return (
+                        <>
+                          <div className="text-sm font-semibold">{productDisplayName(product)}</div>
+                          <div className="font-mono text-xs text-slate-400">{product.sku} · {line?.unitName ?? product.baseUnit}</div>
+                          {product.units.length > 0 && (
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <span className="text-[11px] font-medium text-slate-500">{t("purchases.otherUnits")}:</span>
+                              {product.units.map((unit, index) => {
+                                const multiplier = Number(unit.multiplier) || 1;
+                                const label = `${unit.unitName} ×${multiplier}`;
+                                const active = line?.unitName === unit.unitName;
+                                const selectUnitLabel = t("purchases.usePurchaseUnit", {
+                                  product: productDisplayName(product),
+                                  unit: label,
+                                });
+                                return (
+                                  <button
+                                    key={`${unit.unitName}-${multiplier}-${index}`}
+                                    type="button"
+                                    aria-label={selectUnitLabel}
+                                    aria-pressed={active}
+                                    title={selectUnitLabel}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      if (line) changeUnit(product.id, unit.unitName);
+                                      else addProduct(catalogItemToPurchaseProduct(product), { unitName: unit.unitName, multiplier });
+                                    }}
+                                    className={cn(
+                                      "min-h-8 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                                      active
+                                        ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
+                                        : "border-border bg-surface text-slate-600 hover:border-primary-400 hover:text-primary-700 dark:text-slate-300",
+                                    )}
+                                  >
+                                    {label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                     controls={selected ? (
                       <div onClick={(event) => event.stopPropagation()}>
                         <QuantityInput
@@ -645,6 +710,7 @@ export function PurchaseForm({
                             value={l.unitName}
                             onChange={(event) => changeUnit(l.productId, event.target.value)}
                             className="h-11"
+                            menuMinWidth={140}
                             options={[
                               { value: l.baseUnit, label: l.baseUnit },
                               ...l.units.map((unit) => ({ value: unit.unitName, label: `${unit.unitName} (×${unit.multiplier})` })),
@@ -694,7 +760,7 @@ export function PurchaseForm({
                 </div>
                 <div className="hidden lg:block">
                   <table className="w-full min-w-[760px] text-sm">
-                <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800/80">
+                <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-800/80">
                   <tr className="text-left text-xs uppercase text-slate-500">
                     <th className="px-3 py-2.5 font-semibold">{t("orders.cols.product")}</th>
                     <th className="px-2 py-2.5 font-semibold w-28">{t("products.fields.baseUnit")}</th>
@@ -713,9 +779,11 @@ export function PurchaseForm({
                       </td>
                       <td className="px-2 py-2">
                         <Select
+                          aria-label={`${t("products.fields.baseUnit")} · ${l.name}`}
                           size="sm"
                           value={l.unitName}
                           onChange={(e) => changeUnit(l.productId, e.target.value)}
+                          menuMinWidth={140}
                           options={[
                             { value: l.baseUnit, label: l.baseUnit },
                             ...l.units.map((u) => ({ value: u.unitName, label: `${u.unitName} (×${u.multiplier})` })),

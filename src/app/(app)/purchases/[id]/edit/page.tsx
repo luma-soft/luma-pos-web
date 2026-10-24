@@ -44,6 +44,8 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
         note: purchase.note ?? "",
         items: purchase.items.map((i) => ({
           productId: i.productId,
+          unitName: i.unitName,
+          unitMultiplier: Number(i.unitMultiplier),
           quantity: Number(i.quantity),
           unitCost: Number(i.unitCost),
           discount: Number(i.discount),

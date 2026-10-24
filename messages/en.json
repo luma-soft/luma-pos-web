@@ -3446,6 +3446,8 @@
     "addProduct": "Add product to receipt",
     "pickProduct": "— Pick a product —",
     "unitLabel": "purchases",
+    "otherUnits": "Other units",
+    "usePurchaseUnit": "Use {unit} for {product}",
     "noSuppliers": "No suppliers — create one in Suppliers",
     "payFull": "Pay supplier in full",
     "amountPaid": "Paid to supplier",

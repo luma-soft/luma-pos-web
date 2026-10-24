@@ -78,6 +78,8 @@ export default async function NewPurchasePage({ searchParams }: Props) {
           note: source.note ?? "",
           items: source.items.map((i) => ({
             productId: i.productId,
+            unitName: i.unitName,
+            unitMultiplier: Number(i.unitMultiplier),
             quantity: Number(i.quantity),
             unitCost: Number(i.unitCost),
             discount: Number(i.discount),
