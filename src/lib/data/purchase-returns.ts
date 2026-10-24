@@ -6,6 +6,7 @@ import {
   profiles,
   purchaseReturnItems,
   purchaseReturns,
+  purchaseOrderItems,
   suppliers,
   stockLevels,
   warehouses,
@@ -72,6 +73,7 @@ export async function getPurchaseReturns(storeId: string, filters: { q?: string;
         .select({
           id: purchaseReturnItems.id,
           purchaseReturnId: purchaseReturnItems.purchaseReturnId,
+          purchaseOrderItemId: purchaseReturnItems.purchaseOrderItemId,
           productId: purchaseReturnItems.productId,
           productName: purchaseReturnItems.productName,
           productVariantName: products.variantName, productSpecs: products.specs,
@@ -80,11 +82,17 @@ export async function getPurchaseReturns(storeId: string, filters: { q?: string;
           unitMultiplier: purchaseReturnItems.unitMultiplier,
           quantity: purchaseReturnItems.quantity,
           unitCost: purchaseReturnItems.unitCost,
+          sourceQuantity: purchaseOrderItems.quantity,
+          sourceUnitMultiplier: purchaseOrderItems.unitMultiplier,
+          sourceDiscount: purchaseOrderItems.discount,
+          sourceDiscountMode: purchaseOrderItems.discountMode,
+          sourceDiscountInput: purchaseOrderItems.discountInput,
           returnUnitCost: purchaseReturnItems.returnUnitCost,
           total: purchaseReturnItems.total,
         })
         .from(purchaseReturnItems)
         .innerJoin(products, eq(purchaseReturnItems.productId, products.id))
+        .leftJoin(purchaseOrderItems, and(eq(purchaseOrderItems.id, purchaseReturnItems.purchaseOrderItemId), eq(purchaseOrderItems.storeId, storeId)))
         .where(and(
           eq(purchaseReturnItems.storeId, storeId),
           inArray(purchaseReturnItems.purchaseReturnId, ids),
@@ -146,6 +154,7 @@ export async function getPurchaseReturn(storeId: string, id: string) {
     .select({
       id: purchaseReturnItems.id,
       purchaseReturnId: purchaseReturnItems.purchaseReturnId,
+      purchaseOrderItemId: purchaseReturnItems.purchaseOrderItemId,
       productId: purchaseReturnItems.productId,
       productName: purchaseReturnItems.productName,
           productVariantName: products.variantName, productSpecs: products.specs,
@@ -154,11 +163,17 @@ export async function getPurchaseReturn(storeId: string, id: string) {
           unitMultiplier: purchaseReturnItems.unitMultiplier,
       quantity: purchaseReturnItems.quantity,
       unitCost: purchaseReturnItems.unitCost,
+      sourceQuantity: purchaseOrderItems.quantity,
+      sourceUnitMultiplier: purchaseOrderItems.unitMultiplier,
+      sourceDiscount: purchaseOrderItems.discount,
+      sourceDiscountMode: purchaseOrderItems.discountMode,
+      sourceDiscountInput: purchaseOrderItems.discountInput,
       returnUnitCost: purchaseReturnItems.returnUnitCost,
       total: purchaseReturnItems.total,
     })
     .from(purchaseReturnItems)
     .leftJoin(products, and(eq(purchaseReturnItems.productId, products.id), eq(products.storeId, storeId)))
+    .leftJoin(purchaseOrderItems, and(eq(purchaseOrderItems.id, purchaseReturnItems.purchaseOrderItemId), eq(purchaseOrderItems.storeId, storeId)))
     .where(and(
       eq(purchaseReturnItems.purchaseReturnId, id),
       eq(purchaseReturnItems.storeId, storeId),

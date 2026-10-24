@@ -26,6 +26,26 @@ function settlementClass(status: string) {
   return "text-slate-400";
 }
 
+function purchaseReturnLinePricing(item: PurchaseReturnRow["items"][number]) {
+  const unitCost = Number(item.unitCost);
+  const quantity = Number(item.quantity);
+  const sourceQuantity = Number(item.sourceQuantity ?? 0);
+  const sourceMultiplier = Number(item.sourceUnitMultiplier) || 1;
+  const returnMultiplier = Number(item.unitMultiplier) || 1;
+  const discountPerUnit = !item.purchaseOrderItemId || sourceQuantity <= 0
+    ? 0
+    : item.sourceDiscountMode === "pct" && item.sourceDiscountInput != null
+      ? unitCost * Number(item.sourceDiscountInput) / 100
+      : Number(item.sourceDiscount ?? 0) / sourceQuantity * returnMultiplier / sourceMultiplier;
+  return {
+    discount: Math.max(0, Math.min(unitCost, discountPerUnit)) * quantity,
+    unitCostAfterDiscount: Math.max(0, unitCost - discountPerUnit),
+    discountPercentage: item.purchaseOrderItemId && item.sourceDiscountMode === "pct" && item.sourceDiscountInput != null
+      ? Number(item.sourceDiscountInput)
+      : null,
+  };
+}
+
 export function PurchaseReturnsTable({ rows, capabilities }: { rows: PurchaseReturnRow[]; capabilities?: { canEdit: boolean; canDelete: boolean } }) {
   const t = useTranslations();
   const columns: DataTableColumn<PurchaseReturnRow>[] = [
@@ -100,14 +120,16 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
           {row.note && <Info label={t("purchases.detail.note")} value={row.note} />}
         </div>
         <div className="divide-y divide-border-soft overflow-hidden rounded-lg border border-border lg:hidden" data-mobile-audit="inventory-purchase-return-items">
-          {row.items.map((item) => (
+          {row.items.map((item) => {
+            const pricing = purchaseReturnLinePricing(item);
+            return (
             <article key={item.id} className="space-y-2 p-3 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <Link
                   href={Routes.product(item.productId)}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex min-h-11 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11"
+                  className="inline-flex min-h-11 min-w-11 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 >
                   {productLineDisplayName(item)}
                 </Link>
@@ -116,39 +138,49 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
               <div className="text-xs text-slate-500">{item.sku} · {formatNumber(Number(item.quantity))} {item.unitName}</div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <span>{t("purchaseReturns.cols.unitCost")}: <b className="tabular-nums">{formatCurrency(Number(item.unitCost))}</b></span>
+                <span className="text-right">{t("orders.cols.discount")}: <b className="tabular-nums">{pricing.discount > 0 ? <>{pricing.discountPercentage != null && `${formatNumber(pricing.discountPercentage)}% · `}{formatCurrency(pricing.discount)}</> : "—"}</b></span>
+                <span>{t("orders.cols.unitPriceAfterDiscount")}: <b className="tabular-nums">{formatCurrency(pricing.unitCostAfterDiscount)}</b></span>
                 <span className="text-right">{t("purchaseReturns.cols.returnUnitCost")}: <b className="tabular-nums">{formatCurrency(Number(item.returnUnitCost))}</b></span>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
         <div className="hidden min-w-0 overflow-x-auto rounded-lg border border-border lg:block">
-          <table className="w-full min-w-[760px] text-sm [&_th]:whitespace-nowrap [&_td:not(:nth-child(2))]:whitespace-nowrap">
+          <table className="w-full min-w-[980px] text-sm [&_th]:whitespace-nowrap [&_td:not(:nth-child(2))]:whitespace-nowrap">
             <thead>
               <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                 <th className="px-3 py-2.5 font-semibold">{t("products.fields.sku")}</th>
                 <th className="px-3 py-2.5 font-semibold">{t("orders.cols.product")}</th>
                 <th className="px-3 py-2.5 font-semibold text-right">{t("purchaseReturns.cols.qty")}</th>
                 <th className="px-3 py-2.5 font-semibold text-right">{t("purchaseReturns.cols.unitCost")}</th>
+                <th className="px-3 py-2.5 font-semibold text-right">{t("orders.cols.discount")}</th>
+                <th className="px-3 py-2.5 font-semibold text-right">{t("orders.cols.unitPriceAfterDiscount")}</th>
                 <th className="px-3 py-2.5 font-semibold text-right">{t("purchaseReturns.cols.returnUnitCost")}</th>
                 <th className="px-3 py-2.5 font-semibold text-right">{t("orders.cols.lineTotal")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-soft">
-              {row.items.map((item) => (
-                <tr key={item.id}>
-                  <td className="px-3 py-3">
-                    <Link href={Routes.product(item.productId)} target="_blank" rel="noreferrer" className="font-medium text-primary-600 hover:underline">{item.sku}</Link>
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="min-w-40 break-words font-medium">{productLineDisplayName(item)}</div>
-                    <div className="text-xs text-slate-400">{item.unitName}</div>
-                  </td>
-                  <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.unitCost))}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.returnUnitCost))}</td>
-                  <td className="px-3 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(item.total))}</td>
-                </tr>
-              ))}
+              {row.items.map((item) => {
+                const pricing = purchaseReturnLinePricing(item);
+                return (
+                  <tr key={item.id}>
+                    <td className="px-3 py-3">
+                      <Link href={Routes.product(item.productId)} target="_blank" rel="noreferrer" className="font-medium text-primary-600 hover:underline">{item.sku}</Link>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="min-w-40 break-words font-medium">{productLineDisplayName(item)}</div>
+                      <div className="text-xs text-slate-400">{item.unitName}</div>
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.unitCost))}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-slate-500">{pricing.discount > 0 ? <>{pricing.discountPercentage != null && <div>{formatNumber(pricing.discountPercentage)}%</div>}{formatCurrency(pricing.discount)}</> : "—"}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(pricing.unitCostAfterDiscount)}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.returnUnitCost))}</td>
+                    <td className="px-3 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(item.total))}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

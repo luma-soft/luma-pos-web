@@ -3129,6 +3129,7 @@
       "unit": "Unit",
       "qty": "Qty",
       "unitPrice": "Unit price",
+      "unitPriceAfterDiscount": "Unit price after discount",
       "lineTotal": "Line total",
       "discount": "Discount"
     },

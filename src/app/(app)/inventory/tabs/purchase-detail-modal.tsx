@@ -154,14 +154,15 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
                 <div className="text-xs text-slate-500">{item.sku} · {formatNumber(Number(item.quantity))} {item.baseUnit}</div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <span>{t("purchases.cols.unitCost")}: <b className="tabular-nums">{formatCurrency(Number(item.unitCost))}</b></span>
-                  <span className="text-right">{t("orders.cols.discount")}: <b className="tabular-nums">{discount > 0 ? formatCurrency(discount) : "—"}</b></span>
+                  <span className="text-right">{t("orders.cols.discount")}: <b className="tabular-nums">{discount > 0 ? <>{item.discountMode === "pct" && item.discountInput != null && `${formatNumber(Number(item.discountInput))}% · `}{formatCurrency(discount)}</> : "—"}</b></span>
+                  <span>{t("orders.cols.unitPriceAfterDiscount")}: <b className="tabular-nums">{formatCurrency(Number(item.quantity) > 0 ? Number(item.total) / Number(item.quantity) : Number(item.unitCost))}</b></span>
                 </div>
               </article>
             );
           })}
         </div>
         <div className="hidden min-h-0 flex-1 overflow-auto overscroll-contain rounded-lg border border-border lg:block">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[860px] text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                 <th className="px-3 py-2.5 font-semibold">{t("products.fields.sku")}</th>
@@ -169,6 +170,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
                 <th className="px-3 py-2.5 font-semibold text-right">{t("purchases.cols.qty")}</th>
                 <th className="px-3 py-2.5 font-semibold text-right">{t("purchases.cols.unitCost")}</th>
                 <th className="px-3 py-2.5 font-semibold text-right">{t("orders.cols.discount")}</th>
+                <th className="px-3 py-2.5 font-semibold text-right">{t("orders.cols.unitPriceAfterDiscount")}</th>
                 <th className="px-3 py-2.5 font-semibold text-right">{t("orders.cols.lineTotal")}</th>
               </tr>
             </thead>
@@ -189,8 +191,9 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
                     <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.unitCost))}</td>
                     <td className="px-3 py-3 text-right tabular-nums text-slate-500">
-                      {discount > 0 ? formatCurrency(discount) : "—"}
+                      {discount > 0 ? <>{item.discountMode === "pct" && item.discountInput != null && <div>{formatNumber(Number(item.discountInput))}%</div>}{formatCurrency(discount)}</> : "—"}
                     </td>
+                    <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.quantity) > 0 ? Number(item.total) / Number(item.quantity) : Number(item.unitCost))}</td>
                     <td className="px-3 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(item.total))}</td>
                   </tr>
                 );

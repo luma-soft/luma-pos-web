@@ -39,6 +39,7 @@ import { expandProductSearchUnitResults, rankProductSearchUnitResults } from "@/
 
 type Line = {
   key: string;
+  purchaseOrderItemId?: string;
   unitMultiplier: number;
   productId: string;
   sku: string;
@@ -83,6 +84,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
     const total = Number(raw.total ?? quantity * unitCost);
     return {
       key: String(raw.id ?? productId), productId, sku: String(raw.sku ?? ""), name: String(raw.productName ?? raw.name ?? ""),
+      purchaseOrderItemId: raw.purchaseOrderItemId ? String(raw.purchaseOrderItemId) : !initial && initialPurchase && raw.id ? String(raw.id) : undefined,
       unitName: String(raw.unitName ?? raw.baseUnit ?? "Cái"), unitMultiplier: Number(raw.unitMultiplier) || 1,
       quantity, unitCost,
       returnUnitCost: quantity > 0 ? total / quantity : Number(raw.returnUnitCost ?? unitCost),
@@ -220,6 +222,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
       debtAmount,
       note: note || undefined,
       items: lines.map((line) => ({
+        purchaseOrderItemId: line.purchaseOrderItemId ?? null,
         productId: line.productId,
         unitName: line.unitName,
         unitMultiplier: line.unitMultiplier,

@@ -10,8 +10,25 @@ import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { ReturnActions } from "./return-actions";
 import { productDisplayName } from "@/lib/products/variant-presentation";
+import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 
 type ReturnDetail = NonNullable<Awaited<ReturnType<typeof getReturn>>>;
+
+function returnLinePricing(item: ReturnDetail["items"][number]) {
+  if (item.orderItemId == null || item.sourceQuantity == null || item.sourceUnitPrice == null || item.sourceTotal == null) {
+    const unitPrice = Number(item.unitPrice);
+    return { unitPrice, netUnitPrice: unitPrice, discount: 0, lineDiscountMode: "vnd" as const, lineDiscountValue: 0 };
+  }
+
+  return readOrderLinePricing({
+    quantity: item.sourceQuantity,
+    unitPrice: item.sourceUnitPrice,
+    total: item.sourceTotal,
+    preDiscountUnitPrice: item.sourcePreDiscountUnitPrice,
+    lineDiscountMode: item.sourceLineDiscountMode,
+    lineDiscountValue: item.sourceLineDiscountValue,
+  });
+}
 
 export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnDetail; compact?: boolean }) {
   const t = await getTranslations();
@@ -48,44 +65,60 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
         <div className="min-w-0 space-y-4">
           <div className="overflow-hidden rounded-lg border border-border">
             <div className="divide-y divide-border-soft lg:hidden" data-mobile-audit="sales-return-items">
-              {ret.items.map((item) => (
-                <div key={item.id} className="space-y-2 p-3 text-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="break-words font-semibold">{productDisplayName({ name: item.productName, variantName: item.productVariantName, specs: item.productSpecs })}</div>
-                      <div className="mt-0.5 text-xs text-slate-500">{formatNumber(Number(item.quantity))} {item.unitName} × {formatCurrency(Number(item.unitPrice))}</div>
+              {ret.items.map((item) => {
+                const pricing = returnLinePricing(item);
+                const discount = pricing.lineDiscount * Number(item.quantity);
+                return (
+                  <div key={item.id} className="space-y-2 p-3 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="break-words font-semibold">{productDisplayName({ name: item.productName, variantName: item.productVariantName, specs: item.productSpecs })}</div>
+                        <div className="mt-0.5 text-xs text-slate-500">{formatNumber(Number(item.quantity))} {item.unitName} × {formatCurrency(pricing.unitPrice)}</div>
+                      </div>
+                      <div className="shrink-0 font-semibold tabular-nums text-er">- {formatCurrency(Number(item.total))}</div>
                     </div>
-                    <div className="shrink-0 font-semibold tabular-nums text-er">- {formatCurrency(Number(item.total))}</div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+                      <span>{t("orders.cols.discount")}: <b className="tabular-nums">{discount > 0 ? <>{pricing.lineDiscountMode === "pct" && `${formatNumber(pricing.lineDiscountValue)}% · `}{formatCurrency(discount)}</> : "—"}</b></span>
+                      <span className="text-right">{t("orders.cols.unitPriceAfterDiscount")}: <b className="tabular-nums">{formatCurrency(pricing.netUnitPrice)}</b></span>
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {t("returns.cols.restock")}: {item.restock ? t("returns.restockYes") : t("returns.restockNo")}
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500">
-                    {t("returns.cols.restock")}: {item.restock ? t("returns.restockYes") : t("returns.restockNo")}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-[760px] text-sm">
+              <table className="w-full min-w-[980px] text-sm">
                 <thead>
                   <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
                     <th className="px-3 py-3">{t("orders.cols.product")}</th>
                     <th className="px-3 py-3">{t("orders.cols.unit")}</th>
                     <th className="px-3 py-3 text-right">{t("orders.cols.qty")}</th>
                     <th className="px-3 py-3 text-right">{t("orders.cols.unitPrice")}</th>
+                    <th className="px-3 py-3 text-right">{t("orders.cols.discount")}</th>
+                    <th className="px-3 py-3 text-right">{t("orders.cols.unitPriceAfterDiscount")}</th>
                     <th className="px-3 py-3 text-right">{t("returns.cols.refund")}</th>
                     <th className="px-3 py-3">{t("returns.cols.restock")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-soft">
-                  {ret.items.map((item) => (
-                    <tr key={item.id}>
-                      <td className="px-3 py-3 font-medium">{productDisplayName({ name: item.productName, variantName: item.productVariantName, specs: item.productSpecs })}</td>
-                      <td className="px-3 py-3 text-slate-500">{item.unitName}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.unitPrice))}</td>
-                      <td className="px-3 py-3 text-right tabular-nums font-semibold text-er">- {formatCurrency(Number(item.total))}</td>
-                      <td className="px-3 py-3 text-slate-500">{item.restock ? t("returns.restockYes") : t("returns.restockNo")}</td>
-                    </tr>
-                  ))}
+                  {ret.items.map((item) => {
+                    const pricing = returnLinePricing(item);
+                    const discount = pricing.lineDiscount * Number(item.quantity);
+                    return (
+                      <tr key={item.id}>
+                        <td className="px-3 py-3 font-medium">{productDisplayName({ name: item.productName, variantName: item.productVariantName, specs: item.productSpecs })}</td>
+                        <td className="px-3 py-3 text-slate-500">{item.unitName}</td>
+                        <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
+                        <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(pricing.unitPrice)}</td>
+                        <td className="px-3 py-3 text-right tabular-nums text-slate-500">{discount > 0 ? <>{pricing.lineDiscountMode === "pct" && <div>{formatNumber(pricing.lineDiscountValue)}%</div>}{formatCurrency(discount)}</> : "—"}</td>
+                        <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(pricing.netUnitPrice)}</td>
+                        <td className="px-3 py-3 text-right tabular-nums font-semibold text-er">- {formatCurrency(Number(item.total))}</td>
+                        <td className="px-3 py-3 text-slate-500">{item.restock ? t("returns.restockYes") : t("returns.restockNo")}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -138,13 +138,14 @@ export async function OrderDetailPanel({
                     <span>{formatNumber(Number(item.quantity))} {item.unitName}</span>
                     <span>× {formatCurrency(pricing.unitPrice)}</span>
                     {pricing.discount > 0 && <span>{t("orders.cols.discount")}: {pricing.lineDiscountMode === "pct" && `${formatNumber(pricing.lineDiscountValue)}% · `}{formatCurrency(pricing.discount)}</span>}
+                    <span>{t("orders.cols.unitPriceAfterDiscount")}: {formatCurrency(pricing.netUnitPrice)}</span>
                   </div>
                 </div>
                 );
               })}
             </div>
             <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-[760px] text-sm">
+              <table className="w-full min-w-[860px] text-sm">
                 <thead>
                   <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
                     <th className="px-3 py-3">{t("orders.cols.product")}</th>
@@ -152,6 +153,7 @@ export async function OrderDetailPanel({
                     <th className="px-3 py-3 text-right">{t("orders.cols.qty")}</th>
                     <th className="px-3 py-3 text-right">{t("orders.cols.unitPrice")}</th>
                     <th className="px-3 py-3 text-right">{t("orders.cols.discount")}</th>
+                    <th className="px-3 py-3 text-right">{t("orders.cols.unitPriceAfterDiscount")}</th>
                     <th className="px-3 py-3 text-right">{t("orders.cols.lineTotal")}</th>
                   </tr>
                 </thead>
@@ -173,6 +175,7 @@ export async function OrderDetailPanel({
                       <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(pricing.unitPrice)}</td>
                       <td className="px-3 py-3 text-right tabular-nums text-slate-500">{pricing.discount > 0 ? <>{pricing.lineDiscountMode === "pct" && <div>{formatNumber(pricing.lineDiscountValue)}%</div>}{formatCurrency(pricing.discount)}</> : "—"}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(pricing.netUnitPrice)}</td>
                       <td className="px-3 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(item.total))}</td>
                     </tr>
                     );

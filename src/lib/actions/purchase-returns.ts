@@ -8,6 +8,7 @@ import {
   notificationEvents,
   warehouses,
   purchaseOrders,
+  purchaseOrderItems,
   products,
   purchaseReturnItems,
   purchaseReturns,
@@ -89,6 +90,22 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
         const [purchase] = await tx.select({ id: purchaseOrders.id }).from(purchaseOrders).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, v.purchaseOrderId), eq(purchaseOrders.supplierId, v.supplierId))).limit(1);
         if (!purchase) throw new Error("PRODUCT_NOT_FOUND");
       }
+      const linkedPurchaseItemIds = [...new Set(v.items.map((item) => item.purchaseOrderItemId).filter((id): id is string => Boolean(id)))];
+      if (linkedPurchaseItemIds.length > 0) {
+        if (!v.purchaseOrderId) throw new Error("PRODUCT_NOT_FOUND");
+        const sourceItems = await tx.select({ id: purchaseOrderItems.id, productId: purchaseOrderItems.productId })
+          .from(purchaseOrderItems)
+          .where(and(
+            eq(purchaseOrderItems.storeId, gate.storeId),
+            eq(purchaseOrderItems.purchaseOrderId, v.purchaseOrderId),
+            inArray(purchaseOrderItems.id, linkedPurchaseItemIds),
+          ));
+        const sourceById = new Map(sourceItems.map((item) => [item.id, item]));
+        if (sourceById.size !== linkedPurchaseItemIds.length || v.items.some((item) => {
+          const source = item.purchaseOrderItemId ? sourceById.get(item.purchaseOrderItemId) : null;
+          return item.purchaseOrderItemId != null && source?.productId !== item.productId;
+        })) throw new Error("PRODUCT_NOT_FOUND");
+      }
       const previous = id ? await reversePurchaseReturn(tx, gate.storeId, id, profileId, currentShift?.id ?? null) : null;
       const originalItems = previous ? await tx.select().from(purchaseReturnItems).where(and(eq(purchaseReturnItems.storeId, gate.storeId), eq(purchaseReturnItems.purchaseReturnId, previous.id))) : [];
       const originalStock = new Map<string, number>();
@@ -154,7 +171,7 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
         return {
           storeId: gate.storeId,
           purchaseReturnId: ret.id,
-          purchaseOrderItemId: null,
+          purchaseOrderItemId: item.purchaseOrderItemId ?? null,
           productId: item.productId,
           productName: product.name,
           sku: product.sku,
