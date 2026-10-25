@@ -17,7 +17,7 @@ type ReturnDetail = NonNullable<Awaited<ReturnType<typeof getReturn>>>;
 function returnLinePricing(item: ReturnDetail["items"][number]) {
   if (item.orderItemId == null || item.sourceQuantity == null || item.sourceUnitPrice == null || item.sourceTotal == null) {
     const unitPrice = Number(item.unitPrice);
-    return { unitPrice, netUnitPrice: unitPrice, discount: 0, lineDiscountMode: "vnd" as const, lineDiscountValue: 0 };
+    return { unitPrice, netUnitPrice: unitPrice, lineDiscount: 0, discount: 0, lineDiscountMode: "vnd" as const, lineDiscountValue: 0 };
   }
 
   return readOrderLinePricing({

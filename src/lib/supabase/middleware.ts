@@ -41,6 +41,8 @@ export async function updateSession(request: NextRequest) {
     path === Routes.CameraQuote ||
     path.startsWith(`${Routes.CameraQuote}/`) ||
     path === "/camera-price-list" ||
+    path === "/privacy" ||
+    path === "/support" ||
     path === Routes.HunonicPriceList ||
     path === Routes.RangDongSmartPriceList;
 

@@ -18,6 +18,14 @@ import type { getPurchase, getPurchases } from "@/lib/data/inventory";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 
 export type PurchaseRow = Awaited<ReturnType<typeof getPurchases>>["rows"][number] | NonNullable<Awaited<ReturnType<typeof getPurchase>>>;
+type PurchaseItem = PurchaseRow["items"][number];
+
+function purchaseItemDiscountDetails(item: PurchaseItem) {
+  return {
+    mode: "discountMode" in item ? item.discountMode : undefined,
+    input: "discountInput" in item ? item.discountInput : null,
+  };
+}
 
 function statusClass(status: string) {
   if (status === "cancelled") return "bg-er-soft text-er";
@@ -138,6 +146,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
         <div className="min-h-0 flex-1 divide-y divide-border-soft overflow-auto overscroll-contain rounded-lg border border-border lg:hidden" data-mobile-audit="inventory-purchase-items">
           {purchase.items.map((item) => {
             const discount = Number(item.discount);
+            const discountDetails = purchaseItemDiscountDetails(item);
             return (
               <article key={item.id} className="space-y-2 p-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
@@ -154,7 +163,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
                 <div className="text-xs text-slate-500">{item.sku} · {formatNumber(Number(item.quantity))} {item.baseUnit}</div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <span>{t("purchases.cols.unitCost")}: <b className="tabular-nums">{formatCurrency(Number(item.unitCost))}</b></span>
-                  <span className="text-right">{t("orders.cols.discount")}: <b className="tabular-nums">{discount > 0 ? <>{item.discountMode === "pct" && item.discountInput != null && `${formatNumber(Number(item.discountInput))}% · `}{formatCurrency(discount)}</> : "—"}</b></span>
+                  <span className="text-right">{t("orders.cols.discount")}: <b className="tabular-nums">{discount > 0 ? <>{discountDetails.mode === "pct" && discountDetails.input != null && `${formatNumber(Number(discountDetails.input))}% · `}{formatCurrency(discount)}</> : "—"}</b></span>
                   <span>{t("orders.cols.unitPriceAfterDiscount")}: <b className="tabular-nums">{formatCurrency(Number(item.quantity) > 0 ? Number(item.total) / Number(item.quantity) : Number(item.unitCost))}</b></span>
                 </div>
               </article>
@@ -177,6 +186,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
             <tbody className="divide-y divide-border-soft">
               {purchase.items.map((item) => {
                 const discount = Number(item.discount);
+                const discountDetails = purchaseItemDiscountDetails(item);
                 return (
                   <tr key={item.id}>
                     <td className="px-3 py-3">
@@ -191,7 +201,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
                     <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.unitCost))}</td>
                     <td className="px-3 py-3 text-right tabular-nums text-slate-500">
-                      {discount > 0 ? <>{item.discountMode === "pct" && item.discountInput != null && <div>{formatNumber(Number(item.discountInput))}%</div>}{formatCurrency(discount)}</> : "—"}
+                      {discount > 0 ? <>{discountDetails.mode === "pct" && discountDetails.input != null && <div>{formatNumber(Number(discountDetails.input))}%</div>}{formatCurrency(discount)}</> : "—"}
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.quantity) > 0 ? Number(item.total) / Number(item.quantity) : Number(item.unitCost))}</td>
                     <td className="px-3 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(item.total))}</td>
