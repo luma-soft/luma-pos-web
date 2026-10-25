@@ -6,10 +6,13 @@ export async function GET(request: Request) {
   const gate = await requireMobileStockReadAccess();
   if (!gate.ok) return mobileGate(gate)!;
   const page = Math.max(1, Math.floor(numberParam(request, "page", 1)));
+  const status = searchParam(request, "status");
+  const excludeCancelled = searchParam(request, "excludeCancelled") === "1";
   return mobileOk(await getPurchases(gate.storeId, {
-    q: searchParam(request, "q"), status: searchParam(request, "status"),
+    q: searchParam(request, "q"), status,
     supplierId: searchParam(request, "supplierId"),
     from: searchParam(request, "from"), to: searchParam(request, "to"),
     debtOnly: searchParam(request, "debtOnly") === "1", page, pageSize: 30,
+    ...(excludeCancelled ? { excludeCancelled: true } : {}),
   }));
 }

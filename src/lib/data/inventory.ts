@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
   categories, internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, stockMovements, suppliers, warehouses,
@@ -197,7 +197,7 @@ export async function getInternalUseCostSummary(storeId: string) {
   };
 }
 
-export async function getPurchases(storeId: string, filters: { q?: string; status?: string; supplierId?: string; warehouseId?: string; from?: string; to?: string; debtOnly?: boolean; page?: number; pageSize?: number } = {}) {
+export async function getPurchases(storeId: string, filters: { q?: string; status?: string; supplierId?: string; warehouseId?: string; from?: string; to?: string; debtOnly?: boolean; excludeCancelled?: boolean; page?: number; pageSize?: number } = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize);
   const conds: SQL[] = [eq(purchaseOrders.storeId, storeId)];
@@ -208,6 +208,9 @@ export async function getPurchases(storeId: string, filters: { q?: string; statu
   }
   if (filters.status && ["received", "returned", "cancelled", "draft"].includes(filters.status)) {
     conds.push(eq(purchaseOrders.status, filters.status));
+  }
+  if (filters.excludeCancelled && filters.status !== "cancelled") {
+    conds.push(ne(purchaseOrders.status, "cancelled"));
   }
   if (filters.supplierId) conds.push(eq(purchaseOrders.supplierId, filters.supplierId));
   if (filters.warehouseId) conds.push(eq(purchaseOrders.warehouseId, filters.warehouseId));
