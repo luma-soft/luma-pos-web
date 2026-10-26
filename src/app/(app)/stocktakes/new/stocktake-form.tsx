@@ -212,6 +212,7 @@ export function StocktakeForm({
             onChange={(e) => router.push(`${Routes.StocktakeNew}?wh=${e.target.value}`)}
             disabled={lines.length > 0}
             options={warehouses.map((w) => ({ value: w.id, label: w.name }))}
+            rootClassName="w-full"
             className="font-medium"
             title={lines.length > 0 ? t("stocktakes.warehouseLocked") : undefined}
           />
@@ -223,6 +224,7 @@ export function StocktakeForm({
           onChange={(e) => router.push(`${Routes.StocktakeNew}?wh=${e.target.value}`)}
           disabled={lines.length > 0}
           options={warehouses.map((w) => ({ value: w.id, label: w.name }))}
+          rootClassName="w-full"
           className="h-11 font-medium"
           title={lines.length > 0 ? t("stocktakes.warehouseLocked") : undefined}
         />
