@@ -112,7 +112,7 @@ export function StocktakesTable({ rows, fillHeight = true, canCancelBalanced = f
       detailFooter={(row) => <StocktakeDetailActions id={row.id} status={row.status} canCancelBalanced={canCancelBalanced} />}
       detailTitle={(row) => row.code}
       detailSubtitle={(row) => `${formatDate(row.createdAt)} · ${t(`stocktakes.status.${row.status}` as never)}`}
-      detailPanelClassName="h-[min(88dvh,780px)] w-[min(96vw,960px)] sm:max-w-none"
+      detailPanelClassName="h-[min(88dvh,780px)] w-[min(96vw,1200px)] sm:max-w-none"
     />
   );
 }
