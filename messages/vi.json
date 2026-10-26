@@ -5487,6 +5487,7 @@
   "stocktakes": {
     "title": "Kiểm kho",
     "createNew": "Kiểm kho",
+    "viewDetails": "Xem chi tiết phiếu",
     "empty": "Chưa có phiếu kiểm kho nào",
     "emptyHint": "Tạo phiếu kiểm để đếm thực tế và cân bằng kho.",
     "cols": {
@@ -5503,6 +5504,13 @@
       "draft": "Phiếu tạm",
       "balanced": "Đã cân bằng",
       "cancelled": "Đã hủy"
+    },
+    "detail": {
+      "loading": "Đang tải chi tiết phiếu kiểm kho",
+      "loadError": "Không tải được chi tiết phiếu kiểm kho.",
+      "retry": "Thử lại",
+      "linesTitle": "Sản phẩm trong phiếu",
+      "emptyLines": "Phiếu này chưa có sản phẩm được kiểm."
     },
     "searchPlaceholder": "Tìm SP theo tên / SKU để thêm vào phiếu kiểm…",
     "noLines": "Chưa kiểm sản phẩm nào — tìm và thêm SP ở ô trên.",

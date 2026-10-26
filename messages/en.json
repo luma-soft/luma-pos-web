@@ -5487,6 +5487,7 @@
   "stocktakes": {
     "title": "Stocktake",
     "createNew": "New stocktake",
+    "viewDetails": "View stocktake details",
     "empty": "No stocktakes yet",
     "emptyHint": "Create one to count actual stock and balance inventory.",
     "cols": {
@@ -5503,6 +5504,13 @@
       "draft": "Draft",
       "balanced": "Balanced",
       "cancelled": "Cancelled"
+    },
+    "detail": {
+      "loading": "Loading stocktake details",
+      "loadError": "Could not load stocktake details.",
+      "retry": "Try again",
+      "linesTitle": "Products in this stocktake",
+      "emptyLines": "This stocktake has no counted products."
     },
     "searchPlaceholder": "Search product by name / SKU to add…",
     "noLines": "Nothing counted yet — search above to add products.",
