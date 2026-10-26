@@ -36,7 +36,7 @@ export function StocktakeRowActions({ id, status, canCancelBalanced = false, pro
     if (busy) return;
     const ok = await dialog.confirm({
       description: t(status === "balanced" ? "stocktakes.cancelBalancedConfirm" : "stocktakes.cancelConfirm"),
-      confirmLabel: t("common.cancel"),
+      confirmLabel: t("common.confirm"),
       variant: "destructive",
     });
     if (!ok) return;
