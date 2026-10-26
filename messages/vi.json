@@ -5499,6 +5499,7 @@
     "cols": {
       "code": "Mã kiểm kho",
       "items": "SP kiểm",
+      "productSummary": "Hàng hóa",
       "totalDiff": "Tổng lệch",
       "balancedAt": "Ngày cân bằng",
       "systemQty": "Tồn hệ thống",

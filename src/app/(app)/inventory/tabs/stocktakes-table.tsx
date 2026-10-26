@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronRight } from "lucide-react";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
-import { cn, formatDate, formatNumber } from "@/lib/utils";
+import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { StocktakeRowActions } from "../../stocktakes/stocktake-actions";
 import { StocktakeDetail } from "./stocktake-detail";
 import { StocktakeDetailActions } from "./stocktake-detail-actions";
@@ -20,6 +20,8 @@ export type StocktakeRow = {
   byName: string | null;
   itemCount: number;
   totalDiff: string | number;
+  productSummary: string;
+  netValue: string | number | null;
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -61,7 +63,9 @@ export function StocktakeMobileRow({
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4">
         <Info label={t("stocktakes.cols.items")} value={String(row.itemCount)} />
+        <Info label={t("stocktakes.cols.productSummary")} value={row.productSummary || "—"} />
         <Info label={t("stocktakes.cols.totalDiff")} value={diffText(Number(row.totalDiff))} tone={diffTone(Number(row.totalDiff))} />
+        {row.netValue !== null && <Info label={t("stocktakes.summary.netValue")} value={formatCurrency(Number(row.netValue))} tone={diffTone(Number(row.netValue))} />}
         <Info label={t("stocktakes.cols.balancedAt")} value={row.balancedAt ? formatDate(row.balancedAt) : "—"} />
         <Info label={t("internalUse.cols.by")} value={row.byName ?? "—"} />
       </dl>
@@ -75,13 +79,25 @@ export function StocktakeMobileRow({
   );
 }
 
-export function StocktakesTable({ rows, fillHeight = true, canCancelBalanced = false }: { rows: StocktakeRow[]; fillHeight?: boolean; canCancelBalanced?: boolean }) {
+export function StocktakesTable({
+  rows,
+  fillHeight = true,
+  canCancelBalanced = false,
+  canViewValues = false,
+}: {
+  rows: StocktakeRow[];
+  fillHeight?: boolean;
+  canCancelBalanced?: boolean;
+  canViewValues?: boolean;
+}) {
   const t = useTranslations();
   const columns: DataTableColumn<StocktakeRow>[] = [
     { key: "code", label: t("stocktakes.cols.code"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
     { key: "items", label: t("stocktakes.cols.items"), defaultVisible: true, align: "right", render: (row) => row.itemCount },
+    { key: "productSummary", label: t("stocktakes.cols.productSummary"), defaultVisible: true, render: (row) => <span className="block max-w-64 truncate text-slate-600" title={row.productSummary}>{row.productSummary || "—"}</span> },
     { key: "diff", label: t("stocktakes.cols.totalDiff"), defaultVisible: true, align: "right", cellClassName: (row) => diffClass(Number(row.totalDiff)), render: (row) => diffText(Number(row.totalDiff)) },
+    ...(canViewValues ? [{ key: "netValue", label: t("stocktakes.summary.netValue"), defaultVisible: true, align: "right" as const, cellClassName: (row: StocktakeRow) => row.netValue === null ? "text-slate-400" : diffClass(Number(row.netValue)), render: (row: StocktakeRow) => row.netValue === null ? "—" : formatCurrency(Number(row.netValue)) }] : []),
     { key: "balancedAt", label: t("stocktakes.cols.balancedAt"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.balancedAt ? formatDate(row.balancedAt) : "—"}</span> },
     { key: "status", label: t("orders.cols.status"), defaultVisible: true, render: (row) => <Status row={row} /> },
     { key: "actions", label: "", required: true, width: "90px", align: "right", render: (row) => <span onClick={stopRowToggle}><StocktakeRowActions id={row.id} status={row.status} /></span> },

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
 import { ClipboardCheck, Plus, Search } from "lucide-react";
 import { db } from "@/db";
 import { profiles, stocktakeItems, stocktakes, warehouses } from "@/db/schema";
@@ -11,6 +11,7 @@ import { requireStoreContext } from "@/lib/auth/store-context";
 import { parsePageSize } from "@/lib/pagination";
 import { Pagination } from "@/components/pagination";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
+import { stocktakeListSummaryFields } from "@/lib/stocktakes/list-summary-fields";
 
 type SP = Record<string, string | undefined>;
 
@@ -26,7 +27,12 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
       ilike(profiles.fullName, `%${q}%`),
     )
     : undefined;
-  const where = and(eq(stocktakes.storeId, context.storeId), searchCondition);
+  const where = and(
+    eq(stocktakes.storeId, context.storeId),
+    ne(stocktakes.status, "cancelled"),
+    searchCondition,
+  );
+  const canViewValues = canViewPurchasePrices(context.role);
   const pageSize = parsePageSize(searchParams.size);
   const requestedPage = Math.max(1, Math.floor(Number(searchParams.page) || 1));
 
@@ -46,6 +52,7 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
       createdAt: stocktakes.createdAt, balancedAt: stocktakes.balancedAt, warehouseName: warehouses.name, byName: profiles.fullName,
       itemCount: sql<number>`(select count(*) from ${stocktakeItems} where ${stocktakeItems.stocktakeId} = ${stocktakes.id})::int`,
       totalDiff: sql<string>`coalesce((select sum(${stocktakeItems.actualQty} - ${stocktakeItems.systemQty}) from ${stocktakeItems} where ${stocktakeItems.stocktakeId} = ${stocktakes.id}), 0)`,
+      ...stocktakeListSummaryFields(context.storeId, canViewValues),
     })
     .from(stocktakes)
     .innerJoin(warehouses, eq(stocktakes.warehouseId, warehouses.id))
@@ -88,7 +95,12 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
           <p className="text-sm mt-1">{t("stocktakes.emptyHint")}</p>
         </div>
       ) : (
-        <StocktakesTable rows={rows} fillHeight={false} canCancelBalanced={canViewPurchasePrices(context.role)} />
+        <StocktakesTable
+          rows={rows}
+          fillHeight={false}
+          canCancelBalanced={canViewValues}
+          canViewValues={canViewValues}
+        />
       )}
       <Pagination
         page={page}

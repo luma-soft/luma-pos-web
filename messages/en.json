@@ -5499,6 +5499,7 @@
     "cols": {
       "code": "Code",
       "items": "Items",
+      "productSummary": "Products",
       "totalDiff": "Total diff",
       "balancedAt": "Balanced at",
       "systemQty": "System",

@@ -1,7 +1,9 @@
-import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { profiles, stocktakeItems, stocktakes, warehouses } from "@/db/schema";
 import { createStocktake } from "@/lib/actions/stocktakes";
+import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
+import { stocktakeListSummaryFields } from "@/lib/stocktakes/list-summary-fields";
 import {
   requireMobileStockAccess,
   requireMobileStockReadAccess,
@@ -28,6 +30,7 @@ export async function GET(request: Request) {
     const pageSize = Math.min(100, Math.max(1, Math.floor(numberParam(request, "pageSize", 30))));
     const where = and(
       eq(stocktakes.storeId, gate.storeId),
+      ne(stocktakes.status, "cancelled"),
       query ? or(
         ilike(stocktakes.code, `%${query}%`),
         ilike(stocktakes.note, `%${query}%`),
@@ -54,6 +57,7 @@ export async function GET(request: Request) {
         byName: profiles.fullName,
         itemCount: sql<number>`(select count(*) from ${stocktakeItems} where ${stocktakeItems.stocktakeId} = ${stocktakes.id})::int`,
         totalDiff: sql<string>`coalesce((select sum(${stocktakeItems.actualQty} - ${stocktakeItems.systemQty}) from ${stocktakeItems} where ${stocktakeItems.stocktakeId} = ${stocktakes.id}), 0)`,
+        ...stocktakeListSummaryFields(gate.storeId, canViewPurchasePrices(gate.role)),
       })
       .from(stocktakes)
       .innerJoin(warehouses, eq(stocktakes.warehouseId, warehouses.id))
@@ -78,11 +82,12 @@ export async function GET(request: Request) {
       byName: profiles.fullName,
       itemCount: sql<number>`(select count(*) from ${stocktakeItems} where ${stocktakeItems.stocktakeId} = ${stocktakes.id})::int`,
       totalDiff: sql<string>`coalesce((select sum(${stocktakeItems.actualQty} - ${stocktakeItems.systemQty}) from ${stocktakeItems} where ${stocktakeItems.stocktakeId} = ${stocktakes.id}), 0)`,
+      ...stocktakeListSummaryFields(gate.storeId, canViewPurchasePrices(gate.role)),
     })
     .from(stocktakes)
     .innerJoin(warehouses, eq(stocktakes.warehouseId, warehouses.id))
     .leftJoin(profiles, eq(stocktakes.createdBy, profiles.id))
-    .where(eq(stocktakes.storeId, gate.storeId))
+    .where(and(eq(stocktakes.storeId, gate.storeId), ne(stocktakes.status, "cancelled")))
     .orderBy(desc(stocktakes.createdAt))
     .limit(50);
 
