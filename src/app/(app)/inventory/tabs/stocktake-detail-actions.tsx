@@ -11,7 +11,7 @@ export function StocktakeDetailActions({ id, status, canCancelBalanced }: { id: 
 
   return (
     <div className="flex w-full flex-wrap items-center gap-2">
-      <StocktakeRowActions id={id} status={status} canCancelBalanced={canCancelBalanced} />
+      <StocktakeRowActions id={id} status={status} canCancelBalanced={canCancelBalanced} prominentCancel />
       <div className="ml-auto flex flex-wrap items-center gap-2">
         <Link
           href={Routes.stocktakeCopy(id)}

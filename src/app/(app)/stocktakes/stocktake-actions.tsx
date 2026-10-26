@@ -6,8 +6,9 @@ import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { balanceStocktake, cancelStocktake } from "@/lib/actions/stocktakes";
+import { cn } from "@/lib/utils";
 
-export function StocktakeRowActions({ id, status, canCancelBalanced = false }: { id: string; status: string; canCancelBalanced?: boolean }) {
+export function StocktakeRowActions({ id, status, canCancelBalanced = false, prominentCancel = false }: { id: string; status: string; canCancelBalanced?: boolean; prominentCancel?: boolean }) {
   const t = useTranslations();
   const router = useRouter();
   const dialog = useConfirmDialog();
@@ -48,7 +49,17 @@ export function StocktakeRowActions({ id, status, canCancelBalanced = false }: {
 
   return (
     <span className="inline-flex items-center gap-2 whitespace-nowrap">
-      <button type="button" onClick={cancel} disabled={!!busy} className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-xs font-medium text-red-500 hover:bg-er-soft disabled:opacity-50 min-w-11">
+      <button
+        type="button"
+        onClick={cancel}
+        disabled={!!busy}
+        className={cn(
+          "inline-flex min-h-11 min-w-11 items-center gap-1 rounded-lg text-xs font-medium disabled:opacity-50",
+          prominentCancel
+            ? "border border-er/25 bg-er-soft/55 px-3 text-er hover:border-er/40 dark:bg-er/10"
+            : "px-2 text-red-500 hover:bg-er-soft",
+        )}
+      >
         {busy === "cancel" && <Loader2 className="h-3 w-3 animate-spin" />}
         {t("common.cancel")}
       </button>
