@@ -1,4 +1,4 @@
-export const PAGE_SIZES = [5, 10, 15, 30, 50, 100] as const;
+export const PAGE_SIZES = [10, 15, 30, 50, 100] as const;
 export const DEFAULT_PAGE_SIZE = 30;
 
 /** Ép số dòng/trang về một giá trị hợp lệ (từ query string). */
