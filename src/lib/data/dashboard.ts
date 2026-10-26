@@ -157,7 +157,7 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
       .leftJoin(customers, eq(orders.customerId, customers.id))
       .where(and(eq(orders.storeId, storeId), realSale))
       .orderBy(desc(orders.createdAt))
-      .limit(4),
+      .limit(5),
 
     db.select({
       id: customers.id,
