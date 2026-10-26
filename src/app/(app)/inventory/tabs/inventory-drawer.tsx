@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,24 +29,38 @@ export function InventoryDrawer({
   bodyClassName?: string;
 }) {
   const router = useRouter();
+  const [isVisible, setIsVisible] = useState(false);
   const closeRef = useRef<() => void>(() => {});
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isClosingRef = useRef(false);
   const close = useCallback(() => {
-    if (closeHref) {
-      router.push(closeHref, { scroll: false });
-      return;
-    }
-    onClose?.();
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+    setIsVisible(false);
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
+      if (closeHref) {
+        router.push(closeHref, { scroll: false });
+      } else {
+        onClose?.();
+      }
+    }, prefersReducedMotion ? 0 : 300);
   }, [closeHref, onClose, router]);
   closeRef.current = close;
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const frame = requestAnimationFrame(() => setIsVisible(true));
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") closeRef.current();
     };
     document.addEventListener("keydown", closeOnEscape);
     return () => {
+      cancelAnimationFrame(frame);
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", closeOnEscape);
     };
@@ -54,7 +68,10 @@ export function InventoryDrawer({
 
   return (
     <div
-      className="fixed inset-0 z-[80] bg-slate-950/30"
+      className={cn(
+        "fixed inset-0 z-[80] transition-opacity duration-300 ease-out motion-reduce:duration-0",
+        isVisible ? "bg-slate-950/30 opacity-100" : "bg-slate-950/0 opacity-0",
+      )}
       role="presentation"
       onMouseDown={(event) => {
         if (event.currentTarget === event.target) closeRef.current();
@@ -64,7 +81,8 @@ export function InventoryDrawer({
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel}
-        className="ml-auto flex h-full w-full max-w-[1040px] flex-col bg-surface shadow-2xl"
+        className="ml-auto flex h-full w-full max-w-[1040px] flex-col bg-surface shadow-2xl transition-[transform] duration-300 ease-out motion-reduce:transition-none"
+        style={{ transform: isVisible ? "translateX(0)" : "translateX(100%)" }}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
