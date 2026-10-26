@@ -112,11 +112,9 @@ export function ProductsReport({ data, rows }: { data: ReportsData; rows: Report
 }
 
 export function CustomersReport({ data, rows }: { data: ReportsData; rows: ReportCustomerRow[] }) {
-  const identifiedRows = rows.filter((row) => row.customerId != null);
-  const returningRevenue = identifiedRows.filter((row) => row.segment === "returning").reduce((sum, row) => sum + row.revenue, 0);
-  const newRevenue = identifiedRows.filter((row) => row.segment === "new").reduce((sum, row) => sum + row.revenue, 0);
-  const returningProfit = identifiedRows.filter((row) => row.segment === "returning").reduce((sum, row) => sum + row.profit, 0);
-  const repeatShare = data.summary.grossProfit === 0 ? 0 : returningProfit / data.summary.grossProfit * 100;
+  const newCustomers = data.customerSegments.new;
+  const returningCustomers = data.customerSegments.returning;
+  const repeatShare = data.summary.grossProfit === 0 ? 0 : returningCustomers.grossProfit / data.summary.grossProfit * 100;
   const averageCustomer = data.summary.customerCount === 0 ? 0 : data.summary.revenue / data.summary.customerCount;
   const frequency = data.summary.customerCount === 0 ? 0 : data.summary.orderCount / data.summary.customerCount;
   return (
@@ -133,10 +131,10 @@ export function CustomersReport({ data, rows }: { data: ReportsData; rows: Repor
           <table className="w-full text-sm">
             <thead><tr><th className="pb-3 text-left" /><th className="pb-3 text-right text-slate-500">Khách mới</th><th className="pb-3 text-right text-slate-500">Quay lại</th></tr></thead>
             <tbody className="divide-y divide-border-soft">
-              <MetricComparison label="Doanh thu thuần" first={newRevenue} second={returningRevenue} money />
-              <MetricComparison label="Lãi gộp" first={identifiedRows.filter((r) => r.segment === "new").reduce((s, r) => s + r.profit, 0)} second={returningProfit} money />
-              <MetricComparison label="Giá trị TB/đơn" first={average(identifiedRows.filter((r) => r.segment === "new"), "averageOrder")} second={average(identifiedRows.filter((r) => r.segment === "returning"), "averageOrder")} money />
-              <MetricComparison label="Biên lãi gộp" first={ratio(identifiedRows.filter((r) => r.segment === "new"))} second={ratio(identifiedRows.filter((r) => r.segment === "returning"))} />
+              <MetricComparison label="Doanh thu thuần" first={newCustomers.revenue} second={returningCustomers.revenue} money />
+              <MetricComparison label="Lãi gộp" first={newCustomers.grossProfit} second={returningCustomers.grossProfit} money />
+              <MetricComparison label="Giá trị TB/đơn" first={newCustomers.averageOrder} second={returningCustomers.averageOrder} money />
+              <MetricComparison label="Biên lãi gộp" first={newCustomers.grossMargin} second={returningCustomers.grossMargin} />
             </tbody>
           </table>
           <LineChart rows={data.byDay} series={[{ key: "revenue", color: "#078c87" }, { key: "grossProfit", color: "#076c3b" }]} />
@@ -252,8 +250,6 @@ function InsightMetric({ icon, label, value, note }: { icon: React.ReactNode; la
 
 function MetricComparison({ label, first, second, money }: { label: string; first: number; second: number; money?: boolean }) { return <tr><td className="py-3 text-slate-600">{label}</td><td className="py-3 text-right font-black">{money ? compactMoney(first) : percent(first)}</td><td className="py-3 text-right font-black">{money ? compactMoney(second) : percent(second)}</td></tr>; }
 
-function average(rows: ReportCustomerRow[], key: "averageOrder") { return rows.length ? rows.reduce((sum, row) => sum + row[key], 0) / rows.length : 0; }
-function ratio(rows: ReportCustomerRow[]) { const revenue = rows.reduce((sum, row) => sum + row.revenue, 0); return revenue === 0 ? 0 : rows.reduce((sum, row) => sum + row.profit, 0) / revenue * 100; }
 function change(current: number, previous: number) { return previous === 0 ? current === 0 ? 0 : null : (current - previous) / Math.abs(previous) * 100; }
 function compactMoney(value: number) { const abs = Math.abs(value); const sign = value < 0 ? "−" : ""; if (abs >= 1_000_000_000) return `${sign}${(abs / 1_000_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tỷ`; if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tr`; if (abs >= 1_000) return `${sign}${Math.round(abs / 1_000).toLocaleString("vi-VN")} nghìn`; return formatCurrency(value); }
 function percent(value: number) { return `${value.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`; }

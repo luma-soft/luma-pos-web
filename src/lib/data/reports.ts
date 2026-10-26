@@ -535,9 +535,27 @@ async function getCoreReportsForDatabase(
       segment: createdAt && createdAt >= from && createdAt < to ? "new" as const : "returning" as const,
     };
   });
+  const summarizeCustomerSegment = (segment: "new" | "returning") => {
+    const rows = allCustomers.filter((row) => row.customerId && row.segment === segment);
+    const revenue = rows.reduce((sum, row) => sum + row.revenue, 0);
+    const grossProfit = rows.reduce((sum, row) => sum + row.profit, 0);
+    const orderCount = rows.reduce((sum, row) => sum + row.orderCount, 0);
+    return {
+      customerCount: rows.length,
+      orderCount,
+      revenue,
+      grossProfit,
+      averageOrder: orderCount === 0 ? 0 : revenue / orderCount,
+      grossMargin: revenue === 0 ? 0 : (grossProfit / revenue) * 100,
+    };
+  };
+  const customerSegments = {
+    new: summarizeCustomerSegment("new"),
+    returning: summarizeCustomerSegment("returning"),
+  };
   const byCustomer = allCustomers.sort((left, right) => right.revenue - left.revenue).slice(0, 10);
-  const newCustomerCount = allCustomers.filter((row) => row.customerId && row.segment === "new").length;
-  const returningCustomerCount = allCustomers.filter((row) => row.customerId && row.segment === "returning").length;
+  const newCustomerCount = customerSegments.new.customerCount;
+  const returningCustomerCount = customerSegments.returning.customerCount;
   const orderStatus = { completed: 0, returned: 0, processing: 0, cancelled: 0 };
   for (const row of statusRows) {
     if (row.status === "completed") orderStatus.completed += row.count;
@@ -570,6 +588,7 @@ async function getCoreReportsForDatabase(
     topProducts,
     byCategory,
     byCustomer,
+    customerSegments,
     orderStatus,
   };
 }

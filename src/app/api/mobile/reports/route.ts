@@ -6,11 +6,19 @@ function reportRange(request: Request) {
   const range = searchParam(request, "range", "today");
   const today = startOfDay(new Date());
   const tomorrow = addDays(today, 1);
-  let from = new Date(today.getFullYear(), today.getMonth(), 1);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  let from = monthStart;
   let to = tomorrow;
 
   if (range === "today") from = today;
   else if (range === "week") from = addDays(today, -6);
+  else if (range === "30d") from = addDays(today, -29);
+  else if (range === "90d") from = addDays(today, -89);
+  else if (range === "this_month" || range === "month") from = monthStart;
+  else if (range === "last_month") {
+    from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    to = monthStart;
+  } else if (range === "this_year") from = new Date(today.getFullYear(), 0, 1);
   else if (range === "custom") {
     const url = new URL(request.url);
     const customFrom = parseDate(url.searchParams.get("from"));
