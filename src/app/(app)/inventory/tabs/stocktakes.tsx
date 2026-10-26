@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { ClipboardCheck, Plus, Search } from "lucide-react";
 import { db } from "@/db";
 import { profiles, stocktakeItems, stocktakes, warehouses } from "@/db/schema";
@@ -9,6 +9,8 @@ import { StocktakesTable } from "./stocktakes-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { cn } from "@/lib/utils";
+import { parsePageSize } from "@/lib/pagination";
+import { Pagination } from "@/components/pagination";
 
 type SP = Record<string, string | undefined>;
 
@@ -31,6 +33,19 @@ export async function StocktakesTab({
       ilike(profiles.fullName, `%${q}%`),
     )
     : undefined;
+  const where = and(eq(stocktakes.storeId, context.storeId), searchCondition);
+  const pageSize = parsePageSize(searchParams.size);
+  const requestedPage = Math.max(1, Math.floor(Number(searchParams.page) || 1));
+
+  const [countResult] = await db
+    .select({ total: count() })
+    .from(stocktakes)
+    .innerJoin(warehouses, eq(stocktakes.warehouseId, warehouses.id))
+    .leftJoin(profiles, eq(stocktakes.createdBy, profiles.id))
+    .where(where);
+  const total = countResult?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(requestedPage, pageCount);
 
   const rows = await db
     .select({
@@ -42,8 +57,10 @@ export async function StocktakesTab({
     .from(stocktakes)
     .innerJoin(warehouses, eq(stocktakes.warehouseId, warehouses.id))
     .leftJoin(profiles, eq(stocktakes.createdBy, profiles.id))
-    .where(and(eq(stocktakes.storeId, context.storeId), searchCondition))
-    .orderBy(desc(stocktakes.createdAt)).limit(50);
+    .where(where)
+    .orderBy(desc(stocktakes.createdAt))
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
 
   return (
     <section
@@ -85,6 +102,13 @@ export async function StocktakesTab({
       ) : (
         <StocktakesTable rows={rows} fillHeight={!embedded} />
       )}
+      <Pagination
+        page={page}
+        pageCount={pageCount}
+        total={total}
+        pageSize={pageSize}
+        unitLabel={t("stocktakes.unitLabel")}
+      />
       <p className={cn("text-xs text-slate-400", !embedded && "mt-3")}>{t("stocktakes.balanceHint")}</p>
     </section>
   );

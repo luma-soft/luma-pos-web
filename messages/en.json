@@ -5488,6 +5488,7 @@
   "stocktakes": {
     "title": "Stocktake",
     "listTitle": "Stocktake list",
+    "unitLabel": "stocktakes",
     "createNew": "New stocktake",
     "viewDetails": "View stocktake details",
     "empty": "No stocktakes yet",
