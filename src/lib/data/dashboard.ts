@@ -106,7 +106,13 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(and(eq(products.storeId, storeId), eq(products.isActive, true), stockManagedCategoryCondition()))
       .groupBy(products.id)
-      .having(sql`coalesce(sum(${stockLevels.quantity}), 0) <= coalesce(max(${stockLevels.minLevel}), 0) and coalesce(max(${stockLevels.minLevel}), 0) > 0`),
+      .having(sql`
+        coalesce(sum(${stockLevels.quantity}), 0) <= coalesce(max(${stockLevels.minLevel}), 0)
+        and (
+          coalesce(max(${stockLevels.minLevel}), 0) > 0
+          or coalesce(sum(${stockLevels.quantity}), 0) <= 0
+        )
+      `),
 
     db.select({
       count: sql<number>`count(*)::int`,
@@ -125,9 +131,18 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(and(eq(products.storeId, storeId), eq(products.isActive, true), stockManagedCategoryCondition()))
       .groupBy(products.id, categories.name)
-      .having(sql`coalesce(sum(${stockLevels.quantity}), 0) <= coalesce(max(${stockLevels.minLevel}), 0) and coalesce(max(${stockLevels.minLevel}), 0) > 0`)
-      .orderBy(sql`coalesce(sum(${stockLevels.quantity}), 0) / nullif(coalesce(max(${stockLevels.minLevel}), 0), 0)`)
-      .limit(4),
+      .having(sql`
+        coalesce(sum(${stockLevels.quantity}), 0) <= coalesce(max(${stockLevels.minLevel}), 0)
+        and (
+          coalesce(max(${stockLevels.minLevel}), 0) > 0
+          or coalesce(sum(${stockLevels.quantity}), 0) <= 0
+        )
+      `)
+      .orderBy(
+        sql`case when coalesce(sum(${stockLevels.quantity}), 0) <= 0 then 0 else 1 end`,
+        sql`coalesce(sum(${stockLevels.quantity}), 0) / nullif(coalesce(max(${stockLevels.minLevel}), 0), 0)`,
+      )
+      .limit(5),
 
     db.select({
       id: orders.id,
