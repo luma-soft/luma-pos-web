@@ -1,7 +1,6 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { ArrowLeft, Warehouse } from "lucide-react";
+import { Warehouse } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { formatNumber } from "@/lib/utils";
 import {
@@ -22,6 +21,7 @@ import { StocktakesTab } from "./stocktakes";
 import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 import { ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { InventoryDrawer } from "./inventory-drawer";
 
 type SP = Record<string, string | undefined>;
 type InventoryStockStatus = keyof InventoryStatusCounts;
@@ -44,11 +44,10 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
 
   return (
     <Suspense fallback={<TableSkeleton cols={6} rows={8} />}>
-      {status ? (
-        <StockStatusDetail searchParams={searchParams} status={status} />
-      ) : (
-        <StockOverviewContent searchParams={searchParams} />
-      )}
+      <>
+        <StockOverviewContent searchParams={status ? { tab: "stock" } : searchParams} />
+        {status && <StockStatusDetail searchParams={searchParams} status={status} />}
+      </>
     </Suspense>
   );
 }
@@ -100,62 +99,57 @@ async function StockStatusDetail({
       }),
       getProductFormOptions(context.storeId),
     ]);
+  const title = t(`inventory.statusCards.${status}.label`);
+  const subtitle = `${t("inventory.skuTotal", { count: formatNumber(total) })} · ${t(`inventory.statusCards.${status}.description`)}`;
 
   return (
-    <div className="space-y-4" data-layout="inventory-stock-status-detail">
-      <section className="grid gap-3 border-b border-border-soft pb-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,560px)] lg:items-end">
-        <header>
-          <Link
-            href={`${Routes.Inventory}?tab=stock`}
-            className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-700 hover:underline dark:text-primary-300 lg:min-h-0"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {t("inventory.backToWarehouse")}
-          </Link>
-          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h2 className="text-2xl font-extrabold tracking-[-0.02em] text-slate-950 dark:text-white">
-              {t(`inventory.statusCards.${status}.label`)}
-            </h2>
-            <span className="text-sm font-medium text-slate-500">
-              {t("inventory.skuTotal", { count: formatNumber(total) })}
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-slate-500">
-            {t(`inventory.statusCards.${status}.description`)}
-          </p>
-        </header>
+    <InventoryDrawer
+      title={title}
+      subtitle={subtitle}
+      ariaLabel={title}
+      icon={<Warehouse className="h-5 w-5" />}
+      closeLabel={t("common.close")}
+      closeHref={`${Routes.Inventory}?tab=stock`}
+      bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
+      footer={(
+        <div className="[&>div]:mt-0">
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            total={total}
+            pageSize={pageSize}
+            unitLabel={t("products.unitLabel")}
+          />
+        </div>
+      )}
+    >
+      <div className="flex min-h-0 flex-1 flex-col" data-layout="inventory-stock-status-detail">
+        <div className="shrink-0 border-b border-border bg-canvas/60 p-4">
+          <ListSearchFilterBar
+            className="w-full"
+            searchClassName="min-w-0 flex-1"
+            search={(
+              <InstantFilterForm action={Routes.Inventory}>
+                <input type="hidden" name="tab" value="stock" />
+                <input type="hidden" name="stockStatus" value={status} />
+                <ListSearchInput name="q" defaultValue={searchParams.q ?? ""} placeholder={t("inventory.searchPlaceholder")} />
+              </InstantFilterForm>
+            )}
+            filter={<InventoryFilterDrawer title="Bộ lọc kho hàng" values={searchParams} fields={["category", "stock"]} categories={productOptions.categories.map((item) => ({ value: item.id, label: item.name }))} />}
+          />
+        </div>
 
-        <ListSearchFilterBar
-          className="w-full"
-          searchClassName="min-w-0 flex-1"
-          search={(
-            <InstantFilterForm action={Routes.Inventory}>
-              <input type="hidden" name="tab" value="stock" />
-              <input type="hidden" name="stockStatus" value={status} />
-              <ListSearchInput name="q" defaultValue={searchParams.q ?? ""} placeholder={t("inventory.searchPlaceholder")} />
-            </InstantFilterForm>
+        <section className="min-h-0 flex-1 overflow-auto p-4" aria-label={t("inventory.productList")}>
+          {rows.length === 0 ? (
+            <div className="rounded-card border border-border bg-surface p-12 text-center text-slate-400 shadow-e1">
+              <Warehouse className="mx-auto mb-3 h-10 w-10 opacity-60" />
+              <p className="font-medium">{t("inventory.empty")}</p>
+            </div>
+          ) : (
+            <StockTable rows={rows} stock={status} />
           )}
-          filter={<InventoryFilterDrawer title="Bộ lọc kho hàng" values={searchParams} fields={["category", "stock"]} categories={productOptions.categories.map((item) => ({ value: item.id, label: item.name }))} />}
-        />
-      </section>
-
-      <section aria-label={t("inventory.productList")}>
-        {rows.length === 0 ? (
-          <div className="rounded-card border border-border bg-surface p-12 text-center text-slate-400 shadow-e1">
-            <Warehouse className="mx-auto mb-3 h-10 w-10 opacity-60" />
-            <p className="font-medium">{t("inventory.empty")}</p>
-          </div>
-        ) : (
-          <StockTable rows={rows} stock={status} />
-        )}
-        <Pagination
-          page={page}
-          pageCount={pageCount}
-          total={total}
-          pageSize={pageSize}
-          unitLabel={t("products.unitLabel")}
-        />
-      </section>
-    </div>
+        </section>
+      </div>
+    </InventoryDrawer>
   );
 }

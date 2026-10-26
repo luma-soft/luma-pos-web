@@ -3,11 +3,12 @@
 import { productLineDisplayName } from "@/lib/products/variant-presentation";
 
 import { Select } from "@/components/ui/select";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Filter, History, Search, X } from "lucide-react";
+import { Filter, History, Search } from "lucide-react";
 import { selectAllInputOnClick } from "@/lib/input-selection";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
+import { InventoryDrawer } from "./inventory-drawer";
 
 export type MovementItem = {
   id: string;
@@ -40,12 +41,6 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
   }), [movements, query, type]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-  useEffect(() => {
-    if (!drawerOpen) return;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
-  }, [drawerOpen]);
 
   return (
     <>
@@ -115,21 +110,31 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
       </section>
 
       {drawerOpen && (
-        <div className="fixed inset-0 z-[80] bg-slate-950/30" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setDrawerOpen(false); }}>
-          <aside role="dialog" aria-modal="true" aria-label={t("inventory.movementsTitle")} className="ml-auto flex h-full w-full max-w-[720px] flex-col bg-surface shadow-2xl">
-            <header className="flex items-center gap-3 border-b border-border px-5 py-4">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary-50 text-primary-700 dark:bg-primary-950/40"><History className="h-5 w-5" /></div>
-              <div className="min-w-0 flex-1"><h2 className="text-lg font-bold">{t("inventory.movementsTitle")}</h2><p className="text-xs text-slate-400">{t("inventory.actions.ledgerSubtitle")}</p></div>
-              <button type="button" onClick={() => setDrawerOpen(false)} aria-label={t("common.close")} className="grid h-10 w-10 place-items-center rounded-xl text-slate-500 hover:bg-surface-2 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"><X className="h-5 w-5 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" /></button>
-            </header>
-            <div className="grid gap-2 border-b border-border bg-canvas/60 p-4 sm:grid-cols-[minmax(0,1fr)_160px]">
-              <label className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} onClick={selectAllInputOnClick} placeholder={t("inventory.actions.searchMovements")} className="h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 lg:h-10" /></label>
-              <div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" /><Select value={type} onValueChange={(value) => { setType(value); setPage(1); }} aria-label={t("inventory.actions.allTypes")} className="pl-9" rootClassName="w-full" options={[{ value: "all", label: t("inventory.actions.allTypes") }, ...types.map((value) => ({ value, label: t(`inventory.moveTypes.${value}` as never) }))]} /></div>
+        <InventoryDrawer
+          title={t("inventory.movementsTitle")}
+          subtitle={t("inventory.actions.ledgerSubtitle")}
+          ariaLabel={t("inventory.movementsTitle")}
+          icon={<History className="h-5 w-5" />}
+          closeLabel={t("common.close")}
+          onClose={() => setDrawerOpen(false)}
+          bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
+          footer={(
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-500">{t("inventory.actions.showing", { count: filtered.length })}</span>
+              <div className="flex items-center gap-2">
+                <button type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-40 lg:min-h-0 lg:min-w-0">{t("inventory.actions.previous")}</button>
+                <span className="min-w-14 text-center font-mono text-xs">{page}/{pageCount}</span>
+                <button type="button" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)} className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-40 lg:min-h-0 lg:min-w-0">{t("inventory.actions.next")}</button>
+              </div>
             </div>
-            <div className="min-h-0 flex-1 overflow-auto"><MovementList rows={pageRows} /></div>
-            <footer className="flex items-center justify-between border-t border-border px-5 py-3 text-sm"><span className="text-slate-500">{t("inventory.actions.showing", { count: filtered.length })}</span><div className="flex items-center gap-2"><button type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-40 lg:min-h-0 lg:min-w-0">{t("inventory.actions.previous")}</button><span className="min-w-14 text-center font-mono text-xs">{page}/{pageCount}</span><button type="button" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)} className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-40 lg:min-h-0 lg:min-w-0">{t("inventory.actions.next")}</button></div></footer>
-          </aside>
-        </div>
+          )}
+        >
+          <div className="grid shrink-0 gap-2 border-b border-border bg-canvas/60 p-4 sm:grid-cols-[minmax(0,1fr)_180px]">
+            <label className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} onClick={selectAllInputOnClick} placeholder={t("inventory.actions.searchMovements")} className="h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 lg:h-10" /></label>
+            <div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" /><Select value={type} onValueChange={(value) => { setType(value); setPage(1); }} aria-label={t("inventory.actions.allTypes")} className="pl-9" rootClassName="w-full" options={[{ value: "all", label: t("inventory.actions.allTypes") }, ...types.map((value) => ({ value, label: t(`inventory.moveTypes.${value}` as never) }))]} /></div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto"><MovementList rows={pageRows} /></div>
+        </InventoryDrawer>
       )}
     </>
   );
