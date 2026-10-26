@@ -1732,7 +1732,10 @@
     "debtLink": "Công nợ →",
     "pctOfLimit": "{pct}% hạn mức",
     "noLimit": "Không hạn mức",
-    "totalReceivable": "Tổng phải thu"
+    "totalReceivable": "Tổng phải thu",
+    "topSuppliers": "Nợ nhà cung cấp nhiều nhất",
+    "supplierDebtLink": "Nhà cung cấp →",
+    "totalPayables": "Tổng phải trả"
   },
   "pos": {
     "searchPlaceholder": "Tìm sản phẩm theo tên / SKU / mã vạch...",

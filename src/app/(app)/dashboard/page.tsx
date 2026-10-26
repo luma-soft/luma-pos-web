@@ -20,6 +20,14 @@ export const dynamic = "force-dynamic";
 const RANGES: DashboardRange[] = ["today", "7d", "30d", "month"];
 const DOW_LABEL = ["", "T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
+type DashboardDebtRow = {
+  id: string;
+  name: string;
+  currentDebt: string | number;
+  detail: string | null;
+  detailTone?: "danger" | "muted";
+};
+
 interface PageProps {
   searchParams: Promise<{ range?: string }>;
 }
@@ -37,6 +45,22 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   });
 
   const maxDay = Math.max(1, ...data.revenueByDay.map((d) => Number(d.revenue)));
+  const debtorRows: DashboardDebtRow[] = data.topDebtors.map((customer) => {
+    const debt = Number(customer.currentDebt);
+    const limit = Number(customer.debtLimit ?? 0);
+    const percentage = limit > 0 ? Math.round((debt / limit) * 100) : null;
+    return {
+      ...customer,
+      detail: percentage != null
+        ? t("dashboard.pctOfLimit", { pct: percentage })
+        : contactLine(customer.phone, customer.address),
+      detailTone: percentage != null && percentage > 85 ? "danger" : "muted",
+    };
+  });
+  const supplierRows: DashboardDebtRow[] = data.topSuppliers.map((supplier) => ({
+    ...supplier,
+    detail: contactLine(supplier.phone, supplier.address),
+  }));
 
   return (
     <>
@@ -98,12 +122,17 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                 subtitle={t("mobile.dashboard.needRestock")}
                 tone="warning"
               />
-              <MobileMetricTile
-                label={t("mobile.dashboard.receivables")}
-                value={mobileData.debt.debtors}
-                subtitle={t("mobile.dashboard.owingCustomers")}
-                tone="neutral"
-              />
+              <Link
+                href={`${Routes.Customers}?owing=1`}
+                className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                <MobileMetricTile
+                  label={t("mobile.dashboard.receivables")}
+                  value={mobileData.debt.debtors}
+                  subtitle={t("mobile.dashboard.owingCustomers")}
+                  tone="neutral"
+                />
+              </Link>
             </div>
           </section>
 
@@ -178,6 +207,29 @@ export default async function DashboardPage({ searchParams }: PageProps) {
               tone="blue"
             />
           </section>
+
+          {debtorRows.length > 0 && (
+            <DashboardDebtCard
+              kind="customer"
+              title={t("dashboard.topDebtors")}
+              href={`${Routes.Customers}?owing=1`}
+              linkLabel={t("dashboard.debtLink")}
+              totalLabel={t("dashboard.totalReceivable")}
+              rows={debtorRows}
+              total={data.debt.total}
+            />
+          )}
+          {supplierRows.length > 0 && (
+            <DashboardDebtCard
+              kind="supplier"
+              title={t("dashboard.topSuppliers")}
+              href={`${Routes.Suppliers}?owing=owing`}
+              linkLabel={t("dashboard.supplierDebtLink")}
+              totalLabel={t("dashboard.totalPayables")}
+              rows={supplierRows}
+              total={data.payables.total}
+            />
+          )}
         </div>
       </div>
 
@@ -370,51 +422,106 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        <div className="bg-surface rounded-card border border-border">
-          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
-            <Text as="h2" weight="bold" text={t("dashboard.topDebtors")} />
-            <Link href={`${Routes.Customers}?owing=1`} className="text-xs font-medium text-primary-600 hover:underline">{t("dashboard.debtLink")}</Link>
-          </div>
-          <div className="p-4">
-            {data.topDebtors.length === 0 ? (
-              <Text as="p" variant="muted" className="py-10 text-center" text={t("dashboard.noDebt")} />
-            ) : (
-              <>
-                <div className="divide-y divide-border-soft">
-                  {data.topDebtors.map((c) => {
-                    const initials = c.name.split(" ").map((w) => w[0]).slice(-2).join("").toUpperCase();
-                    const debt = Number(c.currentDebt);
-                    const limit = Number(c.debtLimit ?? 0);
-                    const pct = limit > 0 ? Math.round((debt / limit) * 100) : null;
-                    return (
-                      <div key={c.id} className="py-2.5 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-400 grid place-items-center text-[11px] font-bold shrink-0">
-                          {initials}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <PartnerDetailLink kind="customer" partnerId={c.id} name={c.name} openInCurrentTab className="block whitespace-normal break-words font-semibold text-[13px]" />
-                          <div className={cn("text-xs", pct != null && pct > 85 ? "text-er" : "text-slate-400")}>
-                            {pct != null ? t("dashboard.pctOfLimit", { pct }) : t("dashboard.noLimit")}
-                          </div>
-                        </div>
-                        <b className="text-[13px] tabular-nums text-er shrink-0">{formatCurrency(debt)}</b>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="border-t border-border mt-2 pt-3 flex justify-between text-sm">
-                  <Text as="span" variant="muted" text={t("dashboard.totalReceivable")} />
-                  <b className="tabular-nums">{formatCurrency(data.debt.total)}</b>
-                </div>
-              </>
-            )}
-          </div>
+        <div className="space-y-4">
+          {debtorRows.length > 0 && (
+            <DashboardDebtCard
+              kind="customer"
+              title={t("dashboard.topDebtors")}
+              href={`${Routes.Customers}?owing=1`}
+              linkLabel={t("dashboard.debtLink")}
+              totalLabel={t("dashboard.totalReceivable")}
+              rows={debtorRows}
+              total={data.debt.total}
+            />
+          )}
+          {supplierRows.length > 0 && (
+            <DashboardDebtCard
+              kind="supplier"
+              title={t("dashboard.topSuppliers")}
+              href={`${Routes.Suppliers}?owing=owing`}
+              linkLabel={t("dashboard.supplierDebtLink")}
+              totalLabel={t("dashboard.totalPayables")}
+              rows={supplierRows}
+              total={data.payables.total}
+            />
+          )}
         </div>
       </div>
       <Text as="span" className="hidden" text={formatDate(new Date())} />
       </div>
     </>
   );
+}
+
+function DashboardDebtCard({
+  kind,
+  title,
+  href,
+  linkLabel,
+  totalLabel,
+  rows,
+  total,
+}: {
+  kind: "customer" | "supplier";
+  title: string;
+  href: string;
+  linkLabel: string;
+  totalLabel: string;
+  rows: DashboardDebtRow[];
+  total: number;
+}) {
+  return (
+    <section className="rounded-2xl border border-border bg-surface shadow-e1 lg:rounded-card lg:shadow-none">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-3 sm:px-5">
+        <Text as="h2" weight="bold" className="min-w-0" text={title} />
+        <Link href={href} className="shrink-0 text-xs font-medium text-primary-600 hover:underline">
+          {linkLabel}
+        </Link>
+      </div>
+      <div className="px-3 py-1 sm:p-4">
+        <div className="divide-y divide-border-soft">
+          {rows.slice(0, 5).map((row) => {
+            const initials = row.name.split(" ").map((word) => word[0]).slice(-2).join("").toUpperCase();
+            return (
+              <div key={row.id} className="flex items-center gap-3 py-2.5">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary-50 text-[11px] font-bold text-primary-700 dark:bg-primary-950/50 dark:text-primary-400">
+                  {initials}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <PartnerDetailLink
+                    kind={kind}
+                    partnerId={row.id}
+                    name={row.name}
+                    openInCurrentTab
+                    className="block whitespace-normal break-words text-[13px] font-semibold"
+                  />
+                  {row.detail && (
+                    <div className={cn("line-clamp-2 break-words text-xs", row.detailTone === "danger" ? "text-er" : "text-slate-400")}>
+                      {row.detail}
+                    </div>
+                  )}
+                </div>
+                <b className={cn("shrink-0 text-right text-[13px] tabular-nums", kind === "customer" ? "text-er" : "text-warn")}>
+                  {formatCurrency(Number(row.currentDebt))}
+                </b>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-2 flex justify-between gap-3 border-t border-border pt-3 text-sm">
+          <Text as="span" variant="muted" text={totalLabel} />
+          <b className="tabular-nums">{formatCurrency(total)}</b>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function contactLine(phone?: string | null, address?: string | null) {
+  const contact = [phone, address]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value));
+  return contact.length > 0 ? contact.join(" · ") : null;
 }
 
 function formatCompactCurrency(value: number) {

@@ -1732,7 +1732,10 @@
     "debtLink": "Debts →",
     "pctOfLimit": "{pct}% of limit",
     "noLimit": "No limit",
-    "totalReceivable": "Total receivable"
+    "totalReceivable": "Total receivable",
+    "topSuppliers": "Top supplier payables",
+    "supplierDebtLink": "Suppliers →",
+    "totalPayables": "Total payable"
   },
   "pos": {
     "searchPlaceholder": "Search by name / SKU / barcode...",

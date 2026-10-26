@@ -10,6 +10,7 @@ import {
   returnItems,
   returns,
   stockLevels,
+  suppliers,
 } from "@/db/schema";
 import {
   calculateDashboardFinancials,
@@ -54,12 +55,14 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
     [refundAgg],
     [returnedProfitAgg],
     [debtAgg],
+    [payablesAgg],
     [openOrderAgg],
     lowStockCountRows,
     [eInvoiceAttentionAgg],
     lowStock,
     recentOrders,
     topDebtors,
+    topSuppliers,
     grossRevenueSeries,
     refundsSeries,
     grossProfitSeries,
@@ -95,6 +98,11 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
       totalDebt: sql<string>`coalesce(sum(${customers.currentDebt}), 0)`,
       debtors: sql<number>`count(*) filter (where ${customers.currentDebt} > 0)::int`,
     }).from(customers).where(and(eq(customers.storeId, storeId), eq(customers.isActive, true))),
+
+    db.select({
+      totalDebt: sql<string>`coalesce(sum(${suppliers.currentDebt}), 0)`,
+      suppliers: sql<number>`count(*) filter (where ${suppliers.currentDebt} > 0)::int`,
+    }).from(suppliers).where(and(eq(suppliers.storeId, storeId), eq(suppliers.isActive, true))),
 
     db.select({
       count: sql<number>`count(*)::int`,
@@ -177,13 +185,27 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
     db.select({
       id: customers.id,
       name: customers.name,
+      phone: customers.phone,
+      address: customers.address,
       currentDebt: customers.currentDebt,
       debtLimit: customers.debtLimit,
     })
       .from(customers)
-      .where(and(eq(customers.storeId, storeId), sql`${customers.currentDebt} > 0`))
+      .where(and(eq(customers.storeId, storeId), eq(customers.isActive, true), sql`${customers.currentDebt} > 0`))
       .orderBy(desc(customers.currentDebt))
-      .limit(3),
+      .limit(5),
+
+    db.select({
+      id: suppliers.id,
+      name: suppliers.name,
+      phone: suppliers.phone,
+      address: suppliers.address,
+      currentDebt: suppliers.currentDebt,
+    })
+      .from(suppliers)
+      .where(and(eq(suppliers.storeId, storeId), eq(suppliers.isActive, true), sql`${suppliers.currentDebt} > 0`))
+      .orderBy(desc(suppliers.currentDebt))
+      .limit(5),
 
     db.select({
       key: orderBucketKey,
@@ -247,12 +269,14 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
     costOfGoods: financials.costOfGoods,
     marginPct: financials.marginPct,
     debt: { total: Number(debtAgg.totalDebt), debtors: debtAgg.debtors },
+    payables: { total: Number(payablesAgg.totalDebt), suppliers: payablesAgg.suppliers },
     openOrderCount: openOrderAgg.count,
     lowStockCount: lowStockCountRows.length,
     eInvoiceAttentionCount: eInvoiceAttentionAgg.count,
     lowStock,
     recentOrders,
     topDebtors,
+    topSuppliers,
     revenueByDay: collapseRevenueByDay(grossRevenueSeries, refundsSeries),
     analyticsSeries: mergeAnalyticsSeries(
       grossRevenueSeries,
