@@ -5491,6 +5491,9 @@
     "unitLabel": "stocktakes",
     "createNew": "New stocktake",
     "viewDetails": "View stocktake details",
+    "copy": "Copy",
+    "copyingFrom": "Copying from {code}",
+    "printTitle": "STOCKTAKE",
     "empty": "No stocktakes yet",
     "emptyHint": "Create one to count actual stock and balance inventory.",
     "cols": {
@@ -5513,7 +5516,8 @@
       "loadError": "Could not load stocktake details.",
       "retry": "Try again",
       "linesTitle": "Products in this stocktake",
-      "emptyLines": "This stocktake has no counted products."
+      "emptyLines": "This stocktake has no counted products.",
+      "valueBasis": "Variance values are estimated using current cost prices."
     },
     "searchPlaceholder": "Search product by name / SKU to add…",
     "noLines": "Nothing counted yet — search above to add products.",
@@ -5521,17 +5525,24 @@
     "summary": {
       "checked": "Counted",
       "matched": "Matched",
-      "diff": "Different"
+      "diff": "Different",
+      "diffProducts": "Items with variance",
+      "valueIncrease": "Increase value",
+      "valueDecrease": "Decrease value",
+      "netValue": "Net variance value"
     },
     "saveDraft": "Save draft",
     "complete": "Complete (balance stock)",
     "balance": "Balance stock",
     "balanceConfirm": "Balance now? Stock will be SET to counted quantities; differences logged as adjustments.",
     "cancelConfirm": "Cancel this draft stocktake?",
+    "cancelBalancedConfirm": "Cancel this stocktake to reverse its inventory adjustments. This action cannot be undone.",
     "balanceHint": "Drafts don't affect stock. Balancing sets stock = actual and logs 'adjust' movements.",
     "errors": {
       "emptyItems": "Add at least 1 product.",
-      "notDraft": "Only drafts can be modified."
+      "notDraft": "Only drafts can be modified.",
+      "notCancellable": "This stocktake is already cancelled or cannot be cancelled.",
+      "adjustmentAlreadyUsed": "This stocktake cannot be cancelled because its increased stock has already been issued from the batch."
     }
   },
   "theme": {

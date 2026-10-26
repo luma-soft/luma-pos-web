@@ -10,6 +10,7 @@ import { InstantFilterForm } from "@/components/instant-filter-form";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { parsePageSize } from "@/lib/pagination";
 import { Pagination } from "@/components/pagination";
+import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 
 type SP = Record<string, string | undefined>;
 
@@ -87,7 +88,7 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
           <p className="text-sm mt-1">{t("stocktakes.emptyHint")}</p>
         </div>
       ) : (
-        <StocktakesTable rows={rows} fillHeight={false} />
+        <StocktakesTable rows={rows} fillHeight={false} canCancelBalanced={canViewPurchasePrices(context.role)} />
       )}
       <Pagination
         page={page}

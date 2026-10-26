@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { products, profiles, stocktakeItems, stocktakes, warehouses } from "@/db/schema";
 import { requireStockAccess } from "@/lib/actions/common";
+import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -48,12 +49,14 @@ export async function GET(_request: Request, { params }: Context) {
     return NextResponse.json({ ok: false, error: "errors.notFound" }, { status: 404 });
   }
 
+  const canViewValues = canViewPurchasePrices(gate.role);
   const items = await db
     .select({
       id: stocktakeItems.id,
       productName: products.name,
       sku: products.sku,
       baseUnit: products.baseUnit,
+      costPrice: canViewValues ? products.costPrice : sql<string | null>`null`,
       systemQty: stocktakeItems.systemQty,
       actualQty: stocktakeItems.actualQty,
     })
@@ -69,7 +72,7 @@ export async function GET(_request: Request, { params }: Context) {
     .orderBy(asc(products.name), asc(products.sku));
 
   return NextResponse.json(
-    { ok: true, data: { ...stocktake, items } },
+    { ok: true, data: { ...stocktake, canViewValues, items } },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }

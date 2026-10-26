@@ -90,6 +90,9 @@ export const Routes = {
     const params = new URLSearchParams({ productIds: ids.join(",") });
     return `/purchases/new?${params.toString()}` as const;
   },
+  stocktakeCopy: (id: string) => `/stocktakes/new?copy=${encodeURIComponent(id)}` as const,
+  stocktakePrint: (id: string) => `/stocktakes/${encodeURIComponent(id)}/print` as const,
+  stocktakeDetail: (id: string) => `/inventory?tab=stock&expanded=${encodeURIComponent(id)}` as const,
   posForProducts: (
     kind: "invoice" | "booking" | "return_quick" | "quote",
     ids: readonly string[],

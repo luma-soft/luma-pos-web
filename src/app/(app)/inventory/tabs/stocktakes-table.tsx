@@ -7,6 +7,7 @@ import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/component
 import { cn, formatDate, formatNumber } from "@/lib/utils";
 import { StocktakeRowActions } from "../../stocktakes/stocktake-actions";
 import { StocktakeDetail } from "./stocktake-detail";
+import { StocktakeDetailActions } from "./stocktake-detail-actions";
 
 export type StocktakeRow = {
   id: string;
@@ -74,7 +75,7 @@ export function StocktakeMobileRow({
   );
 }
 
-export function StocktakesTable({ rows, fillHeight = true }: { rows: StocktakeRow[]; fillHeight?: boolean }) {
+export function StocktakesTable({ rows, fillHeight = true, canCancelBalanced = false }: { rows: StocktakeRow[]; fillHeight?: boolean; canCancelBalanced?: boolean }) {
   const t = useTranslations();
   const columns: DataTableColumn<StocktakeRow>[] = [
     { key: "code", label: t("stocktakes.cols.code"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
@@ -106,10 +107,12 @@ export function StocktakesTable({ rows, fillHeight = true }: { rows: StocktakeRo
         />
       )}
       renderDetail={(row) => (
-        <StocktakeDetail stocktakeId={row.id} />
+        <StocktakeDetail stocktakeId={row.id} status={row.status} />
       )}
+      detailFooter={(row) => <StocktakeDetailActions id={row.id} status={row.status} canCancelBalanced={canCancelBalanced} />}
       detailTitle={(row) => row.code}
       detailSubtitle={(row) => `${formatDate(row.createdAt)} · ${t(`stocktakes.status.${row.status}` as never)}`}
+      detailPanelClassName="h-[min(88dvh,780px)] w-[min(96vw,960px)] sm:max-w-none"
     />
   );
 }

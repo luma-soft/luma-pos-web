@@ -5491,6 +5491,9 @@
     "unitLabel": "phiếu",
     "createNew": "Kiểm kho",
     "viewDetails": "Xem chi tiết phiếu",
+    "copy": "Sao chép",
+    "copyingFrom": "Sao chép từ phiếu {code}",
+    "printTitle": "PHIẾU KIỂM KHO",
     "empty": "Chưa có phiếu kiểm kho nào",
     "emptyHint": "Tạo phiếu kiểm để đếm thực tế và cân bằng kho.",
     "cols": {
@@ -5513,7 +5516,8 @@
       "loadError": "Không tải được chi tiết phiếu kiểm kho.",
       "retry": "Thử lại",
       "linesTitle": "Sản phẩm trong phiếu",
-      "emptyLines": "Phiếu này chưa có sản phẩm được kiểm."
+      "emptyLines": "Phiếu này chưa có sản phẩm được kiểm.",
+      "valueBasis": "Giá trị lệch được ước tính theo giá vốn hiện tại."
     },
     "searchPlaceholder": "Tìm SP theo tên / SKU để thêm vào phiếu kiểm…",
     "noLines": "Chưa kiểm sản phẩm nào — tìm và thêm SP ở ô trên.",
@@ -5521,17 +5525,24 @@
     "summary": {
       "checked": "Đã kiểm",
       "matched": "Khớp",
-      "diff": "Lệch"
+      "diff": "Lệch",
+      "diffProducts": "SP có lệch",
+      "valueIncrease": "Giá trị lệch tăng",
+      "valueDecrease": "Giá trị lệch giảm",
+      "netValue": "Giá trị lệch ròng"
     },
     "saveDraft": "Lưu tạm",
     "complete": "Hoàn thành (cân bằng kho)",
     "balance": "Cân bằng kho",
     "balanceConfirm": "Cân bằng kho? Tồn kho sẽ được SET về đúng số thực tế đã đếm, phần lệch ghi vào lịch sử kho.",
     "cancelConfirm": "Hủy phiếu kiểm tạm này?",
+    "cancelBalancedConfirm": "Hủy phiếu này sẽ đảo phần điều chỉnh tồn kho do phiếu tạo. Không thể hoàn tác thao tác này.",
     "balanceHint": "Phiếu tạm chưa ảnh hưởng kho. Khi cân bằng: tồn = số thực tế, lệch ghi movement 'Kiểm kê'.",
     "errors": {
       "emptyItems": "Phiếu kiểm cần ít nhất 1 sản phẩm.",
-      "notDraft": "Chỉ thao tác được trên phiếu tạm."
+      "notDraft": "Chỉ thao tác được trên phiếu tạm.",
+      "notCancellable": "Phiếu này đã hủy hoặc không thể hủy.",
+      "adjustmentAlreadyUsed": "Không thể hủy vì hàng tăng từ phiếu này đã được xuất khỏi lô."
     }
   },
   "theme": {

@@ -2,12 +2,14 @@
 
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { z } from "zod";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { products, stockLevels, stockMovements, stocktakeItems, stocktakes } from "@/db/schema";
+import { products, stockLevels, stockLotMovements, stockLots, stockMovements, stocktakeItems, stocktakes } from "@/db/schema";
 import { type ActionResult, requireManager, requireStockAccess, getProfileId, generateCode, toQty } from "./common";
 import { Routes } from "@/lib/routes";
 import { recordActivity } from "@/lib/audit/activity-log";
+import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
+import { reverseDocumentStockLots } from "@/lib/inventory/reverse-document-stock-lots";
 import {
   consumeTrackedStockLots,
   receiveUnspecifiedTrackedStockLot,
@@ -210,26 +212,141 @@ export async function balanceStocktake(id: string): Promise<ActionResult> {
   }
 }
 
-/** Hủy phiếu tạm (chưa cân bằng — không ảnh hưởng kho). */
+/** Hủy phiếu tạm hoặc đảo an toàn các điều chỉnh của phiếu đã cân bằng. */
 export async function cancelStocktake(id: string): Promise<ActionResult> {
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
   try {
     await db.transaction(async (tx) => {
       const [st] = await tx.select().from(stocktakes).where(and(eq(stocktakes.storeId, gate.storeId), eq(stocktakes.id, id))).limit(1).for("update");
-      if (!st || st.status !== "draft") throw new Error("NOT_DRAFT");
+      if (!st || (st.status !== "draft" && st.status !== "balanced")) throw new Error("NOT_CANCELLABLE");
+      if (st.status === "balanced" && !canViewPurchasePrices(gate.role)) throw new Error("MANAGER_REQUIRED");
+
+      const stockChanges: { type: string; id: string; name?: string; code?: string; beforeQuantity: number; quantity: number }[] = [];
+      if (st.status === "balanced") {
+        const movements = await tx.select({
+          productId: stockMovements.productId,
+          warehouseId: stockMovements.warehouseId,
+          quantity: stockMovements.quantity,
+          unitCost: stockMovements.unitCost,
+          name: products.name,
+          sku: products.sku,
+        }).from(stockMovements)
+          .innerJoin(products, and(eq(products.id, stockMovements.productId), eq(products.storeId, gate.storeId)))
+          .where(and(
+            eq(stockMovements.storeId, gate.storeId),
+            eq(stockMovements.refType, "stocktake"),
+            eq(stockMovements.refId, st.id),
+            eq(stockMovements.type, "adjust"),
+          ))
+          .orderBy(asc(stockMovements.warehouseId), asc(stockMovements.productId));
+
+        const changedProductIds = [...new Set(movements.filter((movement) => Number(movement.quantity) > 0).map((movement) => movement.productId))];
+        const receivedLots = changedProductIds.length > 0
+          ? await tx.select({
+            id: stockLots.id,
+            receivedQuantity: stockLots.receivedQuantity,
+            availableQuantity: stockLots.availableQuantity,
+            quantity: stockLotMovements.quantity,
+          }).from(stockLotMovements)
+            .innerJoin(stockLots, eq(stockLots.id, stockLotMovements.stockLotId))
+            .where(and(
+              eq(stockLotMovements.storeId, gate.storeId),
+              eq(stockLotMovements.refType, "stocktake"),
+              eq(stockLotMovements.refId, st.id),
+              inArray(stockLots.productId, changedProductIds),
+              gt(stockLotMovements.quantity, "0"),
+            ))
+            .for("update")
+          : [];
+        if (receivedLots.some((lot) => Number(lot.availableQuantity) + 1e-9 < Number(lot.receivedQuantity))) {
+          throw new Error("ADJUSTMENT_ALREADY_USED");
+        }
+
+        await reverseDocumentStockLots(tx, {
+          storeId: gate.storeId,
+          refType: "stocktake",
+          refId: st.id,
+          createdBy: gate.userId,
+        });
+
+        for (const lot of receivedLots) {
+          const quantity = Number(lot.quantity);
+          if (quantity <= 0) continue;
+          await tx.update(stockLots).set({
+            availableQuantity: sql`${stockLots.availableQuantity} - ${toQty(quantity)}`,
+          }).where(and(eq(stockLots.storeId, gate.storeId), eq(stockLots.id, lot.id)));
+          await tx.insert(stockLotMovements).values({
+            storeId: gate.storeId,
+            stockLotId: lot.id,
+            quantity: toQty(-quantity),
+            refType: "stocktake",
+            refId: st.id,
+            createdBy: gate.userId,
+          });
+        }
+
+        for (const movement of movements) {
+          const [level] = await tx.select({ quantity: stockLevels.quantity })
+            .from(stockLevels)
+            .where(and(
+              eq(stockLevels.storeId, gate.storeId),
+              eq(stockLevels.productId, movement.productId),
+              eq(stockLevels.warehouseId, movement.warehouseId),
+            ))
+            .limit(1)
+            .for("update");
+          const beforeQuantity = Number(level?.quantity ?? 0);
+          const quantity = beforeQuantity - Number(movement.quantity);
+          await tx.insert(stockLevels).values({
+            storeId: gate.storeId,
+            productId: movement.productId,
+            warehouseId: movement.warehouseId,
+            quantity: toQty(quantity),
+          }).onConflictDoUpdate({
+            target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
+            set: { quantity: toQty(quantity), updatedAt: sql`now()` },
+          });
+          await tx.insert(stockMovements).values({
+            storeId: gate.storeId,
+            productId: movement.productId,
+            warehouseId: movement.warehouseId,
+            type: "adjust",
+            quantity: toQty(-Number(movement.quantity)),
+            unitCost: movement.unitCost,
+            refType: "stocktake_cancel",
+            refId: st.id,
+            note: `${st.code} · hủy phiếu kiểm kho`,
+            createdBy: gate.userId,
+          });
+          stockChanges.push({
+            type: "product",
+            id: movement.productId,
+            name: movement.name,
+            code: movement.sku,
+            beforeQuantity,
+            quantity,
+          });
+        }
+      }
+
       await tx.update(stocktakes).set({ status: "cancelled" }).where(and(eq(stocktakes.storeId, gate.storeId), eq(stocktakes.id, id)));
       await recordActivity(tx, {
         storeId: gate.storeId, actorId: gate.userId, action: "stocktake.cancelled", entityType: "stocktake", entityId: id,
-        before: { code: st.code, status: st.status }, after: { code: st.code, status: "cancelled" },
+        before: { code: st.code, status: st.status }, after: { code: st.code, status: "cancelled", reversedCount: stockChanges.length },
+        affectedRecords: stockChanges,
         metadata: { code: st.code, warehouseId: st.warehouseId },
       });
     });
     revalidatePath(Routes.Stocktakes);
+    revalidatePath(Routes.Inventory);
     return { ok: true, data: undefined };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     if (msg === "NOT_DRAFT") return { ok: false, error: "stocktakes.errors.notDraft" };
+    if (msg === "NOT_CANCELLABLE") return { ok: false, error: "stocktakes.errors.notCancellable" };
+    if (msg === "MANAGER_REQUIRED") return { ok: false, error: "errors.forbidden" };
+    if (msg === "ADJUSTMENT_ALREADY_USED") return { ok: false, error: "stocktakes.errors.adjustmentAlreadyUsed" };
     console.error("cancelStocktake failed:", e);
     return { ok: false, error: "errors.serverError" };
   }

@@ -26,7 +26,7 @@ import { ProductSearchPicker } from "@/components/product-search/product-search-
 import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 
-interface ProductOption {
+export interface ProductOption {
   id: string;
   sku: string;
   barcode: string | null;
@@ -38,10 +38,12 @@ interface ProductOption {
   imageUrls: string[] | null;
 }
 
-interface Line {
+export interface StocktakeFormLine {
   product: ProductOption;
   actualQty: number;
 }
+
+type Line = StocktakeFormLine;
 
 function toProductOption(product: ProductCatalogItem, warehouseId: string): ProductOption {
   return {
@@ -57,7 +59,19 @@ function toProductOption(product: ProductCatalogItem, warehouseId: string): Prod
   };
 }
 
-export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehouseId: string; warehouses: { id: string; name: string }[] }) {
+export function StocktakeForm({
+  activeWarehouseId,
+  warehouses,
+  initialLines = [],
+  initialNote = "",
+  copyFromCode,
+}: {
+  activeWarehouseId: string;
+  warehouses: { id: string; name: string }[];
+  initialLines?: StocktakeFormLine[];
+  initialNote?: string;
+  copyFromCode?: string;
+}) {
   const t = useTranslations();
   const router = useRouter();
   const dialog = useConfirmDialog();
@@ -67,8 +81,8 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
   const warehouseId = activeWarehouseId;
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [lines, setLines] = useState<Line[]>([]);
-  const [note, setNote] = useState("");
+  const [lines, setLines] = useState<Line[]>(initialLines);
+  const [note, setNote] = useState(initialNote);
   const [busy, setBusy] = useState<"draft" | "balance" | null>(null);
   const [error, setError] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
@@ -190,7 +204,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
         backHref={Routes.Stocktakes}
         backLabel={t("common.back")}
         title={t("stocktakes.createNew")}
-        subtitle={t("stocktakes.balanceHint")}
+        subtitle={copyFromCode ? t("stocktakes.copyingFrom", { code: copyFromCode }) : t("stocktakes.balanceHint")}
         badge={<span className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-950 dark:text-primary-200">{t("stocktakes.status.draft")}</span>}
         actions={<div className="hidden min-w-44 sm:block">
           <Select
