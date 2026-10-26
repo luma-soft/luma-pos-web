@@ -3,12 +3,10 @@
 import { productLineDisplayName } from "@/lib/products/variant-presentation";
 
 import { Select } from "@/components/ui/select";
-import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ChevronDown, ClipboardCheck, Filter, History, Plus, Search, X } from "lucide-react";
+import { Filter, History, Search, X } from "lucide-react";
 import { selectAllInputOnClick } from "@/lib/input-selection";
-import { Routes } from "@/lib/routes";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
 
 export type MovementItem = {
@@ -27,53 +25,6 @@ const MOVE_STYLES: Record<string, string> = {
   purchase: "text-ok", sale: "text-er", return_in: "text-in", return_out: "text-warn",
   transfer: "text-in", adjust: "text-warn", init: "text-slate-500", internal_use: "text-warn",
 };
-
-export function StockActionMenu() {
-  const t = useTranslations();
-  const root = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
-    const closeKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", closeKey);
-    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", closeKey); };
-  }, [open]);
-
-  return (
-    <div ref={root} className="relative ml-auto flex items-center gap-2">
-      <Link
-        href={`${Routes.Inventory}?tab=stock#stock-history`}
-        className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-primary-700 shadow-e1 transition hover:bg-surface-2 dark:text-primary-300"
-      >
-        <History className="h-4 w-4" />
-        {t("inventory.actions.history")}
-      </Link>
-      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-slate-700 shadow-e1 transition hover:bg-surface-2 dark:text-slate-200">
-        <ClipboardCheck className="h-4 w-4 text-primary-600" />
-        {t("inventory.actions.warehouseActions")}
-        <ChevronDown className={cn("h-4 w-4 text-slate-400 transition", open && "rotate-180")} />
-      </button>
-      <Link href={Routes.PurchaseNew} className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white transition hover:bg-primary-700 active:scale-[0.98]">
-        <Plus className="h-4 w-4" />{t("purchases.createNew")}
-      </Link>
-      {open && (
-        <div role="menu" className="absolute right-[152px] top-[calc(100%+8px)] z-40 w-64 rounded-xl border border-border bg-surface p-1.5 shadow-e3">
-          <Link role="menuitem" href={Routes.StocktakeNew} className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" onClick={() => setOpen(false)}>
-            <ClipboardCheck className="mt-0.5 h-4 w-4 text-primary-600" />
-            <span><span className="block text-sm font-semibold">{t("stocktakes.createNew")}</span><span className="mt-0.5 block text-xs text-slate-400">{t("inventory.actions.startStocktakeHint")}</span></span>
-          </Link>
-          <Link role="menuitem" href={`${Routes.Inventory}?tab=stocktakes`} className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" onClick={() => setOpen(false)}>
-            <History className="mt-0.5 h-4 w-4 text-slate-500" />
-            <span><span className="block text-sm font-semibold">{t("inventory.actions.viewStocktakes")}</span><span className="mt-0.5 block text-xs text-slate-400">{t("inventory.actions.viewStocktakesHint")}</span></span>
-          </Link>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function RecentMovements({ movements }: { movements: MovementItem[] }) {
   const t = useTranslations();

@@ -1,15 +1,15 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { Routes } from "@/lib/routes";
 import { Text } from "@/components/ui/text";
 import { StockTab } from "./tabs/stock";
 import { ProductsTab, ProductsTabLoading } from "./tabs/products";
 import { PricingTab } from "./tabs/pricing";
 import { PurchasesTab } from "./tabs/purchases";
 import { PurchaseReturnsTab } from "./tabs/purchase-returns";
-import { StocktakesTab } from "./tabs/stocktakes";
 import { InternalUseTab } from "./tabs/internal-use";
 import { InventoryNavigation } from "./inventory-navigation";
-import { StockActionMenu } from "./tabs/stock-actions";
 import { InventoryTabErrorBoundary } from "./inventory-tab-error-boundary";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,15 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const t = await getTranslations();
   const params = await searchParams;
   const requestedTab = params.tab ?? "products";
+  if (requestedTab === "stocktakes") {
+    const redirectedParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (!value || key === "tab") continue;
+      redirectedParams.set(key === "q" ? "stocktakeQ" : key, value);
+    }
+    redirectedParams.set("tab", "stock");
+    redirect(`${Routes.Inventory}?${redirectedParams.toString()}`);
+  }
   const tab = requestedTab === "categories" ? "products" : requestedTab;
   const effectiveParams = requestedTab === "categories"
     ? { ...params, tab: "products", catalog: "categories" }
@@ -29,15 +38,13 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           : tab === "pricing" ? t("nav.pricing")
             : tab === "purchase-returns" ? t("purchaseReturns.title")
               : tab === "internal" ? t("nav.internalUse")
-                : tab === "stocktakes" ? t("stocktakes.title")
                   : t("nav.products");
   const tabContent = tab === "products" || tab === "camera-materials" ? <ProductsTab searchParams={tab === "camera-materials" ? { ...effectiveParams, cameraMaterials: "1" } : effectiveParams} />
     : tab === "pricing" ? <PricingTab searchParams={params} />
       : tab === "purchases" ? <PurchasesTab searchParams={params} />
         : tab === "purchase-returns" ? <PurchaseReturnsTab searchParams={params} />
           : tab === "internal" ? <InternalUseTab searchParams={params} />
-            : tab === "stocktakes" ? <StocktakesTab searchParams={params} />
-              : <StockTab searchParams={params} />;
+                : <StockTab searchParams={params} />;
   const showProductListLoadingBoundary =
     tab === "products" && !effectiveParams.productModal && effectiveParams.catalog !== "categories";
 
@@ -49,7 +56,6 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             <Text as="h1" weight="bold" className="text-xl tracking-[-0.01em] lg:text-[17px]" text={t("nav.groups.inventory")} />
             <Text as="p" variant="muted" className="mt-0.5 text-xs font-semibold lg:hidden" text={t("mobile.inventory.subtitle")} />
           </div>
-          {tab === "stock" && <div className="hidden lg:block"><StockActionMenu /></div>}
         </div>
         <div className="overflow-x-auto px-4 pb-2 sm:px-6"><InventoryNavigation activeTab={tab} /></div>
       </div>

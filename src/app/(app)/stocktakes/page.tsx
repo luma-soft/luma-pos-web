@@ -4,6 +4,11 @@ export default async function StocktakesRedirect({ searchParams }: { searchParam
   const sp = await searchParams;
   const usp = new URLSearchParams();
   for (const [k, v] of Object.entries(sp)) if (typeof v === "string") usp.set(k, v);
-  usp.set("tab", "stocktakes");
+  const search = usp.get("q");
+  if (search) {
+    usp.set("stocktakeQ", search);
+    usp.delete("q");
+  }
+  usp.set("tab", "stock");
   redirect(`/inventory?${usp.toString()}`);
 }

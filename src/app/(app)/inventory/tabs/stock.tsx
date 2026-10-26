@@ -72,7 +72,7 @@ async function StockOverviewContent({ searchParams }: { searchParams: SP }) {
       statusCounts={overview.statusCounts}
       movements={movementItems}
     >
-      <StocktakesTab searchParams={searchParams} embedded />
+      <StocktakesTab searchParams={searchParams} />
     </StockOverview>
   );
 }

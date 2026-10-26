@@ -83,7 +83,7 @@ export default async function MorePage() {
           <MoreSection title={t("nav.groups.inventory")}>
             <MobileSettingsRow href={`${Routes.Inventory}?tab=products`} icon={PackageSearch} label={t("nav.products")} subtitle={t("mobile.more.productsHint")} tone="blue" />
             <MobileSettingsRow href={`${Routes.Inventory}?tab=purchases`} icon={ShoppingCart} label={t("nav.purchases")} subtitle={t("mobile.more.purchasesHint")} />
-            <MobileSettingsRow href={`${Routes.Inventory}?tab=stocktakes`} icon={ClipboardCheck} label={t("nav.stocktakes")} subtitle={t("mobile.more.stocktakesHint")} tone="orange" />
+            <MobileSettingsRow href={`${Routes.Inventory}?tab=stock`} icon={ClipboardCheck} label={t("nav.stocktakes")} subtitle={t("mobile.more.stocktakesHint")} tone="orange" />
           </MoreSection>
         )}
 
