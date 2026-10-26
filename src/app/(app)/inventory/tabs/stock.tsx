@@ -67,8 +67,7 @@ async function StockOverviewContent() {
   return (
     <StockOverview
       totalValue={overview.totalValue}
-      totalSkuCount={overview.totalSkuCount}
-      movementCount={movements.length}
+      productCount={overview.totalSkuCount}
       statusCounts={overview.statusCounts}
       movements={movementItems}
     />

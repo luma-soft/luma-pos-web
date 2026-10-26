@@ -3557,6 +3557,7 @@
     "warehouseTab": "Warehouse",
     "cameraMaterials": "Camera materials",
     "totalValue": "Stock value",
+    "totalProducts": "Products",
     "byCost": "At cost price",
     "lowStock": "Low stock",
     "belowMin": "Below minimum",

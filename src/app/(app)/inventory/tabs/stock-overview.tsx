@@ -31,14 +31,12 @@ const STATUS_CARDS: Array<{
 
 export function StockOverview({
   totalValue,
-  totalSkuCount,
-  movementCount,
+  productCount,
   statusCounts,
   movements,
 }: {
   totalValue: number;
-  totalSkuCount: number;
-  movementCount: number;
+  productCount: number;
   statusCounts: InventoryStatusCounts;
   movements: MovementItem[];
 }) {
@@ -57,22 +55,19 @@ export function StockOverview({
           tone="primary"
         />
         <OverviewMetric
-          label={t("inventory.transactions")}
-          value={formatNumber(movementCount)}
+          label={t("inventory.totalProducts")}
+          value={formatNumber(productCount)}
         />
       </section>
 
       <section aria-labelledby="inventory-status-heading">
-        <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <div className="mb-3">
           <h2
             id="inventory-status-heading"
             className="text-base font-bold text-slate-900 dark:text-slate-100"
           >
             {t("inventory.statusSection")}
           </h2>
-          <span className="text-sm font-medium text-slate-500">
-            {t("inventory.skuTotal", { count: formatNumber(totalSkuCount) })}
-          </span>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
