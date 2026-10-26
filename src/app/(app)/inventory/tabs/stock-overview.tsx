@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import {
   Check,
@@ -34,11 +35,13 @@ export function StockOverview({
   productCount,
   statusCounts,
   movements,
+  children,
 }: {
   totalValue: number;
   productCount: number;
   statusCounts: InventoryStatusCounts;
   movements: MovementItem[];
+  children?: ReactNode;
 }) {
   const t = useTranslations();
 
@@ -82,6 +85,8 @@ export function StockOverview({
           ))}
         </div>
       </section>
+
+      {children}
 
       <RecentMovements movements={movements} />
     </div>

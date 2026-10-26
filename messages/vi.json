@@ -5487,6 +5487,7 @@
   },
   "stocktakes": {
     "title": "Kiểm kho",
+    "listTitle": "Danh sách phiếu kiểm kho",
     "createNew": "Kiểm kho",
     "viewDetails": "Xem chi tiết phiếu",
     "empty": "Chưa có phiếu kiểm kho nào",

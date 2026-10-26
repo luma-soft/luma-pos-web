@@ -18,6 +18,7 @@ import { StockTable } from "./stock-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { serializeMovementCreatedAt } from "@/lib/inventory/movement-serialization";
 import { StockOverview } from "./stock-overview";
+import { StocktakesTab } from "./stocktakes";
 import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 import { ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -46,13 +47,13 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
       {status ? (
         <StockStatusDetail searchParams={searchParams} status={status} />
       ) : (
-        <StockOverviewContent />
+        <StockOverviewContent searchParams={searchParams} />
       )}
     </Suspense>
   );
 }
 
-async function StockOverviewContent() {
+async function StockOverviewContent({ searchParams }: { searchParams: SP }) {
   const context = await requireStoreContext();
   const [overview, movements] = await Promise.all([
     getInventoryOverview(context.storeId),
@@ -70,7 +71,9 @@ async function StockOverviewContent() {
       productCount={overview.totalSkuCount}
       statusCounts={overview.statusCounts}
       movements={movementItems}
-    />
+    >
+      <StocktakesTab searchParams={searchParams} embedded />
+    </StockOverview>
   );
 }
 

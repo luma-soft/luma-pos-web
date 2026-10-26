@@ -74,7 +74,7 @@ export function StocktakeMobileRow({
   );
 }
 
-export function StocktakesTable({ rows }: { rows: StocktakeRow[] }) {
+export function StocktakesTable({ rows, fillHeight = true }: { rows: StocktakeRow[]; fillHeight?: boolean }) {
   const t = useTranslations();
   const columns: DataTableColumn<StocktakeRow>[] = [
     { key: "code", label: t("stocktakes.cols.code"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
@@ -92,6 +92,9 @@ export function StocktakesTable({ rows }: { rows: StocktakeRow[] }) {
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="1080px"
+      fillHeight={fillHeight}
+      maxHeight={fillHeight ? undefined : "none"}
+      minHeight={fillHeight ? 280 : 0}
       rowClassName={(row) => cn(row.status === "cancelled" && "opacity-60")}
       renderMobileRow={({ row, toggle }) => (
         <StocktakeMobileRow

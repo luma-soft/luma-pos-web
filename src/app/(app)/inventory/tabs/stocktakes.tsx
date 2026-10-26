@@ -8,13 +8,21 @@ import { Routes } from "@/lib/routes";
 import { StocktakesTable } from "./stocktakes-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { cn } from "@/lib/utils";
 
 type SP = Record<string, string | undefined>;
 
-export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
+export async function StocktakesTab({
+  searchParams,
+  embedded = false,
+}: {
+  searchParams: SP;
+  embedded?: boolean;
+}) {
   const context = await requireStoreContext();
   const t = await getTranslations();
-  const q = searchParams.q?.trim();
+  const searchKey = embedded ? "stocktakeQ" : "q";
+  const q = searchParams[searchKey]?.trim();
   const searchCondition = q
     ? or(
       ilike(stocktakes.code, `%${q}%`),
@@ -38,15 +46,26 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
     .orderBy(desc(stocktakes.createdAt)).limit(50);
 
   return (
-    <>
-      <InstantFilterForm className="mb-4 flex flex-wrap items-center gap-3" action={Routes.Inventory}>
-        <input type="hidden" name="tab" value="stocktakes" />
+    <section
+      className={embedded ? "space-y-4" : undefined}
+      aria-labelledby={embedded ? "stocktake-list-heading" : undefined}
+    >
+      {embedded && (
+        <h2 id="stocktake-list-heading" className="text-base font-bold text-slate-900 dark:text-slate-100">
+          {t("stocktakes.listTitle")}
+        </h2>
+      )}
+      <InstantFilterForm
+        className={cn("flex flex-wrap items-center gap-3", !embedded && "mb-4")}
+        action={Routes.Inventory}
+      >
+        <input type="hidden" name="tab" value={embedded ? "stock" : "stocktakes"} />
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            name="q"
-            defaultValue={searchParams.q ?? ""}
+            name={searchKey}
+            defaultValue={searchParams[searchKey] ?? ""}
             placeholder="Theo mã phiếu kiểm"
             className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm min-h-11 lg:min-h-0"
           />
@@ -64,9 +83,9 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
           <p className="text-sm mt-1">{t("stocktakes.emptyHint")}</p>
         </div>
       ) : (
-        <StocktakesTable rows={rows} />
+        <StocktakesTable rows={rows} fillHeight={!embedded} />
       )}
-      <p className="text-xs text-slate-400 mt-3">{t("stocktakes.balanceHint")}</p>
-    </>
+      <p className={cn("text-xs text-slate-400", !embedded && "mt-3")}>{t("stocktakes.balanceHint")}</p>
+    </section>
   );
 }
