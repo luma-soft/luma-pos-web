@@ -141,6 +141,17 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
       customerId: orders.customerId,
       customerName: customers.name,
       customerType: customers.type,
+      itemCount: sql<number>`(
+        select count(*)::int from ${orderItems}
+        where ${orderItems.orderId} = ${orders.id}
+          and ${orderItems.storeId} = ${storeId}
+      )`,
+      productNames: sql<string>`coalesce((
+        select string_agg(${orderItems.productName}, ', ' order by ${orderItems.id})
+        from ${orderItems}
+        where ${orderItems.orderId} = ${orders.id}
+          and ${orderItems.storeId} = ${storeId}
+      ), '')`,
     })
       .from(orders)
       .leftJoin(customers, eq(orders.customerId, customers.id))
