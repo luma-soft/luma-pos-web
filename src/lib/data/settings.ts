@@ -2,9 +2,14 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { paymentBankAccounts, profiles, storeSettings } from "@/db/schema";
 import { parseStorePrefs, type StorePrefs } from "@/lib/schemas/settings";
+import { resolveStoreAddress } from "@/lib/addresses/vietnam";
 
 export type StoreSettings = {
-  name: string; address: string; phone: string; taxCode: string;
+  name: string; address: string; addressLine: string;
+  addressProvinceCode: string; addressWardCode: string;
+  addressProvinceName: string; addressWardName: string;
+  addressLatitude: number | null; addressLongitude: number | null;
+  phone: string; taxCode: string;
   industry: string; currency: string; locale: string; onboarded: boolean;
   prefs: StorePrefs;
 };
@@ -72,8 +77,9 @@ export async function getShopeeSettings(storeId: string) {
 export async function getStoreSettings(storeId: string): Promise<StoreSettings> {
   const [row] = await db.select().from(storeSettings).where(eq(storeSettings.storeId, storeId)).limit(1);
   if (!row) throw new Error("Store settings not found");
+  const address = resolveStoreAddress(row);
   return {
-    name: row.name, address: row.address, phone: row.phone, taxCode: row.taxCode,
+    name: row.name, ...address, phone: row.phone, taxCode: row.taxCode,
     industry: row.industry, currency: row.currency, locale: row.locale, onboarded: row.onboarded,
     prefs: sanitizeStorePrefsForClient(parseStorePrefs(row.prefs)),
   };

@@ -44,6 +44,7 @@ import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 import { Routes } from "@/lib/routes";
 import { applyStaffSettingsMutation } from "@/lib/settings/staff-settings-service";
 import { parseStaffSettingsMutation } from "@/lib/settings/staff-settings-mutation";
+import { formatStoreAddress, parseLegacyStoreAddress } from "@/lib/addresses/vietnam";
 
 type AiProviderTestKind = "text" | "vision";
 
@@ -172,11 +173,43 @@ export async function updateStoreSettings(input: StoreSettingsInput): Promise<Ac
   try {
     await db.transaction(async (tx) => {
       const [current] = await tx.select().from(storeSettings).where(eq(storeSettings.storeId, gate.storeId)).limit(1).for("update");
-      const changedFields = (Object.keys(v) as Array<keyof typeof v>).filter((key) => current?.[key] !== v[key]);
+      const hasStructuredAddress = typeof input === "object" && input !== null &&
+        ("addressLine" in input || "addressProvinceCode" in input || "addressWardCode" in input);
+      let addressLine: string;
+      let addressProvinceCode: string;
+      let addressWardCode: string;
+      if (hasStructuredAddress) {
+        addressLine = v.addressLine?.trim() ?? "";
+        addressProvinceCode = v.addressProvinceCode?.trim() ?? "";
+        addressWardCode = v.addressWardCode?.trim() ?? "";
+      } else if (current && v.address.trim() === current.address) {
+        const legacy = parseLegacyStoreAddress(current.address);
+        addressLine = current.addressLine || legacy.addressLine;
+        addressProvinceCode = current.addressProvinceCode || legacy.addressProvinceCode;
+        addressWardCode = current.addressWardCode || legacy.addressWardCode;
+      } else {
+        addressLine = v.address.trim();
+        addressProvinceCode = "";
+        addressWardCode = "";
+      }
+      const address = formatStoreAddress(addressLine, addressProvinceCode, addressWardCode) || addressLine;
+      const values = {
+        name: v.name,
+        address,
+        addressLine,
+        addressProvinceCode,
+        addressWardCode,
+        phone: v.phone,
+        taxCode: v.taxCode,
+        industry: v.industry,
+        currency: v.currency,
+        locale: v.locale,
+      };
+      const changedFields = (Object.keys(values) as Array<keyof typeof values>).filter((key) => current?.[key] !== values[key]);
       if (current && !changedFields.length) return;
       await tx.insert(storeSettings)
-        .values({ id: gate.storeId, storeId: gate.storeId, ...v })
-        .onConflictDoUpdate({ target: storeSettings.storeId, set: { ...v, updatedAt: sql`now()` } });
+        .values({ id: gate.storeId, storeId: gate.storeId, ...values })
+        .onConflictDoUpdate({ target: storeSettings.storeId, set: { ...values, updatedAt: sql`now()` } });
       await recordActivity(tx, {
         storeId: gate.storeId, actorId: gate.userId, action: "settings.store.updated", entityType: "store_settings", entityId: gate.storeId,
         before: current ? { name: current.name, industry: current.industry, currency: current.currency, locale: current.locale } : null,

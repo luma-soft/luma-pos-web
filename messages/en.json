@@ -4082,6 +4082,19 @@
   },
   "settings": {
     "moreSoon": "More settings (staff, permissions, e-invoice…) coming with the roadmap.",
+    "storeAddress": {
+      "addressLine": "Street address",
+      "addressLinePlaceholder": "House number, street, neighborhood...",
+      "province": "Province / city",
+      "ward": "Ward / commune",
+      "chooseProvince": "Choose a province / city",
+      "chooseWard": "Choose a ward / commune",
+      "chooseProvinceFirst": "Choose a province / city first",
+      "loadingProvinces": "Loading provinces / cities...",
+      "loadingWards": "Loading wards / communes...",
+      "wardRequired": "Choose a ward / commune in the selected province or city.",
+      "saveFailed": "Could not save store information. Please try again."
+    },
     "breadcrumb": {
       "settings": "Settings",
       "store": "Store",

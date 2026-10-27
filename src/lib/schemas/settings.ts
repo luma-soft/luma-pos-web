@@ -11,15 +11,31 @@ import {
   normalizeConfiguredNotificationRoles,
 } from "@/lib/notifications/routing-policy";
 import type { NotificationCategory } from "@/lib/notifications/contracts";
+import { getVietnamProvince, getVietnamWard } from "@/lib/addresses/vietnam";
 
 export const storeSettingsSchema = z.object({
   name: z.string().max(200).default(""),
   address: z.string().max(300).default(""),
+  addressLine: z.string().trim().max(220).optional(),
+  addressProvinceCode: z.string().trim().max(8).optional(),
+  addressWardCode: z.string().trim().max(8).optional(),
   phone: z.string().max(30).default(""),
   taxCode: z.string().max(30).default(""),
   industry: z.string().max(40).default("grocery"),
   currency: z.string().max(10).default("VND"),
   locale: z.string().max(10).default("vi-VN"),
+}).superRefine((value, context) => {
+  const provinceCode = value.addressProvinceCode?.trim() ?? "";
+  const wardCode = value.addressWardCode?.trim() ?? "";
+  if (Boolean(provinceCode) !== Boolean(wardCode)) {
+    context.addIssue({ code: "custom", path: [provinceCode ? "addressWardCode" : "addressProvinceCode"], message: "incomplete_store_address" });
+  }
+  if (provinceCode && !getVietnamProvince(provinceCode)) {
+    context.addIssue({ code: "custom", path: ["addressProvinceCode"], message: "invalid_store_province" });
+  }
+  if (wardCode && !getVietnamWard(provinceCode, wardCode)) {
+    context.addIssue({ code: "custom", path: ["addressWardCode"], message: "invalid_store_ward" });
+  }
 });
 export type StoreSettingsInput = z.input<typeof storeSettingsSchema>;
 

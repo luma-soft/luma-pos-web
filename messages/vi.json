@@ -4082,6 +4082,19 @@
   },
   "settings": {
     "moreSoon": "Các mục cài đặt khác (nhân viên, phân quyền, HĐĐT…) sẽ bổ sung theo lộ trình.",
+    "storeAddress": {
+      "addressLine": "Địa chỉ chi tiết",
+      "addressLinePlaceholder": "Số nhà, tên đường, khu phố...",
+      "province": "Tỉnh / thành phố",
+      "ward": "Phường / xã",
+      "chooseProvince": "Chọn tỉnh / thành phố",
+      "chooseWard": "Chọn phường / xã",
+      "chooseProvinceFirst": "Chọn tỉnh / thành phố trước",
+      "loadingProvinces": "Đang tải tỉnh / thành phố...",
+      "loadingWards": "Đang tải phường / xã...",
+      "wardRequired": "Vui lòng chọn phường / xã trong tỉnh / thành phố đã chọn.",
+      "saveFailed": "Không thể lưu thông tin cửa hàng. Vui lòng thử lại."
+    },
     "breadcrumb": {
       "settings": "Cài đặt",
       "store": "Cửa hàng",

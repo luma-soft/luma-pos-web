@@ -8,6 +8,7 @@ import { storeSettingsSchema, type StoreSettingsInput } from "@/lib/schemas/sett
 import { type ActionResult } from "./common";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { recordActivity } from "@/lib/audit/activity-log";
+import { formatStoreAddress } from "@/lib/addresses/vietnam";
 
 /** Hoàn tất thiết lập ban đầu — lưu thông tin cửa hàng + đánh dấu onboarded. */
 export async function completeOnboarding(input: StoreSettingsInput): Promise<ActionResult> {
@@ -19,11 +20,41 @@ export async function completeOnboarding(input: StoreSettingsInput): Promise<Act
   try {
     await db.transaction(async (tx) => {
       const [current] = await tx.select().from(storeSettings).where(eq(storeSettings.storeId, context.storeId)).limit(1).for("update");
-      const changedFields = (Object.keys(v) as Array<keyof typeof v>).filter((key) => current?.[key] !== v[key]);
+      const hasStructuredAddress = typeof input === "object" && input !== null &&
+        ("addressLine" in input || "addressProvinceCode" in input || "addressWardCode" in input);
+      const addressLine = hasStructuredAddress
+        ? v.addressLine?.trim() ?? ""
+        : current && v.address.trim() === current.address
+          ? current.addressLine || v.address.trim()
+          : v.address.trim();
+      const addressProvinceCode = hasStructuredAddress
+        ? v.addressProvinceCode?.trim() ?? ""
+        : current && v.address.trim() === current.address
+          ? current.addressProvinceCode
+          : "";
+      const addressWardCode = hasStructuredAddress
+        ? v.addressWardCode?.trim() ?? ""
+        : current && v.address.trim() === current.address
+          ? current.addressWardCode
+          : "";
+      const address = formatStoreAddress(addressLine, addressProvinceCode, addressWardCode) || addressLine;
+      const values = {
+        name: v.name,
+        address,
+        addressLine,
+        addressProvinceCode,
+        addressWardCode,
+        phone: v.phone,
+        taxCode: v.taxCode,
+        industry: v.industry,
+        currency: v.currency,
+        locale: v.locale,
+      };
+      const changedFields = (Object.keys(values) as Array<keyof typeof values>).filter((key) => current?.[key] !== values[key]);
       if (current?.onboarded && !changedFields.length) return;
       await tx.insert(storeSettings)
-        .values({ storeId: context.storeId, id: "default", ...v, onboarded: true })
-        .onConflictDoUpdate({ target: storeSettings.storeId, set: { ...v, onboarded: true, updatedAt: sql`now()` } });
+        .values({ storeId: context.storeId, id: "default", ...values, onboarded: true })
+        .onConflictDoUpdate({ target: storeSettings.storeId, set: { ...values, onboarded: true, updatedAt: sql`now()` } });
       await recordActivity(tx, {
         storeId: context.storeId, actorId: context.userId, action: "settings.onboarding.completed", entityType: "store_settings", entityId: context.storeId,
         before: current ? { name: current.name, onboarded: current.onboarded } : null,

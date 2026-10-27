@@ -468,13 +468,70 @@ const AVATAR_COLORS = ["#0C7B6B", "#1D4ED8", "#B45309", "#6B6F76", "#9CA0A8"];
 
 function StoreSection({ L, store, canManage }: { L: boolean; store: StoreSettings; canManage: boolean }) {
   const [form, setForm] = useState(store);
+  const [provinceOptions, setProvinceOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [wardOptions, setWardOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [loadingProvinces, setLoadingProvinces] = useState(false);
+  const [loadingWards, setLoadingWards] = useState(false);
+  const [addressError, setAddressError] = useState("");
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
-  const set = <K extends keyof StoreSettings>(k: K, v: StoreSettings[K]) => { setForm((p) => ({ ...p, [k]: v })); setDirty(true); setSaved(false); };
+  const set = <K extends keyof StoreSettings>(k: K, v: StoreSettings[K]) => { setForm((p) => ({ ...p, [k]: v })); setDirty(true); setSaved(false); setAddressError(""); };
   const industryOpts = INDUSTRY_OPTS.map((value) => ({ value, label: settingsTextByFlag(L, `ui.industries.${value}`) }));
   const currencyOpts = [{ value: "VND", label: settingsTextByFlag(L, "ui.currency.vnd") }, { value: "USD", label: settingsTextByFlag(L, "ui.currency.usd") }];
-  function save() { start(async () => { const res = await updateStoreSettings(form); if (res.ok) { setDirty(false); setSaved(true); } }); }
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingProvinces(true);
+    fetch("/api/public/address-catalog", { cache: "force-cache" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("address_catalog_unavailable");
+        return response.json() as Promise<{ data?: { options?: Array<{ code: string; name: string; englishName: string }> } }>;
+      })
+      .then((payload) => {
+        if (!cancelled) setProvinceOptions((payload.data?.options ?? []).map((option) => ({
+          value: option.code,
+          label: L ? option.name : option.englishName,
+        })));
+      })
+      .catch(() => { if (!cancelled) setProvinceOptions([]); })
+      .finally(() => { if (!cancelled) setLoadingProvinces(false); });
+    return () => { cancelled = true; };
+  }, [L]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!form.addressProvinceCode) {
+      setWardOptions([]);
+      setLoadingWards(false);
+      return () => { cancelled = true; };
+    }
+    setLoadingWards(true);
+    fetch(`/api/public/address-catalog?provinceCode=${encodeURIComponent(form.addressProvinceCode)}`, { cache: "force-cache" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("address_catalog_unavailable");
+        return response.json() as Promise<{ data?: { options?: Array<{ code: string; name: string; englishName: string }> } }>;
+      })
+      .then((payload) => {
+        if (!cancelled) setWardOptions((payload.data?.options ?? []).map((option) => ({
+          value: option.code,
+          label: L ? option.name : option.englishName,
+        })));
+      })
+      .catch(() => { if (!cancelled) setWardOptions([]); })
+      .finally(() => { if (!cancelled) setLoadingWards(false); });
+    return () => { cancelled = true; };
+  }, [form.addressProvinceCode, L]);
+  function save() {
+    if (Boolean(form.addressProvinceCode) !== Boolean(form.addressWardCode)) {
+      setAddressError(settingsTextByFlag(L, "storeAddress.wardRequired"));
+      return;
+    }
+    setAddressError("");
+    start(async () => {
+      const res = await updateStoreSettings(form);
+      if (res.ok) { setDirty(false); setSaved(true); }
+      else setAddressError(settingsTextByFlag(L, "storeAddress.saveFailed"));
+    });
+  }
   return (
     <Card title={settingsTextByFlag(L, "legacy.0c4a17131dac")} vi={settingsTextByFlag(L, "legacy.2b5c7ad93928")}>
       <div className="p-4.5 flex flex-col gap-3">
@@ -482,7 +539,40 @@ function StoreSection({ L, store, canManage }: { L: boolean; store: StoreSetting
           <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.a8d9ef6d3dc5")}</span><input className={FI} value={form.name} disabled={!canManage} onChange={(e) => set("name", e.target.value)} /></div>
           <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.8f0bb5fb2246")}</span><input className={FI} value={form.phone} disabled={!canManage} onChange={(e) => set("phone", e.target.value)} /></div>
         </div>
-        <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.4c007f9511be")}</span><input className={FI} value={form.address} disabled={!canManage} onChange={(e) => set("address", e.target.value)} /></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <span className={FL}>{settingsTextByFlag(L, "storeAddress.province")}</span>
+            <SearchableSelect
+              options={provinceOptions}
+              value={form.addressProvinceCode}
+              onChange={(value) => {
+                set("addressProvinceCode", value);
+                set("addressWardCode", "");
+              }}
+              placeholder={loadingProvinces ? settingsTextByFlag(L, "storeAddress.loadingProvinces") : settingsTextByFlag(L, "storeAddress.chooseProvince")}
+              allowClear
+              disabled={!canManage || loadingProvinces}
+              className={searchableTouch}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className={FL}>{settingsTextByFlag(L, "storeAddress.ward")}</span>
+            <SearchableSelect
+              options={wardOptions}
+              value={form.addressWardCode}
+              onChange={(value) => set("addressWardCode", value)}
+              placeholder={loadingWards ? settingsTextByFlag(L, "storeAddress.loadingWards") : settingsTextByFlag(L, form.addressProvinceCode ? "storeAddress.chooseWard" : "storeAddress.chooseProvinceFirst")}
+              allowClear
+              disabled={!canManage || !form.addressProvinceCode || loadingWards}
+              className={searchableTouch}
+            />
+            {addressError && <span className="text-xs text-er" role="alert">{addressError}</span>}
+          </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className={FL}>{settingsTextByFlag(L, "storeAddress.addressLine")}</span>
+          <input className={FI} value={form.addressLine} disabled={!canManage} placeholder={settingsTextByFlag(L, "storeAddress.addressLinePlaceholder")} onChange={(e) => set("addressLine", e.target.value)} />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.50d1b0adcda3")}</span><input className={FI} value={form.taxCode} disabled={!canManage} onChange={(e) => set("taxCode", e.target.value)} /></div>
           <div className="flex flex-col gap-1"><span className={FL}>{settingsTextByFlag(L, "legacy.d251731ba879")}</span>
