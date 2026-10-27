@@ -3936,6 +3936,7 @@
       "grandTotal": "Tổng thanh toán",
       "inWords": "Bằng chữ / ghi chú",
       "paymentInfo": "Thông tin chuyển khoản",
+      "qrInfo": "Thông tin QR",
       "signatures": "Chữ ký",
       "footer": "Chân trang"
     },

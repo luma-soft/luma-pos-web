@@ -3936,6 +3936,7 @@
       "grandTotal": "Grand total",
       "inWords": "Amount in words / note",
       "paymentInfo": "Payment information",
+      "qrInfo": "QR information",
       "signatures": "Signatures",
       "footer": "Footer"
     },
