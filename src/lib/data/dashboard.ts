@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   categories,
@@ -30,24 +30,41 @@ function rangeStart(range: DashboardRange): Date {
   return d;
 }
 
-export async function getDashboard(storeId: string, requestedRange?: DashboardRange) {
+export async function getDashboard(
+  storeId: string,
+  requestedRange?: DashboardRange,
+  customDateWindow?: { startAt: Date; endBefore: Date },
+) {
   const range = resolveDashboardRange(requestedRange);
-  const since = rangeStart(range);
+  const since = customDateWindow?.startAt ?? rangeStart(range);
+  const orderDateFilter = and(
+    gte(orders.createdAt, since),
+    customDateWindow ? lt(orders.createdAt, customDateWindow.endBefore) : undefined,
+  );
+  const returnDateFilter = and(
+    gte(returns.createdAt, since),
+    customDateWindow ? lt(returns.createdAt, customDateWindow.endBefore) : undefined,
+  );
   // chỉ đơn bán thật: loại quote/merged/cancelled/draft
   const realSale = inArray(orders.status, ["completed", "returned"]);
-  const inRange = and(eq(orders.storeId, storeId), realSale, gte(orders.createdAt, since));
-  const orderBucketKey = range === "today"
+  const inRange = and(eq(orders.storeId, storeId), realSale, orderDateFilter);
+  const orderBucketKey = range === "today" && !customDateWindow
     ? sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD-HH24')`
     : sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`;
-  const orderBucketLabel = range === "today"
+  const orderBucketLabel = range === "today" && !customDateWindow
     ? sql<string>`to_char(${orders.createdAt}, 'HH24"h"')`
     : sql<string>`to_char(${orders.createdAt}, 'DD/MM')`;
-  const returnBucketKey = range === "today"
+  const returnBucketKey = range === "today" && !customDateWindow
     ? sql<string>`to_char(${returns.createdAt}, 'YYYY-MM-DD-HH24')`
     : sql<string>`to_char(${returns.createdAt}, 'YYYY-MM-DD')`;
-  const returnBucketLabel = range === "today"
+  const returnBucketLabel = range === "today" && !customDateWindow
     ? sql<string>`to_char(${returns.createdAt}, 'HH24"h"')`
     : sql<string>`to_char(${returns.createdAt}, 'DD/MM')`;
+  const returnsInRange = and(
+    eq(returns.storeId, storeId),
+    returnDateFilter,
+    eq(returns.status, "completed"),
+  );
 
   const [
     [agg],
@@ -84,7 +101,7 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
 
     db.select({
       refundTotal: sql<string>`coalesce(sum(${returns.totalRefund}), 0)`,
-    }).from(returns).where(and(eq(returns.storeId, storeId), gte(returns.createdAt, since), eq(returns.status, "completed"))),
+    }).from(returns).where(returnsInRange),
 
     db.select({
       returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
@@ -92,7 +109,7 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
       .from(returnItems)
       .innerJoin(returns, eq(returnItems.returnId, returns.id))
       .innerJoin(products, eq(returnItems.productId, products.id))
-      .where(and(eq(returns.storeId, storeId), gte(returns.createdAt, since), eq(returns.status, "completed"))),
+      .where(returnsInRange),
 
     db.select({
       totalDebt: sql<string>`coalesce(sum(${customers.currentDebt}), 0)`,
@@ -223,7 +240,7 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
       refund: sql<string>`coalesce(sum(${returns.totalRefund}), 0)`,
     })
       .from(returns)
-      .where(and(eq(returns.storeId, storeId), gte(returns.createdAt, since), eq(returns.status, "completed")))
+      .where(returnsInRange)
       .groupBy(returnBucketKey, returnBucketLabel)
       .orderBy(returnBucketKey),
 
@@ -247,7 +264,7 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
       .from(returnItems)
       .innerJoin(returns, eq(returnItems.returnId, returns.id))
       .innerJoin(products, eq(returnItems.productId, products.id))
-      .where(and(eq(returns.storeId, storeId), gte(returns.createdAt, since), eq(returns.status, "completed")))
+      .where(returnsInRange)
       .groupBy(returnBucketKey, returnBucketLabel)
       .orderBy(returnBucketKey),
   ]);

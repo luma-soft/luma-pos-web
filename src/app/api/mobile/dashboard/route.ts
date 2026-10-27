@@ -1,7 +1,7 @@
 import { getDashboard, type DashboardRange } from "@/lib/data/dashboard";
 import { getExpiryStockAlerts } from "@/lib/data/inventory-lots";
 import { requireMobileUser } from "@/lib/mobile/auth";
-import { mobileGate, mobileOk, searchParam } from "@/lib/mobile/response";
+import { mobileError, mobileGate, mobileOk, searchParam } from "@/lib/mobile/response";
 
 const ranges = new Set<DashboardRange>(["today", "7d", "30d", "month"]);
 
@@ -10,12 +10,32 @@ export async function GET(request: Request) {
   if (!gate.ok) return mobileGate(gate)!;
 
   const requestedRange = searchParam(request, "range", "today");
+  const startAtValue = searchParam(request, "startAt");
+  const endBeforeValue = searchParam(request, "endBefore");
+  let customDateWindow: { startAt: Date; endBefore: Date } | undefined;
+  if (requestedRange === "custom" || startAtValue || endBeforeValue) {
+    if (requestedRange !== "custom" || !startAtValue || !endBeforeValue) {
+      return mobileError("errors.invalidData");
+    }
+    const startAt = new Date(startAtValue);
+    const endBefore = new Date(endBeforeValue);
+    const duration = endBefore.getTime() - startAt.getTime();
+    if (
+      !Number.isFinite(startAt.getTime()) ||
+      !Number.isFinite(endBefore.getTime()) ||
+      duration <= 0 ||
+      duration > 367 * 24 * 60 * 60 * 1000
+    ) {
+      return mobileError("errors.invalidData");
+    }
+    customDateWindow = { startAt, endBefore };
+  }
   const range = ranges.has(requestedRange as DashboardRange)
     ? (requestedRange as DashboardRange)
     : "today";
 
   const [dashboard, expiry] = await Promise.all([
-    getDashboard(gate.storeId, range),
+    getDashboard(gate.storeId, range, customDateWindow),
     getExpiryStockAlerts(gate.storeId, 30, 8),
   ]);
   return mobileOk({
