@@ -89,6 +89,7 @@ import {
 import { completeMaintenanceOccurrenceForJobCore } from "@/lib/services/maintenance-lifecycle";
 import { saveServiceInstallationBatchCore } from "@/lib/services/installation-items";
 import { deleteInstalledAssetCore } from "@/lib/services/delete-installed-asset";
+import { addressWriteFields, hasValidVietnamAddressSelection } from "@/lib/addresses/vietnam-form";
 
 const requireServiceManager = () => requireFeatureRole("field_services", ["owner", "manager"]);
 const requireServiceStockAccess = () => requireFeatureRole("field_services", ["owner", "manager", "warehouse"]);
@@ -206,6 +207,7 @@ export async function createServiceProject(
   const parsed = serviceProjectCreateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const value = parsed.data;
+  if (!hasValidVietnamAddressSelection(value)) return { ok: false, error: "errors.invalidData" };
   const initialNote = value.note?.trim();
 
   try {
@@ -214,7 +216,7 @@ export async function createServiceProject(
         storeId: gate.storeId,
         name: value.name,
         customerId: value.customerId ?? null,
-        address: value.address || null,
+        ...addressWriteFields(value),
         serviceType: value.serviceType,
         status: value.status,
         serviceStage: value.status === "done" ? "completed" : value.serviceStage,

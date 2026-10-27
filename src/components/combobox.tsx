@@ -42,7 +42,7 @@ function findScrollBoundary(element: HTMLElement | null) {
  * Dùng chung mọi nơi cần chọn thực thể (KH/SP/NCC/ĐVT/bảng giá/kho…).
  */
 export function SearchableSelect({
-  value, onChange, options, placeholder, className, allowClear = true, onCreate, showSearch, disabled, actionLabel, onAction, actionIcon,
+  value, onChange, options, placeholder, className, allowClear = true, onCreate, showSearch, disabled, actionLabel, onAction, actionIcon, id, ariaLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -57,6 +57,8 @@ export function SearchableSelect({
   actionLabel?: string;
   onAction?: () => void;
   actionIcon?: ReactNode;
+  id?: string;
+  ariaLabel?: string;
 }) {
   const t = useTranslations("common");
   const [open, setOpen] = useState(false);
@@ -303,11 +305,13 @@ export function SearchableSelect({
     <div ref={ref} className={cn("relative", className)}>
       <Button
         type="button"
+        id={id}
         variant="outline"
         block
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={ariaLabel}
         onClick={() => { setOpen((v) => !v); setQ(""); }}
         className="relative h-11 justify-start rounded-[10px] pl-3 pr-9 text-left lg:h-10"
       >

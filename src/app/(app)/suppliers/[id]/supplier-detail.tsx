@@ -10,6 +10,7 @@ import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { MobileRecordCard, MobileRecordField } from "@/components/mobile-ui";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { SupplierDetail, getSupplierPurchases } from "@/lib/data/partners";
+import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
 
 type Purchases = Awaited<ReturnType<typeof getSupplierPurchases>>;
 
@@ -20,7 +21,10 @@ export function SupplierDetailClient({ supplier, purchases }: { supplier: Suppli
   const [name, setName] = useState(supplier.name);
   const [phone, setPhone] = useState(supplier.phone ?? "");
   const [email, setEmail] = useState(supplier.email ?? "");
-  const [address, setAddress] = useState(supplier.address ?? "");
+  const address = supplier.address ?? "";
+  const [addressLine, setAddressLine] = useState(supplier.addressLine || supplier.address || "");
+  const [addressProvinceCode, setAddressProvinceCode] = useState(supplier.addressProvinceCode ?? "");
+  const [addressWardCode, setAddressWardCode] = useState(supplier.addressWardCode ?? "");
   const [taxCode, setTaxCode] = useState(supplier.taxCode ?? "");
   const [note, setNote] = useState(supplier.note ?? "");
   const [saving, setSaving] = useState(false);
@@ -29,7 +33,10 @@ export function SupplierDetailClient({ supplier, purchases }: { supplier: Suppli
 
   async function save() {
     setSaving(true); setError(""); setSaved(false);
-    const res = await updateSupplier({ id: supplier.id, name: name.trim(), phone, email, address, taxCode, note });
+    const res = await updateSupplier({
+      id: supplier.id, name: name.trim(), phone, email, address,
+      addressLine, addressProvinceCode, addressWardCode, taxCode, note,
+    });
     setSaving(false);
     if (res.ok) { setSaved(true); router.refresh(); setTimeout(() => setSaved(false), 2500); }
     else setError(t(res.error));
@@ -66,7 +73,16 @@ export function SupplierDetailClient({ supplier, purchases }: { supplier: Suppli
             <div className="md:col-span-2"><label className={lbl}>{t("suppliers.cols.name")}</label><input className={input} value={name} onChange={(e) => setName(e.target.value)} /></div>
             <div><label className={lbl}>{t("customers.cols.phone")}</label><input className={input} value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
             <div><label className={lbl}>Email</label><input className={input} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-            <div className="md:col-span-2"><label className={lbl}>{t("customers.fields.address")}</label><input className={input} value={address} onChange={(e) => setAddress(e.target.value)} /></div>
+            <VietnamAddressFields
+              idPrefix="supplier-detail-address"
+              className="md:col-span-2"
+              value={{ addressLine, addressProvinceCode, addressWardCode }}
+              onChange={(value) => {
+                setAddressLine(value.addressLine);
+                setAddressProvinceCode(value.addressProvinceCode);
+                setAddressWardCode(value.addressWardCode);
+              }}
+            />
             <div><label className={lbl}>{t("customers.fields.taxCode")}</label><input className={input} value={taxCode} onChange={(e) => setTaxCode(e.target.value)} /></div>
             <div className="md:col-span-2"><label className={lbl}>{t("customers.fields.note")}</label><input className={input} value={note} onChange={(e) => setNote(e.target.value)} /></div>
           </div>

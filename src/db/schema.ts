@@ -840,6 +840,9 @@ export const customers = pgTable("customers", {
   zaloUserId: text("zalo_user_id"),
   email: text("email"),
   address: text("address"),
+  addressLine: text("address_line").notNull().default(""),
+  addressProvinceCode: text("address_province_code").notNull().default(""),
+  addressWardCode: text("address_ward_code").notNull().default(""),
   type: customerTypeEnum("type").notNull().default("retail"),
   taxCode: varchar("tax_code", { length: 30 }), // MST cho công ty
   // Công nợ
@@ -1037,6 +1040,9 @@ export const suppliers = pgTable("suppliers", {
   phone: text("phone"),
   email: text("email"),
   address: text("address"),
+  addressLine: text("address_line").notNull().default(""),
+  addressProvinceCode: text("address_province_code").notNull().default(""),
+  addressWardCode: text("address_ward_code").notNull().default(""),
   taxCode: varchar("tax_code", { length: 30 }),
   currentDebt: decimal("current_debt", { precision: 14, scale: 2 }).notNull().default("0"),
   note: text("note"),
@@ -1631,6 +1637,9 @@ export const projects = pgTable("projects", {
   name: text("name").notNull(),
   customerId: uuid("customer_id").references(() => customers.id),
   address: text("address"),
+  addressLine: text("address_line").notNull().default(""),
+  addressProvinceCode: text("address_province_code").notNull().default(""),
+  addressWardCode: text("address_ward_code").notNull().default(""),
   status: text("status").notNull().default("active"), // active | done
   serviceType: serviceTypeEnum("service_type"),
   serviceStage: serviceProjectStageEnum("service_stage"),

@@ -7,6 +7,7 @@ import {
 } from "@/lib/schemas/order";
 import { type ActionResult, generateCode, toMoney } from "@/lib/actions/common";
 import { recordActivity } from "@/lib/audit/activity-log";
+import { addressWriteFields, hasValidVietnamAddressSelection } from "@/lib/addresses/vietnam-form";
 
 /**
  * Lõi tạo/sửa khách hàng — KHÔNG phải server action.
@@ -16,6 +17,7 @@ export async function createCustomerCore(storeId: string, input: CreateCustomerI
   const parsed = createCustomerSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  if (!hasValidVietnamAddressSelection(v)) return { ok: false, error: "errors.invalidData" };
   try {
     const row = await db.transaction(async (tx) => {
       const [created] = await tx.insert(customers).values({
@@ -25,7 +27,7 @@ export async function createCustomerCore(storeId: string, input: CreateCustomerI
         phone: v.phone?.trim() || null,
         zaloUserId: v.zaloUserId || null,
         email: v.email || null,
-        address: v.address?.trim() || null,
+        ...addressWriteFields(v),
         type: v.type,
         taxCode: v.taxCode?.trim() || null,
         debtLimit: toMoney(v.debtLimit),
@@ -66,6 +68,7 @@ export async function updateCustomerCore(storeId: string, input: UpdateCustomerI
   const parsed = updateCustomerSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  if (!hasValidVietnamAddressSelection(v)) return { ok: false, error: "errors.invalidData" };
   try {
     await db.transaction(async (tx) => {
       const [current] = await tx.select().from(customers)
@@ -76,7 +79,7 @@ export async function updateCustomerCore(storeId: string, input: UpdateCustomerI
         phone: v.phone?.slice(0, 20) || null,
         zaloUserId: v.zaloUserId || null,
         email: v.email || null,
-        address: v.address || null,
+        ...addressWriteFields(v),
         type: v.type,
         taxCode: v.taxCode?.slice(0, 30) || null,
         debtLimit: toMoney(v.debtLimit) ?? 0,

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai-assistant/utils";
 import { useTenantClientScope } from "@/components/tenant-client-scope";
 import type { ActionResult } from "@/lib/actions/common";
+import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
 
 type AiWorkflowDraft = {
   intent?: string;
@@ -32,7 +33,8 @@ type CreateCustomerAction = (
 
 function defaultCustomerValues(): CreateCustomerInput {
   return {
-    name: "", phone: "", email: "", zaloUserId: "", address: "", type: "retail",
+    name: "", phone: "", email: "", zaloUserId: "", address: "", addressLine: "",
+    addressProvinceCode: "", addressWardCode: "", type: "retail",
     taxCode: "", debtLimit: 0, note: "", consentStatus: "pending",
     consentPurposes: {}, consentSource: "web",
   };
@@ -52,6 +54,11 @@ function readAiCustomerDraft(storageScope: string): CreateCustomerInput | null {
       email: typeof payload.email === "string" ? payload.email : "",
       zaloUserId: typeof payload.zaloUserId === "string" ? payload.zaloUserId : "",
       address: typeof payload.address === "string" ? payload.address : "",
+      addressLine: typeof payload.addressLine === "string"
+        ? payload.addressLine
+        : typeof payload.address === "string" ? payload.address : "",
+      addressProvinceCode: typeof payload.addressProvinceCode === "string" ? payload.addressProvinceCode : "",
+      addressWardCode: typeof payload.addressWardCode === "string" ? payload.addressWardCode : "",
       type,
       taxCode: typeof payload.taxCode === "string" ? payload.taxCode : "",
       debtLimit: typeof payload.debtLimit === "number" ? payload.debtLimit : 0,
@@ -139,9 +146,20 @@ export function CustomerCreateForm({
           {(field) => <Input {...field} />}
         </FormField>
       </div>
-      <FormField name="address" labelTx="customers.fields.address">
-        {(field) => <Input {...field} />}
-      </FormField>
+      <VietnamAddressFields
+        idPrefix="customer-create-address"
+        className="sm:col-span-2"
+        value={{
+          addressLine: form.watch("addressLine") ?? "",
+          addressProvinceCode: form.watch("addressProvinceCode") ?? "",
+          addressWardCode: form.watch("addressWardCode") ?? "",
+        }}
+        onChange={(value) => {
+          form.setValue("addressLine", value.addressLine, { shouldDirty: true });
+          form.setValue("addressProvinceCode", value.addressProvinceCode, { shouldDirty: true });
+          form.setValue("addressWardCode", value.addressWardCode, { shouldDirty: true });
+        }}
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField name="taxCode" labelTx="customers.fields.taxCode">
           {(field) => <Input {...field} />}

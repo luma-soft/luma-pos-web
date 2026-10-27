@@ -8,6 +8,7 @@ import { Button, Form, FormField, Heading, Input, Textarea } from "@/components/
 import { createSupplier } from "@/lib/actions/partners";
 import { createSupplierSchema, type CreateSupplierInput, type CreateSupplierOutput } from "@/lib/schemas/order";
 import { cn } from "@/lib/utils";
+import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
 
 export type SupplierCreateResult = {
   id: string;
@@ -16,7 +17,10 @@ export type SupplierCreateResult = {
 };
 
 function defaultSupplierValues(): CreateSupplierInput {
-  return { name: "", phone: "", email: "", address: "", taxCode: "", note: "" };
+  return {
+    name: "", phone: "", email: "", address: "", addressLine: "",
+    addressProvinceCode: "", addressWardCode: "", taxCode: "", note: "",
+  };
 }
 
 export function SupplierCreateForm({
@@ -61,9 +65,20 @@ export function SupplierCreateForm({
           {(field) => <Input {...field} type="email" />}
         </FormField>
       </div>
-      <FormField name="address" labelTx="customers.fields.address">
-        {(field) => <Input {...field} />}
-      </FormField>
+      <VietnamAddressFields
+        idPrefix="supplier-create-address"
+        className="sm:col-span-2"
+        value={{
+          addressLine: form.watch("addressLine") ?? "",
+          addressProvinceCode: form.watch("addressProvinceCode") ?? "",
+          addressWardCode: form.watch("addressWardCode") ?? "",
+        }}
+        onChange={(value) => {
+          form.setValue("addressLine", value.addressLine, { shouldDirty: true });
+          form.setValue("addressProvinceCode", value.addressProvinceCode, { shouldDirty: true });
+          form.setValue("addressWardCode", value.addressWardCode, { shouldDirty: true });
+        }}
+      />
       <FormField name="taxCode" labelTx="customers.fields.taxCode">
         {(field) => <Input {...field} />}
       </FormField>

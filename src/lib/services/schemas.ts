@@ -17,6 +17,9 @@ export const serviceProjectCreateSchema = z.object({
   name: z.string().trim().min(1),
   customerId: z.uuid().nullable().optional(),
   address: z.string().trim().optional(),
+  addressLine: z.string().trim().max(220).optional(),
+  addressProvinceCode: z.string().trim().max(8).optional(),
+  addressWardCode: z.string().trim().max(8).optional(),
   serviceType: serviceTypeSchema,
   serviceStage: z.enum([
     "planning",

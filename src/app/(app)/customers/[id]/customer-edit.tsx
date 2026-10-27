@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import { useTranslations } from "next-intl";
 import { Pencil, Loader2, X } from "lucide-react";
 import { updateCustomer } from "@/lib/actions/partners";
+import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
 
 type CustomerType = "retail" | "wholesale" | "contractor" | "agent";
 
@@ -14,7 +15,8 @@ export function CustomerEdit({ customer }: {
   customer: {
     id: string; name: string; phone: string | null; email: string | null;
     zaloUserId: string | null;
-    address: string | null; type: CustomerType; taxCode: string | null;
+    address: string | null; addressLine?: string; addressProvinceCode?: string; addressWardCode?: string;
+    type: CustomerType; taxCode: string | null;
     debtLimit: string | null; note: string | null;
   };
 }) {
@@ -25,7 +27,10 @@ export function CustomerEdit({ customer }: {
   const [phone, setPhone] = useState(customer.phone ?? "");
   const [zaloUserId, setZaloUserId] = useState(customer.zaloUserId ?? "");
   const [email, setEmail] = useState(customer.email ?? "");
-  const [address, setAddress] = useState(customer.address ?? "");
+  const address = customer.address ?? "";
+  const [addressLine, setAddressLine] = useState(customer.addressLine || customer.address || "");
+  const [addressProvinceCode, setAddressProvinceCode] = useState(customer.addressProvinceCode ?? "");
+  const [addressWardCode, setAddressWardCode] = useState(customer.addressWardCode ?? "");
   const [type, setType] = useState<CustomerType>(customer.type);
   const [taxCode, setTaxCode] = useState(customer.taxCode ?? "");
   const [debtLimit, setDebtLimit] = useState(String(Number(customer.debtLimit ?? 0)));
@@ -36,7 +41,8 @@ export function CustomerEdit({ customer }: {
   async function save() {
     setSaving(true); setError("");
     const res = await updateCustomer({
-      id: customer.id, name: name.trim(), phone, zaloUserId, email, address, type,
+      id: customer.id, name: name.trim(), phone, zaloUserId, email, address,
+      addressLine, addressProvinceCode, addressWardCode, type,
       taxCode, debtLimit: Number(debtLimit) || 0, note,
     });
     setSaving(false);
@@ -66,7 +72,16 @@ export function CustomerEdit({ customer }: {
               <div><label className={lbl}>{t("customers.cols.phone")}</label><input className={input} value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
               <div><label className={lbl}>Email</label><input className={input} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
               <div className="sm:col-span-2"><label className={lbl}>{t("customers.fields.zaloUserId")}</label><input className={`${input} font-mono`} value={zaloUserId} onChange={(e) => setZaloUserId(e.target.value)} /></div>
-              <div className="sm:col-span-2"><label className={lbl}>{t("customers.fields.address")}</label><input className={input} value={address} onChange={(e) => setAddress(e.target.value)} /></div>
+              <VietnamAddressFields
+                idPrefix="customer-edit-address"
+                className="sm:col-span-2"
+                value={{ addressLine, addressProvinceCode, addressWardCode }}
+                onChange={(value) => {
+                  setAddressLine(value.addressLine);
+                  setAddressProvinceCode(value.addressProvinceCode);
+                  setAddressWardCode(value.addressWardCode);
+                }}
+              />
               <div><label className={lbl}>{t("customers.cols.type")}</label>
                 <Select
                   className={input}

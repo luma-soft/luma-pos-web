@@ -14,6 +14,7 @@ import { type ActionResult, generateCode, requireManager, requireStockAccess } f
 import { createCustomerCore, updateCustomerCore } from "@/lib/customers/write";
 import { Routes } from "@/lib/routes";
 import { recordActivity } from "@/lib/audit/activity-log";
+import { addressWriteFields, hasValidVietnamAddressSelection } from "@/lib/addresses/vietnam-form";
 
 export async function createCustomer(
   input: CreateCustomerOutput
@@ -32,6 +33,9 @@ const updateSupplierSchema = z.object({
   phone: z.string().trim().optional(),
   email: z.string().trim().optional(),
   address: z.string().trim().optional(),
+  addressLine: z.string().trim().max(220).optional(),
+  addressProvinceCode: z.string().trim().max(8).optional(),
+  addressWardCode: z.string().trim().max(8).optional(),
   taxCode: z.string().trim().optional(),
   note: z.string().trim().optional(),
 });
@@ -42,6 +46,7 @@ export async function updateSupplier(input: UpdateSupplierInput): Promise<Action
   const parsed = updateSupplierSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  if (!hasValidVietnamAddressSelection(v)) return { ok: false, error: "errors.invalidData" };
   try {
     await db.transaction(async (tx) => {
       const [current] = await tx.select().from(suppliers)
@@ -51,7 +56,7 @@ export async function updateSupplier(input: UpdateSupplierInput): Promise<Action
         name: v.name,
         phone: v.phone?.slice(0, 20) || null,
         email: v.email || null,
-        address: v.address || null,
+        ...addressWriteFields(v),
         taxCode: v.taxCode?.slice(0, 30) || null,
         note: v.note || null,
       };
@@ -129,6 +134,7 @@ export async function createSupplier(
   const parsed = createSupplierSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  if (!hasValidVietnamAddressSelection(v)) return { ok: false, error: "errors.invalidData" };
 
   try {
     const row = await db.transaction(async (tx) => {
@@ -138,7 +144,7 @@ export async function createSupplier(
         name: v.name.trim(),
         phone: v.phone?.trim() || null,
         email: v.email?.trim() || null,
-        address: v.address?.trim() || null,
+        ...addressWriteFields(v),
         taxCode: v.taxCode?.trim() || null,
         note: v.note || null,
       }).returning({ id: suppliers.id, code: suppliers.code, name: suppliers.name });

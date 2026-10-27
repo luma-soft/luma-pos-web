@@ -16,6 +16,7 @@ import type { getSuppliers } from "@/lib/data/partners";
 import { updateSupplier } from "@/lib/actions/partners";
 import { SupplierQuickCreate } from "../../suppliers/supplier-form";
 import { SupplierPayableActions } from "@/components/partners/supplier-payable-actions";
+import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
 import { useAppDataQuery } from "@/components/use-app-data-query";
 import {
   DEFAULT_PARTNER_DEBT_FILTER,
@@ -34,6 +35,9 @@ type SupplierPreview = {
     phone: string | null;
     email: string | null;
     address: string | null;
+    addressLine?: string;
+    addressProvinceCode?: string;
+    addressWardCode?: string;
     taxCode: string | null;
     currentDebt: string;
     note: string | null;
@@ -80,6 +84,9 @@ type SupplierDraft = {
   phone: string;
   email: string;
   address: string;
+  addressLine: string;
+  addressProvinceCode: string;
+  addressWardCode: string;
   taxCode: string;
   note: string;
 };
@@ -241,6 +248,9 @@ export function SuppliersTable({
       phone: draft.phone,
       email: draft.email,
       address: draft.address,
+      addressLine: draft.addressLine,
+      addressProvinceCode: draft.addressProvinceCode,
+      addressWardCode: draft.addressWardCode,
       taxCode: draft.taxCode,
       note: draft.note,
     });
@@ -587,10 +597,20 @@ function SupplierInfoPanel({
             <span className={labelClassName}>Email</span>
             <input type="email" className={inputClassName} value={draft.email} onChange={(event) => onDraftChange("email", event.target.value)} />
           </label>
-          <label>
-            <span className={labelClassName}>{t("customers.fields.address")}</span>
-            <input className={inputClassName} value={draft.address} onChange={(event) => onDraftChange("address", event.target.value)} />
-          </label>
+          <VietnamAddressFields
+            idPrefix="supplier-quick-edit-address"
+            className="md:col-span-2"
+            value={{
+              addressLine: draft.addressLine,
+              addressProvinceCode: draft.addressProvinceCode,
+              addressWardCode: draft.addressWardCode,
+            }}
+            onChange={(value) => {
+              onDraftChange("addressLine", value.addressLine);
+              onDraftChange("addressProvinceCode", value.addressProvinceCode);
+              onDraftChange("addressWardCode", value.addressWardCode);
+            }}
+          />
           <label>
             <span className={labelClassName}>{t("customers.fields.taxCode")}</span>
             <input className={inputClassName} value={draft.taxCode} onChange={(event) => onDraftChange("taxCode", event.target.value)} />
@@ -627,6 +647,9 @@ function toSupplierDraft(supplier: SupplierPreview["supplier"]): SupplierDraft {
     phone: supplier.phone ?? "",
     email: supplier.email ?? "",
     address: supplier.address ?? "",
+    addressLine: supplier.addressLine || supplier.address || "",
+    addressProvinceCode: supplier.addressProvinceCode ?? "",
+    addressWardCode: supplier.addressWardCode ?? "",
     taxCode: supplier.taxCode ?? "",
     note: supplier.note ?? "",
   };

@@ -26,12 +26,16 @@ import { calculateServiceProjectProfitability } from "@/lib/services/domain";
 import { coercePageSize } from "@/lib/pagination";
 import { hasProjectRedesignSchema } from "@/lib/db/schema-compat";
 import { listProjectAttachmentSummaries } from "@/lib/media/project-media";
+import { resolveStoreAddress } from "@/lib/addresses/vietnam";
 
 const projectRowSelection = (storeId: string) => ({
   id: projects.id,
   name: projects.name,
   customerId: projects.customerId,
   address: projects.address,
+  addressLine: projects.addressLine,
+  addressProvinceCode: projects.addressProvinceCode,
+  addressWardCode: projects.addressWardCode,
   note: projects.note,
   status: projects.status,
   serviceType: projects.serviceType,
@@ -50,7 +54,8 @@ const projectRowSelection = (storeId: string) => ({
 });
 
 export async function getProjectRows(storeId: string) {
-  return db.select(projectRowSelection(storeId)).from(projects).leftJoin(customers, and(eq(projects.customerId, customers.id), eq(customers.storeId, storeId))).where(eq(projects.storeId, storeId)).orderBy(desc(projects.createdAt));
+  const rows = await db.select(projectRowSelection(storeId)).from(projects).leftJoin(customers, and(eq(projects.customerId, customers.id), eq(customers.storeId, storeId))).where(eq(projects.storeId, storeId)).orderBy(desc(projects.createdAt));
+  return rows.map((row) => ({ ...row, ...resolveStoreAddress(row) }));
 }
 
 export async function getProjectPage(storeId: string, page = 1, pageSize?: number) {
@@ -67,7 +72,7 @@ export async function getProjectPage(storeId: string, page = 1, pageSize?: numbe
     db.select({ total: count() }).from(projects).where(eq(projects.storeId, storeId)),
   ]);
   const total = countRows[0]?.total ?? 0;
-  return { rows, total, page: safePage, pageSize: size, pageCount: Math.max(1, Math.ceil(total / size)) };
+  return { rows: rows.map((row) => ({ ...row, ...resolveStoreAddress(row) })), total, page: safePage, pageSize: size, pageCount: Math.max(1, Math.ceil(total / size)) };
 }
 
 export type ProjectRow = Awaited<ReturnType<typeof getProjectRows>>[number];
@@ -78,6 +83,9 @@ export async function getProjectDetail(storeId: string, id: string) {
     name: projects.name,
     customerId: projects.customerId,
     address: projects.address,
+    addressLine: projects.addressLine,
+    addressProvinceCode: projects.addressProvinceCode,
+    addressWardCode: projects.addressWardCode,
     note: projects.note,
     status: projects.status,
     serviceType: projects.serviceType,
@@ -371,7 +379,7 @@ export async function getProjectDetail(storeId: string, id: string) {
   const otherCost = Number(costSummary[0]?.otherCost ?? 0);
   const profitability = calculateServiceProjectProfitability({ revenue, materialCost, laborCost, otherCost });
   return {
-    project,
+    project: { ...project, ...resolveStoreAddress(project) },
     orders: relatedOrders,
     jobs,
     assets,

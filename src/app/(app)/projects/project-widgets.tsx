@@ -19,6 +19,7 @@ import { createProject, toggleProjectStatus, updateProject } from "@/lib/actions
 import { createServiceProject } from "@/lib/actions/services";
 import { projectScheduleState } from "@/lib/projects/schedule";
 import { Routes } from "@/lib/routes";
+import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
 
 export function ProjectQuickCreate({
   customers,
@@ -36,7 +37,9 @@ export function ProjectQuickCreate({
   const [customerId, setCustomerId] = useState("");
   const [createdCustomers, setCreatedCustomers] = useState<{ id: string; name: string }[]>([]);
   const [customerCreateOpen, setCustomerCreateOpen] = useState(false);
-  const [address, setAddress] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [addressProvinceCode, setAddressProvinceCode] = useState("");
+  const [addressWardCode, setAddressWardCode] = useState("");
   const [serviceType, setServiceType] = useState("camera");
   const [startsOn, setStartsOn] = useState("");
   const [targetEndsOn, setTargetEndsOn] = useState("");
@@ -97,7 +100,7 @@ export function ProjectQuickCreate({
       ? await createServiceProject({
           name,
           customerId: customerId || null,
-          address: address || undefined,
+          addressLine, addressProvinceCode, addressWardCode,
           serviceType: serviceType as "camera" | "electrical" | "plumbing" | "mixed",
           startsOn: startsOn || null,
           targetEndsOn: targetEndsOn || null,
@@ -105,10 +108,10 @@ export function ProjectQuickCreate({
           status: completed ? "done" : "active",
           serviceStage: completed ? "completed" : "planning",
         })
-      : await createProject({ name, customerId: customerId || null, address: address || undefined });
+      : await createProject({ name, customerId: customerId || null, addressLine, addressProvinceCode, addressWardCode });
     setBusy(false);
     if (res.ok) {
-      setOpen(false); setName(""); setAddress(""); setStartsOn(""); setTargetEndsOn("");
+      setOpen(false); setName(""); setAddressLine(""); setAddressProvinceCode(""); setAddressWardCode(""); setStartsOn(""); setTargetEndsOn("");
       setNameSuggested(false); setCustomerId("");
       setNote(""); setCompleted(false);
       if (serviceMode && res.data?.id) {
@@ -171,9 +174,16 @@ export function ProjectQuickCreate({
             </Button>
             </div>
           </Field>
-          <Field label={t("customers.fields.address")} className="sm:col-span-2">
-            <Input value={address} onChange={(e) => setAddress(e.target.value)} />
-          </Field>
+          <VietnamAddressFields
+            idPrefix="project-create-address"
+            className="sm:col-span-2"
+            value={{ addressLine, addressProvinceCode, addressWardCode }}
+            onChange={(value) => {
+              setAddressLine(value.addressLine);
+              setAddressProvinceCode(value.addressProvinceCode);
+              setAddressWardCode(value.addressWardCode);
+            }}
+          />
           {serviceMode && (
             <>
               <Field label={t("services.fields.type")}><Select value={serviceType} onChange={(e) => chooseServiceType(e.target.value)} options={[{ value: "camera", label: t("services.types.camera") }, { value: "electrical", label: t("services.types.electrical") }, { value: "plumbing", label: t("services.types.plumbing") }, { value: "mixed", label: t("services.types.mixed") }]} rootClassName="w-full" /></Field>
@@ -248,6 +258,9 @@ type EditableProject = Pick<ProjectRow,
   | "name"
   | "customerId"
   | "address"
+  | "addressLine"
+  | "addressProvinceCode"
+  | "addressWardCode"
   | "note"
   | "status"
   | "serviceType"
@@ -276,7 +289,9 @@ export function ProjectEdit({
   const [customerId, setCustomerId] = useState(project.customerId ?? "");
   const [createdCustomers, setCreatedCustomers] = useState<{ id: string; name: string }[]>([]);
   const [customerCreateOpen, setCustomerCreateOpen] = useState(false);
-  const [address, setAddress] = useState(project.address ?? "");
+  const [addressLine, setAddressLine] = useState(project.addressLine || project.address || "");
+  const [addressProvinceCode, setAddressProvinceCode] = useState(project.addressProvinceCode ?? "");
+  const [addressWardCode, setAddressWardCode] = useState(project.addressWardCode ?? "");
   const [note, setNote] = useState(project.note ?? "");
   const [status, setStatus] = useState(project.status);
   const [serviceType, setServiceType] = useState<string>(project.serviceType ?? "camera");
@@ -323,7 +338,8 @@ export function ProjectEdit({
       id: project.id,
       name,
       customerId: customerId || null,
-      address: address || undefined,
+      address: project.address ?? undefined,
+      addressLine, addressProvinceCode, addressWardCode,
       note: isServiceProject ? project.note ?? undefined : note,
       status: isServiceProject
         ? completed ? "done" : "active"
@@ -410,7 +426,16 @@ export function ProjectEdit({
             </Button>
             </div>
           </Field>
-          <Field label={t("customers.fields.address")} className="sm:col-span-2"><Input value={address} onChange={(e) => setAddress(e.target.value)} /></Field>
+          <VietnamAddressFields
+            idPrefix="project-edit-address"
+            className="sm:col-span-2"
+            value={{ addressLine, addressProvinceCode, addressWardCode }}
+            onChange={(value) => {
+              setAddressLine(value.addressLine);
+              setAddressProvinceCode(value.addressProvinceCode);
+              setAddressWardCode(value.addressWardCode);
+            }}
+          />
           {isServiceProject ? (
             <>
               <Field label={t("services.fields.type")}><Select value={serviceType} onChange={(e) => setServiceType(e.target.value)} options={[{ value: "camera", label: t("services.types.camera") }, { value: "electrical", label: t("services.types.electrical") }, { value: "plumbing", label: t("services.types.plumbing") }, { value: "mixed", label: t("services.types.mixed") }]} rootClassName="w-full" /></Field>

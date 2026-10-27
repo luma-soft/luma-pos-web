@@ -11,6 +11,7 @@ import {
   warrantyClaims,
 } from "@/db/schema";
 import { businessDateKey } from "@/lib/dates/business-date";
+import { resolveStoreAddress } from "@/lib/addresses/vietnam";
 
 export type ServiceProjectListQuery = {
   q?: string;
@@ -79,6 +80,9 @@ export async function getServiceProjectsPage(
     customerId: projects.customerId,
     customerName: customers.name,
     address: projects.address,
+    addressLine: projects.addressLine,
+    addressProvinceCode: projects.addressProvinceCode,
+    addressWardCode: projects.addressWardCode,
     note: projects.note,
     status: projects.status,
     serviceType: projects.serviceType,
@@ -123,7 +127,7 @@ export async function getServiceProjectsPage(
 
   const total = totalRows[0]?.value ?? 0;
   return {
-    rows,
+    rows: rows.map((row) => ({ ...row, ...resolveStoreAddress(row) })),
     total,
     page,
     pageSize,
@@ -141,6 +145,9 @@ export async function getServiceDashboard(storeId: string) {
       customerId: projects.customerId,
       customerName: customers.name,
       address: projects.address,
+      addressLine: projects.addressLine,
+      addressProvinceCode: projects.addressProvinceCode,
+      addressWardCode: projects.addressWardCode,
       note: projects.note,
       status: projects.status,
       serviceType: projects.serviceType,
@@ -203,7 +210,7 @@ export async function getServiceDashboard(storeId: string) {
   ]);
 
   return {
-    projects: projectRows,
+    projects: projectRows.map((project) => ({ ...project, ...resolveStoreAddress(project) })),
     jobs: jobRows,
     claims: claimRows,
     metrics: {

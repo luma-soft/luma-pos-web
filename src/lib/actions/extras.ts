@@ -28,6 +28,7 @@ import {
   deriveReopenedServiceProjectState,
   shouldValidateServiceProjectClose,
 } from "@/lib/projects/status";
+import { addressWriteFields, hasValidVietnamAddressSelection } from "@/lib/addresses/vietnam-form";
 
 // ============ Công trình ============
 
@@ -35,6 +36,9 @@ const projectSchema = z.object({
   name: z.string().min(1, { error: "validation.required" }),
   customerId: z.uuid().nullable().optional(),
   address: z.string().optional(),
+  addressLine: z.string().trim().max(220).optional(),
+  addressProvinceCode: z.string().trim().max(8).optional(),
+  addressWardCode: z.string().trim().max(8).optional(),
   note: z.string().optional(),
 });
 export type CreateProjectInput = z.input<typeof projectSchema>;
@@ -132,6 +136,7 @@ export async function createProject(input: CreateProjectInput): Promise<ActionRe
   const parsed = projectSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  if (!hasValidVietnamAddressSelection(v)) return { ok: false, error: "errors.invalidData" };
   const initialNote = v.note?.trim();
   try {
     if (v.customerId) {
@@ -143,7 +148,7 @@ export async function createProject(input: CreateProjectInput): Promise<ActionRe
         storeId: context.storeId,
         name: v.name.trim(),
         customerId: v.customerId ?? null,
-        address: v.address?.trim() || null,
+        ...addressWriteFields(v),
         note: initialNote || null,
       }).returning({ id: projects.id });
       if (initialNote) {
@@ -338,6 +343,7 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
   const parsed = projectUpdateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  if (!hasValidVietnamAddressSelection(v)) return { ok: false, error: "errors.invalidData" };
   try {
     const [current] = await db.select({
       serviceType: projects.serviceType,
@@ -375,7 +381,7 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
     await db.transaction((tx) => trackServiceChange(tx, gate, { action: "project.updated", entityType: "project", id: v.id }, async () => tx.update(projects).set({
       name: v.name.trim(),
       customerId: v.customerId ?? null,
-      address: v.address?.trim() || null,
+      ...addressWriteFields(v),
       note: v.note?.trim() || null,
       status: v.status,
       completedAt: v.status === "done" ? current.completedAt ?? new Date() : null,

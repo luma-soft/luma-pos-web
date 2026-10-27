@@ -17,6 +17,7 @@ import {
 import { accentInsensitiveLike } from "@/lib/search";
 import { coercePageSize } from "@/lib/pagination";
 import { getSupplierPayableOverview } from "@/lib/data/supplier-payables";
+import { resolveStoreAddress } from "@/lib/addresses/vietnam";
 
 export const PARTNERS_PAGE_SIZE = 20;
 
@@ -153,6 +154,9 @@ export async function getCustomers(
         zaloUserId: customers.zaloUserId,
         email: customers.email,
         address: customers.address,
+        addressLine: customers.addressLine,
+        addressProvinceCode: customers.addressProvinceCode,
+        addressWardCode: customers.addressWardCode,
         type: customers.type,
         taxCode: customers.taxCode,
         debtLimit: customers.debtLimit,
@@ -216,6 +220,7 @@ export async function getCustomers(
   const customerIds = baseRows.map((row) => row.id);
   let rows = baseRows.map((row) => ({
     ...row,
+    ...resolveStoreAddress(row),
     grossSales: "0",
     salesHistory: [] as CustomerSalesHistoryRow[],
     debtLedger: [] as CustomerDebtLedgerRow[],
@@ -483,6 +488,7 @@ export async function getCustomers(
 
     rows = baseRows.map((row) => ({
       ...row,
+      ...resolveStoreAddress(row),
       grossSales: grossByCustomer.get(row.id) ?? "0",
       salesHistory: (salesByCustomer.get(row.id) ?? [])
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
@@ -516,6 +522,9 @@ export async function getCustomer(storeId: string, id: string) {
       zaloUserId: customers.zaloUserId,
       email: customers.email,
       address: customers.address,
+      addressLine: customers.addressLine,
+      addressProvinceCode: customers.addressProvinceCode,
+      addressWardCode: customers.addressWardCode,
       type: customers.type,
       taxCode: customers.taxCode,
       debtLimit: customers.debtLimit,
@@ -551,7 +560,7 @@ export async function getCustomer(storeId: string, id: string) {
     .orderBy(desc(orders.createdAt))
     .limit(50);
 
-  return { ...customer, orders: customerOrders };
+  return { ...customer, ...resolveStoreAddress(customer), orders: customerOrders };
 }
 
 export type CustomerListResult = Awaited<ReturnType<typeof getCustomers>>;
@@ -562,7 +571,7 @@ export async function getSupplier(storeId: string, id: string) {
     eq(suppliers.storeId, storeId),
   )).limit(1);
   if (!supplier) return null;
-  return supplier;
+  return { ...supplier, ...resolveStoreAddress(supplier) };
 }
 
 export async function getSupplierPurchases(storeId: string, id: string) {
@@ -676,7 +685,7 @@ export async function getSuppliers(storeId: string, filters: { q?: string; owing
   ]);
 
   return {
-    rows,
+    rows: rows.map((row) => ({ ...row, ...resolveStoreAddress(row) })),
     total,
     totalDebt: Number(totalDebt),
     totalPurchase: Number(totalPurchase),

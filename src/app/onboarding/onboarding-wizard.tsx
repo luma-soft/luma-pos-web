@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { SearchableSelect } from "@/components/combobox";
+import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
 import { completeOnboarding } from "@/lib/actions/onboarding";
 import type { StoreSettings } from "@/lib/data/settings";
 import { cn } from "@/lib/utils";
@@ -23,7 +24,17 @@ export function OnboardingWizard({ initial }: { initial: StoreSettings }) {
   const [step, setStep] = useState(0);
   const [pending, start] = useTransition();
   const [err, setErr] = useState("");
-  const [f, setF] = useState({ name: initial.name, phone: initial.phone, address: initial.address, industry: initial.industry || "grocery", currency: initial.currency || "VND", locale: initial.locale || "vi-VN" });
+  const [f, setF] = useState({
+    name: initial.name,
+    phone: initial.phone,
+    address: initial.address,
+    addressLine: initial.addressLine || initial.address,
+    addressProvinceCode: initial.addressProvinceCode,
+    addressWardCode: initial.addressWardCode,
+    industry: initial.industry || "grocery",
+    currency: initial.currency || "VND",
+    locale: initial.locale || "vi-VN",
+  });
   const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }));
 
   const industryOpts = INDUSTRY.map((value) => ({ value, label: catalogTextByFlag(L, `settings.ui.industries.${value}`) }));
@@ -64,7 +75,15 @@ export function OnboardingWizard({ initial }: { initial: StoreSettings }) {
         {step === 0 && <>
           <div className="flex flex-col gap-1"><span className={FL}>{legacyTextByFlag(L, "5a9af4186c49")}</span><input className={FI} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder={legacyTextByFlag(L, "64c8a3e60d12")} /></div>
           <div className="flex flex-col gap-1"><span className={FL}>{legacyTextByFlag(L, "8f0bb5fb2246")}</span><input className={FI} value={f.phone} onChange={(e) => set("phone", e.target.value)} /></div>
-          <div className="flex flex-col gap-1"><span className={FL}>{legacyTextByFlag(L, "4c007f9511be")}</span><input className={FI} value={f.address} onChange={(e) => set("address", e.target.value)} /></div>
+          <VietnamAddressFields
+            idPrefix="onboarding-store-address"
+            value={{
+              addressLine: f.addressLine,
+              addressProvinceCode: f.addressProvinceCode,
+              addressWardCode: f.addressWardCode,
+            }}
+            onChange={(value) => setF((current) => ({ ...current, ...value }))}
+          />
         </>}
         {step === 1 && <>
           <div className="flex flex-col gap-1"><span className={FL}>{legacyTextByFlag(L, "d251731ba879")}</span><SearchableSelect options={industryOpts} value={f.industry} onChange={(v) => set("industry", v)} allowClear={false} /></div>
@@ -75,7 +94,7 @@ export function OnboardingWizard({ initial }: { initial: StoreSettings }) {
         </>}
         {step === 2 && <div className="flex flex-col gap-2 text-sm">
           <div className="text-xs text-slate-500">{legacyTextByFlag(L, "1938a79de90c")}</div>
-          {[[legacyTextByFlag(L, "60f67a3547b1"), f.name || "—"], [legacyTextByFlag(L, "5745605d2af1"), f.phone || "—"], [legacyTextByFlag(L, "4c007f9511be"), f.address || "—"], [legacyTextByFlag(L, "d251731ba879"), industryOpts.find((o) => o.value === f.industry)?.label ?? f.industry], [legacyTextByFlag(L, "b5fc197ba6f4"), f.currency]].map(([k, v], i) => (
+          {[[legacyTextByFlag(L, "60f67a3547b1"), f.name || "—"], [legacyTextByFlag(L, "5745605d2af1"), f.phone || "—"], [legacyTextByFlag(L, "4c007f9511be"), f.addressLine || "—"], [legacyTextByFlag(L, "d251731ba879"), industryOpts.find((o) => o.value === f.industry)?.label ?? f.industry], [legacyTextByFlag(L, "b5fc197ba6f4"), f.currency]].map(([k, v], i) => (
             <div key={i} className="flex justify-between gap-3 px-3 py-2 bg-canvas border border-border rounded-[10px]"><span className="text-slate-500">{k}</span><span className="font-semibold text-right truncate">{v}</span></div>
           ))}
         </div>}
