@@ -154,7 +154,7 @@ export function inventoryProductSearchCondition(
     fields.name,
     fields.variantName,
     sql`${fields.specs}::text`,
-  ], sql` `)})`;
+  ], sql`, `)})`;
 
   return productSearchWithinOneFieldCondition([
     nameAndAttributes,
