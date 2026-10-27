@@ -4,6 +4,7 @@ type VariantSummary = {
   id: string;
   name: string;
   sku: string;
+  barcode?: string | null;
   baseUnit?: string | null;
   unitNames?: string | null;
   unitDefinitions?: Array<{
@@ -68,6 +69,36 @@ export function matchesProductVariant(product: VariantSummary, query: string, op
       : Object.keys(product.specs ?? {}).filter((name) => !name.startsWith("__"))),
   ].join(" "));
   return matchesSearchTokens(text, search);
+}
+
+/** Inventory search keeps all query terms inside the product name, SKU, or barcode field. */
+export function matchesInventoryProductSearch(product: VariantSummary, query: string) {
+  if (!normalizeSearch(query)) return true;
+
+  const specificationFields: string[] = [];
+  if (product.specs && typeof product.specs === "object" && !Array.isArray(product.specs)) {
+    for (const [name, raw] of Object.entries(product.specs as Record<string, unknown>)) {
+      if (name.startsWith("__")) continue;
+      specificationFields.push(name);
+      for (const value of Array.isArray(raw) ? raw : [raw]) {
+        if (value !== null && value !== undefined) specificationFields.push(String(value));
+      }
+    }
+  }
+
+  const productName = [product.name, ...productVariantValues(product), ...specificationFields]
+    .filter(Boolean)
+    .join(" ");
+  const searchableFields = [
+    productName,
+    product.sku,
+    product.barcode ?? "",
+    product.baseUnit ?? "",
+    product.unitNames ?? "",
+    ...(product.unitDefinitions ?? []).flatMap((unit) => [unit.unitName ?? "", unit.sku ?? "", unit.barcode ?? ""]),
+  ];
+
+  return searchableFields.some((field) => matchesSearchTokens(field, query));
 }
 
 export function selectableProductIds(product: {

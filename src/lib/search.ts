@@ -44,6 +44,16 @@ export function productSearchCondition(columns: readonly (AnyColumn | SQL)[], qu
   ))!))!;
 }
 
+/** Inventory list search: all query terms must occur in one searchable field. */
+export function productSearchWithinOneFieldCondition(columns: readonly (AnyColumn | SQL)[], query: string): SQL {
+  const tokens = searchTokens(query);
+  if (!tokens.length) return sql`false`;
+  const folded = columns.map((column) => sql`translate(lower(${column}), ${VN_FROM + COMBINING_MARKS}, ${VN_TO})`);
+  return or(...folded.map((field) => and(...tokens.map((token) =>
+    sql`${field} like ${`%${token}%`}`,
+  ))!))!;
+}
+
 type ProductSearchFields = {
   id: AnyColumn | SQL;
   storeId: AnyColumn | SQL;
@@ -76,5 +86,34 @@ export function catalogProductSearchCondition(
     fields.variantName,
     sql`${fields.specs}::text`,
     ...extraColumns,
+  ], query);
+}
+
+/**
+ * Search the inventory catalog without combining a name fragment with a
+ * coincidental number inside an SKU or barcode.
+ */
+export function inventoryProductSearchCondition(
+  fields: ProductSearchFields,
+  query: string,
+): SQL {
+  const unitIdentifiers = sql<string | null>`(
+    select string_agg(concat_ws(' ', ${productUnits.unitName}, ${productUnits.sku}, ${productUnits.barcode}), ' ')
+    from ${productUnits}
+    where ${productUnits.productId} = ${fields.id}
+      and ${productUnits.storeId} = ${fields.storeId}
+  )`;
+  const nameAndAttributes = sql`concat_ws(' ', ${sql.join([
+    fields.name,
+    fields.variantName,
+    sql`${fields.specs}::text`,
+  ], sql` `)})`;
+
+  return productSearchWithinOneFieldCondition([
+    nameAndAttributes,
+    fields.sku,
+    fields.barcode,
+    fields.baseUnit,
+    unitIdentifiers,
   ], query);
 }

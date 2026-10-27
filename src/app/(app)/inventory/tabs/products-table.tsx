@@ -1,6 +1,12 @@
 "use client";
 
-import { productDisplayName } from "@/lib/products/variant-presentation";
+import {
+  matchesInventoryProductSearch,
+  matchesProductVariant,
+  productDisplayName,
+  productVariantLabel,
+  selectableProductIds,
+} from "@/lib/products/variant-presentation";
 import { legacyText } from "@/lib/i18n/catalog-text";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -67,7 +73,6 @@ import {
   productStockDisplay,
 } from "@/lib/product-stock";
 import { useProductSelection } from "./product-selection";
-import { matchesProductVariant, productVariantLabel, selectableProductIds } from "@/lib/products/variant-presentation";
 
 type ProductRow = ProductListResult["rows"][number];
 type StockMovementRow = ProductRow["stockMovements"][number];
@@ -314,8 +319,11 @@ export function ProductsTable({
   }, [expansionStorageKey]);
 
   const groupOf = (product: ProductRow) => grouped ? product.variantGroup : undefined;
-  const isExpanded = (product: ProductRow) => expandedGroups[product.id]
-    ?? Boolean(query.trim() && groupOf(product)?.members.some((member) => matchesProductVariant(member, query)));
+  const isExpanded = (product: ProductRow) => {
+    const group = groupOf(product);
+    return expandedGroups[product.id]
+      ?? Boolean(query.trim() && group?.members.some((member) => matchesInventoryProductSearch(member, query)));
+  };
   function matchesStatus(member: ProductRow) {
     const status = params.get("status") || "active";
     if (status === "active") return member.isActive;
@@ -341,8 +349,11 @@ export function ProductsTable({
   }
 
   function membersFor(product: ProductRow) {
-    const members = (groupOf(product)?.members ?? []).filter(matchesStatus);
-    if (query.trim()) members.sort((a, b) => Number(matchesProductVariant(b, query)) - Number(matchesProductVariant(a, query)));
+    const group = groupOf(product);
+    let members = (group?.members ?? []).filter(matchesStatus);
+    if (query.trim()) {
+      members = members.filter((member) => matchesInventoryProductSearch(member, query));
+    }
     return { members: allVariants[product.id] ? members : members.slice(0, 8), total: members.length };
   }
 
@@ -520,7 +531,7 @@ export function ProductsTable({
             </div>
             {isExpanded(product) && <>
               <div className="ml-3 border-l border-border">
-                {membersFor(product).members.map((member) => <ProductMobileRow key={member.id} product={{ ...member, name: productVariantLabel(member), variantGroup: undefined }} variantRow selectionEnabled={selectionEnabled} selected={selectedIds.has(member.id)} selectLabel={t("products.bulk.selectProduct", { name: member.name })} stockNotTrackedLabel={t("products.stock.notTracked")} selectedUnitName={selectedUnitName(member)} onUnitChange={(unitName) => changeUnit(member.id, unitName)} onToggle={() => toggle(member.id)} onOpen={() => openProduct(member)} />)}
+                {membersFor(product).members.map((member) => <ProductMobileRow key={member.id} product={{ ...member, name: query.trim() ? member.name : productVariantLabel(member), variantGroup: undefined }} variantRow selectionEnabled={selectionEnabled} selected={selectedIds.has(member.id)} selectLabel={t("products.bulk.selectProduct", { name: member.name })} stockNotTrackedLabel={t("products.stock.notTracked")} selectedUnitName={selectedUnitName(member)} onUnitChange={(unitName) => changeUnit(member.id, unitName)} onToggle={() => toggle(member.id)} onOpen={() => openProduct(member)} />)}
               </div>
               <div className="border-t border-border-soft">{groupControls(product)}</div>
             </>}

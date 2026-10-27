@@ -23,7 +23,7 @@ import {
   suppliers,
   warehouses,
 } from "@/db/schema";
-import { catalogProductSearchCondition } from "@/lib/search";
+import { inventoryProductSearchCondition } from "@/lib/search";
 import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
 import {
   priceComparisonCondition,
@@ -108,7 +108,12 @@ function productComplianceFields(hasColumns: boolean) {
 }
 
 /** All filters must match the same sellable SKU, including inside a group. */
-function productFilterPredicate(alias: "member" | "products", storeId: string, filters: ProductListFilters, hasCompliance: boolean, groupSearchFields: SQL[] = []) {
+function productFilterPredicate(
+  alias: "member" | "products",
+  storeId: string,
+  filters: ProductListFilters,
+  hasCompliance: boolean,
+) {
   const field = (name: string) => sql.raw(`${alias}.${name}`);
   const conditions: SQL[] = [];
   const status = filters.status ?? "active";
@@ -116,7 +121,7 @@ function productFilterPredicate(alias: "member" | "products", storeId: string, f
   else if (status === "inactive") conditions.push(sql`${field("is_active")} = false`);
   else if (hasCompliance && (status === "draft" || status === "archived")) conditions.push(sql`${field("lifecycle_status")} = ${status}`);
   const q = filters.q?.trim();
-  if (q) conditions.push(catalogProductSearchCondition({
+  if (q) conditions.push(inventoryProductSearchCondition({
     id: field("id"),
     storeId: field("store_id"),
     name: field("name"),
@@ -125,7 +130,7 @@ function productFilterPredicate(alias: "member" | "products", storeId: string, f
     baseUnit: field("base_unit"),
     variantName: field("variant_name"),
     specs: field("specs"),
-  }, q, groupSearchFields));
+  }, q));
   for (const [column, single, multiple] of [
     ["category_id", filters.categoryId, filters.categoryIds],
     ["brand_id", filters.brandId, filters.brandIds],
@@ -191,8 +196,12 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
   } else if (exactProductId) {
     conditions.push(eq(products.id, exactProductId));
   } else {
-    const match = productFilterPredicate(view === "grouped" ? "member" : "products", storeId, filters, hasComplianceColumns,
-      view === "grouped" ? [sql`${products.name}`, sql`${products.sku}`] : []);
+    const match = productFilterPredicate(
+      view === "grouped" ? "member" : "products",
+      storeId,
+      filters,
+      hasComplianceColumns,
+    );
     if (view === "grouped") {
       conditions.push(sql`${products.parentProductId} is null`);
       if (hasRelatedProducts && groupRelated) conditions.push(sql`(${products.relatedProductId} is null or ${products.relatedProductId} = ${products.id}
