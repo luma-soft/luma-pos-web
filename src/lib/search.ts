@@ -89,6 +89,53 @@ export function catalogProductSearchCondition(
   ], query);
 }
 
+/** POS lookup split into indexed product and unit candidate sets. */
+export function posProductSearchCondition(
+  fields: ProductSearchFields,
+  query: string,
+  storeId: string,
+): SQL {
+  const tokens = searchTokens(query);
+  if (!tokens.length) return sql`false`;
+
+  const directFields = [
+    sql`pos_search_product.name`,
+    sql`pos_search_product.sku`,
+    sql`pos_search_product.barcode`,
+    sql`pos_search_product.base_unit`,
+    sql`pos_search_product.variant_name`,
+    sql`pos_search_product.specs::text`,
+  ].map((column) => sql`normalize_vietnamese_search_text(${column})`);
+  const unitFields = [
+    sql`normalize_vietnamese_search_text(pos_search_unit.unit_name)`,
+    sql`normalize_vietnamese_search_text(pos_search_unit.sku)`,
+    sql`normalize_vietnamese_search_text(pos_search_unit.barcode)`,
+  ];
+  const tokenCandidates = tokens.map((token) => {
+    const pattern = `%${token}%`;
+    const directMatches = or(...directFields.map((field) => sql`${field} like ${pattern}`))!;
+    const unitMatches = or(...unitFields.map((field) => sql`${field} like ${pattern}`))!;
+    const directCandidates = sql`
+      select pos_search_product.id as product_id
+      from products pos_search_product
+      where pos_search_product.store_id = ${storeId}
+        and ${directMatches}
+    `;
+    const unitCandidates = sql`
+      select pos_search_unit.product_id as product_id
+      from product_units pos_search_unit
+      where pos_search_unit.store_id = ${storeId}
+        and ${unitMatches}
+    `;
+    return sql`(${directCandidates} union ${unitCandidates})`;
+  });
+  const candidates = tokenCandidates.length === 1
+    ? tokenCandidates[0]
+    : sql`(${sql.join(tokenCandidates.map((candidate) => sql`(${candidate})`), sql` intersect `)})`;
+
+  return sql`${fields.id} in (${candidates})`;
+}
+
 /**
  * Search the inventory catalog without combining a name fragment with a
  * coincidental number inside an SKU or barcode.

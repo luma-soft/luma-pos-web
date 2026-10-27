@@ -6,7 +6,7 @@ import { getActivePromotions } from "@/lib/data/active-promotions";
 import { getPriceBooks } from "@/lib/data/price-books";
 import type { Role } from "@/lib/actions/common";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
-import { catalogProductSearchCondition } from "@/lib/search";
+import { posProductSearchCondition } from "@/lib/search";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 import { applySystemPriceBooks } from "@/lib/pos/system-price-projection";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
@@ -358,23 +358,25 @@ export async function searchPosProductRows(
     productKind?: "all" | "product" | "service" | "combo";
   },
 ): Promise<PosProduct[]> {
-  const hasComplianceColumns = await hasProductComplianceColumns();
-  const [defaultWh] = await db
-    .select({ id: warehouses.id })
-    .from(warehouses)
-    .where(eq(warehouses.storeId, storeId))
-    .orderBy(desc(warehouses.isDefault))
-    .limit(1);
+  const canCompareSellingPrice = canViewPurchasePrices(options?.role);
+  const [hasComplianceColumns, [defaultWh], visibleBooks] = await Promise.all([
+    hasProductComplianceColumns(),
+    db
+      .select({ id: warehouses.id })
+      .from(warehouses)
+      .where(eq(warehouses.storeId, storeId))
+      .orderBy(desc(warehouses.isDefault))
+      .limit(1),
+    getPriceBooks(storeId, {
+      includeManagerOnly: canCompareSellingPrice,
+    }),
+  ]);
 
   // A blank query is valid for filter-only POS browsing. Omitting the text
   // predicate lets category, stock, kind, and price filters select products.
   const match: SQL | undefined = q.trim()
-    ? catalogProductSearchCondition(products, q)
+    ? posProductSearchCondition(products, q, storeId)
     : undefined;
-  const canCompareSellingPrice = canViewPurchasePrices(options?.role);
-  const visibleBooks = await getPriceBooks(storeId, {
-    includeManagerOnly: canCompareSellingPrice,
-  });
   const requestedBookId = options?.priceComparison?.priceBookId;
   const comparison: PriceComparison = canCompareSellingPrice
     ? {
