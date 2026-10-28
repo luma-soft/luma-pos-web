@@ -31,6 +31,7 @@ import {
   bulkStopSellingProducts,
 } from "@/lib/actions/products";
 import { cn } from "@/lib/utils";
+import { controlHeightClassName } from "@/components/ui/button-variants";
 
 type ProductSelectionContextValue = {
   selectedIds: Set<string>;
@@ -242,7 +243,8 @@ export function ProductBulkActions() {
           count: ids.length,
         })}
         className={cn(
-          "inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-surface-2 disabled:opacity-60",
+          "inline-flex min-w-11 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-surface-2 disabled:opacity-60",
+          controlHeightClassName,
           open && "border-primary-300 bg-primary-50 text-primary-700",
         )}
       >
