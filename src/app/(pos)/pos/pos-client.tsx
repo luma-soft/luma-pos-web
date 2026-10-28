@@ -51,7 +51,7 @@ import {
 } from "@/components/pos/pos-mobile-layout";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
 import { LumaWebPicker } from "@/app/(app)/sales/tabs/filter-drawer-shared";
-import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
 import { ProductCreateMenu, type ProductKind } from "@/app/(app)/inventory/tabs/product-create-menu";
 import type { PaperSize, PrintTemplate } from "@/lib/print/template-shared";
 import type { StorePrefs } from "@/lib/schemas/settings";
@@ -2520,7 +2520,7 @@ export function PosClient({
                 const p = result.product;
                 const resultUnit = result.unitName;
                 const stock = Number(p.stock);
-                const stockManaged = isProductStockManaged(p.categoryName);
+                const stockManaged = isProductStockManaged(p.categoryName, p.productKind);
                 const line = cart.find((item) => item.product.id === p.id && (resultUnit == null || item.unitName === resultUnit));
                 const ordered = orderedBaseQuantityByProduct.get(p.id) ?? 0;
                 const stockInsufficient = exceedsAvailableStock(stockManaged, stock, ordered + Number(p.booked), isReturnDraft);
@@ -2539,9 +2539,13 @@ export function PosClient({
                         <div className="text-sm font-medium whitespace-normal break-words">{productDisplayName(p)}{resultUnit == null ? "" : ` · ${resultUnit}`}</div>
                         {p.isVariantParent ? (
                           <div className="text-xs text-slate-400">{children.length} SKU con</div>
-                        ) : stockManaged ? (
-                          <div className={cn("text-xs", stockInsufficient ? "text-er" : "text-slate-400")}>{t("pos.stockLabel")} {formatNumber(stock)} {p.baseUnit}</div>
                         ) : null}
+                        {stockManaged && <ProductSearchStockLabel
+                          quantity={stock}
+                          unit={p.baseUnit}
+                          label={t("pos.stockLabel")}
+                          className={stockInsufficient ? "text-er" : undefined}
+                        />}
                       </>
                     )}
                     controls={(

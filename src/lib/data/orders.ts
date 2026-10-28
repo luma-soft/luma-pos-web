@@ -331,6 +331,7 @@ export async function getOrder(storeId: string, id: string) {
     .select({
       id: orders.id,
       code: orders.code,
+      warehouseId: orders.warehouseId,
       documentType: orders.documentType,
       status: orders.status,
       paymentStatus: orders.paymentStatus,

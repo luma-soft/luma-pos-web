@@ -14,9 +14,9 @@ import { QuantityInput } from "@/components/ui/quantity-input";
 import { OrderEditMobileLine } from "@/components/order-edit-mobile-line";
 import { updateOrder } from "@/lib/actions/order-edit";
 import { useProductCatalog } from "@/components/product-catalog-provider";
-import type { ProductCatalogItem } from "@/lib/product-catalog";
+import { getCatalogWarehouseStock, type ProductCatalogItem } from "@/lib/product-catalog";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
-import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 import { expandPosSearchUnitResults, rankProductSearchUnitResults, type PosSearchUnitResult } from "@/lib/pos/search-unit-results";
@@ -38,16 +38,18 @@ interface Line {
 interface Props {
   orderId: string;
   orderCode: string;
+  warehouseId: string | null;
   initial: {
     projectName: string; note: string; discount: number; shippingFee: number; amountPaid: number;
     items: Line[];
   };
 }
 
-export function OrderEditForm({ orderId, orderCode, initial }: Props) {
+export function OrderEditForm({ orderId, orderCode, warehouseId, initial }: Props) {
   const t = useTranslations();
   const router = useRouter();
   const catalog = useProductCatalog();
+  const warehouse = catalog.snapshot?.warehouses.find((item) => item.id === warehouseId);
 
   const [items, setItems] = useState<Line[]>(initial.items);
   const [discount, setDiscount] = useState(initial.discount);
@@ -246,11 +248,23 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
               const multiplier = Number(alternateUnit?.multiplier) || 1;
               const override = alternateUnit?.priceOverride;
               const unitPrice = override == null ? Number(product.retailPrice) * multiplier : Number(override);
+              const stock = warehouseId
+                ? getCatalogWarehouseStock(product, warehouseId)
+                : product.warehouseStock.reduce((sum, item) => sum + Number(item.quantity), 0);
               return (
                 <ProductSearchResultLayout
                   selected={selected}
                   leading={<ProductSearchThumbnail product={product} />}
-                  summary={<><div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
+                  summary={<>
+                    <div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div>
+                    <div className="font-mono text-xs text-slate-400">{product.sku}</div>
+                    {product.isStockManaged && <ProductSearchStockLabel
+                      quantity={stock}
+                      unit={product.baseUnit}
+                      label={warehouseId ? t("pos.stockLabel") : t("products.variants.totalStock")}
+                      location={warehouse?.name}
+                    />}
+                  </>}
                   controls={selected && line ? (
                     <div onClick={(event) => event.stopPropagation()}>
                       <QuantityInput size="sm" className="w-[8.25rem]" min={0} value={line.quantity} onChange={(quantity) => patch(lineIndex, { quantity })} inputLabel={t("common.productQuantity", { product: product.name })} />

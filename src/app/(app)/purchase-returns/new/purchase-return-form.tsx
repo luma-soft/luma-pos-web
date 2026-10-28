@@ -32,7 +32,7 @@ import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPurchaseReturnProduct } from "@/lib/inventory/product-catalog-adapter";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
-import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 import { expandProductSearchUnitResults, rankProductSearchUnitResults } from "@/lib/pos/search-unit-results";
@@ -283,7 +283,10 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                 renderItem={(result, { selected }) => {
                   const { product, unitName, alternateUnit } = result;
                   const selectedUnit = unitName ?? product.baseUnit;
-                  const stock = getCatalogWarehouseStock(product, warehouseId);
+                  const warehouse = options.warehouses.find((item) => item.id === warehouseId);
+                  const stock = warehouseId
+                    ? getCatalogWarehouseStock(product, warehouseId)
+                    : product.warehouseStock.reduce((sum, item) => sum + Number(item.quantity), 0);
                   const line = lines.find((item) => item.productId === product.id);
                   const lineSelected = Boolean(line && line.unitName === selectedUnit);
                   const multiplier = Number(alternateUnit?.multiplier) || 1;
@@ -291,7 +294,16 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                     <ProductSearchResultLayout
                       selected={selected}
                       leading={<ProductSearchThumbnail product={product} />}
-                      summary={<><div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
+                      summary={<>
+                        <div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div>
+                        <div className="font-mono text-xs text-slate-400">{product.sku}</div>
+                        {product.isStockManaged && <ProductSearchStockLabel
+                          quantity={stock}
+                          unit={product.baseUnit}
+                          label={warehouseId ? t("pos.stockLabel") : t("products.variants.totalStock")}
+                          location={warehouse?.name}
+                        />}
+                      </>}
                       controls={lineSelected && line ? (
                         <div onClick={(event) => event.stopPropagation()}>
                           <QuantityInput
@@ -304,7 +316,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                             inputLabel={t("common.productQuantity", { product: product.name })}
                           />
                         </div>
-                      ) : <span className="shrink-0 text-sm text-slate-500 tabular-nums">{formatNumber(stock)} {product.baseUnit} · {formatCurrency(Number(product.costPrice ?? 0) * multiplier)}/{selectedUnit}</span>}
+                      ) : <span className="shrink-0 text-sm text-slate-500 tabular-nums">{formatCurrency(Number(product.costPrice ?? 0) * multiplier)}/{selectedUnit}</span>}
                     />
                   );
                 }}

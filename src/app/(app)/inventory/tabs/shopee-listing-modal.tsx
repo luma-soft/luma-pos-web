@@ -21,6 +21,7 @@ import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { isProductStockManaged } from "@/lib/product-stock";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
+import { ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
 
 type FormState = {
   title: string;
@@ -998,6 +999,9 @@ function ProductSearchInListing({
   const [results, setResults] = useState<PosProduct[]>([]);
   const [isPending, startTransition] = useTransition();
   const query = search.trim();
+  const stockWarehouse = catalog.snapshot?.warehouses.find((warehouse) => warehouse.isDefault)
+    ?? catalog.snapshot?.warehouses[0]
+    ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -1008,9 +1012,8 @@ function ProductSearchInListing({
         return;
       }
       startTransition(() => {
-        const defaultWarehouseId = catalog.snapshot?.warehouses.find((warehouse) => warehouse.isDefault)?.id ?? null;
         const rows = catalog.search(query, { limit: 30 }).map((product) =>
-          catalogItemToPosProduct(product, catalog.products, defaultWarehouseId)
+          catalogItemToPosProduct(product, catalog.products, stockWarehouse?.id ?? null)
         );
         if (!cancelled) setResults(rows);
       });
@@ -1019,7 +1022,7 @@ function ProductSearchInListing({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [catalog, query]);
+  }, [catalog, query, stockWarehouse?.id]);
 
   function choose(productId: string, label: string) {
     setSearch(label);
@@ -1060,13 +1063,15 @@ function ProductSearchInListing({
                   <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-lg">{categoryEmoji(product.categoryName)}</div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{productDisplayName(product)}</div>
-                    <div className={cn("text-xs", isProductStockManaged(product.categoryName) && Number(product.stock) <= 0 ? "text-er" : "text-slate-400")}>
-                      {product.isVariantParent
-                        ? `${product.children.length} SKU con`
-                        : isProductStockManaged(product.categoryName)
-                          ? `${product.sku} · ${legacyTextByFlag(L, "75dc5449a256")} ${formatNumber(Number(product.stock))} ${product.baseUnit}`
-                          : product.sku}
-                    </div>
+                    <div className="font-mono text-xs text-slate-400">{product.sku}</div>
+                    {product.isVariantParent && <div className="text-xs text-slate-400">{product.children.length} SKU con</div>}
+                    {isProductStockManaged(product.categoryName, product.productKind) && <ProductSearchStockLabel
+                      quantity={product.stock}
+                      unit={product.baseUnit}
+                      label={legacyTextByFlag(L, "75dc5449a256")}
+                      location={stockWarehouse?.name}
+                      className={Number(product.stock) <= 0 ? "text-er" : undefined}
+                    />}
                   </div>
                   <span className="hidden w-36 shrink-0 truncate text-right text-sm font-semibold tabular-nums text-primary-600 sm:block">
                     {product.isVariantParent ? variantPriceLabel(product) : `${formatCurrency(Number(product.retailPrice))}/${product.baseUnit}`}

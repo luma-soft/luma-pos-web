@@ -19,10 +19,11 @@ import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { SplitGuestRow } from "./split-guest-row";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
-import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 import { expandPosSearchUnitResults, rankProductSearchUnitResults } from "@/lib/pos/search-unit-results";
 import { resolvePosCartUnit } from "@/lib/pos/cart-unit";
+import { isProductStockManaged } from "@/lib/product-stock";
 
 type Method = "cash" | "bank_transfer" | "credit";
 const METHODS: Method[] = ["cash", "bank_transfer", "credit"];
@@ -62,7 +63,25 @@ export function TableOrder({
 
   function persist(next: TableCartItem[]) { setCart(next); setTableCart(id, next); }
 
-  const defaultWarehouseId = catalog.snapshot?.warehouses.find((warehouse) => warehouse.isDefault)?.id ?? null;
+  const stockWarehouse = catalog.snapshot?.warehouses.find((warehouse) => warehouse.isDefault)
+    ?? catalog.snapshot?.warehouses[0]
+    ?? null;
+  const defaultWarehouseId = stockWarehouse?.id ?? null;
+  const totalStockByProductId = useMemo(() => {
+    const totals = new Map(catalog.products.map((product) => [
+      product.id,
+      product.isVariantParent
+        ? 0
+        : product.warehouseStock.reduce((sum, stock) => sum + Number(stock.quantity), 0),
+    ]));
+    for (const product of catalog.products) {
+      if (product.parentProductId) {
+        totals.set(product.parentProductId, (totals.get(product.parentProductId) ?? 0)
+          + product.warehouseStock.reduce((sum, stock) => sum + Number(stock.quantity), 0));
+      }
+    }
+    return totals;
+  }, [catalog.products]);
   const browseProducts = useMemo(
     () => catalog.products.map((product) => catalogItemToPosProduct(product, catalog.products, defaultWarehouseId)),
     [catalog.products, defaultWarehouseId],
@@ -199,6 +218,10 @@ export function TableOrder({
             renderItem={(result, { selected }) => {
               const { product, unitName, alternateUnit } = result;
               const selectedUnit = unitName ?? product.baseUnit;
+              const stockManaged = isProductStockManaged(product.categoryName, product.productKind);
+              const stock = defaultWarehouseId
+                ? product.stock
+                : totalStockByProductId.get(product.id) ?? 0;
               const line = cart.find((item) => item.productId === product.id && item.unitName === selectedUnit && !item.sent && item.modifiers.length === 0 && !item.note);
               const multiplier = Number(alternateUnit?.multiplier) || 1;
               const unitPrice = alternateUnit?.priceOverride == null
@@ -208,7 +231,16 @@ export function TableOrder({
               <ProductSearchResultLayout
                 selected={selected}
                 leading={<ProductSearchThumbnail product={product} />}
-                  summary={<><div className="text-sm font-semibold">{productDisplayName(product)}{unitName == null ? "" : ` · ${selectedUnit}`}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
+                  summary={<>
+                    <div className="text-sm font-semibold">{productDisplayName(product)}{unitName == null ? "" : ` · ${selectedUnit}`}</div>
+                    <div className="font-mono text-xs text-slate-400">{product.sku}</div>
+                    {stockManaged && <ProductSearchStockLabel
+                      quantity={stock}
+                      unit={product.baseUnit}
+                      label={defaultWarehouseId ? t("pos.stockLabel") : t("products.variants.totalStock")}
+                      location={stockWarehouse?.name}
+                    />}
+                  </>}
                 controls={selected && line ? (
                   <div onClick={(event) => event.stopPropagation()}>
                     <QuantityInput size="sm" className="w-[8.25rem]" min={0} value={line.quantity} onChange={(quantity) => setQty(line.lineId, quantity)} inputLabel={t("common.productQuantity", { product: product.name })} />

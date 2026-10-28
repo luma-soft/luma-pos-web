@@ -30,13 +30,14 @@ import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai
 import { useTenantClientScope } from "@/components/tenant-client-scope";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPurchaseProduct } from "@/lib/inventory/product-catalog-adapter";
+import { getCatalogWarehouseStock } from "@/lib/product-catalog";
 import {
   purchaseLineDiscount,
   purchaseLineTotal,
   purchaseUnitCostFromTotal,
 } from "@/lib/purchases/line-calculations";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
-import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 import { expandProductSearchUnitResults, rankProductSearchUnitResults } from "@/lib/pos/search-unit-results";
@@ -595,6 +596,10 @@ export function PurchaseForm({
                   const lineSelected = Boolean(line && line.unitName === selectedUnit);
                   const multiplier = Number(alternateUnit?.multiplier) || 1;
                   const unitCost = Number(product.lastPurchasePrice ?? product.costPrice ?? 0) * multiplier;
+                  const warehouse = options.warehouses.find((item) => item.id === warehouseId);
+                  const stock = warehouseId
+                    ? getCatalogWarehouseStock(product, warehouseId)
+                    : product.warehouseStock.reduce((sum, item) => sum + Number(item.quantity), 0);
                   return (
                     <ProductSearchResultLayout
                       selected={selected}
@@ -603,6 +608,12 @@ export function PurchaseForm({
                         <>
                           <div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div>
                           <div className="font-mono text-xs text-slate-400">{product.sku}</div>
+                          {product.isStockManaged && <ProductSearchStockLabel
+                            quantity={stock}
+                            unit={product.baseUnit}
+                            label={warehouseId ? t("pos.stockLabel") : t("products.variants.totalStock")}
+                            location={warehouse?.name}
+                          />}
                         </>
                       )}
                       controls={lineSelected && line ? (

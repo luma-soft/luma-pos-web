@@ -23,7 +23,7 @@ import { useProductCatalog } from "@/components/product-catalog-provider";
 import { getCatalogWarehouseStock, type ProductCatalogItem } from "@/lib/product-catalog";
 import type { AiActionPreview } from "@/lib/ai/actions";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
-import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 
 export interface ProductOption {
@@ -258,7 +258,16 @@ export function StocktakeForm({
                     <ProductSearchResultLayout
                       selected={selected}
                       leading={<ProductSearchThumbnail product={product} />}
-                      summary={<><div className="text-sm font-semibold">{productDisplayName(product)}</div><div className="font-mono text-xs text-slate-400">{product.sku}</div></>}
+                      summary={<>
+                        <div className="text-sm font-semibold">{productDisplayName(product)}</div>
+                        <div className="font-mono text-xs text-slate-400">{product.sku}</div>
+                        <ProductSearchStockLabel
+                          quantity={product.stock}
+                          unit={product.baseUnit}
+                          label={t("pos.stockLabel")}
+                          location={warehouses.find((warehouse) => warehouse.id === warehouseId)?.name}
+                        />
+                      </>}
                       controls={selected ? (
                         <div onClick={(event) => event.stopPropagation()}>
                           <QuantityInput
@@ -270,7 +279,7 @@ export function StocktakeForm({
                             inputLabel={t("common.productQuantity", { product: product.name })}
                           />
                         </div>
-                      ) : <span className="shrink-0 text-sm text-slate-500 tabular-nums">{t("pos.stockLabel")}: {formatNumber(product.stock)} {product.baseUnit}</span>}
+                      ) : undefined}
                     />
                   )}
                 />

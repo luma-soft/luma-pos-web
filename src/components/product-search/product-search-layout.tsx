@@ -1,5 +1,25 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
+
+export function ProductSearchStockLabel({
+  quantity,
+  unit,
+  label,
+  location,
+  className,
+}: {
+  quantity: number | string;
+  unit: string;
+  label: string;
+  location?: string | null;
+  className?: string;
+}) {
+  return (
+    <div className={cn("text-xs text-slate-400 tabular-nums", className)}>
+      {label}: {formatNumber(quantity)} {unit}{location ? ` · ${location}` : ""}
+    </div>
+  );
+}
 
 export function ProductSearchResultLayout({
   selected = false,

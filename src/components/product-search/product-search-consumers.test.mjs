@@ -10,6 +10,10 @@ const consumers = [
   "../../app/(app)/tables/[id]/table-order.tsx",
   "../../app/(app)/orders/[id]/edit/order-edit-form.tsx",
 ];
+const stockSearchConsumers = [
+  ...consumers,
+  "../../app/(app)/inventory/tabs/shopee-listing-modal.tsx",
+];
 
 describe("shared product search consumers", () => {
   test.each(consumers)("%s uses ProductSearchPicker", (path) => {
@@ -17,10 +21,15 @@ describe("shared product search consumers", () => {
     expect(source).toContain("<ProductSearchPicker");
   });
 
+  test.each(stockSearchConsumers)("%s keeps stock visible in product search results", (path) => {
+    const source = readFileSync(new URL(path, import.meta.url), "utf8");
+    expect(source).toContain("ProductSearchStockLabel");
+  });
+
   test("purchase keeps the picker open for multi-add", () => {
     const source = readFileSync(new URL(consumers[1], import.meta.url), "utf8");
     expect(source).toContain("keepOpenOnSelect");
-    expect(source).toContain("isItemSelected={(product) => selectedProductIds.has(product.id)}");
+    expect(source).toContain("isItemSelected={(result) => lines.some");
   });
 
   test("stocktake and returns keep warehouse-aware stock mapping", () => {
@@ -40,6 +49,6 @@ describe("shared product search consumers", () => {
 
   test("table ordering still enters its modifier flow", () => {
     const source = readFileSync(new URL(consumers[5], import.meta.url), "utf8");
-    expect(source).toContain("setPicker({ product: p, groups })");
+    expect(source).toContain("setPicker({ product: p, groups, unitName: selectedUnitName })");
   });
 });

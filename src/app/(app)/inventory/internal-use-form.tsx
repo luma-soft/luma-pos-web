@@ -29,7 +29,7 @@ import type { PurchaseProductRow } from "@/lib/data/inventory";
 import { internalUseReasonLabel } from "@/lib/inventory/internal-use-reason";
 import type { InternalUseIssueRow } from "@/lib/data/internal-use";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
-import { ProductSearchResultLayout } from "@/components/product-search/product-search-layout";
+import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 import { expandProductSearchUnitResults, rankProductSearchUnitResults } from "@/lib/pos/search-unit-results";
@@ -233,7 +233,16 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                       <ProductSearchResultLayout
                         selected={selected}
                         leading={<ProductSearchThumbnail product={product} />}
-                        summary={<><div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div><div className="font-mono text-xs text-slate-400">{product.sku} · {formatNumber(stock)} {product.baseUnit}</div></>}
+                        summary={<>
+                          <div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div>
+                          <div className="font-mono text-xs text-slate-400">{product.sku}</div>
+                          {product.isStockManaged && <ProductSearchStockLabel
+                            quantity={stock}
+                            unit={product.baseUnit}
+                            label={warehouse ? t("pos.stockLabel") : t("products.variants.totalStock")}
+                            location={warehouse?.name}
+                          />}
+                        </>}
                         controls={lineSelected && line ? (
                           <div onClick={(event) => event.stopPropagation()}>
                             <QuantityInput

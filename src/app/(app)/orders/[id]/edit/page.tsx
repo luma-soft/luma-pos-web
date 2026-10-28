@@ -14,6 +14,7 @@ export default async function OrderEditPage({ params }: { params: Promise<{ id: 
     <OrderEditForm
       orderId={order.id}
       orderCode={order.code}
+      warehouseId={order.warehouseId}
       initial={{
         projectName: order.projectName ?? "",
         note: order.note ?? "",
