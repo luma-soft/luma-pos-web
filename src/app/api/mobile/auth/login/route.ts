@@ -5,6 +5,17 @@ import {
 import { signInWithInternalPhonePassword } from "@/lib/auth/internal-phone-password";
 import { mobileError, mobileOk, readJson } from "@/lib/mobile/response";
 
+function safeErrorCode(error: unknown): string | undefined {
+  let current = error;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (typeof current !== "object" || current === null) return undefined;
+    const record = current as { code?: unknown; cause?: unknown };
+    if (typeof record.code === "string") return record.code;
+    current = record.cause;
+  }
+  return undefined;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await readJson(request);
@@ -41,7 +52,12 @@ export async function POST(request: Request) {
 
     return mobileOk(payload.data);
   } catch (error) {
-    console.error("mobile auth login failed:", error);
+    // Avoid logging the full Drizzle/Postgres error: it includes the submitted
+    // phone number in query parameters. Keep only non-sensitive diagnostics.
+    console.error("mobile auth login failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      code: safeErrorCode(error),
+    });
     return mobileError("errors.serverError", 500);
   }
 }

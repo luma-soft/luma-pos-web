@@ -65,6 +65,8 @@ export default function LoginPage() {
           phone: normalizePhone(values.identifier)!,
           password: values.password,
           supabase,
+          invalidCredentialsMessage: t("auth.invalidCredentials"),
+          serverErrorMessage: t("errors.serverError"),
         });
     if (error) {
       setServerErr(error.message);
@@ -166,10 +168,14 @@ async function signInWithInternalPhone({
   phone,
   password,
   supabase,
+  invalidCredentialsMessage,
+  serverErrorMessage,
 }: {
   phone: string;
   password: string;
   supabase: ReturnType<typeof createClient>;
+  invalidCredentialsMessage: string;
+  serverErrorMessage: string;
 }) {
   const response = await fetch("/api/mobile/auth/login", {
     method: "POST",
@@ -178,10 +184,14 @@ async function signInWithInternalPhone({
   });
   const body = await response.json().catch(() => null) as {
     ok?: boolean;
+    error?: string;
     data?: { accessToken?: string; refreshToken?: string };
   } | null;
+  if (response.status === 401) {
+    return { error: new Error(invalidCredentialsMessage) };
+  }
   if (!response.ok || !body?.ok || !body.data?.accessToken || !body.data.refreshToken) {
-    return { error: new Error("Invalid login credentials") };
+    return { error: new Error(serverErrorMessage) };
   }
   return supabase.auth.setSession({
     access_token: body.data.accessToken,

@@ -146,6 +146,7 @@
     "brandTagline": "Building-materials sales management",
     "loginTitle": "Sign in",
     "accountHint": "Accounts are provisioned by your admin",
+    "invalidCredentials": "The phone number or password is incorrect.",
     "heroTitle": "Sell faster,\ntrack stock tighter,\nkeep debts clear.",
     "heroDesc": "POS for building-material stores — auto tile m² calculation, 4 price groups, realtime receivables.",
     "heroStat1": "Price lists per customer group",

@@ -146,6 +146,7 @@
     "brandTagline": "Quản lý bán hàng thông minh",
     "loginTitle": "Đăng nhập",
     "accountHint": "Tài khoản do quản trị viên cấp",
+    "invalidCredentials": "Số điện thoại hoặc mật khẩu không đúng.",
     "heroTitle": "Bán hàng nhanh,\nquản kho chặt,\nnợ rõ ràng.",
     "heroDesc": "POS cho cửa hàng VLXD — tính m² gạch tự động, 4 bảng giá theo nhóm khách, công nợ realtime.",
     "heroStat1": "Bảng giá theo nhóm khách",
