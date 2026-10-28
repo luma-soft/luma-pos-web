@@ -1025,38 +1025,8 @@ async function getBaseProduct(storeId: string, id: string) {
 // Danh mục/thương hiệu/NCC cho dropdown — cache 60s (ít thay đổi), dùng chung
 // nhiều trang (Sản phẩm, Thiết lập giá, Tồn kho) → đỡ query lặp.
 export const getProductFormOptions = unstable_cache(
-  async (storeId: string, includeComboProducts = false) => {
-    const comboProductRowsPromise = includeComboProducts
-      ? db
-        .select({
-          id: products.id,
-          name: products.name,
-          variantName: products.variantName,
-          specs: products.specs,
-          sku: products.sku,
-          baseUnit: products.baseUnit,
-          baseUnitDirectSale: products.baseUnitDirectSale,
-          productKind: products.productKind,
-          costPrice: products.costPrice,
-          retailPrice: products.retailPrice,
-          imageUrls: productCompatibilityImageUrls(storeId),
-          imageUpdatedAt: products.imageUpdatedAt,
-          totalStock: sql<string>`coalesce((
-            select sum(${stockLevels.quantity})
-            from ${stockLevels}
-            where ${stockLevels.productId} = ${products.id}
-          ), 0)`,
-          isActive: products.isActive,
-        })
-        .from(products)
-        .where(and(
-          eq(products.storeId, storeId),
-          eq(products.isVariantParent, false),
-          sql`${products.productKind} <> 'combo'`,
-        ))
-        .orderBy(asc(products.name))
-      : Promise.resolve([]);
-    const [cats, brandRows, supplierRows, comboProductRows] = await Promise.all([
+  async (storeId: string) => {
+    const [cats, brandRows, supplierRows] = await Promise.all([
       db
         .select({ id: categories.id, name: categories.name })
         .from(categories)
@@ -1072,13 +1042,11 @@ export const getProductFormOptions = unstable_cache(
         .from(suppliers)
         .where(eq(suppliers.storeId, storeId))
         .orderBy(asc(suppliers.name)),
-      comboProductRowsPromise,
     ]);
     return {
       categories: cats,
       brands: brandRows,
       suppliers: supplierRows,
-      comboProducts: comboProductRows,
     };
   },
   ["product-form-options"],
@@ -1089,3 +1057,97 @@ export const getProductFormOptions = unstable_cache(
 export type ProductFormOptions = Awaited<
   ReturnType<typeof getProductFormOptions>
 >;
+
+export interface ComboProductCandidate {
+  id: string;
+  name: string;
+  sku: string | null;
+  baseUnit: string;
+  productKind: "product" | "service";
+  costPrice: string;
+  retailPrice: string;
+  totalStock: string;
+  isActive: boolean;
+}
+
+export interface ComboProductCandidatePage {
+  rows: ComboProductCandidate[];
+  selectedRows: ComboProductCandidate[];
+  hasMore: boolean;
+}
+
+/** Bounded, searchable projection for the combo-item picker. */
+export async function getComboProductCandidatePage(
+  storeId: string,
+  query: string,
+  offset: number,
+  selectedIds: readonly string[],
+  includeCandidates = true,
+): Promise<ComboProductCandidatePage> {
+  const pageSize = 50;
+  const safeOffset = Math.max(0, Math.min(Math.floor(offset), 50_000));
+  const safeSelectedIds = [...new Set(selectedIds)].slice(0, 100);
+  const baseCondition = and(
+    eq(products.storeId, storeId),
+    eq(products.isVariantParent, false),
+    sql`${products.productKind} <> 'combo'`,
+  );
+  const selectCandidates = (where: SQL, limit?: number, rowOffset?: number) => {
+    let queryBuilder = db
+      .select({
+        id: products.id,
+        name: products.name,
+        sku: products.sku,
+        baseUnit: products.baseUnit,
+        productKind: products.productKind,
+        costPrice: products.costPrice,
+        retailPrice: products.retailPrice,
+        totalStock: sql<string>`coalesce(sum(${stockLevels.quantity}), 0)`,
+        isActive: products.isActive,
+      })
+      .from(products)
+      .leftJoin(stockLevels, and(
+        eq(stockLevels.productId, products.id),
+        eq(stockLevels.storeId, storeId),
+      ))
+      .where(where)
+      .groupBy(products.id)
+      .orderBy(asc(products.name), asc(products.id));
+    if (limit !== undefined) queryBuilder = queryBuilder.limit(limit) as typeof queryBuilder;
+    if (rowOffset !== undefined) queryBuilder = queryBuilder.offset(rowOffset) as typeof queryBuilder;
+    return queryBuilder;
+  };
+
+  const normalizedQuery = query.trim();
+  const pageCondition = normalizedQuery
+    ? and(baseCondition, eq(products.isActive, true), inventoryProductSearchCondition({
+      id: products.id,
+      storeId: products.storeId,
+      name: products.name,
+      sku: products.sku,
+      barcode: products.barcode,
+      baseUnit: products.baseUnit,
+      variantName: products.variantName,
+      specs: products.specs,
+    }, normalizedQuery))
+    : and(baseCondition, eq(products.isActive, true));
+  const [pageRows, selectedRows] = await Promise.all([
+    includeCandidates
+      ? selectCandidates(pageCondition!, pageSize + 1, safeOffset)
+      : Promise.resolve([] as ComboProductCandidate[]),
+    safeSelectedIds.length > 0
+      ? selectCandidates(and(baseCondition, inArray(products.id, safeSelectedIds))!)
+      : Promise.resolve([] as ComboProductCandidate[]),
+  ]);
+
+  const hasMore = pageRows.length > pageSize;
+  const asComboProductCandidate = (row: typeof pageRows[number]): ComboProductCandidate => ({
+    ...row,
+    productKind: row.productKind === "service" ? "service" : "product",
+  });
+  return {
+    rows: pageRows.slice(0, pageSize).map(asComboProductCandidate),
+    selectedRows: selectedRows.map(asComboProductCandidate),
+    hasMore,
+  };
+}

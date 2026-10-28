@@ -43,6 +43,7 @@ function findScrollBoundary(element: HTMLElement | null) {
  */
 export function SearchableSelect({
   value, onChange, options, placeholder, className, allowClear = true, onCreate, showSearch, disabled, actionLabel, onAction, actionIcon, id, ariaLabel,
+  onSearchChange, loading = false, hasMore = false, onLoadMore,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -59,6 +60,11 @@ export function SearchableSelect({
   actionIcon?: ReactNode;
   id?: string;
   ariaLabel?: string;
+  /** Fetch a bounded remote page whenever the opened picker's query changes. */
+  onSearchChange?: (query: string) => void;
+  loading?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
 }) {
   const t = useTranslations("common");
   const [open, setOpen] = useState(false);
@@ -71,8 +77,14 @@ export function SearchableSelect({
   const menuRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const onSearchChangeRef = useRef(onSearchChange);
   const selected = options.find((o) => o.value === value);
   const searchable = showSearch ?? options.length > 8;
+  const remoteSearch = Boolean(onSearchChange);
+
+  useLayoutEffect(() => {
+    onSearchChangeRef.current = onSearchChange;
+  }, [onSearchChange]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 1024px)");
@@ -94,10 +106,18 @@ export function SearchableSelect({
 
   const nq = normalizeSearch(q);
   const filtered = useMemo(
-    () => (nq ? options.filter((o) => normalizeSearch(`${o.label} ${o.hint ?? ""} ${o.description ?? ""}`).includes(nq)) : options),
-    [nq, options]
+    () => remoteSearch
+      ? options
+      : nq
+        ? options.filter((o) => normalizeSearch(`${o.label} ${o.hint ?? ""} ${o.description ?? ""}`).includes(nq))
+        : options,
+    [nq, options, remoteSearch]
   );
   const exact = options.some((o) => normalizeSearch(o.label) === nq);
+
+  useEffect(() => {
+    if (open) onSearchChangeRef.current?.(q);
+  }, [open, q]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- reset highlighted index when query/open changes
   useEffect(() => { setActive(0); }, [nq, open]);
@@ -153,7 +173,7 @@ export function SearchableSelect({
       window.removeEventListener("resize", updateMenuPosition);
       window.removeEventListener("scroll", updateMenuPosition, true);
     };
-  }, [allowClear, filtered.length, isDesktop, onAction, onCreate, open, q, searchable]);
+  }, [allowClear, filtered.length, isDesktop, loading, onAction, onCreate, open, q, searchable]);
 
   async function create() {
     if (!onCreate || !q.trim() || creating) return;
@@ -208,7 +228,18 @@ export function SearchableSelect({
           />
         </div>
       )}
-      <div ref={listRef} className="min-h-0 flex-1 overflow-auto py-1 max-h-[60dvh] lg:max-h-64" onKeyDown={onKeyDown}>
+      <div
+        ref={listRef}
+        className="min-h-0 flex-1 overflow-auto py-1 max-h-[60dvh] lg:max-h-64"
+        onKeyDown={onKeyDown}
+        aria-busy={loading}
+        onScroll={(event) => {
+          const list = event.currentTarget;
+          if (onLoadMore && hasMore && !loading && list.scrollHeight - list.scrollTop - list.clientHeight < 32) {
+            onLoadMore();
+          }
+        }}
+      >
         {onAction && actionLabel && (
           <Button
             type="button"
@@ -245,7 +276,9 @@ export function SearchableSelect({
           </Button>
         )}
         {filtered.length === 0 && !(onCreate && q.trim()) ? (
-          <Text as="div" variant="muted" className="px-3 py-3 text-center" text={t("noResults")} />
+          loading
+            ? <div role="status" className="flex justify-center px-3 py-4"><Loader2 className="h-4 w-4 animate-spin text-slate-400" /></div>
+            : <Text as="div" variant="muted" className="px-3 py-3 text-center" text={t("noResults")} />
         ) : filtered.slice(0, 200).map((o, i) => (
           <Button
             key={o.value}
@@ -297,6 +330,11 @@ export function SearchableSelect({
             {o.value === value && <Check className="w-4 h-4 text-primary-600 shrink-0" />}
           </Button>
         ))}
+        {loading && filtered.length > 0 && (
+          <div role="status" className="flex justify-center px-3 py-3">
+            <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+          </div>
+        )}
       </div>
     </div>
   );

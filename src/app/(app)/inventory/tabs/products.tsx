@@ -193,7 +193,7 @@ export async function ProductEditorModal({
   if (seedId && !UUID_RE.test(seedId)) notFound();
 
   const [options, priceBooks, requestedProduct] = await Promise.all([
-    getProductFormOptions(context.storeId, true),
+    getProductFormOptions(context.storeId),
     getPriceBooks(context.storeId),
     seedId ? getProduct(context.storeId, seedId) : Promise.resolve(null),
   ]);
@@ -241,7 +241,6 @@ export async function ProductEditorModal({
           categories={options.categories}
           brands={options.brands}
           suppliers={options.suppliers}
-          comboProducts={options.comboProducts}
           priceBooks={priceBooks}
           layout="modal"
           closeHref={closeHref}

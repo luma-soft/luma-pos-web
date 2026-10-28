@@ -310,3 +310,42 @@ projection contributes to Shared Pooler egress. Keep the local Supabase URL,
 anon key and database URL on one project when updating local configuration.
 Compare bytes returned, calls per user session, Storage egress and device cache
 size separately.
+
+## Implementation follow-up — 2026-10-29
+
+The implementation now covers the actionable application changes in this
+review: web catalog refreshes are coordinated across tabs and back off when
+Realtime is available; native POS skips a full catalog download when its
+revision is unchanged; POS projects are store-scoped; mobile catalog metadata
+is sent once per snapshot and product results are bounded; KDS polling is less
+frequent and pauses in hidden tabs; purchase-price work is role-gated and
+batched; native catalog rows are canonical in SQLite; image and invoice caches
+are bounded; native inventory uses thumbnail URLs and downsampled images; and
+offline browse precomputes its search data. The SQLite catalog writer now also
+reuses its prepared statements across each batch.
+
+Product-form options now contain only categories, brands, and suppliers. The
+combo-item picker requests searchable 50-row pages and does not transfer image
+URLs or stock projections for the whole catalog; it loads details for existing
+combo items separately so cost-price calculations continue to work.
+
+Three items remain gated by evidence or production access:
+
+- A catalog revision change still requires one full snapshot. Replacing that
+  with deltas requires a complete change feed for stock, prices, product
+  identity, and promotion windows; product `updated_at` alone is not a safe
+  invalidation source.
+- The production project showed 0 GB Storage size and no Storage egress in the
+  reviewed billing cycle. The 598 objects previously found through local
+  `.env.local` belong to the old project `qnazjwycsdaezamlejxn`, so no R2 copy,
+  cutover, or source deletion was run. Follow the media runbook if production
+  Storage usage changes.
+- The Supabase advisor warnings for `sepay_payment_sessions` and
+  `_migrations` were not changed. Vercel's production environment did not
+  provide readable database credentials to the isolated check process, while
+  `.env.local` still targets the old project. No production SQL was run; use a
+  verified production session connection before addressing those warnings.
+
+The changed web files pass ESLint. TypeScript still reports only the existing
+`bun:test` type resolution and `priceBook` fixture errors in test files. The
+native app rebuilt and reinstalled successfully on the booted iPhone simulator.

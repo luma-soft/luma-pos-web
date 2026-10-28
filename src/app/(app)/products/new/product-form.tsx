@@ -57,8 +57,9 @@ import {
   createCategory,
   createBrand,
 } from "@/lib/actions/products";
+import { loadComboProductCandidates } from "@/lib/actions/product-combo-search";
 import { Combobox } from "@/components/combobox";
-import type { ProductDetail, ProductFormOptions } from "@/lib/data/products";
+import type { ComboProductCandidate, ProductDetail, ProductFormOptions } from "@/lib/data/products";
 import type { PriceBookRow } from "@/lib/data/price-books";
 import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai-assistant/utils";
 import { useTenantClientScope } from "@/components/tenant-client-scope";
@@ -144,7 +145,6 @@ export interface NewProductFormProps {
   categories: ProductFormOptions["categories"];
   brands: ProductFormOptions["brands"];
   suppliers?: ProductFormOptions["suppliers"]; // NCC tự gắn khi nhập hàng, không sửa ở form
-  comboProducts?: ProductFormOptions["comboProducts"];
   priceBooks?: PriceBookRow[];
   mode?: "create" | "edit";
   productId?: string;
@@ -168,7 +168,6 @@ export function NewProductForm({
   brands,
   storeId,
   publicMediaBaseUrl,
-  comboProducts = [],
   priceBooks = [],
   mode = "create",
   productId,
@@ -672,7 +671,6 @@ export function NewProductForm({
             categories={categories}
             brands={brands}
             priceBooks={priceBooks}
-            comboProducts={comboProducts}
             mode={mode}
             creationKind={creationKind}
             initialManagedImages={initialManagedImages}
@@ -800,7 +798,6 @@ function InfoTab({
   categories,
   brands,
   priceBooks,
-  comboProducts,
   initialManagedImages,
   groupEditing,
   imageUrlDraft,
@@ -820,9 +817,7 @@ function InfoTab({
     <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">
       <div className="min-w-0 space-y-5">
         <BasicInfoSection categories={categories} brands={brands} groupEditing={groupManaging} />
-        {productKind === "combo" && (
-          <ComboItemsField products={comboProducts ?? []} />
-        )}
+        {productKind === "combo" && <ComboItemsField />}
         {!groupManaging && <Section
           titleTx="products.sections.pricing"
           className="rounded-none border-x-0 border-b-0 shadow-none"
@@ -862,50 +857,170 @@ function InfoTab({
   );
 }
 
-function ComboItemsField({
-  products: candidates,
-}: {
-  products: ProductFormOptions["comboProducts"];
-}) {
+function ComboItemsField() {
   const t = useTranslations();
   const { watch, setValue, formState } = useFormCtx();
   const items = watch("comboItems") ?? [];
   const currentCostPrice = Number(watch("costPrice") ?? 0);
-  const candidatesById = useMemo(
-    () => new Map(candidates.map((product) => [product.id, product])),
-    [candidates],
-  );
+  const [candidatesById, setCandidatesById] = useState<Map<string, ComboProductCandidate>>(() => new Map());
+  const [resultIds, setResultIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const requestSequence = useRef(0);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentQuery = useRef("");
+  const nextOffset = useRef(0);
+  const hasMoreRef = useRef(false);
+  const loadingRef = useRef(false);
+  const resolvedSelectionKeys = useRef(new Set<string>());
+  const pendingSelectionKeys = useRef(new Set<string>());
+  const selectedKey = [...new Set(items.map((item) => item.productId))].sort().join(",");
+  const selectedIds = selectedKey ? selectedKey.split(",") : [];
+  const selectedIdsSet = new Set(selectedIds);
+
+  const runCandidateRequest = useCallback(async (
+    query: string,
+    offset: number,
+    append: boolean,
+    includeCandidates: boolean,
+    sequence: number,
+    requestSelectedIds: string[],
+  ) => {
+    try {
+      const result = await loadComboProductCandidates({
+        query,
+        offset,
+        selectedIds: requestSelectedIds,
+        includeCandidates,
+      });
+      if (sequence !== requestSequence.current) return false;
+      if (!result.ok) {
+        if (includeCandidates && !append) {
+          setResultIds([]);
+          hasMoreRef.current = false;
+          setHasMore(false);
+        }
+        return false;
+      }
+
+      const { rows, selectedRows, hasMore: nextHasMore } = result.data;
+      setCandidatesById((current) => {
+        const next = new Map(current);
+        for (const product of [...selectedRows, ...rows]) next.set(product.id, product);
+        return next;
+      });
+
+      if (includeCandidates) {
+        const pageIds = rows.map((product) => product.id);
+        setResultIds((current) => {
+          const merged = append ? [...current, ...pageIds] : pageIds;
+          return [...new Set(merged)];
+        });
+        nextOffset.current = offset + rows.length;
+        hasMoreRef.current = nextHasMore;
+        setHasMore(nextHasMore);
+      }
+      return true;
+    } catch {
+      if (sequence === requestSequence.current && includeCandidates && !append) {
+        setResultIds([]);
+        hasMoreRef.current = false;
+        setHasMore(false);
+      }
+      return false;
+    } finally {
+      if (sequence === requestSequence.current) {
+        loadingRef.current = false;
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  function onSearchChange(query: string) {
+    currentQuery.current = query;
+    nextOffset.current = 0;
+    hasMoreRef.current = false;
+    setResultIds([]);
+    setHasMore(false);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const sequence = ++requestSequence.current;
+    loadingRef.current = true;
+    setLoading(true);
+    searchTimer.current = setTimeout(() => {
+      const requestSelectedIds = selectedKey ? selectedKey.split(",") : [];
+      void runCandidateRequest(query, 0, false, true, sequence, requestSelectedIds);
+    }, 220);
+  }
+
+  function onLoadMore() {
+    if (loadingRef.current || !hasMoreRef.current) return;
+    const sequence = ++requestSequence.current;
+    loadingRef.current = true;
+    setLoading(true);
+    void runCandidateRequest(
+      currentQuery.current,
+      nextOffset.current,
+      true,
+      true,
+      sequence,
+      selectedKey ? selectedKey.split(",") : [],
+    );
+  }
+
+  useEffect(() => {
+    if (!selectedKey
+      || resolvedSelectionKeys.current.has(selectedKey)
+      || pendingSelectionKeys.current.has(selectedKey)) return;
+    const requestSelectedIds = selectedKey.split(",");
+    const selectedProductsReady = requestSelectedIds.every((id) => candidatesById.has(id));
+    if (selectedProductsReady) return;
+    const sequence = ++requestSequence.current;
+    loadingRef.current = true;
+    pendingSelectionKeys.current.add(selectedKey);
+    void runCandidateRequest("", 0, false, false, sequence, requestSelectedIds).then((loaded) => {
+      pendingSelectionKeys.current.delete(selectedKey);
+      if (loaded) resolvedSelectionKeys.current.add(selectedKey);
+    });
+  }, [candidatesById, runCandidateRequest, selectedKey]);
+
+  useEffect(() => () => {
+    requestSequence.current += 1;
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+  }, []);
+
   const calculatedCostPrice = items.reduce((total, item) => {
     const product = candidatesById.get(item.productId);
     return (
       total + Number(product?.costPrice ?? 0) * Number(item.quantity || 0)
     );
   }, 0);
-  const selectedIds = new Set(items.map((item) => item.productId));
-  const options = candidates
-    .filter((product) => product.isActive && !selectedIds.has(product.id))
-    .map((product) => ({
+  const options = resultIds.flatMap((id) => {
+    const product = candidatesById.get(id);
+    if (!product?.isActive || selectedIdsSet.has(product.id)) return [];
+    return [{
       value: product.id,
       label: product.name,
-      hint: `${product.sku} · ${product.baseUnit}`,
-      imageUrl: product.imageUrls?.[0] ?? null,
+      hint: `${product.sku ?? "—"} · ${product.baseUnit}`,
       description: `${t("products.combo.costPrice")}: ${formatCurrency(Number(product.costPrice))} · ${t("products.combo.salePrice")}: ${formatCurrency(Number(product.retailPrice))} · ${t("products.combo.stock")}: ${
         product.productKind === "service"
           ? t("products.stock.notTracked")
           : `${formatNumber(Number(product.totalStock))} ${product.baseUnit}`
       }`,
-    }));
+    }];
+  });
+  const selectedProductsReady = items.every((item) => candidatesById.has(item.productId));
 
   useEffect(() => {
+    if (!selectedProductsReady) return;
     if (Math.abs(currentCostPrice - calculatedCostPrice) < 0.0001) return;
     setValue("costPrice", calculatedCostPrice, {
       shouldDirty: true,
       shouldValidate: true,
     });
-  }, [calculatedCostPrice, currentCostPrice, setValue]);
+  }, [calculatedCostPrice, currentCostPrice, selectedProductsReady, setValue]);
 
   function addItem(productId: string) {
-    if (!productId || selectedIds.has(productId)) return;
+    if (!productId || selectedIdsSet.has(productId)) return;
     setValue(
       "comboItems",
       [...items, { productId, quantity: 1 }],
@@ -923,6 +1038,10 @@ function ComboItemsField({
         value=""
         onChange={addItem}
         options={options}
+        onSearchChange={onSearchChange}
+        loading={loading}
+        hasMore={hasMore}
+        onLoadMore={onLoadMore}
         placeholder={t("products.combo.selectProduct")}
         showSearch
         allowClear={false}
@@ -935,9 +1054,7 @@ function ComboItemsField({
       ) : (
         <div className="mt-3 divide-y divide-border-soft overflow-hidden rounded-xl border border-border">
           {items.map((item, index) => {
-            const product = candidates.find(
-              (candidate) => candidate.id === item.productId,
-            );
+            const product = candidatesById.get(item.productId);
             return (
               <div
                 key={item.productId}
