@@ -338,6 +338,7 @@ export function PurchaseForm({
 
   async function applyAiPreview(preview: AiActionPreview, applyMode: AiQuickActionApplyMode) {
     if (preview.intent !== "create_inventory_inbound" && preview.intent !== "create_draft_purchase_order" && preview.intent !== "create_draft_purchase_order_from_restocking") return;
+    clearError();
     const draft: AiWorkflowDraft = {
       intent: preview.intent,
       action: preview.action,
@@ -429,7 +430,12 @@ export function PurchaseForm({
   const paid = payFull ? total : Math.min(amountPaid, total);
   const owed = total - paid;
 
+  function clearError() {
+    setError("");
+  }
+
   function addProduct(p: PurchaseProductRow, unitName = p.baseUnit) {
+    clearError();
     const line = productToLine(p);
     const multiplier = unitName === line.baseUnit
       ? 1
@@ -459,6 +465,7 @@ export function PurchaseForm({
     router.push(Routes.productCreateForReturn(returnTo, productKind), { scroll: false });
   }
   function patch(id: string, p: Partial<Line>) {
+    clearError();
     setLines((ls) => p.quantity == null
       ? ls.map((l) => (l.productId === id ? { ...l, ...p } : l))
       : setSelectedProductQuantity(
@@ -469,12 +476,14 @@ export function PurchaseForm({
         ));
   }
   function patchLineTotal(id: string, desiredTotal: number) {
+    clearError();
     setLines((current) => current.map((line) => line.productId === id
       ? { ...line, unitCost: purchaseUnitCostFromTotal(line, desiredTotal) }
       : line));
   }
   /** Đổi đơn vị nhưng giữ nguyên số lượng quy đổi và thành tiền của dòng. */
   function changeUnit(id: string, unitName: string) {
+    clearError();
     setLines((ls) => ls.map((line) => line.productId === id ? withPurchaseLineUnit(line, unitName) : line));
   }
 
@@ -682,7 +691,7 @@ export function PurchaseForm({
                         <Button
                           type="button"
                           variant="ghost"
-                          onClick={() => setLines((current) => current.filter((item) => item.productId !== l.productId))}
+                          onClick={() => { clearError(); setLines((current) => current.filter((item) => item.productId !== l.productId)); }}
                           className="min-h-11 text-er"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -808,7 +817,7 @@ export function PurchaseForm({
                         />
                       </td>
                       <td className="px-2 py-2 text-right">
-                        <Button type="button" variant="ghost" size="iconSm" onClick={() => setLines((ls) => ls.filter((x) => x.productId !== l.productId))} className="text-slate-400 hover:text-red-500">
+                        <Button type="button" variant="ghost" size="iconSm" onClick={() => { clearError(); setLines((ls) => ls.filter((x) => x.productId !== l.productId)); }} className="text-slate-400 hover:text-red-500">
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </td>
@@ -827,7 +836,7 @@ export function PurchaseForm({
           <div className="flex flex-col gap-3 p-3 sm:p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto [&>*]:shrink-0">
           <div>
             <Text as="div" variant="muted" size="xs" weight="medium" className="mb-1" text={`${t("purchases.cols.supplier")} *`} />
-            <Combobox value={supplierId} onChange={setSupplierId} allowClear={false}
+            <Combobox value={supplierId} onChange={(value) => { clearError(); setSupplierId(value); }} allowClear={false}
               placeholder={t(options.suppliers.length ? "products.fields.supplierPlaceholder" : "purchases.noSuppliers")}
               options={options.suppliers.map((s) => ({ value: s.id, label: s.name }))} />
             {selectedSupplier && (
@@ -842,33 +851,45 @@ export function PurchaseForm({
           {/* Receiving warehouse is temporarily hidden; retain the saved/default ID. */}
           <div>
             <Text as="div" variant="muted" size="xs" weight="medium" className="mb-1" text={t("purchases.invoiceNumber")} />
-            <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder={t("purchases.invoiceNumberPlaceholder")} />
+            <Input value={invoiceNumber} onChange={(e) => { clearError(); setInvoiceNumber(e.target.value); }} placeholder={t("purchases.invoiceNumberPlaceholder")} />
           </div>
 
           <div className="mt-1 pt-3 border-t border-border space-y-2.5 text-sm">
             <div className="flex justify-between items-center"><span className="text-slate-500">{t("purchases.subtotal")} ({lines.length})</span><span className="tabular-nums">{formatCurrency(subtotal)}</span></div>
-            <div className="flex justify-between items-center gap-2"><span className="text-slate-500">{t("pos.discount")}</span><MoneyInput value={discount || ""} placeholder="0" onChange={(v) => setDiscount(v ?? 0)} className={cn(numCls, "w-32")} /></div>
+            <div className="flex justify-between items-center gap-2"><span className="text-slate-500">{t("pos.discount")}</span><MoneyInput value={discount || ""} placeholder="0" onChange={(v) => { clearError(); setDiscount(v ?? 0); }} className={cn(numCls, "w-32")} /></div>
             <div className="flex justify-between items-center gap-2">
               <label htmlFor="purchase-vat-rate" className="text-slate-500">VAT %</label>
-              <NumberInput id="purchase-vat-rate" min={0} max={100} value={vatRate} placeholder="0" suffix="%" thousandSeparator={false} onChange={(value) => setVatRate(value ?? 0)} className={cn(numCls, "w-32")} />
+              <NumberInput id="purchase-vat-rate" min={0} max={100} value={vatRate} placeholder="0" suffix="%" thousandSeparator={false} onChange={(value) => { clearError(); setVatRate(value ?? 0); }} className={cn(numCls, "w-32")} />
             </div>
             <div className="text-right tabular-nums text-xs text-slate-500">{formatCurrency(tax)}</div>
             <div className="flex justify-between items-center gap-2">
               <label htmlFor="purchase-shipping-fee" className="text-slate-500">Phí vận chuyển</label>
-              <MoneyInput id="purchase-shipping-fee" min={0} value={shippingFee || ""} placeholder="0" onChange={(value) => setShippingFee(value ?? 0)} className={cn(numCls, "w-32")} />
+              <MoneyInput id="purchase-shipping-fee" min={0} value={shippingFee || ""} placeholder="0" onChange={(value) => { clearError(); setShippingFee(value ?? 0); }} className={cn(numCls, "w-32")} />
             </div>
             <div className="flex justify-between items-center text-base font-semibold pt-1"><span>{t("purchases.needPay")}</span><span className="text-primary-600 tabular-nums">{formatCurrency(total)}</span></div>
 
-            <label className="flex min-h-11 min-w-11 items-center gap-2 pt-1 text-sm lg:min-h-0 lg:min-w-0"><Checkbox checked={payFull} onChange={(e) => setPayFull(e.target.checked)}  />{t("purchases.payFull")}</label>
+            <label className="flex min-h-11 min-w-11 items-center gap-2 pt-1 text-sm lg:min-h-0 lg:min-w-0"><Checkbox checked={payFull} onChange={(e) => { clearError(); setPayFull(e.target.checked); }}  />{t("purchases.payFull")}</label>
             {!payFull && (
-              <div className="flex justify-between items-center gap-2"><span className="text-slate-500">{t("purchases.amountPaid")}</span><MoneyInput value={amountPaid || ""} placeholder="0" onChange={(v) => setAmountPaid(v ?? 0)} className={cn(numCls, "w-36")} /></div>
+              <div className="flex justify-between items-center gap-2"><span className="text-slate-500">{t("purchases.amountPaid")}</span><MoneyInput value={amountPaid || ""} placeholder="0" onChange={(v) => { clearError(); setAmountPaid(v ?? 0); }} className={cn(numCls, "w-36")} /></div>
             )}
             <div className="flex justify-between items-center"><span className="text-slate-500">{t("purchases.cols.owed")}</span><span className={cn("tabular-nums font-semibold", owed > 0 ? "text-warn" : "text-slate-400")}>{formatCurrency(owed)}</span></div>
           </div>
 
-          <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("orders.detail.notePlaceholder")} rows={3} className="h-24 shrink-0 resize-none" />
+          <Textarea value={note} onChange={(e) => { clearError(); setNote(e.target.value); }} placeholder={t("orders.detail.notePlaceholder")} rows={3} className="h-24 shrink-0 resize-none" />
 
-          {error && <Text as="p" variant="destructive" text={error} />}
+          {error && (
+            <div role="alert" className="flex items-start justify-between gap-2">
+              <Text as="p" variant="destructive" text={error} />
+              <button
+                type="button"
+                aria-label={t("common.close")}
+                onClick={clearError}
+                className="min-h-11 min-w-11 shrink-0 text-sm font-medium text-red-600 underline-offset-2 hover:underline"
+              >
+                {t("common.close")}
+              </button>
+            </div>
+          )}
           </div>
 
           <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 shrink-0 border-t border-border bg-surface p-3 sm:p-4 lg:static">
