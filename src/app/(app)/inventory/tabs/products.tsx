@@ -193,7 +193,7 @@ export async function ProductEditorModal({
   if (seedId && !UUID_RE.test(seedId)) notFound();
 
   const [options, priceBooks, requestedProduct] = await Promise.all([
-    getProductFormOptions(context.storeId),
+    getProductFormOptions(context.storeId, true),
     getPriceBooks(context.storeId),
     seedId ? getProduct(context.storeId, seedId) : Promise.resolve(null),
   ]);

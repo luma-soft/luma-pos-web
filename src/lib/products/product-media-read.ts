@@ -117,3 +117,56 @@ export function productCompatibilityImageUrls(
     ) image
   ), '[]'::json)`;
 }
+
+/** First product image optimized for list thumbnails, with original fallback. */
+export function productCompatibilityThumbnailUrl(
+  storeId: string,
+  publicMedia: PublicMediaConfig = getPublicMediaConfig(),
+) {
+  const directEligible = productMediaEligibilitySql(mediaColumns("direct_media"), {
+    storeId,
+    targetIds: [sql`products.id`],
+    publicMedia,
+  });
+  const selectedEligible = productMediaEligibilitySql(mediaColumns("media"), {
+    storeId,
+    targetIds: [sql`relation.product_id`],
+    publicMedia,
+  });
+
+  return sql<string | null>`coalesce(
+    (
+      select external_image.url
+      from jsonb_array_elements_text(coalesce(products.image_urls, '[]'::jsonb))
+        with ordinality as external_image(url, ordinality)
+      order by external_image.ordinality
+      limit 1
+    ),
+    (
+      select ${publicPrefix(publicMedia)} || coalesce(nullif(media.thumbnail_object_key, ''), media.object_key)
+      from product_media relation
+      join media_objects media
+        on media.store_id = relation.store_id
+       and media.id = relation.media_object_id
+      where relation.store_id = ${storeId}::uuid
+        and relation.deleted_at is null
+        and relation.product_id = case
+          when exists (
+            select 1
+            from product_media direct_relation
+            join media_objects direct_media
+              on direct_media.store_id = direct_relation.store_id
+             and direct_media.id = direct_relation.media_object_id
+            where direct_relation.store_id = ${storeId}::uuid
+              and direct_relation.product_id = products.id
+              and direct_relation.deleted_at is null
+              and ${directEligible}
+          ) then products.id
+          else coalesce(products.parent_product_id, products.id)
+        end
+        and ${selectedEligible}
+      order by relation.sort_order
+      limit 1
+    )
+  )`;
+}

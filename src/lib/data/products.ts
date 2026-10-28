@@ -40,6 +40,7 @@ import {
 } from "@/lib/inventory/product-list-policy";
 import {
   productCompatibilityImageUrls,
+  productCompatibilityThumbnailUrl,
   productManagedImageDescriptors,
   type ProductManagedImageDescriptor,
 } from "@/lib/products/product-media-read";
@@ -58,6 +59,8 @@ export type ProductListView = "grouped" | "flat";
 export interface ProductListFilters extends PriceComparison {
   /** Skip the receipt-history subquery for callers that cannot display purchase costs. */
   includeLastPurchaseNetPrice?: boolean;
+  /** Return a list-sized image URL when the caller renders product thumbnails. */
+  includeThumbnailUrl?: boolean;
   exactProductId?: string;
   q?: string;
   categoryId?: string;
@@ -262,6 +265,9 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
         dimensions: products.dimensions,
         specs: products.specs,
         imageUrls: productCompatibilityImageUrls(storeId),
+        thumbnailImageUrl: filters.includeThumbnailUrl
+          ? productCompatibilityThumbnailUrl(storeId)
+          : sql<string | null>`null`,
         imageMediaRecords: productMediaCoordinates(storeId),
         imageUpdatedAt: products.imageUpdatedAt,
         comboItems: sql<Array<{
@@ -409,6 +415,9 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
             dimensions: products.dimensions,
             specs: products.specs,
             imageUrls: productCompatibilityImageUrls(storeId),
+            thumbnailImageUrl: filters.includeThumbnailUrl
+              ? productCompatibilityThumbnailUrl(storeId)
+              : sql<string | null>`null`,
             imageMediaRecords: productMediaCoordinates(storeId),
             imageUpdatedAt: products.imageUpdatedAt,
             comboItems: sql<never[]>`'[]'::json`,
@@ -734,6 +743,7 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
       view: "flat",
       warehouseId: filters.warehouseId,
       includeLastPurchaseNetPrice: filters.includeLastPurchaseNetPrice,
+      includeThumbnailUrl: filters.includeThumbnailUrl,
     }, { productIds: batchIds, includeDetails: false }),
     db.execute<{ id: string; name: string; aliases: string[] }>(sql`select a.id, a.name,
       coalesce((select json_agg(alias.name_key) from product_attribute_aliases alias where alias.store_id = a.store_id and alias.attribute_id = a.id), '[]'::json) as aliases
@@ -1015,24 +1025,9 @@ async function getBaseProduct(storeId: string, id: string) {
 // Danh mục/thương hiệu/NCC cho dropdown — cache 60s (ít thay đổi), dùng chung
 // nhiều trang (Sản phẩm, Thiết lập giá, Tồn kho) → đỡ query lặp.
 export const getProductFormOptions = unstable_cache(
-  async (storeId: string) => {
-    const [cats, brandRows, supplierRows, comboProductRows] = await Promise.all([
-      db
-        .select({ id: categories.id, name: categories.name })
-        .from(categories)
-        .where(eq(categories.storeId, storeId))
-        .orderBy(asc(categories.sortOrder), asc(categories.name)),
-      db
-        .select({ id: brands.id, name: brands.name })
-        .from(brands)
-        .where(eq(brands.storeId, storeId))
-        .orderBy(asc(brands.name)),
-      db
-        .select({ id: suppliers.id, name: suppliers.name })
-        .from(suppliers)
-        .where(eq(suppliers.storeId, storeId))
-        .orderBy(asc(suppliers.name)),
-      db
+  async (storeId: string, includeComboProducts = false) => {
+    const comboProductRowsPromise = includeComboProducts
+      ? db
         .select({
           id: products.id,
           name: products.name,
@@ -1059,7 +1054,25 @@ export const getProductFormOptions = unstable_cache(
           eq(products.isVariantParent, false),
           sql`${products.productKind} <> 'combo'`,
         ))
-        .orderBy(asc(products.name)),
+        .orderBy(asc(products.name))
+      : Promise.resolve([]);
+    const [cats, brandRows, supplierRows, comboProductRows] = await Promise.all([
+      db
+        .select({ id: categories.id, name: categories.name })
+        .from(categories)
+        .where(eq(categories.storeId, storeId))
+        .orderBy(asc(categories.sortOrder), asc(categories.name)),
+      db
+        .select({ id: brands.id, name: brands.name })
+        .from(brands)
+        .where(eq(brands.storeId, storeId))
+        .orderBy(asc(brands.name)),
+      db
+        .select({ id: suppliers.id, name: suppliers.name })
+        .from(suppliers)
+        .where(eq(suppliers.storeId, storeId))
+        .orderBy(asc(suppliers.name)),
+      comboProductRowsPromise,
     ]);
     return {
       categories: cats,

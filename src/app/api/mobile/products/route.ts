@@ -54,6 +54,7 @@ export async function GET(request: Request) {
       warehouseId: searchParam(request, "warehouseId"),
       ...priceComparison,
       includeLastPurchaseNetPrice: includePurchasePrices,
+      includeThumbnailUrl: true,
       stock: searchParam(request, "stock") as "instock" | "low" | "out" | undefined,
       sort: parseProductListSort(searchParam(request, "sort")),
       productKind: searchParam(request, "productKind") as "product" | "service" | "combo" | undefined,
