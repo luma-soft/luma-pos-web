@@ -30,3 +30,11 @@ Do not store API keys, database passwords, or connection strings in this file.
 This note records the reason for the project switch. It does not by itself
 confirm that database contents, Auth users, Storage objects, or every deployed
 client have been migrated; track those separately when validating the cutover.
+
+## Contingency
+
+If the new project causes further service issues, the planned fallback is to
+switch the app configuration back to the previous Supabase project. Do this
+only after its quota restriction has cleared; while it is still returning HTTP
+402, switching back will not restore service. Before reverting, reconcile any
+records created or changed in the new project so those writes are not lost.
