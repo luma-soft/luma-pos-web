@@ -61,7 +61,7 @@ beforeAll(async () => {
   }
   await pg.exec("create unique index fixture_product_supplier on product_suppliers(product_id,supplier_id)");
   await pg.exec("create unique index fixture_product_price on product_prices(price_book_id,product_id)");
-  await pg.exec(await readFile(new URL("../../../supabase/denormalize-stock.sql", import.meta.url), "utf8"));
+  await pg.exec(await readFile(new URL("../../../drizzle/0142_sync_stock_level_projection.sql", import.meta.url), "utf8"));
 });
 beforeEach(async () => {
   cashEffect.mockClear(); receiptNotification.mockClear(); debtNotification.mockClear();
@@ -161,6 +161,19 @@ test("new receipt create and edit recalculate average and gross through real act
   expect((await pg.query("select quantity,unit_cost,discount,total from purchase_order_items where purchase_order_id=$1", [id])).rows)
     .toEqual([{ quantity: "20.0000", unit_cost: "150.00", discount: "0.00", total: "3000.00" }]);
   expect((await pg.query("select count(*)::int as n from stock_movements")).rows[0].n).toBe(3);
+});
+
+test("a new receipt repairs stale product stock when the stock sync trigger is missing", async () => {
+  const productId = await product(-4, 100);
+  await database.delete(schema.inventoryCostBaselines).where(eq(schema.inventoryCostBaselines.productId, productId));
+  await pg.exec("drop trigger stock_levels_sync on stock_levels");
+  try {
+    const result = await createPurchase(payload(productId, 4, 200));
+    expect(result.ok).toBe(true);
+    expect(await values(productId)).toEqual({ quantity: 0, cost: 200, gross: 200, retail: 999 });
+  } finally {
+    await pg.exec(await readFile(new URL("../../../drizzle/0142_sync_stock_level_projection.sql", import.meta.url), "utf8"));
+  }
 });
 
 test("cancelling an earlier post-baseline receipt after a sale replays later receipt costs", async () => {

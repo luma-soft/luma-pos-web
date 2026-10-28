@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import {
-  inventoryCostAdjustments, inventoryCostBaselines, products,
+  inventoryCostAdjustments, inventoryCostBaselines, products, stockLevels,
   purchaseOrderItems, purchaseOrders, returns, stockMovements,
 } from "@/db/schema";
 import { calculatePurchaseCosts, replayMovingAverage } from "@/lib/purchases/cost-calculations";
@@ -18,7 +18,14 @@ async function lockProducts(tx: InventoryTransaction, storeId: string, ids: read
   const sorted = uniqueIds(ids);
   if (!sorted.length) return [];
   const rows = await tx.select({
-    id: products.id, quantity: products.totalStock,
+    id: products.id,
+    // stock_levels is the normalized source of truth. total_stock is only a
+    // projection maintained by a manually installed trigger on older projects.
+    quantity: sql<string>`coalesce((
+      select sum(${stockLevels.quantity}) from ${stockLevels}
+      where ${stockLevels.storeId} = ${products.storeId}
+        and ${stockLevels.productId} = ${products.id}
+    ), 0::numeric)`,
     unitCost: products.costPrice, grossUnitCost: products.lastPurchasePrice,
   }).from(products).where(and(eq(products.storeId, storeId), inArray(products.id, sorted)))
     .orderBy(asc(products.id)).for("update");
@@ -235,7 +242,11 @@ export async function revalueInventoryProducts(tx: InventoryTransaction, storeId
     }
     const product = lockedProducts.find((row) => row.id === basis.productId)!;
     if (quantity(state.quantity) !== quantity(Number(product.quantity))) throw costError("COST_LEDGER_MISMATCH");
-    await tx.update(products).set({ costPrice: state.unitCost.toFixed(2), lastPurchasePrice: gross == null ? null : gross.toFixed(2) })
+    await tx.update(products).set({
+      totalStock: quantity(state.quantity).toFixed(4),
+      costPrice: state.unitCost.toFixed(2),
+      lastPurchasePrice: gross == null ? null : gross.toFixed(2),
+    })
       .where(and(eq(products.storeId, storeId), eq(products.id, basis.productId)));
   }
 }

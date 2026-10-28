@@ -43,7 +43,7 @@ before(async () => {
     for (const primaryKey of config.primaryKeys) definitions.push(`primary key (${primaryKey.columns.map((column) => `"${column.name}"`).join(",")})`);
     await pg.exec(`create table "${config.name}" (${definitions.join(",")})`);
   }
-  await pg.exec(await readFile(new URL("../../../supabase/denormalize-stock.sql", import.meta.url), "utf8"));
+  await pg.exec(await readFile(new URL("../../../drizzle/0142_sync_stock_level_projection.sql", import.meta.url), "utf8"));
 });
 after(async () => { await pg.close(); });
 
@@ -257,6 +257,23 @@ test("SQL cutoffs distinguish timestamps within one millisecond and allow newly 
   await movement(id, -2, "2020-01-01T00:00:00.000650Z");
   await revalue([id]);
   assert.deepEqual(await values(id), { qty: 10, cost: 116.67, gross: 200 });
+});
+
+test("revaluation uses stock levels and repairs the product projection when its trigger is missing", async () => {
+  const id = await product(-4, 100);
+  await pg.exec("drop trigger stock_levels_sync on stock_levels");
+  try {
+    await baseline([id]);
+    await receipt([{ productId: id, quantity: 4, unitCost: 200 }], firstAt);
+
+    // The normalized quantity reached zero while the trigger-maintained field
+    // stayed at -4. A receipt must still reconcile and repair the projection.
+    assert.deepEqual(await values(id), { qty: -4, cost: 100, gross: null });
+    await revalue([id]);
+    assert.deepEqual(await values(id), { qty: 0, cost: 200, gross: 200 });
+  } finally {
+    await pg.exec(await readFile(new URL("../../../drizzle/0142_sync_stock_level_projection.sql", import.meta.url), "utf8"));
+  }
 });
 
 test("customer returns use original replayed sale cost; unknown legacy cost preserves average", async () => {
