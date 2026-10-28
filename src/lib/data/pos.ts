@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
+import { latestPurchaseNetPrices } from "@/lib/pricing/last-purchase-net-price";
 import { categories, customers, orderItems, orders, paymentBankAccounts, products, productComboItems, productPrices, productUnits, projects, stockLevels, warehouses } from "@/db/schema";
 import { getActivePromotions } from "@/lib/data/active-promotions";
 import { getPriceBooks } from "@/lib/data/price-books";
@@ -68,7 +68,7 @@ function posProductSelect(
     // Không trả trực tiếp trường này ra client.
     costPrice: products.costPrice,
     lastPurchasePrice: products.lastPurchasePrice,
-    lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
+    lastPurchaseNetPrice: sql<string | null>`null`,
     retailPrice: products.retailPrice,
     wholesalePrice: products.wholesalePrice,
     contractorPrice: products.contractorPrice,
@@ -160,6 +160,36 @@ function attachChildren<
   }));
 }
 
+type PurchasePriceRow = {
+  id: string;
+  lastPurchaseNetPrice: string | null;
+  children: PurchasePriceRow[];
+};
+
+async function attachLatestPurchaseNetPrices<T extends {
+  id: string;
+  lastPurchaseNetPrice: string | null;
+  children: unknown[];
+}>(storeId: string, rows: T[], includePurchasePrices: boolean): Promise<T[]> {
+  const nestedRows = rows as unknown as PurchasePriceRow[];
+  const productIds = nestedRows.flatMap((row) => [
+    row.id,
+    ...row.children.map((child) => child.id),
+  ]);
+  const prices = includePurchasePrices
+    ? await latestPurchaseNetPrices(storeId, productIds)
+    : new Map<string, string>();
+
+  return nestedRows.map((row) => ({
+    ...row,
+    lastPurchaseNetPrice: prices.get(row.id) ?? null,
+    children: row.children.map((child) => ({
+      ...child,
+      lastPurchaseNetPrice: prices.get(child.id) ?? null,
+    })),
+  })) as unknown as T[];
+}
+
 function activeRootCondition(storeId: string) {
   return and(
     eq(products.storeId, storeId),
@@ -190,8 +220,12 @@ export async function getPosData(storeId: string, options?: {
   includeProductCategories?: readonly string[];
   role?: Role;
   sort?: "recent_sales" | "created";
+  rootProductLimit?: number;
+  customerLimit?: number;
+  projectLimit?: number;
 }) {
   const hasComplianceColumns = await hasProductComplianceColumns();
+  const includePurchasePrices = canViewPurchasePrices(options?.role);
   const [defaultWh] = await db
     .select({ id: warehouses.id, name: warehouses.name })
     .from(warehouses)
@@ -211,7 +245,7 @@ export async function getPosData(storeId: string, options?: {
       .orderBy(...(options?.sort === "created"
         ? [desc(products.createdAt), desc(products.id)] as const
         : recentProductSaleOrder()))
-      .limit(200),
+      .limit(options?.rootProductLimit ?? 200),
     includeProductIds.length || includeProductSkus.length || includeProductCategories.length
       ? db
           .select(posProductSelect(storeId, defaultWh?.id ?? null, hasComplianceColumns))
@@ -239,7 +273,7 @@ export async function getPosData(storeId: string, options?: {
       .from(customers)
       .where(and(eq(customers.storeId, storeId), eq(customers.isActive, true)))
       .orderBy(asc(customers.name))
-      .limit(500),
+      .limit(options?.customerLimit ?? 500),
   ]);
 
   const parentIds = rootRows.filter((p) => p.isVariantParent).map((p) => p.id);
@@ -260,7 +294,11 @@ export async function getPosData(storeId: string, options?: {
   const productRows = attachChildren(rootRows, childRows);
   const byId = new Map(productRows.map((p) => [p.id, p]));
   for (const p of sourceProductRows) byId.set(p.id, p);
-  const productsForPos = [...byId.values()];
+  const productsForPos = await attachLatestPurchaseNetPrices(
+    storeId,
+    [...byId.values()],
+    includePurchasePrices,
+  );
 
   const priceBookRows = await getPriceBooks(storeId, {
     includeManagerOnly: canViewPurchasePrices(options?.role),
@@ -271,9 +309,9 @@ export async function getPosData(storeId: string, options?: {
     db
       .select({ id: projects.id, name: projects.name, customerId: projects.customerId })
       .from(projects)
-      .where(eq(projects.status, "active"))
+      .where(and(eq(projects.storeId, storeId), eq(projects.status, "active")))
       .orderBy(asc(projects.name))
-      .limit(300),
+      .limit(options?.projectLimit ?? 300),
     db
       .select({
         id: paymentBankAccounts.id,
@@ -321,6 +359,9 @@ export async function getMobilePosData(
       role,
       sort: "recent_sales",
       includeProductIds,
+      rootProductLimit: 30,
+      customerLimit: 100,
+      projectLimit: 100,
     }),
     getRawStorePrefs(storeId),
   ]);
@@ -498,9 +539,14 @@ export async function searchPosProductRows(
     seen.add(p.id);
     return true;
   }));
+  const rowsWithPurchasePrices = await attachLatestPurchaseNetPrices(
+    storeId,
+    rows,
+    canCompareSellingPrice,
+  );
   // Kết quả tìm kiếm phải có cùng map bảng giá và quyền đọc giá vốn như lưới POS.
-  applySystemPriceBooks(rows as Parameters<typeof applySystemPriceBooks>[0], visibleBooks);
-  return rows;
+  applySystemPriceBooks(rowsWithPurchasePrices as Parameters<typeof applySystemPriceBooks>[0], visibleBooks);
+  return rowsWithPurchasePrices;
 }
 
 export type PosData = Awaited<ReturnType<typeof getPosData>>;

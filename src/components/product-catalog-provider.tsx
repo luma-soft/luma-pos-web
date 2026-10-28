@@ -39,6 +39,7 @@ type ProductCatalogContextValue = {
 
 const ProductCatalogContext = createContext<ProductCatalogContextValue | null>(null);
 const REVISION_POLL_INTERVAL_MS = 60_000;
+const CONNECTED_REVISION_POLL_INTERVAL_MS = 5 * 60_000;
 const PRODUCT_CATALOG_CHANNEL = "luma-pos-product-catalog";
 
 function broadcastCatalogUpdate(scopeId: string, revision: string) {
@@ -64,6 +65,7 @@ export function ProductCatalogProvider({
   const syncQueueRef = useRef<ReturnType<typeof createRefreshQueue<ProductCatalogSnapshot | null>> | null>(null);
   const checkingRef = useRef<Promise<void> | null>(null);
   const revisionRef = useRef<string | null>(null);
+  const realtimeConnectedRef = useRef(false);
 
   useEffect(() => {
     const queue = createRefreshQueue({
@@ -91,15 +93,37 @@ export function ProductCatalogProvider({
     };
   }, [scopeId, userId]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (expectedRevision?: string | null) => {
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
-    await syncQueueRef.current?.refresh();
-  }, []);
+    const queue = syncQueueRef.current;
+    if (!queue) return;
+    const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+    if (!locks) {
+      await queue.refresh();
+      return;
+    }
+
+    await locks.request(`luma-product-catalog:${scopeId}`, async () => {
+      if (expectedRevision != null) {
+        const shared = await readProductCatalogSnapshot(scopeId);
+        if (
+          shared?.userId === userId && shared.scopeId === scopeId &&
+          !catalogRevisionChanged(shared.revision, expectedRevision)
+        ) {
+          setSnapshot(shared);
+          setStatus("cached");
+          revisionRef.current = shared.revision;
+          return;
+        }
+      }
+      await queue.refresh();
+    });
+  }, [scopeId, userId]);
 
   // Successful server mutations revalidate the layout. Do not wait for the
   // next polling tick or assume a Realtime message will always be delivered.
   useEffect(() => {
-    if (catalogRevisionChanged(revisionRef.current, serverRevision)) void refresh();
+    if (catalogRevisionChanged(revisionRef.current, serverRevision)) void refresh(serverRevision);
   }, [refresh, serverRevision]);
 
   const checkForUpdates = useCallback(async () => {
@@ -109,7 +133,7 @@ export function ProductCatalogProvider({
     const check = checkProductCatalogRevision()
       .then(async (remoteRevision) => {
         if (catalogRevisionChanged(revisionRef.current, remoteRevision)) {
-          await refresh();
+          await refresh(remoteRevision);
         }
       })
       .catch(() => undefined)
@@ -140,8 +164,19 @@ export function ProductCatalogProvider({
     const checkWhenVisible = () => {
       if (document.visibilityState === "visible") void checkForUpdates();
     };
+    let connectedPollTicks = 0;
     const interval = window.setInterval(() => {
-      checkWhenVisible();
+      if (document.visibilityState !== "visible") return;
+      if (!realtimeConnectedRef.current) {
+        connectedPollTicks = 0;
+        checkWhenVisible();
+        return;
+      }
+      connectedPollTicks += 1;
+      if (connectedPollTicks >= CONNECTED_REVISION_POLL_INTERVAL_MS / REVISION_POLL_INTERVAL_MS) {
+        connectedPollTicks = 0;
+        checkWhenVisible();
+      }
     }, REVISION_POLL_INTERVAL_MS);
     window.addEventListener("online", check);
     window.addEventListener("focus", check);
@@ -173,13 +208,16 @@ export function ProductCatalogProvider({
             (payload.new as { revision?: string | number }).revision ?? "",
           );
           if (catalogRevisionChanged(revisionRef.current, remoteRevision)) {
-            void refresh();
+            void refresh(remoteRevision);
           }
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        realtimeConnectedRef.current = status === "SUBSCRIBED";
+      });
 
     return () => {
+      realtimeConnectedRef.current = false;
       void supabase.removeChannel(channel);
     };
   }, [refresh, scopeId]);

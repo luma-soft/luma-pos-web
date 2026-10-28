@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { ChefHat, Check, Clock, CheckCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -21,27 +20,58 @@ function elapsed(ms: number, now: number) {
 
 export function KdsBoard({ tickets }: { tickets: Ticket[] }) {
   const t = useTranslations();
-  const router = useRouter();
   const [, start] = useTransition();
   const [now, setNow] = useState(() => Date.now());
+  const [activeTickets, setActiveTickets] = useState(tickets);
+  const refreshInFlightRef = useRef(false);
+  const mountedRef = useRef(true);
 
-  // tự làm mới: cập nhật đồng hồ mỗi 20s + kéo dữ liệu mới
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 20000);
-    const refresh = setInterval(() => router.refresh(), 20000);
-    return () => { clearInterval(tick); clearInterval(refresh); };
-  }, [router]);
+    return () => clearInterval(tick);
+  }, []);
 
-  function advance(itemId: string, status: KdsItemStatus) { start(async () => { await setTicketItemStatus(itemId, status); router.refresh(); }); }
-  function serveAll(ticketId: string) { start(async () => { await serveTicket(ticketId); router.refresh(); }); }
+  const refreshTickets = useCallback(async () => {
+    if (!mountedRef.current || refreshInFlightRef.current || document.visibilityState !== "visible") return;
+    refreshInFlightRef.current = true;
+    try {
+      const response = await fetch("/api/kds/active-tickets", { cache: "no-store" });
+      if (!response.ok) return;
+      const result = await response.json() as { tickets?: Ticket[] };
+      if (mountedRef.current && Array.isArray(result.tickets)) setActiveTickets(result.tickets);
+    } catch {
+      // Keep showing the last loaded board during a temporary network error.
+    } finally {
+      refreshInFlightRef.current = false;
+    }
+  }, []);
 
-  if (tickets.length === 0) {
+  useEffect(() => {
+    mountedRef.current = true;
+    const interval = window.setInterval(() => { void refreshTickets(); }, 30_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refreshTickets();
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("focus", refreshWhenVisible);
+    return () => {
+      mountedRef.current = false;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("focus", refreshWhenVisible);
+    };
+  }, [refreshTickets]);
+
+  function advance(itemId: string, status: KdsItemStatus) { start(async () => { await setTicketItemStatus(itemId, status); void refreshTickets(); }); }
+  function serveAll(ticketId: string) { start(async () => { await serveTicket(ticketId); void refreshTickets(); }); }
+
+  if (activeTickets.length === 0) {
     return <div className="bg-surface border border-dashed border-border rounded-card p-16 text-center text-slate-400"><ChefHat className="w-10 h-10 mx-auto mb-3 opacity-60" /><p className="font-medium">{t("kds.empty")}</p></div>;
   }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 items-start">
-      {tickets.map((tk) => {
+      {activeTickets.map((tk) => {
         const min = (now - tk.createdAtMs) / 60000;
         const head = min > 10 ? "border-er bg-er/5" : min > 5 ? "border-warn bg-warn/5" : "border-border";
         return (

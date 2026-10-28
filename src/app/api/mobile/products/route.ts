@@ -27,9 +27,13 @@ export async function GET(request: Request) {
   if (!gate.ok) return mobileGate(gate)!;
 
   const includePurchasePrices = canViewPurchasePrices(gate.role);
+  const page = Math.max(1, Math.trunc(numberParam(request, "page", 1)));
+  const includeCatalogMetadata = page === 1;
   const requestedComparison = parsePriceComparisonParams(new URL(request.url).searchParams);
-  const priceBooks = await getPriceBooks(gate.storeId, { includeManagerOnly: includePurchasePrices });
   const requestedBookId = requestedComparison.priceBookId;
+  const priceBooks = includeCatalogMetadata || requestedBookId
+    ? await getPriceBooks(gate.storeId, { includeManagerOnly: includePurchasePrices })
+    : [];
   const priceComparison = includePurchasePrices
     ? {
         ...requestedComparison,
@@ -49,6 +53,7 @@ export async function GET(request: Request) {
       supplierIds: searchParam(request, "supplierIds")?.split(",").filter(Boolean),
       warehouseId: searchParam(request, "warehouseId"),
       ...priceComparison,
+      includeLastPurchaseNetPrice: includePurchasePrices,
       stock: searchParam(request, "stock") as "instock" | "low" | "out" | undefined,
       sort: parseProductListSort(searchParam(request, "sort")),
       productKind: searchParam(request, "productKind") as "product" | "service" | "combo" | undefined,
@@ -56,11 +61,11 @@ export async function GET(request: Request) {
       view: searchParam(request, "view") as ProductListView | undefined,
       groupRelated: searchParam(request, "variantContractVersion") === "2",
       updatedSince: searchParam(request, "updatedSince"),
-      page: numberParam(request, "page", 1),
+      page,
       pageSize: numberParam(request, "pageSize", 50),
     }),
-    getMobileProductOptions(gate.storeId),
-    getActivePromotions(gate.storeId),
+    includeCatalogMetadata ? getMobileProductOptions(gate.storeId) : Promise.resolve(undefined),
+    includeCatalogMetadata ? getActivePromotions(gate.storeId) : Promise.resolve(undefined),
   ]);
 
   const includeNetPurchase = includePurchasePrices;
@@ -73,7 +78,7 @@ export async function GET(request: Request) {
         ...member, lastPurchaseNetPrice: includeNetPurchase ? member.lastPurchaseNetPrice : null,
       })) } } : {}),
     })),
-  }, options, priceBooks, promoByProduct });
+  }, ...(includeCatalogMetadata ? { options, priceBooks, promoByProduct } : {}) });
 }
 
 export async function POST(request: Request) {

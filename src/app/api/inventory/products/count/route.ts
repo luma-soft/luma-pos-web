@@ -24,6 +24,7 @@ export async function GET(request: Request) {
     ...priceComparison,
     page: 1,
     pageSize: 1,
+    includeLastPurchaseNetPrice: false,
   });
   return NextResponse.json({ ok: true, data: { total: result.total } }, { headers: { "Cache-Control": "private, no-store" } });
 }

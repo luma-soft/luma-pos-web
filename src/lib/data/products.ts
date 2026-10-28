@@ -24,7 +24,7 @@ import {
   warehouses,
 } from "@/db/schema";
 import { inventoryProductSearchCondition } from "@/lib/search";
-import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
+import { latestPurchaseNetPrices } from "@/lib/pricing/last-purchase-net-price";
 import {
   priceComparisonCondition,
   type PriceComparison,
@@ -56,6 +56,8 @@ export type ProductStatusFilter = "active" | "inactive" | "draft" | "archived" |
 export type ProductListView = "grouped" | "flat";
 
 export interface ProductListFilters extends PriceComparison {
+  /** Skip the receipt-history subquery for callers that cannot display purchase costs. */
+  includeLastPurchaseNetPrice?: boolean;
   exactProductId?: string;
   q?: string;
   categoryId?: string;
@@ -236,7 +238,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
         baseUnitDirectSale: products.baseUnitDirectSale,
         costPrice: products.costPrice,
         lastPurchasePrice: products.lastPurchasePrice,
-        lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
+        lastPurchaseNetPrice: sql<string | null>`null`,
         retailPrice: products.retailPrice,
         wholesalePrice: products.wholesalePrice,
         contractorPrice: products.contractorPrice,
@@ -383,7 +385,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
             baseUnitDirectSale: products.baseUnitDirectSale,
             costPrice: products.costPrice,
             lastPurchasePrice: products.lastPurchasePrice,
-            lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
+            lastPurchaseNetPrice: sql<string | null>`null`,
             retailPrice: products.retailPrice,
             wholesalePrice: products.wholesalePrice,
             contractorPrice: products.contractorPrice,
@@ -458,8 +460,23 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
           )
       : [];
 
+  const purchaseNetPriceByProductId = filters.includeLastPurchaseNetPrice === false
+    ? new Map<string, string>()
+    : await latestPurchaseNetPrices(storeId, [
+        ...rows.map((row) => row.id),
+        ...children.map((child) => child.id),
+      ]);
+  const rowsWithPurchasePrices = rows.map((row) => ({
+    ...row,
+    lastPurchaseNetPrice: purchaseNetPriceByProductId.get(row.id) ?? null,
+  }));
+  const childrenWithPurchasePrices = children.map((child) => ({
+    ...child,
+    lastPurchaseNetPrice: purchaseNetPriceByProductId.get(child.id) ?? null,
+  }));
+
   const childrenByParent = new Map<string, typeof children>();
-  for (const child of children) {
+  for (const child of childrenWithPurchasePrices) {
     if (!child.parentProductId) continue;
     const group = childrenByParent.get(child.parentProductId) ?? [];
     group.push(child);
@@ -658,7 +675,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
     : [];
 
   return {
-    rows: rows.map((row) => {
+    rows: rowsWithPurchasePrices.map((row) => {
       const productRow = withProductMedia(row);
       const relatedProducts = selectRelatedProducts(row, relatedCandidates);
       return {
@@ -712,7 +729,12 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
   const batchIds = coordinates.filter((candidate) => rootIds.includes(candidate.id)
     || rootIds.includes(candidate.parentProductId ?? "") || rootIds.includes(candidate.relatedProductId ?? "")).map((candidate) => candidate.id);
   const [batch, catalogResult] = await Promise.all([
-    getBaseProducts(storeId, { status: "all", view: "flat", warehouseId: filters.warehouseId }, { productIds: batchIds, includeDetails: false }),
+    getBaseProducts(storeId, {
+      status: "all",
+      view: "flat",
+      warehouseId: filters.warehouseId,
+      includeLastPurchaseNetPrice: filters.includeLastPurchaseNetPrice,
+    }, { productIds: batchIds, includeDetails: false }),
     db.execute<{ id: string; name: string; aliases: string[] }>(sql`select a.id, a.name,
       coalesce((select json_agg(alias.name_key) from product_attribute_aliases alias where alias.store_id = a.store_id and alias.attribute_id = a.id), '[]'::json) as aliases
       from product_attributes a where a.store_id = ${storeId}`),

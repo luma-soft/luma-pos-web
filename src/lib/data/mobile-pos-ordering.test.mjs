@@ -9,9 +9,10 @@ test("mobile POS seed uses the same recent-sale ordering as web POS", () => {
   )?.[0];
 
   expect(mobileProjection).toBeDefined();
-  expect(mobileProjection).toContain(
-    'getPosData(storeId, { role, sort: "recent_sales" })',
-  );
+  expect(mobileProjection).toContain('sort: "recent_sales"');
+  expect(mobileProjection).toContain("rootProductLimit: 30");
+  expect(mobileProjection).toContain("customerLimit: 100");
+  expect(mobileProjection).toContain("projectLimit: 100");
   expect(mobileProjection).not.toContain('sort: "created"');
 });
 

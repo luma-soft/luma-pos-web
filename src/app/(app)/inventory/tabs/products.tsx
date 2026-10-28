@@ -77,7 +77,7 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
     const pageSize = parsePageSize(params.size);
     const [categoryData, productData] = await Promise.all([
       getCategoriesWithCounts(context.storeId, { page, pageSize }),
-      getProducts(context.storeId, { status: "active", view: "grouped", sort: DEFAULT_PRODUCT_LIST_SORT, page: 1, pageSize: 15 }),
+      getProducts(context.storeId, { status: "active", view: "grouped", sort: DEFAULT_PRODUCT_LIST_SORT, page: 1, pageSize: 15, includeLastPurchaseNetPrice: false }),
     ]);
     return (
       <>
@@ -298,6 +298,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
     view,
     page,
     pageSize,
+    includeLastPurchaseNetPrice: showPriceComparison,
     productSkus: cameraMaterials ? [...CAMERA_QUOTE_MATERIAL_SKUS, ...CAMERA_QUOTE_DETAIL_MATERIAL_SKUS] : undefined,
     cameraMaterial: cameraMaterials,
     ...(showPriceComparison ? parsePriceComparisonParams(params) : {}),

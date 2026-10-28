@@ -23,7 +23,7 @@ import {
   type ProductCatalogSnapshot,
 } from "@/lib/product-catalog";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
-import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
+import { latestPurchaseNetPrices } from "@/lib/pricing/last-purchase-net-price";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 import { sortByRecentProductSale } from "@/lib/data/recent-product-sales";
 
@@ -70,7 +70,7 @@ async function buildProductCatalogSnapshot(
         baseUnitDirectSale: products.baseUnitDirectSale,
         costPrice: products.costPrice,
         lastPurchasePrice: products.lastPurchasePrice,
-        lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
+        lastPurchaseNetPrice: sql<string | null>`null`,
         retailPrice: products.retailPrice,
         wholesalePrice: products.wholesalePrice,
         contractorPrice: products.contractorPrice,
@@ -158,6 +158,9 @@ async function buildProductCatalogSnapshot(
       .orderBy(desc(warehouses.isDefault), asc(warehouses.name)),
     getPriceBooks(storeId, { includeManagerOnly: canViewPurchasePrices(role) }),
   ]);
+  const purchaseNetPriceByProductId = canViewPurchasePrices(role)
+    ? await latestPurchaseNetPrices(storeId, productRows.map((product) => product.id))
+    : new Map<string, string>();
   const revisionAfter = await getProductCatalogRevision(storeId);
   if (revisionBefore !== revisionAfter) {
     if (attempt >= 2) throw new Error("PRODUCT_CATALOG_CHANGED_DURING_SNAPSHOT");
@@ -174,7 +177,10 @@ async function buildProductCatalogSnapshot(
       }
     }
   }
-  const orderedProductRows = sortByRecentProductSale(productRows, lastSoldAtByProduct);
+  const orderedProductRows = sortByRecentProductSale(productRows.map((product) => ({
+    ...product,
+    lastPurchaseNetPrice: purchaseNetPriceByProductId.get(product.id) ?? null,
+  })), lastSoldAtByProduct);
 
   return {
     schemaVersion: PRODUCT_CATALOG_SCHEMA_VERSION,
