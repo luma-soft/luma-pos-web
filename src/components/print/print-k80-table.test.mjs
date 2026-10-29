@@ -24,20 +24,17 @@ function renderK80(overrides = {}) {
   }));
 }
 
-test("K80 renders line items as a compact semantic table", () => {
+test("K80 gives product names full width and puts quantity and price on the next row", () => {
   const html = renderK80();
 
   expect(html).toContain('<table class="print-line-items');
   expect(html).toContain("Sản phẩm");
-  expect(html).toContain("SL");
-  expect(html).toContain("Đơn giá");
+  expect(html).toContain("SL × Đơn giá");
   expect(html).toContain("Thành tiền");
-  expect(html).toContain("m²");
+  expect(html).toContain("17 m² × 135.000");
   expect(html).toContain("2.295.000");
-  expect(html).toContain('class="w-[42%]"');
-  expect(html).toContain('class="w-[12%]"');
-  expect(html).toContain('class="w-[21%]"');
-  expect(html).toContain('class="w-[25%]"');
+  expect(html).toContain('class="w-[70%]"');
+  expect(html).toContain('class="w-[30%]"');
 });
 
 test("K80 keeps the payment QR at a scannable 32mm-class size", () => {

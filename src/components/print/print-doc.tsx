@@ -302,43 +302,45 @@ function K80Doc(p: PrintDocProps) {
 
       {!isMoneyReceipt && <table className="print-line-items mt-3 w-full table-fixed border-collapse leading-tight" style={{ fontSize: ty.tableHeader }}>
         <colgroup>
-          <col className="w-[42%]" />
-          <col className="w-[12%]" />
-          <col className="w-[21%]" />
-          <col className="w-[25%]" />
+          <col className="w-[70%]" />
+          <col className="w-[30%]" />
         </colgroup>
         <thead>
-          <tr className="border-y-2 border-black">
-            <th className="py-1.5 pr-1 text-left">{p.cols.product}</th>
-            <th className="px-0.5 py-1.5 text-right">{p.cols.qty}</th>
-            <th className="px-0.5 py-1.5 text-right">{p.cols.unitPrice}</th>
+          <tr className="border-t-2 border-black">
+            <th colSpan={2} className="pt-1.5 pb-0 text-left">{p.cols.product}</th>
+          </tr>
+          <tr className="border-b-2 border-black">
+            <th className="py-1.5 pr-1 text-left">{p.cols.qty} × {p.cols.unitPrice}</th>
             <th className="py-1.5 pl-0.5 text-right">{p.cols.lineTotal}</th>
           </tr>
         </thead>
-        <tbody>
-          {p.items.map((i) => (
-            <tr key={i.id} className="break-inside-avoid border-b border-dashed border-slate-400">
-              <td className="py-1.5 pr-1 align-top">
-                <div className="break-words font-bold leading-snug" style={{ fontSize: ty.productName }}>{printLineDisplayName(i)}</div>
-                <div className="mt-0.5 text-slate-600" style={{ fontSize: ty.productMeta }}>
-                  {i.unitName}
-                  {t.options.showSku && i.sku && <> · {i.sku}</>}
-                </div>
-                {(showLineDiscountPercent || showLineDiscountAmount) && Number(i.discount ?? 0) > 0 && (
-                  <div className="mt-0.5 text-slate-700" style={{ fontSize: ty.productMeta }}>
-                    {p.cols.discount ?? "Giảm giá"}: {[
-                      showLineDiscountPercent ? lineDiscountPercent(i) : "",
-                      showLineDiscountAmount ? `−${formatNumber(Number(i.discount))}` : "",
-                    ].filter(Boolean).join(" · ")}
-                  </div>
-                )}
-              </td>
-              <td className="px-0.5 py-1.5 text-right align-top tabular-nums">{formatNumber(i.quantity)}</td>
-              <td className="px-0.5 py-1.5 text-right align-top tabular-nums whitespace-nowrap">{formatNumber(showLineDiscountPercent || showLineDiscountAmount || i.quantity <= 0 ? i.unitPrice : i.total / i.quantity)}</td>
-              <td className="py-1.5 pl-0.5 text-right align-top font-bold tabular-nums whitespace-nowrap">{formatNumber(i.total)}</td>
-            </tr>
-          ))}
-        </tbody>
+        {p.items.map((i) => {
+          const quantityAndUnit = [formatNumber(i.quantity), i.unitName.trim()].filter(Boolean).join(" ");
+          const unitPrice = formatNumber(showLineDiscountPercent || showLineDiscountAmount || i.quantity <= 0 ? i.unitPrice : i.total / i.quantity);
+
+          return (
+            <tbody key={i.id} className="break-inside-avoid">
+              <tr>
+                <td colSpan={2} className="pt-1.5 pb-0 align-top">
+                  <div className="break-words font-bold leading-snug" style={{ fontSize: ty.productName }}>{printLineDisplayName(i)}</div>
+                  {t.options.showSku && i.sku && <div className="mt-0.5 text-slate-600" style={{ fontSize: ty.productMeta }}>{i.sku}</div>}
+                  {(showLineDiscountPercent || showLineDiscountAmount) && Number(i.discount ?? 0) > 0 && (
+                    <div className="mt-0.5 text-slate-700" style={{ fontSize: ty.productMeta }}>
+                      {p.cols.discount ?? "Giảm giá"}: {[
+                        showLineDiscountPercent ? lineDiscountPercent(i) : "",
+                        showLineDiscountAmount ? `−${formatNumber(Number(i.discount))}` : "",
+                      ].filter(Boolean).join(" · ")}
+                    </div>
+                  )}
+                </td>
+              </tr>
+              <tr className="border-b border-dashed border-slate-400">
+                <td className="pt-0.5 pb-1.5 pr-1 align-top tabular-nums whitespace-nowrap">{quantityAndUnit} × {unitPrice}</td>
+                <td className="pt-0.5 pb-1.5 pl-0.5 text-right align-top font-bold tabular-nums whitespace-nowrap">{formatNumber(i.total)}</td>
+              </tr>
+            </tbody>
+          );
+        })}
       </table>}
 
       <section className="mt-2 border-y-2 border-black py-1.5" style={{ fontSize: ty.numbers }}>
