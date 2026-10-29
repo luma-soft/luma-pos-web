@@ -1537,10 +1537,15 @@ export function PosClient({
 
   function openProductCreator(productKind: ProductKind) {
     const params = new URLSearchParams(window.location.search);
-    params.delete("createdProductId");
-    const query = params.toString();
-    const returnTo = `${window.location.pathname}${query ? `?${query}` : ""}`;
-    router.push(Routes.productCreateForReturn(returnTo, productKind), { scroll: false });
+    for (const key of ["createdProductId", "productModal", "productKind", "returnTo"]) {
+      params.delete(key);
+    }
+    const returnQuery = params.toString();
+    const returnTo = `${window.location.pathname}${returnQuery ? `?${returnQuery}` : ""}`;
+    params.set("productModal", "create");
+    params.set("productKind", productKind);
+    params.set("returnTo", returnTo);
+    router.push(`${Routes.POS}?${params.toString()}`, { scroll: false });
   }
 
   useEffect(() => {

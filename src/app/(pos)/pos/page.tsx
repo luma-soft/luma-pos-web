@@ -13,6 +13,7 @@ import { formatDate } from "@/lib/utils";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { PosClient, type PosSourceInvoice } from "./pos-client";
 import type { PosInitialContext } from "./pos-client";
+import { ProductEditorModal } from "@/app/(app)/inventory/tabs/products";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +117,11 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
   const aiProductIds = csvUuids(params.aiProducts);
   const createdProductId = one(params.createdProductId);
   const validCreatedProductId = createdProductId && UUID_RE.test(createdProductId) ? createdProductId : null;
+  const productModalParams = {
+    productModal: one(params.productModal),
+    productKind: one(params.productKind),
+    returnTo: one(params.returnTo),
+  };
   const includeProductIds = [
     ...(sourceInvoice?.items?.map((item) => item.productId) ?? []),
     ...(baseInitialContext?.items?.map((item) => item.productId) ?? []),
@@ -153,6 +159,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
       }
     : baseInitialContext;
   return (
+    <>
     <div className="h-full flex flex-col">
       <header className="flex h-[58px] shrink-0 items-center justify-between border-b border-border bg-surface px-4 lg:hidden">
         <div className="min-w-0">
@@ -203,5 +210,13 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
         />
       </div>
     </div>
+    {productModalParams.productModal === "create" && (
+      <ProductEditorModal
+        searchParams={productModalParams}
+        closeNavigation="replace"
+        cancelNavigation="replace"
+      />
+    )}
+    </>
   );
 }
