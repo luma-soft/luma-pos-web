@@ -12,7 +12,7 @@ import {
 import { recordCashTx, fundForMethod } from "@/lib/cash";
 import { Routes } from "@/lib/routes";
 import type { NormalizedOrderItem } from "@/lib/orders/normalize";
-import { CHECKOUT_PRICING_CHANGED, prepareCheckoutPricing } from "@/lib/orders/checkout-pricing";
+import { CHECKOUT_CATALOG_RACE, CHECKOUT_PRICING_CHANGED, prepareCheckoutPricing } from "@/lib/orders/checkout-pricing";
 import { revalueInventoryProducts } from "@/lib/inventory/cost-valuation";
 import { getOrderStockRestorations, restoreOrderStockInTransaction } from "@/lib/inventory/order-stock-restoration";
 import { getCurrentShift } from "@/lib/data/shifts";
@@ -35,6 +35,27 @@ function revalidateOrderPaths(sourceOrderId?: string) {
   } catch (e) {
     if (e instanceof Error && e.message.includes("static generation store missing")) return;
     console.warn("createOrder revalidate failed:", e);
+  }
+}
+
+async function retryCheckoutTransaction<T>(runTransaction: () => Promise<T>): Promise<T> {
+  const maxAttempts = 3;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await runTransaction();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      const code = pgErrorCode(error) ?? "";
+      const retryable = message === CHECKOUT_CATALOG_RACE || ["40001", "40P01", "55P03"].includes(code);
+      if (!retryable || attempt + 1 >= maxAttempts) throw error;
+
+      // The shared catalog revision also changes for inventory writes. Retry
+      // brief races so simultaneous checkouts do not look like stale pricing.
+      // A fresh transaction still compares resolved prices to the cashier's
+      // snapshot before any business write.
+      const delayMs = 25 * (2 ** attempt) + Math.floor(Math.random() * 25);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
   }
 }
 
@@ -104,7 +125,7 @@ export async function createOrderForUser(
     const profileId = await getProfileId(userId);
     const currentShift = profileId ? await getCurrentShift(storeId, profileId) : null;
 
-    const result = await db.transaction(async (tx) => {
+    const result = await retryCheckoutTransaction(() => db.transaction(async (tx) => {
       await tx.execute(sql`set local lock_timeout = '2s'`);
       if (v.clientId) {
         // Serialize only retries of this tenant/request, not all checkouts.
@@ -482,7 +503,7 @@ export async function createOrderForUser(
         await revalueInventoryProducts(tx, storeId, affected.map((row) => row.productId));
       }
       return { order, notification };
-    }, { isolationLevel: "read committed" });
+    }, { isolationLevel: "read committed" }));
 
     if (result.notification?.created) {
       await publishCommittedNotification(result.notification.eventId);
@@ -507,7 +528,7 @@ export async function createOrderForUser(
       INSUFFICIENT_BATCH_STOCK: "pos.errors.insufficientStock",
     };
     const msg = e instanceof Error ? e.message : "";
-    if (msg === CHECKOUT_PRICING_CHANGED || ["40001", "40P01", "55P03"].includes(pgErrorCode(e) ?? "")) {
+    if (msg === CHECKOUT_PRICING_CHANGED || msg === CHECKOUT_CATALOG_RACE || ["40001", "40P01", "55P03"].includes(pgErrorCode(e) ?? "")) {
       return { ok: false, error: CHECKOUT_PRICING_CHANGED };
     }
     if (msg === "UNIT_NOT_SELLABLE") return { ok: false, error: "pos.errors.unitUnavailable" };

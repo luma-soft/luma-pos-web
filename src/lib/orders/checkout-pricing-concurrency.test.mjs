@@ -75,7 +75,7 @@ beforeAll(async () => {
     });
     await admin.query(`create table "${config.name}" (${columns.join(",")})`);
   }
-  await admin.query("create unique index on catalog_sync_state(store_id,id); create table qa_orders(store_id uuid, unit_price numeric)");
+  await admin.query("create unique index on catalog_sync_state(store_id,id); create unique index on stock_levels(store_id,product_id,warehouse_id); create table qa_orders(store_id uuid, unit_price numeric)");
   const original = await readFile("drizzle/0104_tenant_catalog_and_storage.sql", "utf8");
   await admin.query(original.split("DROP POLICY")[0]);
   await admin.query(await readFile("drizzle/0130_pricing_catalog_revision.sql", "utf8"));
@@ -86,7 +86,7 @@ beforeAll(async () => {
 }, 15000);
 beforeEach(async () => {
   if (!url) return;
-  await admin.query("truncate qa_orders; update product_units set price_override=45000,multiplier=4; update products set retail_price=10000");
+  await admin.query("truncate qa_orders, stock_levels; update product_units set price_override=45000,multiplier=4; update products set retail_price=10000");
 });
 afterAll(async () => { if (url) await Promise.allSettled([admin.end(), checkout.end(), writer.end()]); });
 
@@ -117,7 +117,7 @@ integration("checkout-first fence blocks the competing price writer until order 
   expect((await admin.query("select price_override from product_units where product_id=$1", [productId])).rows[0].price_override).toBe("48000.00");
 });
 
-integration("a commit between revision read and price reads is rejected even when the expected price matches", async () => {
+integration("a stock-only revision race requests a fresh checkout attempt", async () => {
   const originalQuery = checkout.query.bind(checkout);
   let injected = false;
   checkout.query = async (...args) => {
@@ -125,15 +125,18 @@ integration("a commit between revision read and price reads is rejected even whe
     const text = typeof args[0] === "string" ? args[0] : args[0].text;
     if (!injected && text.includes('from "catalog_sync_state"') && !text.includes("for update")) {
       injected = true;
-      await writer.query("update product_units set price_override=48000 where product_id=$1", [productId]);
+      await writer.query(
+        "insert into stock_levels(store_id,product_id,warehouse_id,quantity) values($1,$2,$3,0) on conflict(store_id,product_id,warehouse_id) do update set quantity=excluded.quantity",
+        [storeId, productId, warehouseId],
+      );
     }
     return result;
   };
   try {
     await expect(database.transaction(async (tx) => {
-      await prepareCheckoutPricing(tx, storeId, request(48000), "owner");
-      await tx.execute(sql`insert into qa_orders values (${storeId},48000)`);
-    }, { isolationLevel: "read committed" })).rejects.toThrow("pos.errors.pricingChanged");
+      await prepareCheckoutPricing(tx, storeId, request(), "owner");
+      await tx.execute(sql`insert into qa_orders values (${storeId},45000)`);
+    }, { isolationLevel: "read committed" })).rejects.toThrow("CHECKOUT_CATALOG_RACE");
     expect(injected).toBe(true);
     expect(await countOrders()).toBe(0);
   } finally { checkout.query = originalQuery; }

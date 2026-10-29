@@ -44,6 +44,7 @@ mock.module("@/lib/notifications/events-core", () => ({ createNotificationEventI
 mock.module("@/lib/notifications/outbox", () => ({ publishCommittedNotification: async () => {} }));
 const { createOrderForUser } = await import("./create");
 const { normalizeOrderItems } = await import("./normalize");
+const { CHECKOUT_CATALOG_RACE } = await import("./checkout-pricing");
 
 const dialect = new PgDialect();
 const quote = (value) => `'${value.replaceAll("'", "''")}'`;
@@ -115,6 +116,31 @@ test("stale checkout rejects before order, cash, stock and audit writes", async 
   await pg.query("update product_units set price_override='48000' where product_id=$1", [productId]);
   expect(await createOrderForUser(userId, request())).toEqual({ ok: false, error: "pos.errors.pricingChanged" });
   expect(Object.values(await effects())).toEqual([0, 0, 0, 0, 0, 0]);
+});
+
+test("a transient catalog revision race retries with the same checkout snapshot", async () => {
+  const originalTransaction = database.transaction.bind(database);
+  let attempts = 0;
+  database.transaction = (...args) => {
+    attempts += 1;
+    if (attempts === 1) {
+      const [, config] = args;
+      return originalTransaction(async (tx) => {
+        await tx.execute(sql`insert into qa_effects(kind) values ('race-attempt')`);
+        throw new Error(CHECKOUT_CATALOG_RACE);
+      }, config);
+    }
+    return originalTransaction(...args);
+  };
+  try {
+    const result = await createOrderForUser(userId, request());
+    expect(result.ok).toBe(true);
+    expect(attempts).toBe(2);
+    expect((await effects()).orders).toBe(1);
+    expect((await pg.query("select count(*) as n from qa_effects where kind='race-attempt'")).rows[0].n).toBe(0);
+  } finally {
+    database.transaction = originalTransaction;
+  }
 });
 
 test("matching checkout preserves selected unit, total, payment and stock", async () => {

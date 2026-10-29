@@ -6,6 +6,7 @@ import { normalizeOrderItems, type NormalizedOrderItem } from "./normalize";
 
 type OrderTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export const CHECKOUT_PRICING_CHANGED = "pos.errors.pricingChanged";
+export const CHECKOUT_CATALOG_RACE = "CHECKOUT_CATALOG_RACE";
 
 const moneyEquals = (a: number, b: number) =>
   Number.isFinite(a) && Number.isFinite(b) && a.toFixed(2) === b.toFixed(2);
@@ -67,7 +68,11 @@ export async function prepareCheckoutPricing(
 
   const [locked] = await tx.select({ revision: sql<string>`${catalogSyncState.revision}::text` })
     .from(catalogSyncState).where(condition).for("update", { noWait: true });
-  if (!locked || before.revision !== locked.revision) throw new Error(CHECKOUT_PRICING_CHANGED);
+  if (!locked) throw new Error(CHECKOUT_PRICING_CHANGED);
+  // The catalog revision also advances for stock changes. A revision race is
+  // retried by the order writer; the next attempt re-resolves prices and still
+  // rejects if the cashier's snapshot is actually stale.
+  if (before.revision !== locked.revision) throw new Error(CHECKOUT_CATALOG_RACE);
   assertCheckoutPricing(input, items, authorizedItems);
   return {
     items,
