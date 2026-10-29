@@ -436,34 +436,30 @@ export function SuppliersTable({
         closeLabel={t("common.close")}
         bodyClassName="flex flex-col !overflow-hidden"
         footer={preview?.data && (
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap justify-end gap-2">
             {!editing && detailTab === "debt" && preview.data.payables && (
-              <div className="flex flex-wrap gap-2">
-                <SupplierPayableActions
-                  supplierId={preview.data.supplier.id}
-                  overview={preview.data.payables}
-                  onChanged={refreshSelectedSupplier}
-                />
-              </div>
+              <SupplierPayableActions
+                supplierId={preview.data.supplier.id}
+                overview={preview.data.payables}
+                onChanged={refreshSelectedSupplier}
+              />
             )}
-            <div className="flex justify-end gap-2">
-              {editing ? (
-                <>
-                  <button type="button" onClick={cancelEditing} disabled={saving} className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold text-slate-600 hover:bg-surface-2 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
-                    {t("common.cancel")}
-                  </button>
-                  <button type="button" onClick={saveSupplier} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
-                    {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {t("common.save")}
-                  </button>
-                </>
-              ) : (
-                <button type="button" onClick={startEditing} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-primary-600 hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
-                  <Pencil className="h-4 w-4" />
-                  {t("common.edit")}
+            {editing ? (
+              <>
+                <button type="button" onClick={cancelEditing} disabled={saving} className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold text-slate-600 hover:bg-surface-2 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+                  {t("common.cancel")}
                 </button>
-              )}
-            </div>
+                <button type="button" onClick={saveSupplier} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {t("common.save")}
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={startEditing} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-primary-600 hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+                <Pencil className="h-4 w-4" />
+                {t("common.edit")}
+              </button>
+            )}
           </div>
         )}
       >
@@ -574,7 +570,7 @@ function SupplierDetailTabs({
       <div className="min-h-0 flex-1 overflow-hidden pt-4">
         {visibleTab === "info" && <SupplierInfoPanel supplier={preview.supplier} draft={draft} editing={editing} onDraftChange={onDraftChange} />}
         {visibleTab === "history" && <SupplierHistoryPanel rows={history} />}
-        {visibleTab === "debt" && <SupplierDebtPanel preview={preview} rows={debtRows} />}
+        {visibleTab === "debt" && <SupplierDebtPanel rows={debtRows} />}
       </div>
     </div>
   );
@@ -745,22 +741,15 @@ function SupplierHistoryPanel({ rows }: { rows: SupplierHistoryRow[] }) {
   );
 }
 
-function SupplierDebtPanel({ preview, rows }: { preview: SupplierPreview; rows: SupplierDebtRow[] }) {
+function SupplierDebtPanel({ rows }: { rows: SupplierDebtRow[] }) {
   const t = useTranslations();
   const [filter, setFilter] = useState(DEFAULT_PARTNER_DEBT_FILTER);
   const visibleRows = useMemo(
     () => rows.filter((row) => matchesPartnerDebtFilter(row, filter)),
     [filter, rows],
   );
-  const currentDebt = preview.payables?.currentDebt ?? Number(preview.supplier.currentDebt);
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
-        <div className="rounded-lg bg-warn-soft px-4 py-2 text-right">
-          <div className="text-xs font-semibold text-warn">{t("suppliers.details.currentDebt")}</div>
-          <div className="font-bold tabular-nums text-warn">{formatCurrency(currentDebt)}</div>
-        </div>
-      </div>
       <PartnerDebtFilterControl value={filter} onChange={setFilter} />
       {visibleRows.length === 0 ? (
         <div className="min-h-0 flex-1 overflow-auto"><EmptyPanel message={t("suppliers.details.emptyDebt")} /></div>
