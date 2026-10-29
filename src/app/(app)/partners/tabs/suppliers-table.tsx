@@ -137,6 +137,7 @@ export function SuppliersTable({
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftDebtFilter, setDraftDebtFilter] = useState<SupplierDebtFilter>(owing);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(initialDetailId);
+  const [detailTab, setDetailTab] = useState<SupplierDetailTab>("info");
   const selectedSupplier = rows.find((row) => row.id === selectedSupplierId)
     ?? (initialDetailSupplier?.id === selectedSupplierId ? initialDetailSupplier : null);
   const { state: preview, refresh: refreshPreview } = useAppDataQuery(selectedSupplier?.id ?? null, loadSupplierPreview);
@@ -209,6 +210,7 @@ export function SuppliersTable({
 
   function closeSupplier() {
     setSelectedSupplierId(null);
+    setDetailTab("info");
     if (searchParams.has("detailSupplierId")) {
       const next = new URLSearchParams(searchParams.toString());
       next.delete("detailSupplierId");
@@ -434,23 +436,34 @@ export function SuppliersTable({
         closeLabel={t("common.close")}
         bodyClassName="flex flex-col !overflow-hidden"
         footer={preview?.data && (
-          <div className="flex justify-end gap-2">
-            {editing ? (
-              <>
-                <button type="button" onClick={cancelEditing} disabled={saving} className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold text-slate-600 hover:bg-surface-2 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
-                  {t("common.cancel")}
-                </button>
-                <button type="button" onClick={saveSupplier} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
-                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {t("common.save")}
-                </button>
-              </>
-            ) : (
-              <button type="button" onClick={startEditing} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-primary-600 hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
-                <Pencil className="h-4 w-4" />
-                {t("common.edit")}
-              </button>
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            {!editing && detailTab === "debt" && preview.data.payables && (
+              <div className="flex flex-wrap gap-2">
+                <SupplierPayableActions
+                  supplierId={preview.data.supplier.id}
+                  overview={preview.data.payables}
+                  onChanged={refreshSelectedSupplier}
+                />
+              </div>
             )}
+            <div className="flex justify-end gap-2">
+              {editing ? (
+                <>
+                  <button type="button" onClick={cancelEditing} disabled={saving} className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold text-slate-600 hover:bg-surface-2 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+                    {t("common.cancel")}
+                  </button>
+                  <button type="button" onClick={saveSupplier} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+                    {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {t("common.save")}
+                  </button>
+                </>
+              ) : (
+                <button type="button" onClick={startEditing} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-primary-600 hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
+                  <Pencil className="h-4 w-4" />
+                  {t("common.edit")}
+                </button>
+              )}
+            </div>
           </div>
         )}
       >
@@ -467,8 +480,9 @@ export function SuppliersTable({
               preview={preview.data}
               draft={draft ?? toSupplierDraft(preview.data.supplier)}
               editing={editing}
+              tab={detailTab}
+              onTabChange={setDetailTab}
               onDraftChange={(field, value) => setDraft((current) => current ? { ...current, [field]: value } : current)}
-              onPayablesChanged={refreshSelectedSupplier}
             />
           </div>
         ) : null}
@@ -481,17 +495,18 @@ function SupplierDetailTabs({
   preview,
   draft,
   editing,
+  tab,
+  onTabChange,
   onDraftChange,
-  onPayablesChanged,
 }: {
   preview: SupplierPreview;
   draft: SupplierDraft;
   editing: boolean;
+  tab: SupplierDetailTab;
+  onTabChange: (tab: SupplierDetailTab) => void;
   onDraftChange: (field: keyof SupplierDraft, value: string) => void;
-  onPayablesChanged: () => void | Promise<void>;
 }) {
   const t = useTranslations();
-  const [tab, setTab] = useState<SupplierDetailTab>("info");
   const visibleTab: SupplierDetailTab = editing ? "info" : tab;
 
   const history: SupplierHistoryRow[] = [
@@ -543,7 +558,7 @@ function SupplierDetailTabs({
           <button
             key={key}
             type="button"
-            onClick={() => { if (!editing || key === "info") setTab(key); }}
+            onClick={() => { if (!editing || key === "info") onTabChange(key); }}
             disabled={editing && key !== "info"}
             className={cn(
               "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center border-b-2 px-2 transition-colors lg:min-h-0 lg:min-w-0 lg:pb-2",
@@ -559,7 +574,7 @@ function SupplierDetailTabs({
       <div className="min-h-0 flex-1 overflow-hidden pt-4">
         {visibleTab === "info" && <SupplierInfoPanel supplier={preview.supplier} draft={draft} editing={editing} onDraftChange={onDraftChange} />}
         {visibleTab === "history" && <SupplierHistoryPanel rows={history} />}
-        {visibleTab === "debt" && <SupplierDebtPanel preview={preview} rows={debtRows} onPayablesChanged={onPayablesChanged} />}
+        {visibleTab === "debt" && <SupplierDebtPanel preview={preview} rows={debtRows} />}
       </div>
     </div>
   );
@@ -730,7 +745,7 @@ function SupplierHistoryPanel({ rows }: { rows: SupplierHistoryRow[] }) {
   );
 }
 
-function SupplierDebtPanel({ preview, rows, onPayablesChanged }: { preview: SupplierPreview; rows: SupplierDebtRow[]; onPayablesChanged: () => void | Promise<void> }) {
+function SupplierDebtPanel({ preview, rows }: { preview: SupplierPreview; rows: SupplierDebtRow[] }) {
   const t = useTranslations();
   const [filter, setFilter] = useState(DEFAULT_PARTNER_DEBT_FILTER);
   const visibleRows = useMemo(
@@ -740,16 +755,7 @@ function SupplierDebtPanel({ preview, rows, onPayablesChanged }: { preview: Supp
   const currentDebt = preview.payables?.currentDebt ?? Number(preview.supplier.currentDebt);
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        {preview.payables && (
-          <div className="flex flex-wrap gap-2">
-            <SupplierPayableActions
-              supplierId={preview.supplier.id}
-              overview={preview.payables}
-              onChanged={onPayablesChanged}
-            />
-          </div>
-        )}
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
         <div className="rounded-lg bg-warn-soft px-4 py-2 text-right">
           <div className="text-xs font-semibold text-warn">{t("suppliers.details.currentDebt")}</div>
           <div className="font-bold tabular-nums text-warn">{formatCurrency(currentDebt)}</div>
