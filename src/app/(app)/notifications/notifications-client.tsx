@@ -55,7 +55,7 @@ export function NotificationsClient({
   const t = useTranslations("notifications.inbox");
   const activityT = useTranslations("notifications.activity");
   const router = useRouter();
-  const [tab, setTab] = useState<NotificationTab>("action");
+  const [tab, setTab] = useState<NotificationTab>("all");
   const [rows, setRows] = useState<NotificationRow[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -340,6 +340,10 @@ export function NotificationsClient({
             role="tablist"
             aria-label={t("tabs.label")}
           >
+            <TabButton selected={tab === "all"} onClick={() => setTab("all")}>
+              {t("tabs.all")}
+              <CountBadge>{rows.length}</CountBadge>
+            </TabButton>
             <TabButton
               selected={tab === "action"}
               onClick={() => setTab("action")}
@@ -348,10 +352,6 @@ export function NotificationsClient({
               {actionableRows.length > 0 && (
                 <CountBadge tone="danger">{actionableRows.length}</CountBadge>
               )}
-            </TabButton>
-            <TabButton selected={tab === "all"} onClick={() => setTab("all")}>
-              {t("tabs.all")}
-              <CountBadge>{rows.length}</CountBadge>
             </TabButton>
             <TabButton
               selected={tab === "activity"}
