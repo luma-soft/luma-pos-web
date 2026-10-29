@@ -967,6 +967,8 @@
       "impact": "If this is not handled soon, business operations may be affected.",
       "processed": "Mark as resolved",
       "processing": "Processing...",
+      "markAllRead": "Mark all as read",
+      "markingAllRead": "Marking...",
       "updateError": "The notification status could not be saved. Please try again.",
       "next": "Up next",
       "information": "Information",

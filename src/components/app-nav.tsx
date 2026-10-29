@@ -88,22 +88,36 @@ export function AppNav({
   useEffect(() => {
     let active = true;
     let requestVersion = 0;
+    let lastConfirmedCount: number | null = null;
     const refresh = async () => {
       const version = ++requestVersion;
       try {
         const count = await fetchNotificationUnreadCount();
-        if (active && version === requestVersion) setNotificationCount(count);
+        if (!active || version !== requestVersion) return;
+        const changed = lastConfirmedCount !== null && lastConfirmedCount !== count;
+        lastConfirmedCount = count;
+        setNotificationCount(count);
+        if (changed) window.dispatchEvent(new Event(NOTIFICATION_INBOX_CHANGED_EVENT));
       } catch {
         // Keep the last confirmed value when the inbox is temporarily unavailable.
       }
     };
     const handleInboxChanged = () => void refresh();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
 
     void refresh();
     window.addEventListener(NOTIFICATION_INBOX_CHANGED_EVENT, handleInboxChanged);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    const refreshTimer = window.setInterval(refreshWhenVisible, 30_000);
     return () => {
       active = false;
       window.removeEventListener(NOTIFICATION_INBOX_CHANGED_EVENT, handleInboxChanged);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.clearInterval(refreshTimer);
     };
   }, [pathname]);
 

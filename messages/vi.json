@@ -967,6 +967,8 @@
       "impact": "Nếu không xử lý sớm, hoạt động kinh doanh có thể bị ảnh hưởng.",
       "processed": "Đánh dấu đã xử lý",
       "processing": "Đang xử lý...",
+      "markAllRead": "Đánh dấu tất cả đã đọc",
+      "markingAllRead": "Đang đánh dấu...",
       "updateError": "Chưa lưu được trạng thái thông báo. Vui lòng thử lại.",
       "next": "Tiếp theo",
       "information": "Thông tin",

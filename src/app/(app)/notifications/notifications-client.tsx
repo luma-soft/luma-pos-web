@@ -10,7 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Bell, Filter, RefreshCw, Settings } from "lucide-react";
+import { AlertTriangle, Bell, CheckCheck, Filter, RefreshCw, Settings } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/lib/routes";
@@ -57,11 +57,14 @@ export function NotificationsClient({
   const router = useRouter();
   const [tab, setTab] = useState<NotificationTab>("action");
   const [rows, setRows] = useState<NotificationRow[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [updateError, setUpdateError] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
   const updating = useRef(false);
+  const feedLoadVersion = useRef(0);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<NotificationFilters>(
     defaultNotificationFilters,
@@ -81,9 +84,12 @@ export function NotificationsClient({
   const [activityError, setActivityError] = useState(false);
   const [, startTransition] = useTransition();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(false);
+  const load = useCallback(async (silent = false) => {
+    const version = ++feedLoadVersion.current;
+    if (!silent) {
+      setLoading(true);
+      setError(false);
+    }
     try {
       const response = await fetch("/api/mobile/notifications?locale=vi", {
         cache: "no-store",
@@ -94,16 +100,25 @@ export function NotificationsClient({
       };
       if (!response.ok || !payload.ok || !Array.isArray(payload.data?.rows))
         throw new Error("notifications_failed");
+      if (version !== feedLoadVersion.current) return;
       setRows(payload.data.rows);
+      const unread = payload.data.counts?.unread;
+      setUnreadCount(typeof unread === "number" && Number.isSafeInteger(unread) && unread >= 0
+        ? unread
+        : payload.data.rows.filter((row) => row.unread).length);
     } catch {
-      setError(true);
+      if (!silent && version === feedLoadVersion.current) setError(true);
     } finally {
-      setLoading(false);
+      if (version === feedLoadVersion.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     let active = true;
+    const version = ++feedLoadVersion.current;
+    const refresh = () => {
+      if (active && document.visibilityState === "visible") void load(true);
+    };
     fetch("/api/mobile/notifications?locale=vi", { cache: "no-store" })
       .then(async (response) => {
         const payload = (await response.json()) as {
@@ -113,18 +128,30 @@ export function NotificationsClient({
         if (!response.ok || !payload.ok || !Array.isArray(payload.data?.rows)) {
           throw new Error("notifications_failed");
         }
-        if (active) setRows(payload.data.rows);
+        if (!active || version !== feedLoadVersion.current) return;
+        setRows(payload.data.rows);
+        const unread = payload.data.counts?.unread;
+        setUnreadCount(typeof unread === "number" && Number.isSafeInteger(unread) && unread >= 0
+          ? unread
+          : payload.data.rows.filter((row) => row.unread).length);
       })
       .catch(() => {
-        if (active) setError(true);
+        if (active && version === feedLoadVersion.current) setError(true);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active && version === feedLoadVersion.current) setLoading(false);
       });
+    window.addEventListener(NOTIFICATION_INBOX_CHANGED_EVENT, refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
     return () => {
       active = false;
+      feedLoadVersion.current += 1;
+      window.removeEventListener(NOTIFICATION_INBOX_CHANGED_EVENT, refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
-  }, []);
+  }, [load]);
 
   const visibleRows = useMemo(
     () => applyNotificationFilters(rows, filters, tab),
@@ -201,6 +228,7 @@ export function NotificationsClient({
               item.id === row.id ? { ...item, unread: false } : item,
             ),
       );
+      if (row.unread) setUnreadCount((count) => Math.max(0, count - 1));
       window.dispatchEvent(new Event(NOTIFICATION_INBOX_CHANGED_EVENT));
       return true;
     } catch {
@@ -209,6 +237,28 @@ export function NotificationsClient({
     } finally {
       updating.current = false;
       setPendingId(null);
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    if (markingAllRead || unreadCount === 0) return;
+    setMarkingAllRead(true);
+    setUpdateError(false);
+    try {
+      const response = await fetch("/api/mobile/notifications/read-all", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: rows.map((row) => row.id) }),
+      });
+      const payload = (await response.json()) as { ok?: boolean };
+      if (!response.ok || !payload.ok) throw new Error("notification_update_failed");
+      setRows((current) => current.map((row) => ({ ...row, unread: false })));
+      setUnreadCount(0);
+      window.dispatchEvent(new Event(NOTIFICATION_INBOX_CHANGED_EVENT));
+    } catch {
+      setUpdateError(true);
+    } finally {
+      setMarkingAllRead(false);
     }
   }
 
@@ -239,6 +289,20 @@ export function NotificationsClient({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {tab !== "activity" && (
+              <button
+                type="button"
+                onClick={() => void markAllNotificationsRead()}
+                disabled={markingAllRead || unreadCount === 0}
+                aria-label={t("markAllRead")}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-bold text-slate-600 outline-none transition hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-primary-200 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
+              >
+                <CheckCheck className="size-4 shrink-0" />
+                <span className="hidden sm:inline">
+                  {markingAllRead ? t("markingAllRead") : t("markAllRead")}
+                </span>
+              </button>
+            )}
             {tab !== "activity" && (
               <button
                 type="button"
