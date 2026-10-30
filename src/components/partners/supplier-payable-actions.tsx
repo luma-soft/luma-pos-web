@@ -135,7 +135,7 @@ function SupplierPaymentDialog({
       <div className="space-y-4">
         <DebtBalanceSummary value={overview.currentDebt} tone="warning" />
         <label className="block text-sm font-medium">
-          Thời gian thanh toán
+          Thời gian
           <Input type="datetime-local" value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} required className="mt-1 w-full" />
         </label>
         <label className="block text-sm font-medium">
@@ -248,7 +248,7 @@ function SupplierAdjustmentDialog({
       <div className="space-y-4">
         <DebtBalanceSummary value={currentDebt} tone="warning" />
         <label className="block text-sm font-medium">
-          Thời gian điều chỉnh
+          Thời gian
           <Input type="datetime-local" value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} required className="mt-1 w-full" />
         </label>
         <label className="block text-sm font-medium">
