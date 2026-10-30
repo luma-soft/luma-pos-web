@@ -24,6 +24,9 @@ export async function getCashbook(storeId: string, filters: { fund?: string; typ
         refType: cashTransactions.refType,
         refId: cashTransactions.refId,
         note: cashTransactions.note,
+        status: cashTransactions.status,
+        cancelledAt: cashTransactions.cancelledAt,
+        cancellationReason: cashTransactions.cancellationReason,
         createdAt: cashTransactions.createdAt,
         byName: profiles.fullName,
       })
@@ -68,6 +71,9 @@ export async function getCashTransaction(storeId: string, id: string) {
       refType: cashTransactions.refType,
       refId: cashTransactions.refId,
       note: cashTransactions.note,
+      status: cashTransactions.status,
+      cancelledAt: cashTransactions.cancelledAt,
+      cancellationReason: cashTransactions.cancellationReason,
       createdAt: cashTransactions.createdAt,
       byName: profiles.fullName,
     })

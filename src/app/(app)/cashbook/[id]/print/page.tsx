@@ -26,6 +26,9 @@ export default async function PrintCashTransactionPage({ params, searchParams }:
     : template.paperDefault;
   const incoming = transaction.type === "in";
   const fund = transaction.fund === "cash" ? "Tiền mặt" : "Ngân hàng";
+  const cancellationNote = transaction.status === "cancelled"
+    ? ` · ĐÃ HỦY${transaction.cancellationReason ? ` · Lý do: ${transaction.cancellationReason}` : ""}`
+    : "";
 
   return (
     <>
@@ -51,7 +54,7 @@ export default async function PrintCashTransactionPage({ params, searchParams }:
             ? ["Người nộp tiền", "Người lập phiếu", "Thủ quỹ"]
             : ["Người nhận tiền", "Người lập phiếu", "Thủ quỹ"]}
           signHint="(Ký, ghi rõ họ tên)"
-          note={`${transaction.note ?? "—"} · Hình thức: ${fund}`}
+          note={`${transaction.note ?? "—"} · Hình thức: ${fund}${cancellationNote}`}
           noteLabel={incoming ? "Lý do nộp" : "Lý do chi"}
           cols={{ product: "Nội dung", unit: "ĐVT", qty: "SL", unitPrice: "Đơn giá", lineTotal: "Thành tiền" }}
         />

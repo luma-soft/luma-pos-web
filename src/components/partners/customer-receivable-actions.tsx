@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { MoreHorizontal, Pencil, QrCode, WalletCards } from "lucide-react";
 import { collectCustomerReceivable, createCustomerReceivableEntry } from "@/lib/actions/receivables";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -129,6 +130,7 @@ function QrCreateDialog({ invoices, error, onCreate, onClose }: { invoices: Invo
 }
 
 function CollectDialog({ customerId, overview, error, onError, onClose }: { customerId: string; overview: Overview | null; error: string; onError: (value: string) => void; onClose: () => void }) {
+  const t = useTranslations();
   const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState<"cash" | "bank_transfer">("cash");
   const [occurredAt, setOccurredAt] = useState(() => localDateTimeValue(new Date()));
@@ -147,7 +149,7 @@ function CollectDialog({ customerId, overview, error, onError, onClose }: { cust
     if (!valid || pending) return;
     startTransition(async () => {
       const result = await collectCustomerReceivable({ customerId, amount, method, bankAccountId: method === "bank_transfer" ? bankAccountId : null, occurredAt: new Date(occurredAt).toISOString(), allocations: allocations.filter((row) => row.amount > 0), clientRequestId });
-      if (!result.ok) return onError("Không thể ghi nhận phiếu thu. Vui lòng kiểm tra số tiền và quyền thao tác.");
+      if (!result.ok) return onError(t.has(result.error) ? t(result.error as never) : "Không thể ghi nhận phiếu thu.");
       onClose();
     });
   }
@@ -167,6 +169,7 @@ function CollectDialog({ customerId, overview, error, onError, onClose }: { cust
 }
 
 function EntryDialog({ customerId, currentDebt, mode, error, onError, onClose }: { customerId: string; currentDebt: number; mode: "adjust" | "discount"; error: string; onError: (value: string) => void; onClose: () => void }) {
+  const t = useTranslations();
   const [amount, setAmount] = useState<number | null>(null); const [reason, setReason] = useState(""); const [pending, startTransition] = useTransition();
   const [occurredAt, setOccurredAt] = useState(() => localDateTimeValue(new Date()));
   const [clientRequestId] = useState(() => requestId("web-receivable-entry"));
@@ -175,6 +178,6 @@ function EntryDialog({ customerId, currentDebt, mode, error, onError, onClose }:
   const reasonRequired = mode === "discount";
   const reasonMissing = reasonRequired && !reason.trim();
   const valid = Boolean(occurredAt) && amount != null && !(mode === "adjust" ? amount === currentDebt : signedAmount === 0) && !reasonMissing && !pending;
-  function submit() { if (!valid || amount == null || !occurredAt) return; startTransition(async () => { const result = await createCustomerReceivableEntry({ customerId, ...(mode === "adjust" ? { targetDebt: amount } : { amount: signedAmount }), type, reason: reason.trim(), occurredAt: new Date(occurredAt).toISOString(), clientRequestId }); if (!result.ok) return onError("Không thể tạo chứng từ. Thao tác này yêu cầu quyền quản lý."); onClose(); }); }
+  function submit() { if (!valid || amount == null || !occurredAt) return; startTransition(async () => { const result = await createCustomerReceivableEntry({ customerId, ...(mode === "adjust" ? { targetDebt: amount } : { amount: signedAmount }), type, reason: reason.trim(), occurredAt: new Date(occurredAt).toISOString(), clientRequestId }); if (!result.ok) return onError(t.has(result.error) ? t(result.error as never) : "Không thể tạo chứng từ."); onClose(); }); }
   return <PartnerDebtDialog title={mode === "discount" ? "Chiết khấu thanh toán" : "Điều chỉnh công nợ"} onClose={onClose}><div className="space-y-4"><DebtBalanceSummary value={currentDebt} /><label className="block text-sm font-medium">Thời gian<Input type="datetime-local" value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} required className="mt-1 w-full" /></label><label className="block text-sm font-medium">{mode === "adjust" ? "Công nợ mới" : "Số tiền"}<MoneyInput value={amount} min={mode === "adjust" ? -Number.MAX_SAFE_INTEGER : 0} onChange={setAmount} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-right" /></label>{mode === "adjust" && <p className="text-xs text-slate-500">Nhập số âm nếu khách hàng có số dư/trả trước.</p>}<label className="block text-sm font-medium">{reasonRequired ? "Lý do" : "Lý do (không bắt buộc)"}<textarea value={reason} maxLength={200} onChange={(event) => setReason(event.target.value)} className="mt-1 min-h-24 w-full rounded-lg border border-border p-2" /><span className="mt-1 block text-right text-xs text-slate-400">{reason.length}/200</span></label>{error && <p className="text-sm text-er">{error}</p>}<DebtDialogFooter onCancel={onClose} onConfirm={submit} confirmLabel={pending ? "Đang lưu..." : "Xác nhận"} disabled={!valid} /></div></PartnerDebtDialog>;
 }

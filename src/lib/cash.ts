@@ -3,7 +3,7 @@ import { generateCode } from "@/lib/actions/common";
 
 type Tx = { insert: (table: typeof cashTransactions) => { values: (v: typeof cashTransactions.$inferInsert) => Promise<unknown> } };
 
-export type CashCategory = "sale" | "debt_collect" | "supplier_payment" | "refund" | "expense" | "other";
+export type CashCategory = "sale" | "debt_collect" | "supplier_payment" | "refund" | "expense" | "other" | "cancellation";
 
 /** Ghi 1 dòng sổ quỹ trong transaction đang mở. */
 export async function recordCashTx(

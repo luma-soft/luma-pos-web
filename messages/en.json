@@ -4887,10 +4887,31 @@
       "supplier_payment": "Supplier payment",
       "refund": "Customer refund",
       "expense": "Expense",
+      "cancellation": "Cancellation reversal",
       "other": "Other"
     },
     "notePlaceholder": "Description (required)…",
     "unitLabel": "transactions"
+  },
+  "financialVoucherCancellation": {
+    "cancelAction": "Cancel voucher",
+    "title": "Cancel record {code}",
+    "amount": "Amount",
+    "warning": "This restores the debt and records an offsetting cashbook transaction. It does not issue a refund or reverse an external bank transfer.",
+    "reasonLabel": "Cancellation reason",
+    "reasonPlaceholder": "Enter a reason to keep in the history",
+    "cancelled": "Cancelled",
+    "confirmed": "Recorded",
+    "statusLabel": "Status",
+    "confirm": "Confirm cancellation",
+    "working": "Cancelling…",
+    "failed": "Could not cancel this record. Check your permissions and try again.",
+    "errors": {
+      "notCancellable": "This record is not in a cancellable state.",
+      "alreadyCancelled": "This record has already been cancelled.",
+      "cashTransactionMissing": "The cashbook entry for this voucher is missing, so it cannot be safely cancelled.",
+      "useSource": "Cancel this transaction from its source record."
+    }
   },
   "orderEdit": {
     "title": "Edit {code}",

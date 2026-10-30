@@ -2,10 +2,12 @@
 
 import { requireManager, type ActionResult } from "@/lib/actions/common";
 import {
+  cancelSupplierPayableForUser,
   createSupplierPayableEntryForUser,
   paySupplierPayableForUser,
 } from "@/lib/payables/service";
 import type {
+  CancelSupplierPayableInput,
   PaySupplierInput,
   SupplierPayableEntryInput,
 } from "@/lib/payables/service-core";
@@ -16,6 +18,17 @@ export async function paySupplierPayable(
   const gate = await requireManager();
   if (!gate.ok) return gate;
   const result = await paySupplierPayableForUser(gate.userId, input);
+  return result.ok
+    ? { ok: true, data: { receiptId: result.data.receiptId, replayed: result.data.replayed } }
+    : result;
+}
+
+export async function cancelSupplierPayable(
+  input: CancelSupplierPayableInput,
+): Promise<ActionResult<{ receiptId: string; replayed: boolean }>> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const result = await cancelSupplierPayableForUser(gate.userId, input);
   return result.ok
     ? { ok: true, data: { receiptId: result.data.receiptId, replayed: result.data.replayed } }
     : result;

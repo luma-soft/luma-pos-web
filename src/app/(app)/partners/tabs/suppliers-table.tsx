@@ -16,6 +16,7 @@ import type { getSuppliers } from "@/lib/data/partners";
 import { updateSupplier } from "@/lib/actions/partners";
 import { SupplierQuickCreate } from "../../suppliers/supplier-form";
 import { SupplierPayableActions } from "@/components/partners/supplier-payable-actions";
+import { CancelFinancialVoucherButton } from "@/components/partners/cancel-financial-voucher-button";
 import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
 import { useAppDataQuery } from "@/components/use-app-data-query";
 import {
@@ -99,7 +100,7 @@ type SupplierDraft = {
 };
 type SupplierDebtRow = {
   id: string;
-  kind: "purchase" | "return" | "payment" | "adjustment";
+  kind: "purchase" | "return" | "payment" | "payment_cancellation" | "adjustment";
   code: string;
   purchaseOrderId: string | null;
   createdAt: string;
@@ -107,6 +108,9 @@ type SupplierDebtRow = {
   value: number;
   balance: number;
   reason: string | null;
+  receiptId?: string | null;
+  receiptStatus?: string | null;
+  cancellationReason?: string | null;
 };
 
 const DETAIL_TABS: SupplierDetailTab[] = ["info", "history", "debt"];
@@ -496,6 +500,7 @@ export function SuppliersTable({
               editing={editing}
               tab={detailTab}
               onTabChange={setDetailTab}
+              onDebtChanged={() => refreshPreview()}
               onDraftChange={(field, value) => setDraft((current) => current ? { ...current, [field]: value } : current)}
             />
           </div>
@@ -511,6 +516,7 @@ function SupplierDetailTabs({
   editing,
   tab,
   onTabChange,
+  onDebtChanged,
   onDraftChange,
 }: {
   preview: SupplierPreview;
@@ -518,6 +524,7 @@ function SupplierDetailTabs({
   editing: boolean;
   tab: SupplierDetailTab;
   onTabChange: (tab: SupplierDetailTab) => void;
+  onDebtChanged: () => void | Promise<void>;
   onDraftChange: (field: keyof SupplierDraft, value: string) => void;
 }) {
   const t = useTranslations();
@@ -588,7 +595,7 @@ function SupplierDetailTabs({
       <div className="min-h-0 flex-1 overflow-hidden pt-4">
         {visibleTab === "info" && <SupplierInfoPanel supplier={preview.supplier} draft={draft} editing={editing} onDraftChange={onDraftChange} />}
         {visibleTab === "history" && <SupplierHistoryPanel rows={history} />}
-        {visibleTab === "debt" && <SupplierDebtPanel rows={debtRows} />}
+        {visibleTab === "debt" && <SupplierDebtPanel rows={debtRows} supplierId={preview.supplier.id} onChanged={onDebtChanged} />}
       </div>
     </div>
   );
@@ -759,7 +766,7 @@ function SupplierHistoryPanel({ rows }: { rows: SupplierHistoryRow[] }) {
   );
 }
 
-function SupplierDebtPanel({ rows }: { rows: SupplierDebtRow[] }) {
+function SupplierDebtPanel({ rows, supplierId, onChanged }: { rows: SupplierDebtRow[]; supplierId: string; onChanged: () => void | Promise<void> }) {
   const t = useTranslations();
   const [filter, setFilter] = useState(DEFAULT_PARTNER_DEBT_FILTER);
   const visibleRows = useMemo(
@@ -779,12 +786,15 @@ function SupplierDebtPanel({ rows }: { rows: SupplierDebtRow[] }) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   {row.purchaseOrderId ? <PurchaseDetailLink purchaseId={row.purchaseOrderId} className="font-semibold text-primary-600 hover:underline min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 inline-flex">{row.code}</PurchaseDetailLink> : <div className="font-semibold text-primary-600 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">{row.code}</div>}
+                  {row.receiptStatus === "cancelled" && <span className="ml-2 inline-flex rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-semibold text-warn">{t("financialVoucherCancellation.cancelled")}</span>}
                   <div className="mt-0.5 text-xs text-slate-500">{formatDate(row.createdAt)} · {row.typeLabel}{row.reason ? ` · ${row.reason}` : ""}</div>
+                  {row.cancellationReason && <div className="mt-1 text-xs text-slate-500">{t("financialVoucherCancellation.reasonLabel")}: {row.cancellationReason}</div>}
                 </div>
                 <div className={cn("shrink-0 font-semibold tabular-nums", row.value < 0 ? "text-ok" : "text-warn")}>
                   {row.value > 0 ? "+" : "−"}{formatCurrency(Math.abs(row.value))}
                 </div>
               </div>
+              {row.kind === "payment" && row.receiptId && row.receiptStatus === "confirmed" && <CancelFinancialVoucherButton kind="supplier" receiptId={row.receiptId} partyId={supplierId} code={row.code} amount={Math.abs(row.value)} onCancelled={onChanged} />}
               <div className="flex items-center justify-between gap-3 border-t border-border-soft pt-2 text-xs">
                 <span className="text-slate-500">{t("suppliers.details.debtCols.balance")}</span>
                 <span className="font-semibold tabular-nums">{formatCurrency(row.balance)}</span>
@@ -806,7 +816,14 @@ function SupplierDebtPanel({ rows }: { rows: SupplierDebtRow[] }) {
             <tbody className="divide-y divide-border-soft">
               {visibleRows.map((row) => (
                 <tr key={`${row.kind}-${row.id}`}>
-                  <td className="px-3 py-3 font-semibold text-primary-600">{row.purchaseOrderId ? <PurchaseDetailLink purchaseId={row.purchaseOrderId} className="hover:underline">{row.code}</PurchaseDetailLink> : row.code}</td>
+                  <td className="px-3 py-3 font-semibold text-primary-600">
+                    <div className="flex items-center gap-2">
+                      {row.purchaseOrderId ? <PurchaseDetailLink purchaseId={row.purchaseOrderId} className="hover:underline">{row.code}</PurchaseDetailLink> : row.code}
+                      {row.receiptStatus === "cancelled" && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-semibold text-warn">{t("financialVoucherCancellation.cancelled")}</span>}
+                    </div>
+                    {row.cancellationReason && <div className="mt-1 text-xs font-normal text-slate-500">{t("financialVoucherCancellation.reasonLabel")}: {row.cancellationReason}</div>}
+                    {row.kind === "payment" && row.receiptId && row.receiptStatus === "confirmed" && <div className="mt-1"><CancelFinancialVoucherButton kind="supplier" receiptId={row.receiptId} partyId={supplierId} code={row.code} amount={Math.abs(row.value)} onCancelled={onChanged} /></div>}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-500">{formatDate(row.createdAt)}</td>
                   <td className="px-3 py-3">{row.typeLabel}{row.reason ? <div className="text-xs text-slate-500">{row.reason}</div> : null}</td>
                   <td className={cn("px-3 py-3 text-right font-semibold tabular-nums", row.value < 0 ? "text-ok" : "text-warn")}>

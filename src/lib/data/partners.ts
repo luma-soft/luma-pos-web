@@ -1,8 +1,10 @@
-import { and, count, desc, eq, getTableColumns, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, gte, inArray, isNull, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
   customerConsents,
+  customerReceivableAllocations,
   customerReceivableEntries,
+  customerReceivableReceipts,
   customers,
   orderItems,
   orders,
@@ -58,7 +60,7 @@ export type CustomerSalesHistoryRow = {
 
 export type CustomerDebtLedgerRow = {
   id: string;
-  kind: "sale" | "payment" | "return" | "adjustment" | "discount";
+  kind: "sale" | "payment" | "payment_cancellation" | "return" | "adjustment" | "discount";
   code: string;
   orderId: string | null;
   createdAt: Date;
@@ -66,6 +68,9 @@ export type CustomerDebtLedgerRow = {
   value: number;
   balance: number;
   reason: string | null;
+  receiptId?: string | null;
+  receiptStatus?: string | null;
+  cancellationReason?: string | null;
 };
 
 function isCustomerType(value?: string): value is CustomerType {
@@ -250,7 +255,7 @@ export async function getCustomers(
   }
 
   if (customerIds.length > 0) {
-    const [grossRows, orderRows, returnRows, paymentRows, receivableEntryRows] = await Promise.all([
+    const [grossRows, orderRows, returnRows, paymentRows, receiptRows, receivableEntryRows] = await Promise.all([
       db
         .select({
           customerId: orders.customerId,
@@ -333,8 +338,37 @@ export async function getCustomers(
         })
         .from(payments)
         .innerJoin(orders, eq(payments.orderId, orders.id))
-        .where(inArray(orders.customerId, customerIds))
+        .leftJoin(customerReceivableAllocations, and(
+          eq(customerReceivableAllocations.paymentId, payments.id),
+          eq(customerReceivableAllocations.storeId, payments.storeId),
+        ))
+        .where(and(
+          inArray(orders.customerId, customerIds),
+          isNull(customerReceivableAllocations.receiptId),
+          notInArray(payments.status, ["pending", "expired", "failed", "cancelled"]),
+        ))
         .orderBy(desc(payments.createdAt))
+        .limit(customerIds.length * 60),
+      db
+        .select({
+          customerId: customerReceivableReceipts.customerId,
+          id: customerReceivableReceipts.id,
+          code: customerReceivableReceipts.code,
+          status: customerReceivableReceipts.status,
+          amount: customerReceivableReceipts.amount,
+          method: customerReceivableReceipts.method,
+          reference: customerReceivableReceipts.reference,
+          note: customerReceivableReceipts.note,
+          createdAt: customerReceivableReceipts.createdAt,
+          cancelledAt: customerReceivableReceipts.cancelledAt,
+          cancellationReason: customerReceivableReceipts.cancellationReason,
+        })
+        .from(customerReceivableReceipts)
+        .where(and(
+          inArray(customerReceivableReceipts.customerId, customerIds),
+          inArray(customerReceivableReceipts.status, ["confirmed", "cancelled"]),
+        ))
+        .orderBy(desc(customerReceivableReceipts.createdAt))
         .limit(customerIds.length * 60),
       db
         .select({
@@ -443,6 +477,39 @@ export async function getCustomers(
       });
     }
 
+    for (const receipt of receiptRows) {
+      addLedger(receipt.customerId, {
+        id: receipt.id,
+        kind: "payment",
+        code: receipt.code,
+        orderId: null,
+        createdAt: receipt.createdAt,
+        typeLabel: "Thu nợ khách hàng",
+        value: -Number(receipt.amount),
+        reason: receipt.note || receipt.reference || receipt.method,
+        receiptId: receipt.id,
+        receiptStatus: receipt.status,
+        cancellationReason: receipt.cancellationReason,
+        sort: 20,
+      });
+      if (receipt.status === "cancelled" && receipt.cancelledAt) {
+        addLedger(receipt.customerId, {
+          id: `${receipt.id}:cancellation`,
+          kind: "payment_cancellation",
+          code: `Hủy ${receipt.code}`,
+          orderId: null,
+          createdAt: receipt.cancelledAt,
+          typeLabel: "Hủy phiếu thu công nợ",
+          value: Number(receipt.amount),
+          reason: receipt.cancellationReason,
+          receiptId: receipt.id,
+          receiptStatus: "cancelled",
+          cancellationReason: receipt.cancellationReason,
+          sort: 25,
+        });
+      }
+    }
+
     for (const entry of receivableEntryRows) {
       const isDiscount = entry.type === "settlement_discount";
       addLedger(entry.customerId, {
@@ -479,6 +546,9 @@ export async function getCustomers(
           value: event.value,
           reason: event.reason,
           balance,
+          receiptId: event.receiptId,
+          receiptStatus: event.receiptStatus,
+          cancellationReason: event.cancellationReason,
         };
         balance -= event.value;
         return row;

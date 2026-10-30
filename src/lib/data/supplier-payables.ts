@@ -13,7 +13,7 @@ import { getEffectiveSupplierInvoices } from "@/lib/payables/document-balances";
 
 export type SupplierPayableLedgerRow = {
   id: string;
-  kind: "purchase" | "return" | "payment" | "adjustment";
+  kind: "purchase" | "return" | "payment" | "payment_cancellation" | "adjustment";
   code: string;
   purchaseOrderId: string | null;
   createdAt: Date;
@@ -21,6 +21,9 @@ export type SupplierPayableLedgerRow = {
   value: number;
   balance: number;
   reason: string | null;
+  receiptId?: string | null;
+  receiptStatus?: string | null;
+  cancellationReason?: string | null;
 };
 
 type PayableEvent = Omit<SupplierPayableLedgerRow, "balance"> & { sort: number };
@@ -76,13 +79,16 @@ export async function getSupplierPayableOverview(storeId: string, supplierId: st
         method: supplierPayableReceipts.method,
         reference: supplierPayableReceipts.reference,
         note: supplierPayableReceipts.note,
+        status: supplierPayableReceipts.status,
         createdAt: supplierPayableReceipts.createdAt,
+        cancelledAt: supplierPayableReceipts.cancelledAt,
+        cancellationReason: supplierPayableReceipts.cancellationReason,
       })
       .from(supplierPayableReceipts)
       .where(and(
         eq(supplierPayableReceipts.supplierId, supplierId),
         eq(supplierPayableReceipts.storeId, storeId),
-        eq(supplierPayableReceipts.status, "confirmed"),
+        inArray(supplierPayableReceipts.status, ["confirmed", "cancelled"]),
       ))
       .orderBy(desc(supplierPayableReceipts.createdAt))
       .limit(100),
@@ -151,8 +157,13 @@ export async function getSupplierPayableOverview(storeId: string, supplierId: st
       amount: sql<string>`coalesce(sum(${supplierPayableAllocations.amount}), 0)`,
     })
     .from(supplierPayableAllocations)
+      .innerJoin(supplierPayableReceipts, and(
+        eq(supplierPayableReceipts.id, supplierPayableAllocations.receiptId),
+        eq(supplierPayableReceipts.storeId, supplierPayableAllocations.storeId),
+      ))
     .where(and(
       eq(supplierPayableAllocations.storeId, storeId),
+        eq(supplierPayableReceipts.status, "confirmed"),
       inArray(supplierPayableAllocations.purchaseOrderId, purchases.map((purchase) => purchase.id)),
     ))
     .groupBy(supplierPayableAllocations.purchaseOrderId);
@@ -214,8 +225,27 @@ export async function getSupplierPayableOverview(storeId: string, supplierId: st
       typeLabel: "Thanh toán",
       value: -Number(receipt.amount),
       reason: receipt.note || receipt.reference,
+      receiptId: receipt.id,
+      receiptStatus: receipt.status,
+      cancellationReason: receipt.cancellationReason,
       sort: 20,
     });
+    if (receipt.status === "cancelled" && receipt.cancelledAt) {
+      events.push({
+        id: `${receipt.id}:cancellation`,
+        kind: "payment_cancellation",
+        code: `Hủy ${receipt.code}`,
+        purchaseOrderId: null,
+        createdAt: receipt.cancelledAt,
+        typeLabel: "Hủy thanh toán nhà cung cấp",
+        value: Number(receipt.amount),
+        reason: receipt.cancellationReason,
+        receiptId: receipt.id,
+        receiptStatus: "cancelled",
+        cancellationReason: receipt.cancellationReason,
+        sort: 25,
+      });
+    }
   }
   for (const entry of entries) {
     events.push({
@@ -247,6 +277,9 @@ export async function getSupplierPayableOverview(storeId: string, supplierId: st
       value: event.value,
       balance,
       reason: event.reason,
+      receiptId: event.receiptId,
+      receiptStatus: event.receiptStatus,
+      cancellationReason: event.cancellationReason,
     };
     balance -= event.value;
     return row;

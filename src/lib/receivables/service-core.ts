@@ -3,16 +3,19 @@ import {
   customerReceivableAllocations,
   customerReceivableEntries,
   customerReceivableReceipts,
+  cashTransactions,
   customers,
   orders,
   payments,
   paymentBankAccounts,
+  returns,
 } from "@/db/schema";
 import { generateCode } from "@/lib/actions/common";
 import { fundForMethod, recordCashTx } from "@/lib/cash";
 import { getEffectiveCustomerInvoices } from "@/lib/receivables/document-balances";
 import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
 import { recordActivity } from "@/lib/audit/activity-log";
+import { reverseCashTransaction } from "@/lib/cashbook/reversals";
 
 // Drizzle Postgres and PGlite expose the same runtime transaction API.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,6 +65,9 @@ function knownError(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
   const errors: Record<string, string> = {
     CUSTOMER_NOT_FOUND: "errors.notFound",
+    RECEIPT_NOT_CANCELLABLE: "financialVoucherCancellation.errors.notCancellable",
+    RECEIPT_CASH_TRANSACTION_NOT_FOUND: "financialVoucherCancellation.errors.cashTransactionMissing",
+    CASH_TRANSACTION_ALREADY_CANCELLED: "financialVoucherCancellation.errors.alreadyCancelled",
     INVALID_INPUT: "errors.invalidData",
     RECEIPT_CONFLICT: "payments.errors.referenceConflict",
     ORDER_NOT_PAYABLE: "orders.errors.notPayable",
@@ -309,6 +315,214 @@ export async function collectCustomerReceivable(
       });
     }
     return { ok: false, error: mappedError };
+  }
+}
+
+export type CancelCustomerReceivableInput = {
+  receiptId: string;
+  customerId?: string;
+  reason: string;
+};
+
+/** Cancel a confirmed customer receipt and reverse its debt, allocations, and cash movement atomically. */
+export async function cancelCustomerReceivableReceipt(
+  database: DbLike,
+  input: CancelCustomerReceivableInput,
+  actor: Actor,
+): Promise<ReceivableResult<{ receiptId: string; replayed: boolean; notificationEventId?: string }>> {
+  const reason = input.reason?.trim() ?? "";
+  if (!input.receiptId || reason.length < 3 || reason.length > 500) {
+    return { ok: false, error: "errors.invalidData" };
+  }
+
+  try {
+    return await database.transaction(async (tx: DbLike) => {
+      const [receiptOwner] = await tx
+        .select({ customerId: customerReceivableReceipts.customerId })
+        .from(customerReceivableReceipts)
+        .where(and(
+          eq(customerReceivableReceipts.storeId, actor.storeId),
+          eq(customerReceivableReceipts.id, input.receiptId),
+        ))
+        .limit(1);
+      if (!receiptOwner || (input.customerId && receiptOwner.customerId !== input.customerId)) {
+        throw new Error("CUSTOMER_NOT_FOUND");
+      }
+
+      const [customer] = await tx
+        .select({ id: customers.id, code: customers.code, name: customers.name, currentDebt: customers.currentDebt })
+        .from(customers)
+        .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, receiptOwner.customerId)))
+        .limit(1)
+        .for("update");
+      if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
+
+      const [receipt] = await tx
+        .select()
+        .from(customerReceivableReceipts)
+        .where(and(
+          eq(customerReceivableReceipts.storeId, actor.storeId),
+          eq(customerReceivableReceipts.id, input.receiptId),
+          eq(customerReceivableReceipts.customerId, customer.id),
+        ))
+        .limit(1)
+        .for("update");
+      if (!receipt) throw new Error("CUSTOMER_NOT_FOUND");
+      if (receipt.status === "cancelled") {
+        return { ok: true as const, data: { receiptId: receipt.id, replayed: true } };
+      }
+      if (receipt.status !== "confirmed") throw new Error("RECEIPT_NOT_CANCELLABLE");
+
+      const allocations = await tx
+        .select({ orderId: customerReceivableAllocations.orderId, paymentId: customerReceivableAllocations.paymentId, amount: customerReceivableAllocations.amount })
+        .from(customerReceivableAllocations)
+        .where(and(
+          eq(customerReceivableAllocations.storeId, actor.storeId),
+          eq(customerReceivableAllocations.receiptId, receipt.id),
+        ))
+        .orderBy(asc(customerReceivableAllocations.orderId))
+        .for("update");
+      const orderIds: string[] = [...new Set<string>(allocations.map((allocation: { orderId: string }) => allocation.orderId))].sort();
+      const orderRows = orderIds.length > 0
+        ? await tx
+          .select()
+          .from(orders)
+          .where(and(eq(orders.storeId, actor.storeId), inArray(orders.id, orderIds)))
+          .orderBy(asc(orders.id))
+          .for("update")
+        : [];
+      const ordersById = new Map<string, typeof orders.$inferSelect>(
+        orderRows.map((order: typeof orders.$inferSelect) => [order.id, order]),
+      );
+      if (orderIds.some((id) => !ordersById.has(id))) throw new Error("CUSTOMER_NOT_FOUND");
+
+      const paymentIds = allocations
+        .map((allocation: { paymentId: string | null }) => allocation.paymentId)
+        .filter((id: string | null): id is string => Boolean(id));
+      if (paymentIds.length > 0) {
+        await tx.update(payments)
+          .set({ status: "cancelled" })
+          .where(and(eq(payments.storeId, actor.storeId), inArray(payments.id, paymentIds)));
+      }
+
+      const [adjustmentRows, returnRows] = orderIds.length > 0
+        ? await Promise.all([
+          tx.select({ orderId: customerReceivableEntries.orderId, amount: customerReceivableEntries.amount })
+            .from(customerReceivableEntries)
+            .where(and(
+              eq(customerReceivableEntries.storeId, actor.storeId),
+              eq(customerReceivableEntries.customerId, customer.id),
+              inArray(customerReceivableEntries.orderId, orderIds),
+            )),
+          tx.select({ orderId: returns.orderId, amount: returns.totalRefund })
+            .from(returns)
+            .where(and(
+              eq(returns.storeId, actor.storeId),
+              eq(returns.customerId, customer.id),
+              eq(returns.status, "completed"),
+              eq(returns.refundMethod, "debt_deduct"),
+              inArray(returns.orderId, orderIds),
+            )),
+        ])
+        : [[], []];
+      const adjustmentsByOrder = new Map<string, number>();
+      for (const row of adjustmentRows) {
+        if (row.orderId) adjustmentsByOrder.set(row.orderId, money((adjustmentsByOrder.get(row.orderId) ?? 0) + Number(row.amount)));
+      }
+      const returnsByOrder = new Map<string, number>();
+      for (const row of returnRows) {
+        if (row.orderId) returnsByOrder.set(row.orderId, money((returnsByOrder.get(row.orderId) ?? 0) + Number(row.amount)));
+      }
+
+      const allocationsByOrder = new Map<string, number>();
+      for (const allocation of allocations) {
+        allocationsByOrder.set(
+          allocation.orderId,
+          money((allocationsByOrder.get(allocation.orderId) ?? 0) + Number(allocation.amount)),
+        );
+      }
+      for (const [orderId, allocatedAmount] of allocationsByOrder) {
+        const order = ordersById.get(orderId)!;
+        const newPaid = money(Math.max(0, Number(order.amountPaid) - allocatedAmount));
+        const remaining = money(Math.max(
+          0,
+          Number(order.total) - newPaid + (adjustmentsByOrder.get(orderId) ?? 0) - (returnsByOrder.get(orderId) ?? 0),
+        ));
+        await tx.update(orders).set({
+          amountPaid: newPaid.toFixed(2),
+          paymentStatus: remaining <= 0 ? "paid" : newPaid > 0 ? "partial" : "unpaid",
+          updatedAt: sql`now()`,
+        }).where(and(eq(orders.storeId, actor.storeId), eq(orders.id, orderId)));
+      }
+
+      const occurredAt = new Date();
+      const cashRows = await tx
+        .select()
+        .from(cashTransactions)
+        .where(and(
+          eq(cashTransactions.storeId, actor.storeId),
+          eq(cashTransactions.refType, "customer_receivable_receipt"),
+          eq(cashTransactions.refId, receipt.id),
+        ))
+        .limit(2)
+        .for("update");
+      if (cashRows.length > 1) throw new Error("RECEIPT_CASH_TRANSACTION_CONFLICT");
+      if (cashRows.length !== 1) throw new Error("RECEIPT_CASH_TRANSACTION_NOT_FOUND");
+      if (cashRows[0]) {
+        await reverseCashTransaction(tx, {
+          transaction: cashRows[0],
+          actorId: actor.profileId,
+          shiftId: actor.shiftId,
+          reason,
+          referenceType: "customer_receivable_receipt_cancellation",
+          referenceId: receipt.id,
+          reversedAt: occurredAt,
+        });
+      }
+
+      await tx.update(customerReceivableReceipts).set({
+        status: "cancelled",
+        cancelledAt: occurredAt,
+        cancelledBy: actor.profileId,
+        cancellationReason: reason,
+      }).where(and(
+        eq(customerReceivableReceipts.storeId, actor.storeId),
+        eq(customerReceivableReceipts.id, receipt.id),
+      ));
+      const newDebt = money(Number(customer.currentDebt) + Number(receipt.amount));
+      await tx.update(customers)
+        .set({ currentDebt: newDebt.toFixed(2) })
+        .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, customer.id)));
+
+      await recordActivity(tx, {
+        storeId: actor.storeId,
+        actorId: actor.profileId,
+        action: "customer.receivable.receipt.cancelled",
+        entityType: "customer_receivable_receipt",
+        entityId: receipt.id,
+        before: { code: receipt.code, status: receipt.status, currentDebt: Number(customer.currentDebt) },
+        after: { code: receipt.code, status: "cancelled", amount: Number(receipt.amount), currentDebt: newDebt, reason, cancelledAt: occurredAt },
+        affectedRecords: [
+          { type: "customer", id: customer.id, code: customer.code, name: customer.name },
+          ...orderIds.map((id) => ({ type: "order", id, code: ordersById.get(id)!.code })),
+        ],
+      });
+      const notification = await createDebtChangedEventInTx(tx, {
+        storeId: actor.storeId,
+        entityType: "customer",
+        entityId: customer.id,
+        operationType: "receivable_collection_cancelled",
+        operationId: receipt.id,
+        delta: Number(receipt.amount),
+        actorId: actor.profileId,
+      });
+      return {
+        ok: true as const,
+        data: { receiptId: receipt.id, replayed: false, ...(notification?.created ? { notificationEventId: notification.eventId } : {}) },
+      };
+    });
+  } catch (error) {
+    return { ok: false, error: knownError(error) };
   }
 }
 

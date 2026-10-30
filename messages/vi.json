@@ -4887,10 +4887,31 @@
       "supplier_payment": "Trả NCC",
       "refund": "Hoàn trả khách",
       "expense": "Chi vận hành",
+      "cancellation": "Phiếu đảo do hủy",
       "other": "Khác"
     },
     "notePlaceholder": "Diễn giải (bắt buộc)…",
     "unitLabel": "giao dịch"
+  },
+  "financialVoucherCancellation": {
+    "cancelAction": "Hủy phiếu",
+    "title": "Hủy chứng từ {code}",
+    "amount": "Số tiền",
+    "warning": "Hệ thống sẽ hoàn lại công nợ và ghi một giao dịch đảo trong sổ quỹ. Thao tác này không tự hoàn tiền hoặc thu hồi chuyển khoản bên ngoài.",
+    "reasonLabel": "Lý do hủy",
+    "reasonPlaceholder": "Nhập lý do để lưu vào lịch sử",
+    "cancelled": "Đã hủy",
+    "confirmed": "Đã ghi nhận",
+    "statusLabel": "Trạng thái",
+    "confirm": "Xác nhận hủy",
+    "working": "Đang hủy…",
+    "failed": "Không thể hủy chứng từ. Vui lòng kiểm tra quyền thao tác và thử lại.",
+    "errors": {
+      "notCancellable": "Chứng từ này không ở trạng thái có thể hủy.",
+      "alreadyCancelled": "Chứng từ đã được hủy.",
+      "cashTransactionMissing": "Không tìm thấy giao dịch quỹ của phiếu này nên chưa thể hủy an toàn.",
+      "useSource": "Vui lòng hủy giao dịch từ chứng từ gốc liên quan."
+    }
   },
   "orderEdit": {
     "title": "Sửa đơn {code}",

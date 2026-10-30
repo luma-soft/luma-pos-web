@@ -3,8 +3,10 @@
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { OrderDetailLink } from "@/components/order-detail-link";
+import { CancelFinancialVoucherButton } from "@/components/partners/cancel-financial-voucher-button";
 import Link from "next/link";
 import { Printer } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { getCashbook } from "@/lib/data/cashbook";
 
@@ -16,13 +18,15 @@ const CAT_STYLES: Record<string, string> = {
   supplier_payment: "bg-er-soft text-er",
   refund: "bg-warn-soft text-warn",
   expense: "bg-warn-soft text-warn",
+  cancellation: "bg-surface-2 text-slate-600",
   other: "bg-surface-2 text-slate-600",
 };
 
 export function CashbookTable({ rows }: { rows: CashbookRow[] }) {
   const t = useTranslations();
+  const router = useRouter();
   const columns: DataTableColumn<CashbookRow>[] = [
-    { key: "code", label: t("cashbook.cols.code"), required: true, render: (row) => <span className="font-medium text-primary-600">{row.code}</span> },
+    { key: "code", label: t("cashbook.cols.code"), required: true, render: (row) => <span className="inline-flex items-center gap-2 font-medium text-primary-600">{row.code}{row.status === "cancelled" && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-semibold text-warn">{t("financialVoucherCancellation.cancelled")}</span>}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, width: "160px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
     { key: "category", label: t("cashbook.cols.category"), defaultVisible: true, render: (row) => <Category row={row} /> },
     { key: "note", label: t("cashbook.cols.note"), defaultVisible: true, render: (row) => <Note row={row} /> },
@@ -49,17 +53,36 @@ export function CashbookTable({ rows }: { rows: CashbookRow[] }) {
           <Info label={t("orders.cols.date")} value={formatDate(row.createdAt)} />
           <Info label={t("cashbook.cols.fund")} value={row.fund === "cash" ? t("cashbook.fundCash") : t("cashbook.fundBank")} />
           <Info label={t("cashbook.cols.amount")} value={`${row.type === "in" ? "+" : "-"} ${formatCurrency(Number(row.amount))}`} tone={row.type === "in" ? "ok" : "er"} />
+          <Info label={t("financialVoucherCancellation.statusLabel")} value={row.status === "cancelled" ? t("financialVoucherCancellation.cancelled") : t("financialVoucherCancellation.confirmed")} />
           <Info label={row.type === "in" ? t("cashbook.payer") : t("cashbook.recipient")} value={row.counterparty ?? "—"} />
           <div className="md:col-span-4"><Info label={t("cashbook.cols.note")} value={row.note ?? "—"} /></div>
+          {row.cancellationReason && <div className="md:col-span-4"><Info label={t("financialVoucherCancellation.reasonLabel")} value={row.cancellationReason} /></div>}
           <div className="md:col-span-4">
-            <Link href={`/cashbook/${row.id}/print`} target="_blank" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-primary-600 hover:bg-surface-2">
-              <Printer className="h-4 w-4" /> {t("cashbook.printVoucher")}
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href={`/cashbook/${row.id}/print`} target="_blank" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-primary-600 hover:bg-surface-2">
+                <Printer className="h-4 w-4" /> {t("cashbook.printVoucher")}
+              </Link>
+              {canCancelCashbookRow(row) && (
+                <CancelFinancialVoucherButton
+                  kind="cashbook"
+                  transactionId={row.id}
+                  code={row.code}
+                  amount={Number(row.amount)}
+                  onCancelled={() => router.refresh()}
+                />
+              )}
+            </div>
           </div>
         </div>
       )}
     />
   );
+}
+
+function canCancelCashbookRow(row: CashbookRow) {
+  if (row.status !== "confirmed") return false;
+  if (row.refType === "manual") return true;
+  return (row.refType === "customer_receivable_receipt" || row.refType === "supplier_payable_receipt") && Boolean(row.refId);
 }
 
 function Category({ row }: { row: CashbookRow }) {

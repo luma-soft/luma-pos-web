@@ -1246,6 +1246,9 @@ export const customerReceivableReceipts = pgTable("customer_receivable_receipts"
   reference: text("reference"),
   note: text("note"),
   clientRequestId: varchar("client_request_id", { length: 80 }).notNull(),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  cancelledBy: uuid("cancelled_by").references(() => profiles.id),
+  cancellationReason: text("cancellation_reason"),
   createdBy: uuid("created_by").references(() => profiles.id),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
@@ -1379,6 +1382,9 @@ export const supplierPayableReceipts = pgTable("supplier_payable_receipts", {
   reference: text("reference"),
   note: text("note"),
   clientRequestId: varchar("client_request_id", { length: 80 }).notNull(),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  cancelledBy: uuid("cancelled_by").references(() => profiles.id),
+  cancellationReason: text("cancellation_reason"),
   createdBy: uuid("created_by").references(() => profiles.id),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -1625,12 +1631,18 @@ export const cashTransactions = pgTable("cash_transactions", {
   refType: text("ref_type"),
   refId: uuid("ref_id"),
   note: text("note"),
+  status: text("status").notNull().default("confirmed"),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  cancelledBy: uuid("cancelled_by").references(() => profiles.id),
+  cancellationReason: text("cancellation_reason"),
   createdBy: uuid("created_by").references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   uniqueIndex("cash_transactions_store_code_unique").on(t.storeId, t.code),
   index("cash_tx_created_idx").on(t.createdAt),
   index("cash_tx_shift_idx").on(t.shiftId),
+  index("cash_tx_status_created_idx").on(t.status, t.createdAt),
+  check("cash_transactions_status_check", sql`${t.status} in ('confirmed', 'cancelled')`),
 ]);
 
 // ============= Công trình / dự án =============

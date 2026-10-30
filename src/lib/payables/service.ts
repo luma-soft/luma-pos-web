@@ -4,13 +4,17 @@ import { getProfileId } from "@/lib/actions/common";
 import { getCurrentShift } from "@/lib/data/shifts";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
 import {
+  cancelSupplierPayableReceipt as cancelReceiptCore,
   createSupplierPayableEntry as createEntryCore,
   paySupplierPayable as payCore,
+  type CancelSupplierPayableInput,
   type PaySupplierInput,
   type SupplierPayableEntryInput,
 } from "@/lib/payables/service-core";
 import { Routes } from "@/lib/routes";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
+import { supplierPayableAllocations } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 async function actorForUser(userId: string, source: "manual" | "mobile") {
   const context = await resolveStoreContextForUser(userId);
@@ -34,6 +38,27 @@ export async function paySupplierPayableForUser(
     for (const allocation of input.allocations) {
       revalidatePath(Routes.purchase(allocation.purchaseOrderId));
     }
+  }
+  return result;
+}
+
+export async function cancelSupplierPayableForUser(
+  userId: string,
+  input: CancelSupplierPayableInput,
+  source: "manual" | "mobile" = "manual",
+) {
+  const result = await cancelReceiptCore(db, input, await actorForUser(userId, source));
+  if (result.ok) {
+    if (result.data.notificationEventId) await publishCommittedNotification(result.data.notificationEventId);
+    revalidatePath(Routes.Suppliers);
+    revalidatePath(Routes.Partners);
+    revalidatePath(Routes.Purchases);
+    revalidatePath(Routes.Cashbook);
+    revalidatePath(Routes.Finance);
+    const allocations = await db.select({ purchaseOrderId: supplierPayableAllocations.purchaseOrderId })
+      .from(supplierPayableAllocations)
+      .where(eq(supplierPayableAllocations.receiptId, input.receiptId));
+    for (const allocation of allocations) revalidatePath(Routes.purchase(allocation.purchaseOrderId));
   }
   return result;
 }

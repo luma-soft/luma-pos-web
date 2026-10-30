@@ -2,6 +2,7 @@ import { requireMobileManager, requireMobileSalesAccess } from "@/lib/mobile/aut
 import { getCustomerReceivableOverview } from "@/lib/data/customer-receivables";
 import { mobileAction, mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 import {
+  cancelCustomerReceivableForUser,
   collectCustomerReceivableForUser,
   createCustomerReceivableEntryForUser,
 } from "@/lib/receivables/service";
@@ -47,6 +48,15 @@ export async function POST(
       ...payload,
       customerId,
     } as ReceivableEntryInput));
+  }
+  if (action === "cancel") {
+    const gate = await requireMobileManager();
+    if (!gate.ok) return mobileGate(gate)!;
+    return mobileAction(await cancelCustomerReceivableForUser(gate.userId, {
+      receiptId: typeof payload.receiptId === "string" ? payload.receiptId : "",
+      customerId,
+      reason: typeof payload.reason === "string" ? payload.reason : "",
+    }));
   }
   return mobileAction({ ok: false, error: "errors.invalidData" });
 }

@@ -9,6 +9,7 @@ import {
   readJson,
 } from "@/lib/mobile/response";
 import {
+  cancelSupplierPayableForUser,
   createSupplierPayableEntryForUser,
   paySupplierPayableForUser,
 } from "@/lib/payables/service";
@@ -53,6 +54,17 @@ export async function POST(
     return mobileAction(await createSupplierPayableEntryForUser(
       gate.userId,
       { ...payload, supplierId } as SupplierPayableEntryInput,
+      "mobile",
+    ));
+  }
+  if (payload.action === "cancel") {
+    return mobileAction(await cancelSupplierPayableForUser(
+      gate.userId,
+      {
+        receiptId: typeof payload.receiptId === "string" ? payload.receiptId : "",
+        supplierId,
+        reason: typeof payload.reason === "string" ? payload.reason : "",
+      },
       "mobile",
     ));
   }

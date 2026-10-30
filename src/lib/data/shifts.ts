@@ -44,7 +44,7 @@ export async function getShiftSummary(shift: Shift | null) {
         total: sql<string>`coalesce(sum(${payments.amount}), 0)`,
       })
       .from(payments)
-      .where(and(eq(payments.storeId, shift.storeId), eq(payments.shiftId, shift.id), notInArray(payments.status, ["pending", "expired"])))
+      .where(and(eq(payments.storeId, shift.storeId), eq(payments.shiftId, shift.id), notInArray(payments.status, ["pending", "expired", "cancelled"])))
       .groupBy(payments.method),
     db
       .select({
@@ -57,7 +57,7 @@ export async function getShiftSummary(shift: Shift | null) {
       .select({
         cashIn: sql<string>`coalesce(sum(${cashTransactions.amount}) filter (where ${cashTransactions.type} = 'in' and ${cashTransactions.fund} = 'cash'), 0)`,
         cashOut: sql<string>`coalesce(sum(${cashTransactions.amount}) filter (where ${cashTransactions.type} = 'out' and ${cashTransactions.fund} = 'cash'), 0)`,
-        refundTotal: sql<string>`coalesce(sum(${cashTransactions.amount}) filter (where ${cashTransactions.category} = 'refund'), 0)`,
+        refundTotal: sql<string>`coalesce(sum(${cashTransactions.amount}) filter (where ${cashTransactions.category} = 'refund' and ${cashTransactions.status} = 'confirmed'), 0)`,
       })
       .from(cashTransactions)
       .where(and(eq(cashTransactions.storeId, shift.storeId), eq(cashTransactions.shiftId, shift.id))),

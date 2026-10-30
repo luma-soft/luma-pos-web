@@ -120,7 +120,7 @@ export function matchesPartnerDebtFilter(
 
 function matchesKind(kind: string, selected: PartnerDebtKind) {
   if (selected === "all") return true;
-  if (selected === "payment") return kind === "payment";
+  if (selected === "payment") return kind === "payment" || kind === "payment_cancellation";
   if (selected === "adjustment") return kind === "adjustment" || kind === "discount";
   return kind === "sale" || kind === "purchase" || kind === "return";
 }

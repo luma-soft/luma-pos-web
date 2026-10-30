@@ -47,6 +47,7 @@ import { OrderStatusBadge } from "../../orders/status-badges";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { CustomerReceivableActions } from "@/components/partners/customer-receivable-actions";
+import { CancelFinancialVoucherButton } from "@/components/partners/cancel-financial-voucher-button";
 import {
   DEFAULT_PARTNER_DEBT_FILTER,
   PartnerDebtFilterControl,
@@ -698,6 +699,7 @@ function CustomerSalesPanel({
 
 function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
   const t = useTranslations();
+  const router = useRouter();
   const [filter, setFilter] = useState(DEFAULT_PARTNER_DEBT_FILTER);
   const rows = useMemo(
     () =>
@@ -727,17 +729,35 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
                 className="space-y-2 border border-border-soft p-3 first:rounded-t-card last:rounded-b-card"
               >
                 <div className="flex items-start justify-between gap-3">
-                  {row.orderId ? (
-                    <OrderDetailLink
-                      orderId={row.orderId}
-                      className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                    >
-                      {row.code}
-                    </OrderDetailLink>
-                  ) : (
-                    <span className="font-semibold text-primary-600">
-                      {row.code}
-                    </span>
+                  <div className="min-w-0">
+                    {row.orderId ? (
+                      <OrderDetailLink
+                        orderId={row.orderId}
+                        className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                      >
+                        {row.code}
+                      </OrderDetailLink>
+                    ) : (
+                      <span className="font-semibold text-primary-600">{row.code}</span>
+                    )}
+                    {row.receiptStatus === "cancelled" && (
+                      <span className="ml-2 inline-flex rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-semibold text-warn">
+                        {t("financialVoucherCancellation.cancelled")}
+                      </span>
+                    )}
+                    {row.cancellationReason && (
+                      <p className="mt-1 text-xs text-slate-500">{t("financialVoucherCancellation.reasonLabel")}: {row.cancellationReason}</p>
+                    )}
+                  </div>
+                  {row.kind === "payment" && row.receiptId && row.receiptStatus === "confirmed" && (
+                    <CancelFinancialVoucherButton
+                      kind="customer"
+                      receiptId={row.receiptId}
+                      partyId={customer.id}
+                      code={row.code}
+                      amount={Math.abs(row.value)}
+                      onCancelled={() => router.refresh()}
+                    />
                   )}
                   <span
                     className={cn(
@@ -794,15 +814,34 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
                 {rows.map((row) => (
                   <tr key={`${row.kind}-${row.id}`}>
                     <td className="px-3 py-3 font-semibold">
-                      {row.orderId ? (
-                        <OrderDetailLink
-                          orderId={row.orderId}
-                          className="text-primary-600 hover:underline"
-                        >
-                          {row.code}
-                        </OrderDetailLink>
-                      ) : (
-                        <span className="text-primary-600">{row.code}</span>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="min-w-0">
+                          {row.orderId ? (
+                            <OrderDetailLink orderId={row.orderId} className="text-primary-600 hover:underline">
+                              {row.code}
+                            </OrderDetailLink>
+                          ) : (
+                            <span className="text-primary-600">{row.code}</span>
+                          )}
+                        </span>
+                        {row.receiptStatus === "cancelled" && (
+                          <span className="shrink-0 rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-semibold text-warn">
+                            {t("financialVoucherCancellation.cancelled")}
+                          </span>
+                        )}
+                      </div>
+                      {row.cancellationReason && <div className="mt-1 text-xs font-normal text-slate-500">{t("financialVoucherCancellation.reasonLabel")}: {row.cancellationReason}</div>}
+                      {row.kind === "payment" && row.receiptId && row.receiptStatus === "confirmed" && (
+                        <div className="mt-1">
+                          <CancelFinancialVoucherButton
+                            kind="customer"
+                            receiptId={row.receiptId}
+                            partyId={customer.id}
+                            code={row.code}
+                            amount={Math.abs(row.value)}
+                            onCancelled={() => router.refresh()}
+                          />
+                        </div>
                       )}
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">
