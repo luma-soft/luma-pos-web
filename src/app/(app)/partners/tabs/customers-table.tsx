@@ -214,6 +214,15 @@ function CustomerRows({
       });
     }
   }
+  function openCustomer(customer: CustomerRow) {
+    setSelectedCustomerId(customer.id);
+    setDetailTab("info");
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("tab", "customers");
+    next.set("detailCustomerId", customer.id);
+    next.delete("detailSupplierId");
+    router.push(`${Routes.Partners}?${next.toString()}`, { scroll: false });
+  }
   const columns: DataTableColumn<CustomerRow>[] = [
     {
       key: "select",
@@ -304,6 +313,8 @@ function CustomerRows({
         rows={data.rows}
         columns={columns}
         getRowId={(customer) => customer.id}
+        onRowClick={openCustomer}
+        rowClickMode="row"
         minWidth="980px"
         empty={
           <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">

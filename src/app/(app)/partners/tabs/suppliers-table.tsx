@@ -177,6 +177,15 @@ export function SuppliersTable({
     router.replace(`${Routes.Partners}?${next.toString()}`, { scroll: false });
     setFilterOpen(false);
   }
+  function openSupplier(row: SupplierRow) {
+    setSelectedSupplierId(row.id);
+    setDetailTab("info");
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("tab", "suppliers");
+    next.set("detailSupplierId", row.id);
+    next.delete("detailCustomerId");
+    router.push(`${Routes.Partners}?${next.toString()}`, { scroll: false });
+  }
   const columns: DataTableColumn<SupplierRow>[] = [
     {
       key: "name",
@@ -287,6 +296,8 @@ export function SuppliersTable({
         rows={rows}
         columns={columns}
         getRowId={(row) => row.id}
+        onRowClick={openSupplier}
+        rowClickMode="row"
         minWidth="1040px"
         summaryCells={[
           { key: "totalPurchase", content: formatCurrency(totalPurchase) },
