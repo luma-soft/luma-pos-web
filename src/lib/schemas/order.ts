@@ -107,6 +107,11 @@ export const addPaymentSchema = z.object({
   orderId: z.uuid(),
   amount: z.number().positive(),
   method: z.enum(["cash", "bank_transfer", "card"]),
+  bankAccountId: z.uuid().nullable().optional(),
+  occurredAt: z.preprocess(
+    (value) => value === "" || value === null ? undefined : value,
+    z.coerce.date().optional(),
+  ),
   clientRequestId: z.string().trim().min(8).max(80).optional(),
   reference: z.string().trim().optional(),
   note: z.string().optional(),

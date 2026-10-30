@@ -3,6 +3,7 @@ import { getOrder } from "@/lib/data/orders";
 import { db } from "@/db";
 import { einvoices } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { getEnabledPaymentBankAccounts } from "@/lib/data/payment-bank-accounts";
 import { updateOrderForUser } from "@/lib/orders/edit";
 import { requireMobileManager, requireMobileSalesAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
@@ -18,28 +19,33 @@ export async function GET(
   const { id } = await params;
   const order = await getOrder(gate.storeId, id);
   if (!order) return mobileError("errors.notFound", 404);
-  const [eInvoice] = await db
-    .select({
-      id: einvoices.id,
-      status: einvoices.status,
-      number: einvoices.number,
-      serial: einvoices.serial,
-      provider: einvoices.provider,
-      providerReference: einvoices.providerReference,
-      requestId: einvoices.requestId,
-      attemptCount: einvoices.attemptCount,
-      lastAttemptAt: einvoices.lastAttemptAt,
-      nextAttemptAt: einvoices.nextAttemptAt,
-      lastError: einvoices.lastError,
-      issuedAt: einvoices.issuedAt,
-    })
-    .from(einvoices)
-    .where(and(eq(einvoices.storeId, gate.storeId), eq(einvoices.orderId, id)))
-    .limit(1);
+  const [eInvoiceRows, bankAccounts] = await Promise.all([
+    db
+      .select({
+        id: einvoices.id,
+        status: einvoices.status,
+        number: einvoices.number,
+        serial: einvoices.serial,
+        provider: einvoices.provider,
+        providerReference: einvoices.providerReference,
+        requestId: einvoices.requestId,
+        attemptCount: einvoices.attemptCount,
+        lastAttemptAt: einvoices.lastAttemptAt,
+        nextAttemptAt: einvoices.nextAttemptAt,
+        lastError: einvoices.lastError,
+        issuedAt: einvoices.issuedAt,
+      })
+      .from(einvoices)
+      .where(and(eq(einvoices.storeId, gate.storeId), eq(einvoices.orderId, id)))
+      .limit(1),
+    getEnabledPaymentBankAccounts(gate.storeId),
+  ]);
+  const eInvoice = eInvoiceRows[0];
   return mobileOk({
     ...order,
     items: order.items.map((item) => ({ ...item, productName: productLineDisplayName(item) })),
     eInvoice: eInvoice ?? null,
+    bankAccounts,
     lifecycle: {
       hasReturns: order.returns.length > 0,
       hasEInvoice: eInvoice?.status === "issued",

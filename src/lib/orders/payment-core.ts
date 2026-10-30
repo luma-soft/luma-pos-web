@@ -1,5 +1,5 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { customers, orders, payments } from "@/db/schema";
+import { customers, orders, paymentBankAccounts, payments } from "@/db/schema";
 import { recordCashTx, fundForMethod } from "@/lib/cash";
 import { addPaymentSchema, type AddPaymentInput } from "@/lib/schemas/order";
 import {
@@ -44,6 +44,7 @@ export async function addManualPaymentCore(
             orderId: payments.orderId,
             amount: payments.amount,
             method: payments.method,
+            bankAccountId: payments.bankAccountId,
           })
           .from(payments)
           .where(
@@ -58,7 +59,8 @@ export async function addManualPaymentCore(
           if (
             existing.orderId !== order.id ||
             existing.method !== value.method ||
-            Math.abs(Number(existing.amount) - value.amount) > 1e-9
+            Math.abs(Number(existing.amount) - value.amount) > 1e-9 ||
+            (value.bankAccountId !== undefined && existing.bankAccountId !== value.bankAccountId)
           ) {
             throw new Error("IDEMPOTENCY_CONFLICT");
           }
@@ -74,10 +76,36 @@ export async function addManualPaymentCore(
         throw new Error("AMOUNT_EXCEEDS_REMAINING");
       }
 
+      if (value.bankAccountId && value.method !== "bank_transfer") {
+        throw new Error("BANK_ACCOUNT_METHOD_MISMATCH");
+      }
+      let bankAccount: { id: string; accountNumber: string } | null = null;
+      if (value.bankAccountId) {
+        const [selectedAccount] = await tx
+          .select({
+            id: paymentBankAccounts.id,
+            accountNumber: paymentBankAccounts.accountNumber,
+          })
+          .from(paymentBankAccounts)
+          .where(and(
+            eq(paymentBankAccounts.storeId, actor.storeId),
+            eq(paymentBankAccounts.id, value.bankAccountId),
+            eq(paymentBankAccounts.enabled, true),
+          ))
+          .limit(1)
+          .for("update");
+        if (!selectedAccount) throw new Error("BANK_ACCOUNT_NOT_FOUND");
+        bankAccount = selectedAccount;
+      }
+      const occurredAt = value.occurredAt ?? new Date();
+
       const [payment] = await tx.insert(payments).values({
         storeId: actor.storeId,
         orderId: order.id,
         shiftId: actor.shiftId,
+        bankAccountId: bankAccount?.id ?? null,
+        accountNumber: bankAccount?.accountNumber ?? null,
+        confirmedAt: occurredAt,
         amount: value.amount.toFixed(2),
         method: value.method,
         status: "manual_confirmed",
@@ -85,6 +113,7 @@ export async function addManualPaymentCore(
         reference: value.reference?.trim() || null,
         note: value.note?.trim() || null,
         createdBy: actor.profileId,
+        createdAt: occurredAt,
       }).returning({ id: payments.id });
       await recordCashTx(tx, {
         storeId: actor.storeId,
@@ -97,6 +126,7 @@ export async function addManualPaymentCore(
         note: `Thu nợ ${order.code}`,
         createdBy: actor.profileId,
         shiftId: actor.shiftId,
+        createdAt: occurredAt,
       });
 
       const newPaid = alreadyPaid + value.amount;
@@ -159,6 +189,9 @@ export async function addManualPaymentCore(
         before: { code: order.code, amountPaid: alreadyPaid, paymentStatus: order.paymentStatus },
         after: {
           code: order.code, total, amount: value.amount, amountPaid: newPaid, method: value.method,
+          occurredAt,
+          bankAccountId: bankAccount?.id ?? null,
+          accountNumber: bankAccount?.accountNumber ?? null,
           paymentStatus: newPaid >= total - 1e-9 ? "paid" : "partial", note: value.note?.trim() || null,
         },
         affectedRecords: [{ type: "order", id: order.id, code: order.code }, { type: "payment", id: payment.id }],
@@ -188,6 +221,8 @@ export async function addManualPaymentCore(
       NOTHING_TO_PAY: "orders.errors.nothingToPay",
       AMOUNT_EXCEEDS_REMAINING: "orders.errors.amountExceedsRemaining",
       IDEMPOTENCY_CONFLICT: "payments.errors.referenceConflict",
+      BANK_ACCOUNT_NOT_FOUND: "errors.invalidData",
+      BANK_ACCOUNT_METHOD_MISMATCH: "errors.invalidData",
     };
     return { ok: false, error: known[message] ?? "errors.serverError" };
   }

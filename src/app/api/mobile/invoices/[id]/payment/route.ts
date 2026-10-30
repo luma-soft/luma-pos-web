@@ -21,6 +21,9 @@ export async function POST(
   ) {
     return mobileAction({ ok: false, error: "errors.invalidData" });
   }
+  if (payload.method === "bank_transfer" && typeof payload.bankAccountId !== "string") {
+    return mobileAction({ ok: false, error: "errors.invalidData" });
+  }
 
   return mobileAction(
     await addPaymentForUser(gate.userId, {

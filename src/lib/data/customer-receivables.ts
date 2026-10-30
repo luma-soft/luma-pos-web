@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { customerReceivableEntries, customerReceivableReceipts, customers, orders, paymentBankAccounts } from "@/db/schema";
+import { customerReceivableEntries, customerReceivableReceipts, customers, orders } from "@/db/schema";
+import { getEnabledPaymentBankAccounts } from "@/lib/data/payment-bank-accounts";
 
 export async function getCustomerReceivableOverview(storeId: string, customerId: string) {
   const [customer] = await db.select({ id: customers.id, currentDebt: customers.currentDebt })
@@ -30,16 +31,7 @@ export async function getCustomerReceivableOverview(storeId: string, customerId:
       createdAt: customerReceivableReceipts.createdAt,
     }).from(customerReceivableReceipts).where(and(eq(customerReceivableReceipts.storeId, storeId), eq(customerReceivableReceipts.customerId, customerId)))
       .orderBy(desc(customerReceivableReceipts.createdAt)).limit(50),
-    db.select({
-      id: paymentBankAccounts.id,
-      bankCode: paymentBankAccounts.bankCode,
-      accountNumber: paymentBankAccounts.accountNumber,
-      accountName: paymentBankAccounts.accountName,
-      isDefault: paymentBankAccounts.isDefault,
-    }).from(paymentBankAccounts).where(and(
-      eq(paymentBankAccounts.storeId, storeId),
-      eq(paymentBankAccounts.enabled, true),
-    )).orderBy(desc(paymentBankAccounts.isDefault), asc(paymentBankAccounts.createdAt)),
+    getEnabledPaymentBankAccounts(storeId),
   ]);
   return {
     customerId: customer.id,
