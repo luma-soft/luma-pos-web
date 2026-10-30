@@ -72,6 +72,33 @@ function knownError(error: unknown): string {
   return errors[message] ?? "errors.serverError";
 }
 
+function safeDatabaseFailureFields(error: unknown) {
+  let current: unknown = error;
+  const seen = new Set<object>();
+  const fields: Record<string, string> = {};
+
+  for (let depth = 0; depth < 4 && current && typeof current === "object"; depth += 1) {
+    if (seen.has(current)) break;
+    seen.add(current);
+    const candidate = current as Record<string, unknown>;
+    if (!fields.errorType && typeof candidate.name === "string" && /^[A-Za-z0-9_]+$/.test(candidate.name)) {
+      fields.errorType = candidate.name;
+    }
+    if (!fields.sqlState && typeof candidate.code === "string" && /^[0-9A-Z]{5}$/i.test(candidate.code)) {
+      fields.sqlState = candidate.code.toUpperCase();
+    }
+    for (const key of ["constraint", "table", "column"] as const) {
+      const value = candidate[key];
+      if (!fields[key] && typeof value === "string" && /^[A-Za-z0-9_]+$/.test(value)) {
+        fields[key] = value;
+      }
+    }
+    current = candidate.cause;
+  }
+
+  return fields;
+}
+
 /**
  * Collect one customer receipt and allocate it to one or more invoices atomically.
  * The cashbook receives exactly one entry, while each invoice still gets a payment
@@ -100,12 +127,15 @@ export async function collectCustomerReceivable(
     allocationTotal - amount > 1e-9
   ) return { ok: false, error: "errors.invalidData" };
 
+  let phase = "begin_transaction";
   try {
     return await database.transaction(async (tx: DbLike) => {
+      phase = "lock_customer";
       const [customer] = await tx.select({ id: customers.id, code: customers.code, name: customers.name, currentDebt: customers.currentDebt })
         .from(customers).where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId))).limit(1).for("update");
       if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
 
+      phase = "check_idempotency";
       const [existing] = await tx.select({
         id: customerReceivableReceipts.id,
         customerId: customerReceivableReceipts.customerId,
@@ -128,6 +158,7 @@ export async function collectCustomerReceivable(
         return { ok: true as const, data: { receiptId: existing.id, replayed: true } };
       }
 
+      phase = "read_bank_account";
       const [bankAccount] = bankAccountId ? await tx
         .select({ id: paymentBankAccounts.id, accountNumber: paymentBankAccounts.accountNumber })
         .from(paymentBankAccounts)
@@ -141,6 +172,7 @@ export async function collectCustomerReceivable(
 
       // Lock all open invoices, then reconcile their legacy/raw balances to the
       // customer's authoritative net balance before allocating new cash.
+      phase = "lock_open_invoices";
       const invoiceRows = await tx
         .select()
         .from(orders)
@@ -158,6 +190,7 @@ export async function collectCustomerReceivable(
         ))
         .orderBy(asc(orders.createdAt), asc(orders.id))
         .for("update");
+      phase = "reconcile_invoice_balances";
       const effectiveInvoices = await getEffectiveCustomerInvoices(
         tx,
         { storeId: actor.storeId, customerId: input.customerId, currentDebt: Number(customer.currentDebt) },
@@ -199,6 +232,7 @@ export async function collectCustomerReceivable(
         unallocated = money(unallocated - automaticAmount);
       }
 
+      phase = "insert_receipt";
       const [receipt] = await tx.insert(customerReceivableReceipts).values({
         storeId: actor.storeId,
         code: generateCode("PTN"), customerId: input.customerId, amount: amount.toFixed(2),
@@ -212,6 +246,7 @@ export async function collectCustomerReceivable(
         const order = invoices.get(allocation.orderId)!;
         const newPaid = money(Number(order.amountPaid) + allocation.amount);
         const effectivelySettled = money((remainingByOrder.get(order.id) ?? 0) - allocation.amount) <= 0;
+        phase = "insert_invoice_payment";
         const [payment] = await tx.insert(payments).values({
           storeId: actor.storeId,
           orderId: order.id, shiftId: actor.shiftId, amount: allocation.amount.toFixed(2), method: input.method,
@@ -221,6 +256,7 @@ export async function collectCustomerReceivable(
           reference: input.reference?.trim() || null, note: input.note?.trim() || null, createdBy: actor.profileId,
           confirmedAt: occurredAt, createdAt: occurredAt,
         }).returning({ id: payments.id });
+        phase = "update_invoice_payment_state";
         await tx.update(orders).set({
           amountPaid: newPaid.toFixed(2),
           paymentStatus: newPaid >= Number(order.total) - 1e-9 || effectivelySettled ? "paid" : "partial",
@@ -229,8 +265,10 @@ export async function collectCustomerReceivable(
         allocationRows.push({ storeId: actor.storeId, receiptId: receipt.id, orderId: order.id, paymentId: payment.id, amount: allocation.amount.toFixed(2) });
       }
       if (allocationRows.length > 0) {
+        phase = "insert_invoice_allocations";
         await tx.insert(customerReceivableAllocations).values(allocationRows);
       }
+      phase = "record_cash_transaction";
       await recordCashTx(tx, {
         storeId: actor.storeId,
         type: "in", fund: fundForMethod(input.method), amount, category: "debt_collect",
@@ -239,8 +277,10 @@ export async function collectCustomerReceivable(
         createdBy: actor.profileId, shiftId: actor.shiftId,
         createdAt: occurredAt,
       });
+      phase = "update_customer_balance";
       await tx.update(customers).set({ currentDebt: sql`${customers.currentDebt} - ${amount.toFixed(2)}` })
         .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId)));
+      phase = "record_activity";
       await recordActivity(tx, {
         storeId: actor.storeId, actorId: actor.profileId,
         action: "customer.receivable.collected", entityType: "customer_receivable_receipt", entityId: receipt.id,
@@ -251,15 +291,24 @@ export async function collectCustomerReceivable(
           ...allocations.map((allocation) => ({ type: "order", id: allocation.orderId, code: invoices.get(allocation.orderId)!.code })),
         ],
       });
+      phase = "create_debt_notification";
       const notification = await createDebtChangedEventInTx(tx, {
         storeId: actor.storeId,
         entityType: "customer", entityId: input.customerId, operationType: "receivable_collection",
         operationId: receipt.id, delta: -amount, actorId: actor.profileId,
       });
+      phase = "commit_transaction";
       return { ok: true as const, data: { receiptId: receipt.id, replayed: false, ...(notification?.created ? { notificationEventId: notification.eventId } : {}) } };
     });
   } catch (error) {
-    return { ok: false, error: knownError(error) };
+    const mappedError = knownError(error);
+    if (mappedError === "errors.serverError") {
+      console.error("Customer receivable collection failed", {
+        phase,
+        ...safeDatabaseFailureFields(error),
+      });
+    }
+    return { ok: false, error: mappedError };
   }
 }
 
