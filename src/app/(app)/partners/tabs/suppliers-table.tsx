@@ -803,7 +803,7 @@ function SupplierDebtPanel({ rows, supplierId, onChanged }: { rows: SupplierDebt
           ))}
         </div>
         <div className="hidden min-h-0 flex-1 overscroll-contain overflow-auto rounded-card border border-border-soft lg:block">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[920px] text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
                 <th className="px-3 py-3">{t("suppliers.details.debtCols.code")}</th>
@@ -811,6 +811,7 @@ function SupplierDebtPanel({ rows, supplierId, onChanged }: { rows: SupplierDebt
                 <th className="px-3 py-3">{t("suppliers.details.debtCols.type")}</th>
                 <th className="px-3 py-3 text-right">{t("suppliers.details.debtCols.change")}</th>
                 <th className="px-3 py-3 text-right">{t("suppliers.details.debtCols.balance")}</th>
+                <th className="w-[170px] px-3 py-3 text-right">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-soft">
@@ -822,7 +823,6 @@ function SupplierDebtPanel({ rows, supplierId, onChanged }: { rows: SupplierDebt
                       {row.receiptStatus === "cancelled" && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-semibold text-warn">{t("financialVoucherCancellation.cancelled")}</span>}
                     </div>
                     {row.cancellationReason && <div className="mt-1 text-xs font-normal text-slate-500">{t("financialVoucherCancellation.reasonLabel")}: {row.cancellationReason}</div>}
-                    {row.kind === "payment" && row.receiptId && row.receiptStatus === "confirmed" && <div className="mt-1"><CancelFinancialVoucherButton kind="supplier" receiptId={row.receiptId} partyId={supplierId} code={row.code} amount={Math.abs(row.value)} onCancelled={onChanged} /></div>}
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-500">{formatDate(row.createdAt)}</td>
                   <td className="px-3 py-3">{row.typeLabel}{row.reason ? <div className="text-xs text-slate-500">{row.reason}</div> : null}</td>
@@ -830,6 +830,18 @@ function SupplierDebtPanel({ rows, supplierId, onChanged }: { rows: SupplierDebt
                     {row.value > 0 ? "+" : "−"}{formatCurrency(Math.abs(row.value))}
                   </td>
                   <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatCurrency(row.balance)}</td>
+                  <td className="px-3 py-3 text-right align-top">
+                    {row.kind === "payment" && row.receiptId && row.receiptStatus === "confirmed" && (
+                      <CancelFinancialVoucherButton
+                        kind="supplier"
+                        receiptId={row.receiptId}
+                        partyId={supplierId}
+                        code={row.code}
+                        amount={Math.abs(row.value)}
+                        onCancelled={onChanged}
+                      />
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

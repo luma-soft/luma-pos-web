@@ -790,7 +790,7 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
             ))}
           </div>
           <div className="hidden min-h-0 flex-1 overscroll-contain overflow-auto lg:block">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[1060px] text-sm">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
                   <th className="px-3 py-3">
@@ -807,6 +807,9 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
                   </th>
                   <th className="px-3 py-3 text-right">
                     {t("customers.expand.debtCols.balance")}
+                  </th>
+                  <th className="w-[170px] px-3 py-3 text-right">
+                    {t("common.actions")}
                   </th>
                 </tr>
               </thead>
@@ -831,18 +834,6 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
                         )}
                       </div>
                       {row.cancellationReason && <div className="mt-1 text-xs font-normal text-slate-500">{t("financialVoucherCancellation.reasonLabel")}: {row.cancellationReason}</div>}
-                      {row.kind === "payment" && row.receiptId && row.receiptStatus === "confirmed" && (
-                        <div className="mt-1">
-                          <CancelFinancialVoucherButton
-                            kind="customer"
-                            receiptId={row.receiptId}
-                            partyId={customer.id}
-                            code={row.code}
-                            amount={Math.abs(row.value)}
-                            onCancelled={() => router.refresh()}
-                          />
-                        </div>
-                      )}
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">
                       {formatDate(row.createdAt)}
@@ -865,6 +856,18 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
                       )}
                     >
                       {formatCurrency(row.balance)}
+                    </td>
+                    <td className="px-3 py-3 text-right align-top">
+                      {row.kind === "payment" && row.receiptId && row.receiptStatus === "confirmed" && (
+                        <CancelFinancialVoucherButton
+                          kind="customer"
+                          receiptId={row.receiptId}
+                          partyId={customer.id}
+                          code={row.code}
+                          amount={Math.abs(row.value)}
+                          onCancelled={() => router.refresh()}
+                        />
+                      )}
                     </td>
                   </tr>
                 ))}
