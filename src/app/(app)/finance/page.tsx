@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Routes } from "@/lib/routes";
 import { GroupTabs } from "@/components/group-tabs";
 import { Text } from "@/components/ui/text";
+import { SHIFT_MANAGEMENT_UI_ENABLED } from "@/lib/features";
 import { CashbookTab } from "./tabs/cashbook";
 import { ShiftsTab } from "./tabs/shifts";
 
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 const TABS = [
   { tab: "cashbook", labelKey: "nav.cashbook" },
-  { tab: "shifts", labelKey: "nav.shifts" },
+  ...(SHIFT_MANAGEMENT_UI_ENABLED ? [{ tab: "shifts", labelKey: "nav.shifts" }] : []),
 ];
 
 export default async function FinancePage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -25,6 +26,10 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
     redirect(`${Routes.Sales}?${usp.toString()}`);
   }
 
+  if (tab === "shifts" && !SHIFT_MANAGEMENT_UI_ENABLED) {
+    redirect(Routes.Finance);
+  }
+
   return (
     <div className="p-4 sm:p-6">
       <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 bg-surface border-b border-border">
@@ -34,7 +39,9 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         <div className="px-4 sm:px-6 pb-1.5"><GroupTabs base={Routes.Finance} items={TABS} /></div>
       </div>
 
-      {tab === "shifts" ? <ShiftsTab /> : <CashbookTab searchParams={params} />}
+      {tab === "shifts" && SHIFT_MANAGEMENT_UI_ENABLED
+        ? <ShiftsTab />
+        : <CashbookTab searchParams={params} />}
     </div>
   );
 }

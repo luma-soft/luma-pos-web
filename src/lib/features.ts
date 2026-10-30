@@ -11,3 +11,6 @@ export const ONLINE_SALES_ENABLED =
  */
 export const EINVOICE_UI_ENABLED =
   process.env.NEXT_PUBLIC_ENABLE_EINVOICE === "true";
+
+/** Keep shift management hidden while its customer-facing experience is paused. */
+export const SHIFT_MANAGEMENT_UI_ENABLED = false;

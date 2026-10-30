@@ -1,4 +1,5 @@
 import { Routes } from "@/lib/routes";
+import { SHIFT_MANAGEMENT_UI_ENABLED } from "@/lib/features";
 import type { NotificationAction } from "./notification-view-model";
 
 export function notificationHref(action?: NotificationAction) {
@@ -29,7 +30,7 @@ function switchTarget(target?: string, id?: string) {
     case "sales":
       return Routes.Reports;
     case "shift":
-      return "/finance?tab=shifts";
+      return SHIFT_MANAGEMENT_UI_ENABLED ? "/finance?tab=shifts" : Routes.Finance;
     case "paymentReconciliation":
       return "/finance?tab=payments";
     case "services":
