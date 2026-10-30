@@ -36,6 +36,7 @@ const GROUPS: Group[] = [
       { href: Routes.Dashboard, icon: LayoutDashboard, key: "nav.dashboard" },
       { href: Routes.Notifications, icon: Bell, key: "nav.notifications", badge: "notifications" },
       { href: Routes.Reports, icon: BarChart3, key: "nav.reports" },
+      { href: Routes.Finance, icon: Wallet, key: "nav.groups.finance" },
       { href: Routes.POS, icon: ShoppingCart, key: "nav.pos" },
       ...(ONLINE_SALES_ENABLED
         ? [{ href: Routes.OnlineSales, icon: Store, key: "nav.onlineSales" }]
@@ -53,7 +54,6 @@ const GROUPS: Group[] = [
       { href: Routes.CameraQuote, icon: Camera, key: "mobile.more.cameraQuote", newTab: true },
       { href: Routes.HunonicPriceList, icon: Cpu, key: "mobile.more.hunonicPriceList", newTab: true },
       { href: Routes.RangDongSmartPriceList, icon: Lightbulb, key: "mobile.more.rangDongPriceList", newTab: true },
-      { href: Routes.Finance, icon: Wallet, key: "nav.groups.finance" },
       { href: Routes.Accounting, icon: BookOpen, key: "nav.accounting" },
       { href: Routes.TaxDeclarations, icon: FileText, key: "nav.taxDeclarations" },
     ],
