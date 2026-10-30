@@ -9,6 +9,7 @@ import {
   supplierPayableReceipts,
   suppliers,
 } from "@/db/schema";
+import { getEffectiveSupplierInvoices } from "@/lib/payables/document-balances";
 
 export type SupplierPayableLedgerRow = {
   id: string;
@@ -116,6 +117,34 @@ export async function getSupplierPayableOverview(storeId: string, supplierId: st
       ))
       .orderBy(desc(paymentBankAccounts.isDefault), asc(paymentBankAccounts.createdAt)),
   ]);
+  const openPurchases = await database
+    .select({
+      id: purchaseOrders.id,
+      code: purchaseOrders.code,
+      status: purchaseOrders.status,
+      total: purchaseOrders.total,
+      amountPaid: purchaseOrders.amountPaid,
+      createdAt: purchaseOrders.createdAt,
+    })
+    .from(purchaseOrders)
+    .where(and(
+      eq(purchaseOrders.supplierId, supplierId),
+      eq(purchaseOrders.storeId, storeId),
+      sql`${purchaseOrders.status} in ('received', 'returned')`,
+      sql`${purchaseOrders.total} > ${purchaseOrders.amountPaid} or exists (
+        select 1 from ${supplierPayableEntries}
+        where ${supplierPayableEntries.storeId} = ${storeId}
+          and ${supplierPayableEntries.supplierId} = ${supplierId}
+          and ${supplierPayableEntries.purchaseOrderId} = ${purchaseOrders.id}
+          and ${supplierPayableEntries.amount} > 0
+      )`,
+    ))
+    .orderBy(desc(purchaseOrders.createdAt), desc(purchaseOrders.id));
+  const effectiveOpenPurchases = await getEffectiveSupplierInvoices(
+    database,
+    { storeId, supplierId, currentDebt: Number(supplier.currentDebt) },
+    openPurchases,
+  );
   const allocatedPaymentRows = purchases.length === 0 ? [] : await database
     .select({
       purchaseOrderId: supplierPayableAllocations.purchaseOrderId,
@@ -228,16 +257,16 @@ export async function getSupplierPayableOverview(storeId: string, supplierId: st
     currentDebt: Number(supplier.currentDebt),
     bankAccounts,
     lastReconciledAt: ledger[0]?.createdAt ?? null,
-    invoices: purchases
+    invoices: effectiveOpenPurchases
+      .filter((purchase) => purchase.remaining > 0)
       .map((purchase) => ({
         id: purchase.id,
         code: purchase.code,
         createdAt: purchase.createdAt,
         total: Number(purchase.total),
         amountPaid: Number(purchase.amountPaid),
-        remaining: Math.max(0, Number(purchase.total) - Number(purchase.amountPaid)),
-      }))
-      .filter((purchase) => purchase.remaining > 0),
+        remaining: purchase.remaining,
+      })),
     receipts: receipts.map((receipt) => ({ ...receipt, amount: Number(receipt.amount) })),
     entries: entries.map((entry) => ({ ...entry, amount: Number(entry.amount) })),
     ledger,

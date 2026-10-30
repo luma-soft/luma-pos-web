@@ -10,6 +10,7 @@ import {
 } from "@/db/schema";
 import { generateCode } from "@/lib/actions/common";
 import { fundForMethod, recordCashTx } from "@/lib/cash";
+import { getEffectiveCustomerInvoices } from "@/lib/receivables/document-balances";
 import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
 import { recordActivity } from "@/lib/audit/activity-log";
 
@@ -138,9 +139,8 @@ export async function collectCustomerReceivable(
         .limit(1) : [];
       if (input.method === "bank_transfer" && !bankAccount) throw new Error("INVALID_INPUT");
 
-      // Lock every open invoice so omitted allocation details cannot leave the
-      // customer balance and invoice amountPaid fields out of sync. Any excess
-      // after all invoices are paid remains a genuine customer advance.
+      // Lock all open invoices, then reconcile their legacy/raw balances to the
+      // customer's authoritative net balance before allocating new cash.
       const invoiceRows = await tx
         .select()
         .from(orders)
@@ -148,10 +148,22 @@ export async function collectCustomerReceivable(
           eq(orders.storeId, actor.storeId),
           eq(orders.customerId, input.customerId),
           inArray(orders.status, ["completed", "returned"]),
-          sql`${orders.total} > ${orders.amountPaid}`,
+          sql`${orders.total} > ${orders.amountPaid} or exists (
+            select 1 from ${customerReceivableEntries}
+            where ${customerReceivableEntries.storeId} = ${actor.storeId}
+              and ${customerReceivableEntries.customerId} = ${input.customerId}
+              and ${customerReceivableEntries.orderId} = ${orders.id}
+              and ${customerReceivableEntries.amount} > 0
+          )`,
         ))
         .orderBy(asc(orders.createdAt), asc(orders.id))
         .for("update");
+      const effectiveInvoices = await getEffectiveCustomerInvoices(
+        tx,
+        { storeId: actor.storeId, customerId: input.customerId, currentDebt: Number(customer.currentDebt) },
+        invoiceRows,
+      );
+      const remainingByOrder = new Map(effectiveInvoices.map((invoice) => [invoice.id, invoice.remaining]));
       const invoices = new Map<string, typeof orders.$inferSelect>(
         invoiceRows.map((order: typeof orders.$inferSelect) => [order.id, order]),
       );
@@ -160,7 +172,7 @@ export async function collectCustomerReceivable(
         const order = invoices.get(allocation.orderId);
         if (!order || order.customerId !== input.customerId) throw new Error("ORDER_NOT_CUSTOMER");
         if (order.status !== "completed" && order.status !== "returned") throw new Error("ORDER_NOT_PAYABLE");
-        if (allocation.amount > money(Number(order.total) - Number(order.amountPaid)) + 1e-9) {
+        if (allocation.amount > (remainingByOrder.get(order.id) ?? 0) + 1e-9) {
           throw new Error("ALLOCATION_EXCEEDS_REMAINING");
         }
       }
@@ -174,7 +186,7 @@ export async function collectCustomerReceivable(
         if (unallocated <= 0) break;
         const explicit = allocationsByOrder.get(order.id);
         const available = money(
-          Number(order.total) - Number(order.amountPaid) - (explicit?.amount ?? 0),
+          (remainingByOrder.get(order.id) ?? 0) - (explicit?.amount ?? 0),
         );
         const automaticAmount = money(Math.min(unallocated, Math.max(0, available)));
         if (automaticAmount <= 0) continue;
@@ -199,6 +211,7 @@ export async function collectCustomerReceivable(
         const allocation = allocations[index];
         const order = invoices.get(allocation.orderId)!;
         const newPaid = money(Number(order.amountPaid) + allocation.amount);
+        const effectivelySettled = money((remainingByOrder.get(order.id) ?? 0) - allocation.amount) <= 0;
         const [payment] = await tx.insert(payments).values({
           storeId: actor.storeId,
           orderId: order.id, shiftId: actor.shiftId, amount: allocation.amount.toFixed(2), method: input.method,
@@ -209,7 +222,8 @@ export async function collectCustomerReceivable(
           confirmedAt: occurredAt, createdAt: occurredAt,
         }).returning({ id: payments.id });
         await tx.update(orders).set({
-          amountPaid: newPaid.toFixed(2), paymentStatus: newPaid >= Number(order.total) - 1e-9 ? "paid" : "partial",
+          amountPaid: newPaid.toFixed(2),
+          paymentStatus: newPaid >= Number(order.total) - 1e-9 || effectivelySettled ? "paid" : "partial",
           updatedAt: sql`now()`,
         }).where(and(eq(orders.storeId, actor.storeId), eq(orders.id, order.id)));
         allocationRows.push({ storeId: actor.storeId, receiptId: receipt.id, orderId: order.id, paymentId: payment.id, amount: allocation.amount.toFixed(2) });
@@ -292,6 +306,15 @@ export async function createCustomerReceivableEntry(
         if (existing.customerId !== input.customerId || Math.abs(Number(existing.amount) - amount) > 1e-9 ||
           (input.occurredAt != null && existing.createdAt.getTime() !== occurredAt.getTime())) throw new Error("RECEIPT_CONFLICT");
         return { ok: true as const, data: { entryId: existing.id, replayed: true } };
+      }
+      if (input.orderId) {
+        const [order] = await tx.select({ customerId: orders.customerId, status: orders.status })
+          .from(orders)
+          .where(and(eq(orders.storeId, actor.storeId), eq(orders.id, input.orderId)))
+          .limit(1)
+          .for("update");
+        if (!order || order.customerId !== input.customerId) throw new Error("ORDER_NOT_CUSTOMER");
+        if (order.status !== "completed" && order.status !== "returned") throw new Error("ORDER_NOT_PAYABLE");
       }
       const [entry] = await tx.insert(customerReceivableEntries).values({
         storeId: actor.storeId,

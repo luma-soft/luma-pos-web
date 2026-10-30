@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import { generateCode } from "@/lib/actions/common";
 import { fundForMethod, recordCashTx } from "@/lib/cash";
+import { getEffectiveSupplierInvoices } from "@/lib/payables/document-balances";
 import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
 import { recordActivity } from "@/lib/audit/activity-log";
 
@@ -181,12 +182,8 @@ export async function paySupplierPayable(
         throw new Error("DEBT_EXCEEDS_CURRENT");
       }
 
-      // Lock every open receipt for this supplier so any unallocated part of
-      // the payment can be applied deterministically to the newest receipt.
-      // Supplier payments in this flow normally settle the receipt just entered;
-      // older imported balances may already be offset by unlinked returns.
-      // keeps purchase.amountPaid (used by list/detail/print screens) aligned
-      // with the supplier balance even when a client omits allocations.
+      // Lock all open receipts, then reconcile legacy, return and adjustment
+      // balances to the supplier's authoritative net debt before allocation.
       const purchaseRows = await tx
         .select()
         .from(purchaseOrders)
@@ -194,10 +191,22 @@ export async function paySupplierPayable(
           eq(purchaseOrders.storeId, actor.storeId),
           eq(purchaseOrders.supplierId, input.supplierId),
           inArray(purchaseOrders.status, ["received", "returned"]),
-          sql`${purchaseOrders.total} > ${purchaseOrders.amountPaid}`,
+          sql`${purchaseOrders.total} > ${purchaseOrders.amountPaid} or exists (
+            select 1 from ${supplierPayableEntries}
+            where ${supplierPayableEntries.storeId} = ${actor.storeId}
+              and ${supplierPayableEntries.supplierId} = ${input.supplierId}
+              and ${supplierPayableEntries.purchaseOrderId} = ${purchaseOrders.id}
+              and ${supplierPayableEntries.amount} > 0
+          )`,
         ))
         .orderBy(desc(purchaseOrders.createdAt), desc(purchaseOrders.id))
         .for("update");
+      const effectivePurchases = await getEffectiveSupplierInvoices(
+        tx,
+        { storeId: actor.storeId, supplierId: input.supplierId, currentDebt: Number(supplier.currentDebt) },
+        purchaseRows,
+      );
+      const remainingByPurchase = new Map(effectivePurchases.map((purchase) => [purchase.id, purchase.remaining]));
       const purchases = new Map<string, typeof purchaseOrders.$inferSelect>(
         purchaseRows.map((purchase: typeof purchaseOrders.$inferSelect) => [purchase.id, purchase]),
       );
@@ -210,7 +219,7 @@ export async function paySupplierPayable(
         if (!["received", "returned"].includes(purchase.status)) {
           throw new Error("PURCHASE_NOT_PAYABLE");
         }
-        const remaining = money(Number(purchase.total) - Number(purchase.amountPaid));
+        const remaining = remainingByPurchase.get(purchase.id) ?? 0;
         if (allocation.amount > remaining + 1e-9) {
           throw new Error("ALLOCATION_EXCEEDS_REMAINING");
         }
@@ -225,7 +234,7 @@ export async function paySupplierPayable(
         if (unallocated <= 0) break;
         const explicit = allocationsByPurchase.get(purchase.id);
         const available = money(
-          Number(purchase.total) - Number(purchase.amountPaid) - (explicit?.amount ?? 0),
+          (remainingByPurchase.get(purchase.id) ?? 0) - (explicit?.amount ?? 0),
         );
         const automaticAmount = money(Math.min(unallocated, Math.max(0, available)));
         if (automaticAmount <= 0) continue;
@@ -412,13 +421,16 @@ export async function createSupplierPayableEntry(
       }
       if (input.purchaseOrderId) {
         const [purchase] = await tx
-          .select({ supplierId: purchaseOrders.supplierId })
+          .select({ supplierId: purchaseOrders.supplierId, status: purchaseOrders.status })
           .from(purchaseOrders)
           .where(and(eq(purchaseOrders.storeId, actor.storeId), eq(purchaseOrders.id, input.purchaseOrderId)))
           .limit(1)
           .for("update");
         if (!purchase || purchase.supplierId !== input.supplierId) {
           throw new Error("PURCHASE_NOT_SUPPLIER");
+        }
+        if (purchase.status !== "received" && purchase.status !== "returned") {
+          throw new Error("PURCHASE_NOT_PAYABLE");
         }
       }
 
