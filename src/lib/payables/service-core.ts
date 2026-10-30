@@ -5,6 +5,7 @@ import {
   supplierPayableEntries,
   supplierPayableReceipts,
   suppliers,
+  paymentBankAccounts,
 } from "@/db/schema";
 import { generateCode } from "@/lib/actions/common";
 import { fundForMethod, recordCashTx } from "@/lib/cash";
@@ -34,6 +35,8 @@ export type PaySupplierInput = {
   method: SupplierPaymentMethod;
   allocations: SupplierPayableAllocationInput[];
   clientRequestId: string;
+  bankAccountId?: string | null;
+  occurredAt?: string;
   reference?: string;
   note?: string;
 };
@@ -46,6 +49,7 @@ export type SupplierPayableEntryInput = {
   targetDebt?: number;
   reason?: string;
   clientRequestId: string;
+  occurredAt?: string;
   reference?: string;
   note?: string;
 };
@@ -89,9 +93,15 @@ export async function paySupplierPayable(
   }));
   const allocationTotal = money(requestedAllocations.reduce((sum, row) => sum + row.amount, 0));
   const ids = requestedAllocations.map((row) => row.purchaseOrderId);
+  const rawBankAccountId = typeof input.bankAccountId === "string" ? input.bankAccountId.trim() : "";
+  const bankAccountId = input.method === "bank_transfer" ? rawBankAccountId || null : null;
+  const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
   if (
     !input.supplierId || !validRequestId(input.clientRequestId) || amount <= 0 ||
     !["cash", "bank_transfer"].includes(input.method) ||
+    !Number.isFinite(occurredAt.getTime()) ||
+    (input.method === "bank_transfer" && !bankAccountId) ||
+    (input.method === "cash" && rawBankAccountId.length > 0) ||
     new Set(ids).size !== ids.length ||
     requestedAllocations.some((row) => !row.purchaseOrderId || row.amount <= 0) ||
     allocationTotal - amount > 1e-9
@@ -109,12 +119,27 @@ export async function paySupplierPayable(
         .for("update");
       if (!supplier) throw new Error("SUPPLIER_NOT_FOUND");
 
+      if (bankAccountId) {
+        const [bankAccount] = await tx
+          .select({ id: paymentBankAccounts.id })
+          .from(paymentBankAccounts)
+          .where(and(
+            eq(paymentBankAccounts.storeId, actor.storeId),
+            eq(paymentBankAccounts.id, bankAccountId),
+            eq(paymentBankAccounts.enabled, true),
+          ))
+          .limit(1);
+        if (!bankAccount) throw new Error("INVALID_INPUT");
+      }
+
       const [existing] = await tx
         .select({
           id: supplierPayableReceipts.id,
           supplierId: supplierPayableReceipts.supplierId,
           amount: supplierPayableReceipts.amount,
           method: supplierPayableReceipts.method,
+          bankAccountId: supplierPayableReceipts.bankAccountId,
+          createdAt: supplierPayableReceipts.createdAt,
           reference: supplierPayableReceipts.reference,
           note: supplierPayableReceipts.note,
         })
@@ -143,6 +168,8 @@ export async function paySupplierPayable(
           existing.supplierId !== input.supplierId ||
           Math.abs(Number(existing.amount) - amount) > 1e-9 ||
           existing.method !== input.method ||
+          existing.bankAccountId !== bankAccountId ||
+          (input.occurredAt != null && existing.createdAt.getTime() !== occurredAt.getTime()) ||
           existing.reference !== (input.reference?.trim() || null) ||
           existing.note !== (input.note?.trim() || null) ||
           !allocationMatches
@@ -219,11 +246,13 @@ export async function paySupplierPayable(
           supplierId: input.supplierId,
           amount: amount.toFixed(2),
           method: input.method,
+          bankAccountId,
           reference: input.reference?.trim() || null,
           note: input.note?.trim() || null,
           clientRequestId: input.clientRequestId.trim(),
           createdBy: actor.profileId,
-          confirmedAt: new Date(),
+          confirmedAt: occurredAt,
+          createdAt: occurredAt,
         })
         .returning({ id: supplierPayableReceipts.id, code: supplierPayableReceipts.code });
 
@@ -256,6 +285,7 @@ export async function paySupplierPayable(
         note: `Thanh toán nhà cung cấp ${input.reference?.trim() || receipt.id}`,
         createdBy: actor.profileId,
         shiftId: actor.shiftId,
+        createdAt: occurredAt,
       });
       await tx
         .update(suppliers)
@@ -287,6 +317,8 @@ export async function paySupplierPayable(
         ],
         metadata: {
           clientRequestId: input.clientRequestId.trim(),
+          bankAccountId,
+          occurredAt: occurredAt.toISOString(),
           reference: input.reference?.trim() || null,
           note: input.note?.trim() || null,
         },
@@ -323,8 +355,10 @@ export async function createSupplierPayableEntry(
   const requestedAmount = input.amount == null ? Number.NaN : money(input.amount);
   const targetDebt = input.targetDebt == null ? null : money(input.targetDebt);
   const reason = input.reason?.trim() ?? "";
+  const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
   if (
     !input.supplierId || !validRequestId(input.clientRequestId) ||
+    !Number.isFinite(occurredAt.getTime()) ||
     (targetDebt == null && (!Number.isFinite(requestedAmount) || requestedAmount === 0)) ||
     (targetDebt != null && !Number.isFinite(targetDebt))
   ) return { ok: false, error: "errors.invalidData" };
@@ -352,6 +386,7 @@ export async function createSupplierPayableEntry(
           purchaseOrderId: supplierPayableEntries.purchaseOrderId,
           reference: supplierPayableEntries.reference,
           note: supplierPayableEntries.note,
+          createdAt: supplierPayableEntries.createdAt,
         })
         .from(supplierPayableEntries)
         .where(and(eq(supplierPayableEntries.storeId, actor.storeId), eq(supplierPayableEntries.clientRequestId, input.clientRequestId.trim())))
@@ -364,7 +399,8 @@ export async function createSupplierPayableEntry(
           existing.reason !== reason ||
           existing.purchaseOrderId !== (input.purchaseOrderId || null) ||
           existing.reference !== (input.reference?.trim() || null) ||
-          existing.note !== (input.note?.trim() || null)
+          existing.note !== (input.note?.trim() || null) ||
+          (input.occurredAt != null && existing.createdAt.getTime() !== occurredAt.getTime())
         ) throw new Error("PAYMENT_CONFLICT");
         return { ok: true as const, data: { entryId: existing.id, replayed: true } };
       }
@@ -402,6 +438,7 @@ export async function createSupplierPayableEntry(
           clientRequestId: input.clientRequestId.trim(),
           createdBy: actor.profileId,
           approvedBy: actor.profileId,
+          createdAt: occurredAt,
         })
         .returning({ id: supplierPayableEntries.id, code: supplierPayableEntries.code });
       await tx
@@ -433,6 +470,7 @@ export async function createSupplierPayableEntry(
         ],
         metadata: {
           clientRequestId: input.clientRequestId.trim(),
+          occurredAt: occurredAt.toISOString(),
           reference: input.reference?.trim() || null,
           note: input.note?.trim() || null,
         },

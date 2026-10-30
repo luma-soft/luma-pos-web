@@ -6,6 +6,7 @@ import {
   customers,
   orders,
   payments,
+  paymentBankAccounts,
 } from "@/db/schema";
 import { generateCode } from "@/lib/actions/common";
 import { fundForMethod, recordCashTx } from "@/lib/cash";
@@ -17,13 +18,15 @@ import { recordActivity } from "@/lib/audit/activity-log";
 type DbLike = any;
 
 type Actor = { storeId: string; profileId: string | null; shiftId: string | null };
-type PaymentMethod = "cash" | "bank_transfer" | "card";
+type PaymentMethod = "cash" | "bank_transfer";
 
 export type ReceivableAllocationInput = { orderId: string; amount: number };
 export type CollectReceivableInput = {
   customerId: string;
   amount: number;
   method: PaymentMethod;
+  bankAccountId?: string | null;
+  occurredAt?: string;
   allocations: ReceivableAllocationInput[];
   clientRequestId: string;
   reference?: string;
@@ -38,6 +41,7 @@ export type ReceivableEntryInput = {
   targetDebt?: number;
   type: "adjustment_debit" | "adjustment_credit" | "settlement_discount";
   reason?: string;
+  occurredAt?: string;
   clientRequestId: string;
   reference?: string;
   note?: string;
@@ -81,9 +85,15 @@ export async function collectCustomerReceivable(
   const requestedAllocations = input.allocations.map((row) => ({ ...row, amount: money(row.amount) }));
   const allocationTotal = money(requestedAllocations.reduce((sum, row) => sum + row.amount, 0));
   const ids = requestedAllocations.map((row) => row.orderId);
+  const rawBankAccountId = typeof input.bankAccountId === "string" ? input.bankAccountId.trim() : "";
+  const bankAccountId = input.method === "bank_transfer" ? rawBankAccountId || null : null;
+  const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
   if (
     !input.customerId || !validRequestId(input.clientRequestId) || amount <= 0 ||
-    !["cash", "bank_transfer", "card"].includes(input.method) ||
+    !["cash", "bank_transfer"].includes(input.method) ||
+    !Number.isFinite(occurredAt.getTime()) ||
+    (input.method === "bank_transfer" && !bankAccountId) ||
+    (input.method === "cash" && rawBankAccountId.length > 0) ||
     new Set(ids).size !== ids.length ||
     requestedAllocations.some((row) => !row.orderId || row.amount <= 0) ||
     allocationTotal - amount > 1e-9
@@ -95,14 +105,38 @@ export async function collectCustomerReceivable(
         .from(customers).where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId))).limit(1).for("update");
       if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
 
-      const [existing] = await tx.select({ id: customerReceivableReceipts.id, customerId: customerReceivableReceipts.customerId, amount: customerReceivableReceipts.amount })
+      const [existing] = await tx.select({
+        id: customerReceivableReceipts.id,
+        customerId: customerReceivableReceipts.customerId,
+        amount: customerReceivableReceipts.amount,
+        method: customerReceivableReceipts.method,
+        bankAccountId: customerReceivableReceipts.bankAccountId,
+        createdAt: customerReceivableReceipts.createdAt,
+      })
         .from(customerReceivableReceipts)
         .where(and(eq(customerReceivableReceipts.storeId, actor.storeId), eq(customerReceivableReceipts.clientRequestId, input.clientRequestId.trim())))
         .limit(1).for("update");
       if (existing) {
-        if (existing.customerId !== input.customerId || Math.abs(Number(existing.amount) - amount) > 1e-9) throw new Error("RECEIPT_CONFLICT");
+        if (
+          existing.customerId !== input.customerId ||
+          Math.abs(Number(existing.amount) - amount) > 1e-9 ||
+          existing.method !== input.method ||
+          existing.bankAccountId !== bankAccountId ||
+          (input.occurredAt != null && existing.createdAt.getTime() !== occurredAt.getTime())
+        ) throw new Error("RECEIPT_CONFLICT");
         return { ok: true as const, data: { receiptId: existing.id, replayed: true } };
       }
+
+      const [bankAccount] = bankAccountId ? await tx
+        .select({ id: paymentBankAccounts.id, accountNumber: paymentBankAccounts.accountNumber })
+        .from(paymentBankAccounts)
+        .where(and(
+          eq(paymentBankAccounts.storeId, actor.storeId),
+          eq(paymentBankAccounts.id, bankAccountId),
+          eq(paymentBankAccounts.enabled, true),
+        ))
+        .limit(1) : [];
+      if (input.method === "bank_transfer" && !bankAccount) throw new Error("INVALID_INPUT");
 
       // Lock every open invoice so omitted allocation details cannot leave the
       // customer balance and invoice amountPaid fields out of sync. Any excess
@@ -156,8 +190,8 @@ export async function collectCustomerReceivable(
       const [receipt] = await tx.insert(customerReceivableReceipts).values({
         storeId: actor.storeId,
         code: generateCode("PTN"), customerId: input.customerId, amount: amount.toFixed(2),
-        method: input.method, reference: input.reference?.trim() || null, note: input.note?.trim() || null,
-        clientRequestId: input.clientRequestId.trim(), createdBy: actor.profileId, confirmedAt: new Date(),
+        method: input.method, bankAccountId, reference: input.reference?.trim() || null, note: input.note?.trim() || null,
+        clientRequestId: input.clientRequestId.trim(), createdBy: actor.profileId, confirmedAt: occurredAt, createdAt: occurredAt,
       }).returning({ id: customerReceivableReceipts.id, code: customerReceivableReceipts.code });
 
       const allocationRows = [] as Array<typeof customerReceivableAllocations.$inferInsert>;
@@ -168,8 +202,11 @@ export async function collectCustomerReceivable(
         const [payment] = await tx.insert(payments).values({
           storeId: actor.storeId,
           orderId: order.id, shiftId: actor.shiftId, amount: allocation.amount.toFixed(2), method: input.method,
+          bankAccountId,
+          accountNumber: bankAccount?.accountNumber ?? null,
           status: "manual_confirmed", clientRequestId: `${input.clientRequestId.trim()}:${index}`,
           reference: input.reference?.trim() || null, note: input.note?.trim() || null, createdBy: actor.profileId,
+          confirmedAt: occurredAt, createdAt: occurredAt,
         }).returning({ id: payments.id });
         await tx.update(orders).set({
           amountPaid: newPaid.toFixed(2), paymentStatus: newPaid >= Number(order.total) - 1e-9 ? "paid" : "partial",
@@ -186,6 +223,7 @@ export async function collectCustomerReceivable(
         refType: "customer_receivable_receipt", refId: receipt.id,
         note: `Thu nợ khách hàng ${input.reference?.trim() || receipt.id}`,
         createdBy: actor.profileId, shiftId: actor.shiftId,
+        createdAt: occurredAt,
       });
       await tx.update(customers).set({ currentDebt: sql`${customers.currentDebt} - ${amount.toFixed(2)}` })
         .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId)));
@@ -193,7 +231,7 @@ export async function collectCustomerReceivable(
         storeId: actor.storeId, actorId: actor.profileId,
         action: "customer.receivable.collected", entityType: "customer_receivable_receipt", entityId: receipt.id,
         before: { currentDebt: Number(customer.currentDebt) },
-        after: { code: receipt.code, customerName: customer.name, amount, method: input.method, currentDebt: money(Number(customer.currentDebt) - amount) },
+        after: { code: receipt.code, customerName: customer.name, amount, method: input.method, bankAccountId, occurredAt: occurredAt.toISOString(), currentDebt: money(Number(customer.currentDebt) - amount) },
         affectedRecords: [
           { type: "customer", id: customer.id, code: customer.code, name: customer.name },
           ...allocations.map((allocation) => ({ type: "order", id: allocation.orderId, code: invoices.get(allocation.orderId)!.code })),
@@ -220,7 +258,9 @@ export async function createCustomerReceivableEntry(
   const requestedAmount = input.amount == null ? Number.NaN : money(input.amount);
   const targetDebt = input.targetDebt == null ? null : money(input.targetDebt);
   const reason = input.reason?.trim() ?? "";
+  const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
   if (!input.customerId || !validRequestId(input.clientRequestId) ||
+    !Number.isFinite(occurredAt.getTime()) ||
     (input.type === "settlement_discount" && !reason) ||
     (targetDebt == null && (!Number.isFinite(requestedAmount) || requestedAmount === 0)) ||
     (targetDebt != null && !Number.isFinite(targetDebt)) ||
@@ -241,10 +281,16 @@ export async function createCustomerReceivableEntry(
       const entryType = targetDebt == null
         ? input.type
         : amount > 0 ? "adjustment_debit" : "adjustment_credit";
-      const [existing] = await tx.select({ id: customerReceivableEntries.id, customerId: customerReceivableEntries.customerId, amount: customerReceivableEntries.amount })
+      const [existing] = await tx.select({
+        id: customerReceivableEntries.id,
+        customerId: customerReceivableEntries.customerId,
+        amount: customerReceivableEntries.amount,
+        createdAt: customerReceivableEntries.createdAt,
+      })
         .from(customerReceivableEntries).where(and(eq(customerReceivableEntries.storeId, actor.storeId), eq(customerReceivableEntries.clientRequestId, input.clientRequestId.trim()))).limit(1);
       if (existing) {
-        if (existing.customerId !== input.customerId || Math.abs(Number(existing.amount) - amount) > 1e-9) throw new Error("RECEIPT_CONFLICT");
+        if (existing.customerId !== input.customerId || Math.abs(Number(existing.amount) - amount) > 1e-9 ||
+          (input.occurredAt != null && existing.createdAt.getTime() !== occurredAt.getTime())) throw new Error("RECEIPT_CONFLICT");
         return { ok: true as const, data: { entryId: existing.id, replayed: true } };
       }
       const [entry] = await tx.insert(customerReceivableEntries).values({
@@ -253,6 +299,7 @@ export async function createCustomerReceivableEntry(
         orderId: input.orderId || null, type: entryType, amount: amount.toFixed(2), reason,
         reference: input.reference?.trim() || null, note: input.note?.trim() || null,
         clientRequestId: input.clientRequestId.trim(), createdBy: actor.profileId, approvedBy: actor.profileId,
+        createdAt: occurredAt,
       }).returning({ id: customerReceivableEntries.id, code: customerReceivableEntries.code });
       await tx.update(customers).set({ currentDebt: sql`${customers.currentDebt} + ${amount.toFixed(2)}` })
         .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId)));
@@ -260,7 +307,7 @@ export async function createCustomerReceivableEntry(
         storeId: actor.storeId, actorId: actor.profileId,
         action: "customer.receivable.adjusted", entityType: "customer_receivable_entry", entityId: entry.id,
         before: { currentDebt: Number(customer.currentDebt) },
-        after: { code: entry.code, customerName: customer.name, amount, targetDebt: targetDebt ?? undefined, type: entryType, reason: reason || undefined, currentDebt: money(Number(customer.currentDebt) + amount) },
+        after: { code: entry.code, customerName: customer.name, amount, targetDebt: targetDebt ?? undefined, type: entryType, reason: reason || undefined, occurredAt: occurredAt.toISOString(), currentDebt: money(Number(customer.currentDebt) + amount) },
         affectedRecords: [{ type: "customer", id: customer.id, code: customer.code, name: customer.name }],
       });
       const notification = await createDebtChangedEventInTx(tx, {

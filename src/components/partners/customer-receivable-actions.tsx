@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { MoreHorizontal, Pencil, QrCode, WalletCards } from "lucide-react";
 import { collectCustomerReceivable, createCustomerReceivableEntry } from "@/lib/actions/receivables";
 import { MoneyInput } from "@/components/ui/money-input";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { LumaActionMenu } from "@/components/ui/action-menu";
 import {
@@ -15,10 +16,18 @@ import { cn, formatCurrency } from "@/lib/utils";
 import { autoAllocatePayment } from "@/lib/payments/auto-allocation";
 
 type Invoice = { id: string; code: string; createdAt: string; remaining: number };
-type Overview = { currentDebt: number; invoices: Invoice[] };
+type Overview = {
+  currentDebt: number;
+  invoices: Invoice[];
+  bankAccounts: Array<{ id: string; bankCode: string; accountNumber: string; accountName: string; isDefault: boolean }>;
+};
 type Mode = "collect" | "adjust" | "discount" | "qr";
 
 const requestId = (prefix: string) => `${prefix}:${crypto.randomUUID()}`;
+function localDateTimeValue(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 export function CustomerReceivableActions({
   customerId,
@@ -121,12 +130,14 @@ function QrCreateDialog({ invoices, error, onCreate, onClose }: { invoices: Invo
 
 function CollectDialog({ customerId, overview, error, onError, onClose }: { customerId: string; overview: Overview | null; error: string; onError: (value: string) => void; onClose: () => void }) {
   const [amount, setAmount] = useState(0);
-  const [method, setMethod] = useState<"cash" | "bank_transfer" | "card">("cash");
+  const [method, setMethod] = useState<"cash" | "bank_transfer">("cash");
+  const [occurredAt, setOccurredAt] = useState(() => localDateTimeValue(new Date()));
+  const [bankAccountId, setBankAccountId] = useState(() => overview?.bankAccounts.find((account) => account.isDefault)?.id ?? overview?.bankAccounts[0]?.id ?? "");
   const [allocations, setAllocations] = useState<Array<{ orderId: string; amount: number }>>(() => (overview?.invoices ?? []).map((invoice) => ({ orderId: invoice.id, amount: 0 })));
   const [pending, startTransition] = useTransition();
   const [clientRequestId] = useState(() => requestId("web-receivable"));
   const allocationTotal = useMemo(() => allocations.reduce((sum, row) => sum + row.amount, 0), [allocations]);
-  const valid = Boolean(overview && amount > 0 && allocationTotal <= amount + 0.01);
+  const valid = Boolean(overview && amount > 0 && occurredAt && allocationTotal <= amount + 0.01 && (method !== "bank_transfer" || bankAccountId));
   function setPaymentAmount(value: number) {
     setAmount(value);
     const automatic = autoAllocatePayment(value, overview?.invoices ?? []);
@@ -135,7 +146,7 @@ function CollectDialog({ customerId, overview, error, onError, onClose }: { cust
   function submit() {
     if (!valid || pending) return;
     startTransition(async () => {
-      const result = await collectCustomerReceivable({ customerId, amount, method, allocations: allocations.filter((row) => row.amount > 0), clientRequestId });
+      const result = await collectCustomerReceivable({ customerId, amount, method, bankAccountId: method === "bank_transfer" ? bankAccountId : null, occurredAt: new Date(occurredAt).toISOString(), allocations: allocations.filter((row) => row.amount > 0), clientRequestId });
       if (!result.ok) return onError("Không thể ghi nhận phiếu thu. Vui lòng kiểm tra số tiền và quyền thao tác.");
       onClose();
     });
@@ -143,8 +154,10 @@ function CollectDialog({ customerId, overview, error, onError, onClose }: { cust
   return <PartnerDebtDialog title="Thanh toán công nợ" onClose={onClose}>
     {!overview ? <p className="text-sm text-er">{error || "Không có dữ liệu công nợ."}</p> : <div className="space-y-4">
       <DebtBalanceSummary value={overview.currentDebt} />
+      <label className="block text-sm font-medium">Thời gian thanh toán<Input type="datetime-local" value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} required className="mt-1 w-full" /></label>
       <label className="block text-sm font-medium">Số tiền thanh toán<MoneyInput value={amount} min={0} onChange={(value) => setPaymentAmount(value ?? 0)} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-right" /><span className="mt-1 block text-xs text-slate-500">Có thể thanh toán vượt dư nợ để ghi nhận khách trả trước.</span></label>
-      <div><div className="mb-1.5 text-sm font-medium">Phương thức thanh toán</div><div className="grid grid-cols-3">{(["cash", "bank_transfer", "card"] as const).map((value) => <button key={value} type="button" onClick={() => setMethod(value)} className={cn("min-h-11 border px-3 py-2 text-sm first:rounded-l-lg last:rounded-r-lg", method === value ? "border-primary-600 bg-primary-600 text-white" : "border-border", "min-w-11 lg:min-w-0")}>{value === "cash" ? "Tiền mặt" : value === "bank_transfer" ? "Chuyển khoản" : "Thẻ"}</button>)}</div></div>
+      <div><div className="mb-1.5 text-sm font-medium">Phương thức thanh toán</div><div className="grid grid-cols-2">{(["cash", "bank_transfer"] as const).map((value) => <button key={value} type="button" onClick={() => setMethod(value)} className={cn("min-h-11 border px-3 py-2 text-sm first:rounded-l-lg last:rounded-r-lg", method === value ? "border-primary-600 bg-primary-600 text-white" : "border-border", "min-w-11 lg:min-w-0")}>{value === "cash" ? "Tiền mặt" : "Chuyển khoản"}</button>)}</div></div>
+      {method === "bank_transfer" && <div className="space-y-1.5"><label htmlFor="customer-payment-bank-account" className="block text-sm font-medium">Số tài khoản</label>{overview.bankAccounts.length > 0 ? <Select id="customer-payment-bank-account" aria-label="Số tài khoản" value={bankAccountId} onValueChange={setBankAccountId} options={overview.bankAccounts.map((account) => ({ value: account.id, label: `${account.bankCode} · ${account.accountNumber}`, description: account.accountName }))} rootClassName="w-full" /> : <p className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-slate-500">Chưa có tài khoản đang hoạt động. Hãy thêm tài khoản trong Cài đặt trước khi ghi nhận chuyển khoản.</p>}</div>}
       <div><div className="mb-1.5 text-sm font-medium">Phân bổ hóa đơn</div>{overview.invoices.length > 0 && amount <= 0 && <p className="mb-1.5 text-xs text-slate-500">Nhập tổng tiền thanh toán trước để bật phân bổ hóa đơn.</p>}<div className="max-h-48 space-y-2 overflow-auto rounded-lg border border-border p-2">{overview.invoices.length === 0 ? <p className="p-2 text-sm text-slate-500">Không có hóa đơn còn nợ; khoản thu sẽ được ghi nhận chưa phân bổ.</p> : overview.invoices.map((invoice, index) => <div key={invoice.id} className="flex items-center justify-between gap-3 text-sm"><span>{invoice.code}<span className="ml-2 text-slate-400">còn {formatCurrency(invoice.remaining)}</span></span><MoneyInput value={allocations[index]?.amount ?? 0} min={0} max={invoice.remaining} disabled={amount <= 0 || pending} onChange={(value) => setAllocations((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, amount: value ?? 0 } : row))} className="w-32 rounded border border-border px-2 py-1 text-right disabled:cursor-not-allowed disabled:opacity-50" /></div>)}</div></div>
       <p className={cn("text-xs", valid ? "text-slate-500" : "text-er")}>Tổng phân bổ: {formatCurrency(allocationTotal)}{amount > allocationTotal ? ` · Khách trả trước: ${formatCurrency(amount - allocationTotal)}` : ""}{valid ? "" : " — kiểm tra lại số tiền."}</p>
       {error && <p className="text-sm text-er">{error}</p>}
@@ -155,11 +168,13 @@ function CollectDialog({ customerId, overview, error, onError, onClose }: { cust
 
 function EntryDialog({ customerId, currentDebt, mode, error, onError, onClose }: { customerId: string; currentDebt: number; mode: "adjust" | "discount"; error: string; onError: (value: string) => void; onClose: () => void }) {
   const [amount, setAmount] = useState<number | null>(null); const [reason, setReason] = useState(""); const [pending, startTransition] = useTransition();
+  const [occurredAt, setOccurredAt] = useState(() => localDateTimeValue(new Date()));
   const [clientRequestId] = useState(() => requestId("web-receivable-entry"));
   const signedAmount = mode === "discount" ? -Math.abs(amount ?? 0) : amount ?? 0;
   const type = mode === "discount" ? "settlement_discount" : signedAmount > 0 ? "adjustment_debit" : "adjustment_credit";
   const reasonRequired = mode === "discount";
   const reasonMissing = reasonRequired && !reason.trim();
-  function submit() { if (amount == null || (mode === "adjust" ? amount === currentDebt : signedAmount === 0) || reasonMissing || pending) return; startTransition(async () => { const result = await createCustomerReceivableEntry({ customerId, ...(mode === "adjust" ? { targetDebt: amount } : { amount: signedAmount }), type, reason: reason.trim(), clientRequestId }); if (!result.ok) return onError("Không thể tạo chứng từ. Thao tác này yêu cầu quyền quản lý."); onClose(); }); }
-  return <PartnerDebtDialog title={mode === "discount" ? "Chiết khấu thanh toán" : "Điều chỉnh công nợ"} onClose={onClose}><div className="space-y-4"><DebtBalanceSummary value={currentDebt} /><label className="block text-sm font-medium">{mode === "adjust" ? "Công nợ mới" : "Số tiền"}<MoneyInput value={amount} min={mode === "adjust" ? -Number.MAX_SAFE_INTEGER : 0} onChange={setAmount} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-right" /></label>{mode === "adjust" && <p className="text-xs text-slate-500">Nhập số âm nếu khách hàng có số dư/trả trước.</p>}<label className="block text-sm font-medium">{reasonRequired ? "Lý do" : "Lý do (không bắt buộc)"}<textarea value={reason} maxLength={200} onChange={(event) => setReason(event.target.value)} className="mt-1 min-h-24 w-full rounded-lg border border-border p-2" /><span className="mt-1 block text-right text-xs text-slate-400">{reason.length}/200</span></label>{error && <p className="text-sm text-er">{error}</p>}<DebtDialogFooter onCancel={onClose} onConfirm={submit} confirmLabel={pending ? "Đang lưu..." : "Xác nhận"} disabled={amount == null || (mode === "adjust" ? amount === currentDebt : amount === 0) || reasonMissing || pending} /></div></PartnerDebtDialog>;
+  const valid = Boolean(occurredAt) && amount != null && !(mode === "adjust" ? amount === currentDebt : signedAmount === 0) && !reasonMissing && !pending;
+  function submit() { if (!valid || amount == null || !occurredAt) return; startTransition(async () => { const result = await createCustomerReceivableEntry({ customerId, ...(mode === "adjust" ? { targetDebt: amount } : { amount: signedAmount }), type, reason: reason.trim(), occurredAt: new Date(occurredAt).toISOString(), clientRequestId }); if (!result.ok) return onError("Không thể tạo chứng từ. Thao tác này yêu cầu quyền quản lý."); onClose(); }); }
+  return <PartnerDebtDialog title={mode === "discount" ? "Chiết khấu thanh toán" : "Điều chỉnh công nợ"} onClose={onClose}><div className="space-y-4"><DebtBalanceSummary value={currentDebt} /><label className="block text-sm font-medium">Thời gian điều chỉnh<Input type="datetime-local" value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} required className="mt-1 w-full" /></label><label className="block text-sm font-medium">{mode === "adjust" ? "Công nợ mới" : "Số tiền"}<MoneyInput value={amount} min={mode === "adjust" ? -Number.MAX_SAFE_INTEGER : 0} onChange={setAmount} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-right" /></label>{mode === "adjust" && <p className="text-xs text-slate-500">Nhập số âm nếu khách hàng có số dư/trả trước.</p>}<label className="block text-sm font-medium">{reasonRequired ? "Lý do" : "Lý do (không bắt buộc)"}<textarea value={reason} maxLength={200} onChange={(event) => setReason(event.target.value)} className="mt-1 min-h-24 w-full rounded-lg border border-border p-2" /><span className="mt-1 block text-right text-xs text-slate-400">{reason.length}/200</span></label>{error && <p className="text-sm text-er">{error}</p>}<DebtDialogFooter onCancel={onClose} onConfirm={submit} confirmLabel={pending ? "Đang lưu..." : "Xác nhận"} disabled={!valid} /></div></PartnerDebtDialog>;
 }

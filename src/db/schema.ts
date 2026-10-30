@@ -1242,6 +1242,7 @@ export const customerReceivableReceipts = pgTable("customer_receivable_receipts"
   status: customerReceivableReceiptStatusEnum("status").notNull().default("confirmed"),
   amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
   method: paymentMethodEnum("method").notNull(),
+  bankAccountId: uuid("bank_account_id").references(() => paymentBankAccounts.id, { onDelete: "set null" }),
   reference: text("reference"),
   note: text("note"),
   clientRequestId: varchar("client_request_id", { length: 80 }).notNull(),
@@ -1253,6 +1254,7 @@ export const customerReceivableReceipts = pgTable("customer_receivable_receipts"
   uniqueIndex("customer_receivable_receipts_store_code_unique").on(t.storeId, t.code),
   uniqueIndex("customer_receivable_receipts_store_client_unique").on(t.storeId, t.clientRequestId),
   index("customer_receivable_receipts_customer_idx").on(t.customerId, t.createdAt),
+  index("customer_receivable_receipts_bank_account_idx").on(t.bankAccountId),
   index("customer_receivable_receipts_status_idx").on(t.status, t.createdAt),
 ]);
 
@@ -1373,6 +1375,7 @@ export const supplierPayableReceipts = pgTable("supplier_payable_receipts", {
   status: supplierPayableReceiptStatusEnum("status").notNull().default("confirmed"),
   amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
   method: paymentMethodEnum("method").notNull(),
+  bankAccountId: uuid("bank_account_id").references(() => paymentBankAccounts.id, { onDelete: "set null" }),
   reference: text("reference"),
   note: text("note"),
   clientRequestId: varchar("client_request_id", { length: 80 }).notNull(),
@@ -1383,6 +1386,7 @@ export const supplierPayableReceipts = pgTable("supplier_payable_receipts", {
   uniqueIndex("supplier_payable_receipts_store_code_unique").on(t.storeId, t.code),
   uniqueIndex("supplier_payable_receipts_store_client_unique").on(t.storeId, t.clientRequestId),
   index("supplier_payable_receipts_supplier_idx").on(t.supplierId, t.createdAt),
+  index("supplier_payable_receipts_bank_account_idx").on(t.bankAccountId),
   index("supplier_payable_receipts_status_idx").on(t.status, t.createdAt),
   check("supplier_payable_receipts_amount_check", sql`${t.amount} > 0`),
 ]);

@@ -4,6 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import { Pencil, WalletCards } from "lucide-react";
 import { createSupplierPayableEntry, paySupplierPayable } from "@/lib/actions/payables";
 import { MoneyInput } from "@/components/ui/money-input";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import {
   DebtBalanceSummary,
   DebtDialogFooter,
@@ -16,9 +18,21 @@ type Invoice = { id: string; code: string; createdAt: string; remaining: number 
 export type SupplierPayableOverview = {
   currentDebt: number;
   invoices: Invoice[];
+  bankAccounts: Array<{
+    id: string;
+    bankCode: string;
+    accountNumber: string;
+    accountName: string;
+    isDefault: boolean;
+  }>;
 };
 
 const requestId = (prefix: string) => `${prefix}:${crypto.randomUUID()}`;
+
+function localDateTimeValue(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 export function SupplierPayableActions({
   supplierId,
@@ -71,6 +85,10 @@ function SupplierPaymentDialog({
 }) {
   const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState<"cash" | "bank_transfer">("cash");
+  const [occurredAt, setOccurredAt] = useState(() => localDateTimeValue(new Date()));
+  const [bankAccountId, setBankAccountId] = useState(() =>
+    overview.bankAccounts.find((account) => account.isDefault)?.id ?? overview.bankAccounts[0]?.id ?? "",
+  );
   const [allocations, setAllocations] = useState(() => overview.invoices.map((invoice) => ({ purchaseOrderId: invoice.id, amount: 0 })));
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -80,6 +98,8 @@ function SupplierPaymentDialog({
     [allocations],
   );
   const valid = amount > 0 && amount <= overview.currentDebt + 0.01 &&
+    Boolean(occurredAt) &&
+    (method !== "bank_transfer" || Boolean(bankAccountId)) &&
     allocationTotal <= amount + 0.01;
 
   function setPaymentAmount(value: number) {
@@ -96,6 +116,8 @@ function SupplierPaymentDialog({
         supplierId,
         amount,
         method,
+        bankAccountId: method === "bank_transfer" ? bankAccountId : null,
+        occurredAt: new Date(occurredAt).toISOString(),
         allocations: allocations.filter((row) => row.amount > 0),
         clientRequestId,
       });
@@ -113,6 +135,10 @@ function SupplierPaymentDialog({
       <div className="space-y-4">
         <DebtBalanceSummary value={overview.currentDebt} tone="warning" />
         <label className="block text-sm font-medium">
+          Thời gian thanh toán
+          <Input type="datetime-local" value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} required className="mt-1 w-full" />
+        </label>
+        <label className="block text-sm font-medium">
           Số tiền thanh toán
           <MoneyInput value={amount} min={0} max={overview.currentDebt} onChange={(value) => setPaymentAmount(value ?? 0)} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-right" />
           <span className="mt-1 block text-xs text-slate-500">Tối đa {formatCurrency(overview.currentDebt)}</span>
@@ -127,6 +153,29 @@ function SupplierPaymentDialog({
             ))}
           </div>
         </div>
+        {method === "bank_transfer" && (
+          <div className="space-y-1.5">
+            <label htmlFor="supplier-payment-bank-account" className="block text-sm font-medium">Số tài khoản</label>
+            {overview.bankAccounts.length > 0 ? (
+              <Select
+                id="supplier-payment-bank-account"
+                aria-label="Số tài khoản"
+                value={bankAccountId}
+                onValueChange={setBankAccountId}
+                options={overview.bankAccounts.map((account) => ({
+                  value: account.id,
+                  label: `${account.bankCode} · ${account.accountNumber}`,
+                  description: account.accountName,
+                }))}
+                rootClassName="w-full"
+              />
+            ) : (
+              <p className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-slate-500">
+                Chưa có tài khoản đang hoạt động. Hãy thêm tài khoản trong Cài đặt trước khi ghi nhận chuyển khoản.
+              </p>
+            )}
+          </div>
+        )}
         <div>
           <div className="mb-1.5 text-sm font-medium">Phân bổ phiếu nhập</div>
           <div className="max-h-56 space-y-2 overflow-auto rounded-lg border border-border p-2">
@@ -167,13 +216,14 @@ function SupplierAdjustmentDialog({
 }) {
   const [amount, setAmount] = useState<number | null>(null);
   const [reason, setReason] = useState("");
+  const [occurredAt, setOccurredAt] = useState(() => localDateTimeValue(new Date()));
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const [clientRequestId] = useState(() => requestId("web-supplier-payable-entry"));
-  const valid = amount != null && amount !== currentDebt;
+  const valid = Boolean(occurredAt) && amount != null && amount !== currentDebt;
 
   function submit() {
-    if (!valid || pending || amount == null) return;
+    if (!valid || pending || amount == null || !occurredAt) return;
     const targetDebt = amount;
     setError("");
     startTransition(async () => {
@@ -181,6 +231,7 @@ function SupplierAdjustmentDialog({
         supplierId,
         targetDebt,
         reason: reason.trim(),
+        occurredAt: new Date(occurredAt).toISOString(),
         clientRequestId,
       });
       if (!result.ok) {
@@ -196,6 +247,10 @@ function SupplierAdjustmentDialog({
     <PartnerDebtDialog title="Điều chỉnh công nợ" onClose={onClose}>
       <div className="space-y-4">
         <DebtBalanceSummary value={currentDebt} tone="warning" />
+        <label className="block text-sm font-medium">
+          Thời gian điều chỉnh
+          <Input type="datetime-local" value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} required className="mt-1 w-full" />
+        </label>
         <label className="block text-sm font-medium">
           Công nợ mới
           <MoneyInput value={amount} min={-Number.MAX_SAFE_INTEGER} onChange={setAmount} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-right" />

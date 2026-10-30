@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   purchaseOrders,
   purchaseReturns,
+  paymentBankAccounts,
   supplierPayableAllocations,
   supplierPayableEntries,
   supplierPayableReceipts,
@@ -31,7 +32,7 @@ export async function getSupplierPayableOverview(storeId: string, supplierId: st
     .limit(1);
   if (!supplier) return null;
 
-  const [purchases, returns, receipts, entries] = await Promise.all([
+  const [purchases, returns, receipts, entries, bankAccounts] = await Promise.all([
     database
       .select({
         id: purchaseOrders.id,
@@ -100,6 +101,20 @@ export async function getSupplierPayableOverview(storeId: string, supplierId: st
       .where(and(eq(supplierPayableEntries.storeId, storeId), eq(supplierPayableEntries.supplierId, supplierId)))
       .orderBy(desc(supplierPayableEntries.createdAt))
       .limit(100),
+    database
+      .select({
+        id: paymentBankAccounts.id,
+        bankCode: paymentBankAccounts.bankCode,
+        accountNumber: paymentBankAccounts.accountNumber,
+        accountName: paymentBankAccounts.accountName,
+        isDefault: paymentBankAccounts.isDefault,
+      })
+      .from(paymentBankAccounts)
+      .where(and(
+        eq(paymentBankAccounts.storeId, storeId),
+        eq(paymentBankAccounts.enabled, true),
+      ))
+      .orderBy(desc(paymentBankAccounts.isDefault), asc(paymentBankAccounts.createdAt)),
   ]);
   const allocatedPaymentRows = purchases.length === 0 ? [] : await database
     .select({
@@ -211,6 +226,7 @@ export async function getSupplierPayableOverview(storeId: string, supplierId: st
   return {
     supplierId: supplier.id,
     currentDebt: Number(supplier.currentDebt),
+    bankAccounts,
     lastReconciledAt: ledger[0]?.createdAt ?? null,
     invoices: purchases
       .map((purchase) => ({

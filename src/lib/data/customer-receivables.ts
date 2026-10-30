@@ -1,12 +1,12 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { customerReceivableEntries, customerReceivableReceipts, customers, orders } from "@/db/schema";
+import { customerReceivableEntries, customerReceivableReceipts, customers, orders, paymentBankAccounts } from "@/db/schema";
 
 export async function getCustomerReceivableOverview(storeId: string, customerId: string) {
   const [customer] = await db.select({ id: customers.id, currentDebt: customers.currentDebt })
     .from(customers).where(and(eq(customers.storeId, storeId), eq(customers.id, customerId))).limit(1);
   if (!customer) return null;
-  const [invoices, entries, receipts] = await Promise.all([
+  const [invoices, entries, receipts, bankAccounts] = await Promise.all([
     db.select({
       id: orders.id, code: orders.code, createdAt: orders.createdAt,
       total: orders.total, amountPaid: orders.amountPaid, paymentStatus: orders.paymentStatus,
@@ -30,10 +30,21 @@ export async function getCustomerReceivableOverview(storeId: string, customerId:
       createdAt: customerReceivableReceipts.createdAt,
     }).from(customerReceivableReceipts).where(and(eq(customerReceivableReceipts.storeId, storeId), eq(customerReceivableReceipts.customerId, customerId)))
       .orderBy(desc(customerReceivableReceipts.createdAt)).limit(50),
+    db.select({
+      id: paymentBankAccounts.id,
+      bankCode: paymentBankAccounts.bankCode,
+      accountNumber: paymentBankAccounts.accountNumber,
+      accountName: paymentBankAccounts.accountName,
+      isDefault: paymentBankAccounts.isDefault,
+    }).from(paymentBankAccounts).where(and(
+      eq(paymentBankAccounts.storeId, storeId),
+      eq(paymentBankAccounts.enabled, true),
+    )).orderBy(desc(paymentBankAccounts.isDefault), asc(paymentBankAccounts.createdAt)),
   ]);
   return {
     customerId: customer.id,
     currentDebt: Number(customer.currentDebt),
+    bankAccounts,
     invoices: invoices.map((invoice) => ({ ...invoice, total: Number(invoice.total), amountPaid: Number(invoice.amountPaid), remaining: Number(invoice.total) - Number(invoice.amountPaid) })),
     entries: entries.map((entry) => ({ ...entry, amount: Number(entry.amount) })),
     receipts: receipts.map((receipt) => ({ ...receipt, amount: Number(receipt.amount) })),

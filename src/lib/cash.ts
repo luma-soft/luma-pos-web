@@ -19,6 +19,7 @@ export async function recordCashTx(
     note?: string;
     createdBy?: string | null;
     shiftId?: string | null;
+    createdAt?: Date;
   }
 ) {
   if (params.amount <= 0) return;
@@ -34,6 +35,7 @@ export async function recordCashTx(
     refId: params.refId ?? null,
     note: params.note ?? null,
     createdBy: params.createdBy ?? null,
+    ...(params.createdAt ? { createdAt: params.createdAt } : {}),
   });
 }
 

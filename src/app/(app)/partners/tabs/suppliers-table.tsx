@@ -65,6 +65,13 @@ type SupplierPreview = {
   payables: {
     currentDebt: number;
     lastReconciledAt: string | null;
+    bankAccounts: Array<{
+      id: string;
+      bankCode: string;
+      accountNumber: string;
+      accountName: string;
+      isDefault: boolean;
+    }>;
     invoices: Array<{ id: string; code: string; createdAt: string; total: number; amountPaid: number; remaining: number }>;
     ledger: SupplierDebtRow[];
   } | null;
