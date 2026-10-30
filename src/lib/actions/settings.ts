@@ -252,6 +252,27 @@ export async function updateStorePrefsForUser(
   }
 }
 
+export async function updateSepayPaymentNotificationsEnabled(enabled: boolean): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  if (typeof enabled !== "boolean") return { ok: false, error: "errors.invalidData" };
+  try {
+    await persistSettingsWithActivity(gate.storeId, gate.userId, "settings.payment_notifications.updated", (current) => ({
+      next: {
+        ...current,
+        payments: { ...current.payments, sepayNotificationsEnabled: enabled },
+      },
+      value: undefined,
+    }));
+    revalidatePath(Routes.Settings);
+    revalidatePath(Routes.POS);
+    return { ok: true, data: undefined };
+  } catch (e) {
+    console.error("updateSepayPaymentNotificationsEnabled failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
 export async function updateCameraQuoteSettings(input: StorePrefs["cameraQuote"]): Promise<ActionResult> {
   const gate = await requireManager();
   if (!gate.ok) return gate;

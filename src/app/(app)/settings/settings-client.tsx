@@ -37,6 +37,7 @@ import {
   updateShopeeSettings,
   updateZaloSettings,
   updateStoreSettings,
+  updateSepayPaymentNotificationsEnabled,
   updateStaffRole,
   setStaffActive,
   updateStorePrefs,
@@ -105,10 +106,6 @@ const DEVICES = [
 const PAYMENTS = [
   { ico: "💵", labelKey: "cash", id: "cash", enabled: true, color: "#15803D", note: "Always available · change calc built-in" },
   { ico: "📱", labelKey: "qr", id: "qr", enabled: true, color: "#1D4ED8", note: "Dynamic QR · auto-confirm · Napas" },
-  { ico: "🟣", labelKey: "momo", id: "momo", enabled: true, color: "#A50064", note: "Deep-link + webhook · timeout 90s" },
-  { ico: "🔵", labelKey: "zalopay", id: "zalopay", enabled: false, color: "#006AFF", note: "Not yet configured — tap to set up" },
-  { ico: "🔴", labelKey: "vnpay", id: "vnpay", enabled: false, color: "#CC0000", note: "Not yet configured — tap to set up" },
-  { ico: "💳", labelKey: "card", id: "card", enabled: false, color: "#374151", note: "Connect card reader in Hardware first" },
   { ico: "🧾", labelKey: "credit", id: "credit", enabled: true, color: "#B45309", note: "Saved customer required · server-owned debt" },
 ];
 const VIETQR_BANKS = [
@@ -1853,8 +1850,30 @@ function PaymentsSection({
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
+  const [sepayNotificationsEnabled, setSepayNotificationsEnabled] = useState(prefs.sepayNotificationsEnabled);
+  const [notificationError, setNotificationError] = useState("");
+  const [notificationPending, startNotificationTransition] = useTransition();
+  const t = useTranslations("settings.payments.sepay");
   const toggle = (id: keyof typeof pm) => { if (!canManage) return; setPm((p) => ({ ...p, [id]: !p[id] })); setDirty(true); setSaved(false); };
-  function save() { start(async () => { const r = await updateStorePrefs({ payments: pm }); if (r.ok) { setDirty(false); setSaved(true); } }); }
+  function save() {
+    start(async () => {
+      const r = await updateStorePrefs({ payments: { ...pm, sepayNotificationsEnabled } });
+      if (r.ok) { setDirty(false); setSaved(true); }
+    });
+  }
+  function toggleSepayNotifications(next: boolean) {
+    if (!canManage || notificationPending) return;
+    const previous = sepayNotificationsEnabled;
+    setSepayNotificationsEnabled(next);
+    setNotificationError("");
+    startNotificationTransition(async () => {
+      const result = await updateSepayPaymentNotificationsEnabled(next);
+      if (!result.ok) {
+        setSepayNotificationsEnabled(previous);
+        setNotificationError(t("toggleSaveError"));
+      }
+    });
+  }
   const tabs = [
     { id: "methods", label: settingsTextByFlag(L, "legacy.75b7ecc9fa25") },
     { id: "accounts", label: settingsTextByFlag(L, "legacy.6cf92dd12923") },
@@ -1885,12 +1904,35 @@ function PaymentsSection({
           ? <LazySectionState L={L} loading={accountsLoading} error={accountsError} />
           : <SePayAccountsSection L={L} accounts={bankAccounts} canManage={canManage} />
       )}
-      {tab === "notifications" && <SePayNotificationsSection L={L} />}
+      {tab === "notifications" && (
+        <SePayNotificationsSection
+          L={L}
+          canManage={canManage}
+          enabled={sepayNotificationsEnabled}
+          pending={notificationPending}
+          error={notificationError}
+          onChange={toggleSepayNotifications}
+        />
+      )}
     </>
   );
 }
 
-function SePayNotificationsSection({ L }: { L: boolean }) {
+function SePayNotificationsSection({
+  L,
+  canManage,
+  enabled,
+  pending,
+  error,
+  onChange,
+}: {
+  L: boolean;
+  canManage: boolean;
+  enabled: boolean;
+  pending: boolean;
+  error: string;
+  onChange: (enabled: boolean) => void;
+}) {
   const t = useTranslations("settings.payments.sepay");
   const [copied, setCopied] = useState(false);
   const [origin] = useState(() => typeof window !== "undefined" ? window.location.origin : "");
@@ -1906,8 +1948,24 @@ function SePayNotificationsSection({ L }: { L: boolean }) {
     }
   };
   return (
-    <Card title={t("notificationTitle")} vi={settingsTextByFlag(L, "legacy.ab21a20f0c4d")}>
+    <Card
+      title={t("notificationTitle")}
+      vi={settingsTextByFlag(L, "legacy.ab21a20f0c4d")}
+      action={(
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300">{t("autoConfirm")}</span>
+          <TouchTargetToggle
+            checked={enabled}
+            disabled={!canManage || pending}
+            onChange={onChange}
+            aria-label={t("autoConfirm")}
+          />
+        </div>
+      )}
+    >
       <div className="p-4 flex flex-col gap-4">
+        <div className="text-[11px] leading-relaxed text-slate-500">{t("autoConfirmHint")}</div>
+        {error && <div role="alert" className="text-[11px] font-medium text-er">{error}</div>}
         <div className="rounded-xl border border-border bg-canvas p-3.5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">

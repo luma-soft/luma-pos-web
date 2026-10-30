@@ -2,6 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { paymentBankAccounts } from "@/db/schema";
+import { getRawStorePrefs } from "@/lib/data/settings";
 import { matchSepayWebhookEvent, recordSepayWebhookEvent } from "@/lib/payments/service";
 import { extractSepayApiKey, normalizeSepayWebhookPayload, verifySepaySignature } from "@/lib/payments/sepay";
 
@@ -84,6 +85,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: recorded.error }, { status: 500 });
   }
   if (!account.webhookEnabled) {
+    return NextResponse.json({ success: true });
+  }
+
+  const prefs = await getRawStorePrefs(account.storeId);
+  if (!prefs.payments.sepayNotificationsEnabled) {
     return NextResponse.json({ success: true });
   }
 

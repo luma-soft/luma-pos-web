@@ -1,10 +1,6 @@
 export type MobilePaymentMethodId =
   | "cash"
   | "qr"
-  | "card"
-  | "momo"
-  | "zalopay"
-  | "vnpay"
   | "credit";
 
 export type MobilePaymentMethodCapability = {
@@ -15,14 +11,13 @@ export type MobilePaymentMethodCapability = {
   unavailableReason?: string;
 };
 
-type PaymentPreferences = Record<MobilePaymentMethodId, boolean>;
+type PaymentPreferences = Pick<Record<MobilePaymentMethodId, boolean>, "cash" | "qr" | "credit">;
 
 export function buildMobilePaymentMethods(input: {
   prefs: PaymentPreferences;
   hasSepayAccount: boolean;
-  gatewayAvailability: Record<"momo" | "zalopay" | "vnpay", boolean>;
 }): MobilePaymentMethodCapability[] {
-  const { prefs, hasSepayAccount, gatewayAvailability } = input;
+  const { prefs, hasSepayAccount } = input;
   return [
     {
       id: "cash",
@@ -39,21 +34,6 @@ export function buildMobilePaymentMethods(input: {
         ? { unavailableReason: "payments.errors.bankAccountNotFound" }
         : {}),
     },
-    {
-      id: "card",
-      enabled: prefs.card,
-      available: true,
-      settlement: "manual_confirmed",
-    },
-    ...(["momo", "zalopay", "vnpay"] as const).map((id) => ({
-      id,
-      enabled: prefs[id],
-      available: gatewayAvailability[id],
-      settlement: "gateway_pending" as const,
-      ...(!gatewayAvailability[id]
-        ? { unavailableReason: "payments.errors.providerNotConfigured" }
-        : {}),
-    })),
     {
       id: "credit",
       enabled: prefs.credit,

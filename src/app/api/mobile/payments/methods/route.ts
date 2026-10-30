@@ -5,7 +5,6 @@ import { requireMobileSalesAccess } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk } from "@/lib/mobile/response";
 import { getRawStorePrefs } from "@/lib/data/settings";
 import { buildMobilePaymentMethods } from "@/lib/payments/mobile-methods";
-import { resolveGatewayAvailability } from "@/lib/payments/gateways";
 
 export async function GET() {
   const gate = await requireMobileSalesAccess();
@@ -30,7 +29,6 @@ export async function GET() {
     methods: buildMobilePaymentMethods({
       prefs: prefs.payments,
       hasSepayAccount: account.length > 0,
-      gatewayAvailability: resolveGatewayAvailability(process.env),
     }),
   });
 }

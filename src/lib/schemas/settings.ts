@@ -114,6 +114,9 @@ const taxPrefs = z.object({
 const paymentPrefs = z.object({
   cash: z.boolean().default(true),
   qr: z.boolean().default(true),
+  // Store-wide switch for processing verified SePay webhooks and auto-confirming payments.
+  // VietQR generation still depends only on an enabled receiving bank account.
+  sepayNotificationsEnabled: z.boolean().default(true),
   momo: z.boolean().default(false),
   zalopay: z.boolean().default(false),
   vnpay: z.boolean().default(false),
@@ -415,7 +418,7 @@ export const storePrefsSchema = z.object({
     einvoiceProvider: "VNPT",
     einvoiceTaxId: "",
   }),
-  payments: paymentPrefs.default({ cash: true, qr: true, momo: false, zalopay: false, vnpay: false, card: false, credit: true }),
+  payments: paymentPrefs.default({ cash: true, qr: true, sepayNotificationsEnabled: true, momo: false, zalopay: false, vnpay: false, card: false, credit: true }),
   notifications: notificationPrefs.default({
     lowStock: true,
     stagnant: true,

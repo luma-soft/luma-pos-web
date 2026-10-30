@@ -4118,6 +4118,9 @@
       "sepay": {
         "title": "Tài khoản ngân hàng SePay / VietQR",
         "notificationTitle": "Thông báo thanh toán SePay",
+        "autoConfirm": "Tự động xác nhận",
+        "autoConfirmHint": "Tắt mục này chỉ dừng webhook tự khớp và xác nhận tiền về. POS vẫn tạo mã VietQR từ tài khoản ngân hàng đã bật.",
+        "toggleSaveError": "Không lưu được cài đặt thông báo thanh toán.",
         "setupTitle": "Thiết lập SePay",
         "setupHelp": "Hải Đăng POS quản lý webhook URL và secret ở server. Người dùng cửa hàng chỉ cần thêm tài khoản ngân hàng nhận tiền tại đây.",
         "qrOnlyHelp": "Người dùng không cần cấu hình SePay để tạo mã VietQR. Chỉ cần thêm tài khoản ngân hàng, Hải Đăng POS sẽ dùng tài khoản mặc định để tạo QR ở POS và hiển thị trên phiếu in.",

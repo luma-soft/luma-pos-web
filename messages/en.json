@@ -4118,6 +4118,9 @@
       "sepay": {
         "title": "SePay / VietQR bank accounts",
         "notificationTitle": "SePay payment notifications",
+        "autoConfirm": "Auto-confirm payments",
+        "autoConfirmHint": "Turning this off only stops webhook matching and automatic payment confirmation. POS can still create VietQR from an enabled bank account.",
+        "toggleSaveError": "Could not save payment notification settings.",
         "setupTitle": "SePay setup",
         "setupHelp": "Hải Đăng POS manages the webhook endpoint and server secret. Store users only add the receiving bank account here.",
         "qrOnlyHelp": "Users do not need to configure SePay to generate VietQR. Add a receiving bank account and Hải Đăng POS will use the default account for POS checkout QR and printed slips.",
