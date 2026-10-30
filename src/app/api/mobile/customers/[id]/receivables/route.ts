@@ -31,10 +31,14 @@ export async function POST(
   if (action === "collect") {
     const gate = await requireMobileSalesAccess();
     if (!gate.ok) return mobileGate(gate)!;
-    return mobileAction(await collectCustomerReceivableForUser(gate.userId, {
+    const result = await collectCustomerReceivableForUser(gate.userId, {
       ...payload,
       customerId,
-    } as CollectReceivableInput));
+    } as CollectReceivableInput);
+    if (!result.ok) {
+      console.warn("Mobile customer receivable collection rejected", { error: result.error });
+    }
+    return mobileAction(result);
   }
   if (action === "entry") {
     const gate = await requireMobileManager();
