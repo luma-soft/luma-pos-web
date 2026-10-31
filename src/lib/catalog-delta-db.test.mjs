@@ -14,14 +14,14 @@ test("delta journal records committed hard deletes, tenant isolation and replay 
 
   try {
     await pg.exec(`
-      DO $ BEGIN
+      DO $test_roles$ BEGIN
         IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
           CREATE ROLE anon;
         END IF;
         IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
           CREATE ROLE authenticated;
         END IF;
-      END $;
+      END $test_roles$;
       CREATE TABLE stores (id uuid PRIMARY KEY);
       CREATE TABLE catalog_sync_state (
         store_id uuid NOT NULL REFERENCES stores(id), id integer NOT NULL,
