@@ -24,6 +24,14 @@ export type ProductCatalogItem = {
   barcode: string | null;
   name: string;
   productKind: "product" | "service" | "combo";
+  // Optional to remain compatible with existing web offline snapshots. The
+  // mobile full-catalog endpoint always supplies these fields.
+  isActive?: boolean;
+  lifecycleStatus?: string;
+  trackBatches?: boolean;
+  supplierId?: string | null;
+  minStock?: string;
+  totalStock?: string;
   brandId: string | null;
   brandName: string | null;
   model: string | null;
