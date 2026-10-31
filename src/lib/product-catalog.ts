@@ -30,6 +30,8 @@ export type ProductCatalogItem = {
   lifecycleStatus?: string;
   trackBatches?: boolean;
   supplierId?: string | null;
+  supplierName?: string | null;
+  supplierIDs?: string[];
   minStock?: string;
   totalStock?: string;
   brandId: string | null;
