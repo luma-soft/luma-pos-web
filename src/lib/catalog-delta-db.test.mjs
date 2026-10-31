@@ -14,8 +14,14 @@ test("delta journal records committed hard deletes, tenant isolation and replay 
 
   try {
     await pg.exec(`
-      CREATE ROLE anon;
-      CREATE ROLE authenticated;
+      DO $ BEGIN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
+          CREATE ROLE anon;
+        END IF;
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
+          CREATE ROLE authenticated;
+        END IF;
+      END $;
       CREATE TABLE stores (id uuid PRIMARY KEY);
       CREATE TABLE catalog_sync_state (
         store_id uuid NOT NULL REFERENCES stores(id), id integer NOT NULL,
@@ -65,7 +71,9 @@ test("delta journal records committed hard deletes, tenant isolation and replay 
       SELECT store_id::text, revision, product_id::text, requires_full
       FROM catalog_delta_events ORDER BY store_id, revision
     `);
-    expect(events.rows).toEqual([
+    expect(events.rows.map((event) => ({
+      ...event, revision: Number(event.revision),
+    }))).toEqual([
       { store_id: storeA, revision: 11, product_id: productA, requires_full: false },
       { store_id: storeA, revision: 12, product_id: productA, requires_full: false },
       { store_id: storeB, revision: 21, product_id: productB, requires_full: false },
