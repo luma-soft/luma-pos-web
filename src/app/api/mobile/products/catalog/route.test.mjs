@@ -38,6 +38,7 @@ mock.module("@/lib/data/product-catalog", () => ({
       savedAt: 1,
       products: [{
         id: "product-a", name: "Dây điện", isActive: false,
+        relatedProductId: null,
         lifecycleStatus: "inactive", units: [{ unitName: "cuộn", directSale: true }],
       }],
       warehouses: [],
@@ -77,6 +78,8 @@ test("new revision returns full, authorized and inactive-aware snapshot", async 
   expect(body.data.mode).toBe("full");
   expect(body.data.deltaSupported).toBe(true);
   expect(body.data.catalog.products[0].isActive).toBe(false);
+  expect(body.data.catalog.products[0].relatedProductId).toBeNull();
+  expect(body.data.catalog.schemaVersion).toBe(10);
   expect(requestedOptions).toEqual([
     "store-a", "cashier-a", "cashier", { includeInactive: true },
   ]);
@@ -89,7 +92,7 @@ test("changed product or hard-delete returns replayable delta without full snaps
   deltaResult = {
     baseRevision: "41", revision: "42", schemaVersion: 10,
     userId: "cashier-a", scopeId: "store-a:cashier-a:cashier",
-    upserts: [{ id: "product-a", retailPrice: "15000" }],
+    upserts: [{ id: "product-a", retailPrice: "15000", relatedProductId: "product-root" }],
     deletedIds: ["product-deleted"],
   };
   const response = await GET(new Request(
@@ -100,6 +103,8 @@ test("changed product or hard-delete returns replayable delta without full snaps
   expect(body.data.mode).toBe("delta");
   expect(body.data.deltaSupported).toBe(true);
   expect(body.data.delta.deletedIds).toEqual(["product-deleted"]);
+  expect(body.data.delta.upserts[0].relatedProductId).toBe("product-root");
+  expect(body.data.delta.schemaVersion).toBe(10);
   expect(deltaRequests.at(-1)).toEqual(["store-a","cashier-a","cashier","41","42"]);
   expect(snapshotRequests).toBe(0);
   deltaResult = null;
