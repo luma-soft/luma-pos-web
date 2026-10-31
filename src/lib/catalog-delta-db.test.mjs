@@ -39,7 +39,7 @@ test("delta journal records committed hard deletes, tenant isolation and replay 
       "warehouses", "categories", "brands", "product_combo_items",
       "product_suppliers", "product_variant_members", "product_media",
       "suppliers", "media_objects", "orders", "order_items",
-      "product_variant_groups",
+      "purchase_orders", "purchase_order_items", "product_variant_groups",
     ];
     for (const table of others) {
       await pg.exec(`CREATE TABLE ${table} (
