@@ -14,6 +14,12 @@ export async function GET(request: Request) {
 
   const params = new URL(request.url).searchParams;
   const sinceRevision = params.get("sinceRevision")?.trim() ?? null;
+  const sinceScope = params.get("sinceScope")?.trim() ?? null;
+  const currentScope = `${gate.storeId}:${gate.userId}:${gate.role}`;
+  // Revision is store-wide, whereas the snapshot's prices and purchase-cost
+  // fields depend on the effective actor and role. Never replay/unchanged
+  // across a role, user or store switch.
+  const sameScope = sinceScope === currentScope;
   if (sinceRevision && !/^\d+$/.test(sinceRevision)) {
     return mobileError("errors.invalidData", 400);
   }
@@ -21,7 +27,7 @@ export async function GET(request: Request) {
   // Fast path: no need to build or transfer a full catalog when unchanged.
   // The transactionally journaled revision is store-scoped, not timestamp-based.
   const revision = await getProductCatalogRevision(gate.storeId);
-  if (sinceRevision === revision) {
+  if (sameScope && sinceRevision === revision) {
     const response = mobileOk({
       mode: "unchanged" as const,
       revision,
@@ -31,7 +37,7 @@ export async function GET(request: Request) {
     return response;
   }
 
-  if (sinceRevision && sinceRevision !== revision) {
+  if (sameScope && sinceRevision && sinceRevision !== revision) {
     try {
       const delta = await getProductCatalogDelta(
         gate.storeId, gate.userId, gate.role, sinceRevision, revision,
