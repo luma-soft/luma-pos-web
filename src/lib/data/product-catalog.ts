@@ -1,8 +1,10 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   brands,
   catalogSyncState,
+  catalogDeltaEvents,
+  catalogDeltaFloors,
   categories,
   productComboItems,
   orderItems,
@@ -38,12 +40,88 @@ export async function getProductCatalogRevision(storeId: string): Promise<string
   return String(state?.revision ?? 0);
 }
 
+export type ProductCatalogDelta = {
+  baseRevision: string;
+  revision: string;
+  schemaVersion: number;
+  userId: string;
+  scopeId: string;
+  upserts: ProductCatalogSnapshot["products"];
+  deletedIds: string[];
+};
+
+// Only replay a contiguous, retained revision range. A global catalog
+// mutation, a pre-journal client, a pruned gap, or a large delta falls back
+// to the full snapshot contract. No partial result is ever published.
+export async function getProductCatalogDelta(
+  storeId: string,
+  userId: string,
+  role: string,
+  sinceRevision: string,
+  expectedRevision: string,
+): Promise<ProductCatalogDelta | null> {
+  const since = Number(sinceRevision);
+  const target = Number(expectedRevision);
+  if (!Number.isSafeInteger(since) || !Number.isSafeInteger(target) ||
+      since >= target || since < 0) return null;
+
+  const [floor] = await db.select({ revision: catalogDeltaFloors.floorRevision })
+    .from(catalogDeltaFloors)
+    .where(eq(catalogDeltaFloors.storeId, storeId))
+    .limit(1);
+  if (!floor || since < floor.revision) return null;
+
+  const events = await db.select({
+    revision: catalogDeltaEvents.revision,
+    productId: catalogDeltaEvents.productId,
+    requiresFull: catalogDeltaEvents.requiresFull,
+  }).from(catalogDeltaEvents).where(and(
+    eq(catalogDeltaEvents.storeId, storeId),
+    gt(catalogDeltaEvents.revision, since),
+    lte(catalogDeltaEvents.revision, target),
+  )).orderBy(asc(catalogDeltaEvents.revision)).limit(2001);
+
+  if (events.length === 0 || events.length > 2000 ||
+      events.some((event) => event.requiresFull || !event.productId)) return null;
+
+  // Every increment is journaled in the same DB transaction. A gap means
+  // retention or a legacy writer; fail closed instead of missing tombstones.
+  let previous = since;
+  for (const event of events) {
+    if (event.revision !== previous + 1) return null;
+    previous = event.revision;
+  }
+  if (previous !== target) return null;
+
+  const changedIds = [...new Set(events.flatMap((event) => event.productId ? [event.productId] : []))];
+  if (changedIds.length > 300) return null;
+
+  const partial = await getProductCatalogSnapshot(storeId, userId, role, {
+    includeInactive: true,
+    productIds: changedIds,
+  });
+  // Snapshot builders retry when a revision changes during hydration. A
+  // changed revision here means our journal window is already stale.
+  if (partial.revision !== expectedRevision) return null;
+
+  const liveIds = new Set(partial.products.map((product) => product.id));
+  return {
+    baseRevision: sinceRevision,
+    revision: expectedRevision,
+    schemaVersion: partial.schemaVersion,
+    userId: partial.userId,
+    scopeId: partial.scopeId,
+    upserts: partial.products,
+    deletedIds: changedIds.filter((id) => !liveIds.has(id)),
+  };
+}
+
 /** Projection đầy đủ để mọi màn hình dùng chung khi online và offline. */
 export async function getProductCatalogSnapshot(
   storeId: string,
   userId: string,
   role: string,
-  options: { includeInactive?: boolean } = {},
+  options: { includeInactive?: boolean; productIds?: readonly string[] } = {},
 ): Promise<ProductCatalogSnapshot> {
   return buildProductCatalogSnapshot(storeId, userId, role, 0, options);
 }
@@ -53,7 +131,7 @@ async function buildProductCatalogSnapshot(
   userId: string,
   role: string,
   attempt: number,
-  options: { includeInactive?: boolean },
+  options: { includeInactive?: boolean; productIds?: readonly string[] },
 ): Promise<ProductCatalogSnapshot> {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const revisionBefore = await getProductCatalogRevision(storeId);
@@ -156,6 +234,7 @@ async function buildProductCatalogSnapshot(
       .where(and(
         eq(products.storeId, storeId),
         options.includeInactive ? undefined : eq(products.isActive, true),
+        options.productIds ? inArray(products.id, [...options.productIds]) : undefined,
       ))
       .orderBy(asc(products.name), asc(products.id)),
     db
@@ -167,7 +246,10 @@ async function buildProductCatalogSnapshot(
       .from(orderItems)
       .innerJoin(orders, eq(orders.id, orderItems.orderId))
       .innerJoin(products, eq(products.id, orderItems.productId))
-      .where(and(eq(orders.storeId, storeId), eq(orders.status, "completed")))
+      .where(and(
+        eq(orders.storeId, storeId), eq(orders.status, "completed"),
+        options.productIds ? inArray(orderItems.productId, [...options.productIds]) : undefined,
+      ))
       .groupBy(orderItems.productId, products.parentProductId),
     db
       .select({
