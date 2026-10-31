@@ -8,8 +8,10 @@ import {
   orderItems,
   orders,
   productPrices,
+  productSuppliers,
   products,
   productUnits,
+  suppliers,
   stockLevels,
   warehouses,
 } from "@/db/schema";
@@ -67,6 +69,13 @@ async function buildProductCatalogSnapshot(
         lifecycleStatus: products.lifecycleStatus,
         trackBatches: products.trackBatches,
         supplierId: products.supplierId,
+        supplierName: suppliers.name,
+        supplierIDs: sql<string[]> `coalesce((
+          select json_agg(distinct ${productSuppliers.supplierId})
+          from ${productSuppliers}
+          where ${productSuppliers.storeId} = ${storeId}::uuid
+            and ${productSuppliers.productId} = ${products.id}
+        ), '[]')`,
         minStock: products.minStock,
         totalStock: products.totalStock,
         brandId: products.brandId,
@@ -143,6 +152,7 @@ async function buildProductCatalogSnapshot(
       .from(products)
       .leftJoin(brands, eq(products.brandId, brands.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(suppliers, eq(products.supplierId, suppliers.id))
       .where(and(
         eq(products.storeId, storeId),
         options.includeInactive ? undefined : eq(products.isActive, true),
