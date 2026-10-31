@@ -30,6 +30,7 @@ import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 import { latestPurchaseNetPrices } from "@/lib/pricing/last-purchase-net-price";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 import { sortByRecentProductSale } from "@/lib/data/recent-product-sales";
+import { changedCatalogProductIds } from "@/lib/catalog-delta";
 
 export async function getProductCatalogRevision(storeId: string): Promise<string> {
   const [state] = await db
@@ -81,20 +82,9 @@ export async function getProductCatalogDelta(
     lte(catalogDeltaEvents.revision, target),
   )).orderBy(asc(catalogDeltaEvents.revision)).limit(2001);
 
-  if (events.length === 0 || events.length > 2000 ||
-      events.some((event) => event.requiresFull || !event.productId)) return null;
-
-  // Every increment is journaled in the same DB transaction. A gap means
-  // retention or a legacy writer; fail closed instead of missing tombstones.
-  let previous = since;
-  for (const event of events) {
-    if (event.revision !== previous + 1) return null;
-    previous = event.revision;
-  }
-  if (previous !== target) return null;
-
-  const changedIds = [...new Set(events.flatMap((event) => event.productId ? [event.productId] : []))];
-  if (changedIds.length > 300) return null;
+  // Gap, stale history, cross-product change or oversized patch => full.
+  const changedIds = changedCatalogProductIds(since, target, events);
+  if (!changedIds) return null;
 
   const partial = await getProductCatalogSnapshot(storeId, userId, role, {
     includeInactive: true,
