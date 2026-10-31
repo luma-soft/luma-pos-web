@@ -54,7 +54,7 @@ test("same revision returns no-op without downloading the product catalog", asyn
   expect(response.status).toBe(200);
   expect(response.headers.get("cache-control")).toContain("no-store");
   expect((await response.json()).data).toEqual({
-    mode: "unchanged", revision: "42", deltaSupported: false,
+    mode: "unchanged", revision: "42", deltaSupported: true,
   });
   expect(snapshotRequests).toBe(0);
 });
@@ -75,7 +75,7 @@ test("new revision returns full, authorized and inactive-aware snapshot", async 
   const body = await response.json();
   expect(response.status).toBe(200);
   expect(body.data.mode).toBe("full");
-  expect(body.data.deltaSupported).toBe(false);
+  expect(body.data.deltaSupported).toBe(true);
   expect(body.data.catalog.products[0].isActive).toBe(false);
   expect(requestedOptions).toEqual([
     "store-a", "cashier-a", "cashier", { includeInactive: true },
