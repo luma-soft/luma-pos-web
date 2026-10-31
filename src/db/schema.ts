@@ -780,6 +780,24 @@ export const catalogSyncState = pgTable("catalog_sync_state", {
   check("catalog_sync_state_singleton_check", sql`${t.id} = 1`),
 ]);
 
+// Canonical mobile catalog delta journal. Each committed revision has one
+// changed product ID or a requires-full marker, including DELETE tombstones.
+export const catalogDeltaFloors = pgTable("catalog_delta_floors", {
+  storeId: uuid("store_id").primaryKey().references(() => stores.id, { onDelete: "cascade" }),
+  floorRevision: bigint("floor_revision", { mode: "number" }).notNull(),
+});
+
+export const catalogDeltaEvents = pgTable("catalog_delta_events", {
+  storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "cascade" }),
+  revision: bigint("revision", { mode: "number" }).notNull(),
+  productId: uuid("product_id"),
+  requiresFull: boolean("requires_full").notNull().default(false),
+  changedAt: timestamp("changed_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.storeId, t.revision] }),
+  index("catalog_delta_events_retention_idx").on(t.changedAt),
+]);
+
 // ============= Stock Movements (audit) =============
 
 export const stockMovements = pgTable("stock_movements", {

@@ -1,4 +1,4 @@
-import { getProductCatalogRevision, getProductCatalogSnapshot } from "@/lib/data/product-catalog";
+import { getProductCatalogDelta, getProductCatalogRevision, getProductCatalogSnapshot } from "@/lib/data/product-catalog";
 import { requireMobileStockReadAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 
@@ -14,22 +14,48 @@ export async function GET(request: Request) {
 
   const params = new URL(request.url).searchParams;
   const sinceRevision = params.get("sinceRevision")?.trim() ?? null;
+  const sinceScope = params.get("sinceScope")?.trim() ?? null;
+  const currentScope = `${gate.storeId}:${gate.userId}:${gate.role}`;
+  // Revision is store-wide, whereas the snapshot's prices and purchase-cost
+  // fields depend on the effective actor and role. Never replay/unchanged
+  // across a role, user or store switch.
+  const sameScope = sinceScope === currentScope;
   if (sinceRevision && !/^\d+$/.test(sinceRevision)) {
     return mobileError("errors.invalidData", 400);
   }
 
   // Fast path: no need to build or transfer a full catalog when unchanged.
-  // Use the canonical revision shared with the catalog_sync_state trigger.
+  // The transactionally journaled revision is store-scoped, not timestamp-based.
   const revision = await getProductCatalogRevision(gate.storeId);
-  if (sinceRevision === revision) {
+  if (sameScope && sinceRevision === revision) {
     const response = mobileOk({
       mode: "unchanged" as const,
       revision,
-      // Never claim delta while no revision-scoped tombstone log exists.
-      deltaSupported: false,
+      deltaSupported: true,
     });
     response.headers.set("Cache-Control", "private, no-store, max-age=0");
     return response;
+  }
+
+  if (sameScope && sinceRevision && sinceRevision !== revision) {
+    try {
+      const delta = await getProductCatalogDelta(
+        gate.storeId, gate.userId, gate.role, sinceRevision, revision,
+      );
+      if (delta) {
+        const response = mobileOk({
+          mode: "delta" as const,
+          revision: delta.revision,
+          deltaSupported: true,
+          delta,
+        });
+        response.headers.set("Cache-Control", "private, no-store, max-age=0");
+        return response;
+      }
+    } catch {
+      // Missing migration/table or concurrent catalog edit: never return an
+      // incomplete delta. Retain the original authoritative full fallback.
+    }
   }
 
   try {
@@ -42,7 +68,7 @@ export async function GET(request: Request) {
     const response = mobileOk({
       mode: "full" as const,
       revision: snapshot.revision,
-      deltaSupported: false,
+      deltaSupported: true,
       catalog: snapshot,
     });
     response.headers.set("Cache-Control", "private, no-store, max-age=0");
