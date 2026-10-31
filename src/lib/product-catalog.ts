@@ -1,6 +1,6 @@
 import { normalizeSearch, matchesSearchTokens } from "@/lib/normalize";
 
-export const PRODUCT_CATALOG_SCHEMA_VERSION = 9;
+export const PRODUCT_CATALOG_SCHEMA_VERSION = 10;
 
 export type CatalogUnit = {
   unitName: string;
@@ -52,6 +52,10 @@ export type ProductCatalogItem = {
   imageUpdatedAt: string;
   specs: unknown;
   parentProductId: string | null;
+  // Legacy related-product families are grouped ONLY in Inventory's list.
+  // Keep optional for older persisted web snapshots; new mobile full/delta
+  // snapshots always include this field, including explicit null roots.
+  relatedProductId?: string | null;
   variantName: string | null;
   isVariantParent: boolean;
   m2PerUnit: string | null;
