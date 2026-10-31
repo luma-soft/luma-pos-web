@@ -106,6 +106,7 @@ DECLARE
 BEGIN
   FOREACH table_name IN ARRAY ARRAY[
     'suppliers', 'media_objects', 'orders', 'order_items',
+    'purchase_orders', 'purchase_order_items',
     'product_variant_groups'
   ] LOOP
     EXECUTE format(
