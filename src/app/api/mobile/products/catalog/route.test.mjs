@@ -50,7 +50,7 @@ const { GET } = await import("./route");
 test("same revision returns no-op without downloading the product catalog", async () => {
   authorized = true; shouldFail = false; snapshotRequests = 0;
   deltaResult = null; deltaThrows = false;
-  const response = await GET(new Request("http://localhost/api/mobile/products/catalog?sinceRevision=42"));
+  const response = await GET(new Request("http://localhost/api/mobile/products/catalog?sinceRevision=42&sinceScope=store-a%3Acashier-a%3Acashier"));
   expect(response.status).toBe(200);
   expect(response.headers.get("cache-control")).toContain("no-store");
   expect((await response.json()).data).toEqual({
@@ -59,9 +59,19 @@ test("same revision returns no-op without downloading the product catalog", asyn
   expect(snapshotRequests).toBe(0);
 });
 
+test("same store revision with changed effective role is a FULL download", async () => {
+  authorized = true; shouldFail = false; snapshotRequests = 0;
+  const response = await GET(new Request(
+    "http://localhost/api/mobile/products/catalog?sinceRevision=42&sinceScope=store-a%3Aprevious-user%3Aowner",
+  ));
+  const body = await response.json();
+  expect(body.data.mode).toBe("full");
+  expect(snapshotRequests).toBe(1);
+});
+
 test("new revision returns full, authorized and inactive-aware snapshot", async () => {
   snapshotRequests = 0;
-  const response = await GET(new Request("http://localhost/api/mobile/products/catalog?sinceRevision=41"));
+  const response = await GET(new Request("http://localhost/api/mobile/products/catalog?sinceRevision=41&sinceScope=store-a%3Acashier-a%3Acashier"));
   const body = await response.json();
   expect(response.status).toBe(200);
   expect(body.data.mode).toBe("full");
@@ -83,7 +93,7 @@ test("changed product or hard-delete returns replayable delta without full snaps
     deletedIds: ["product-deleted"],
   };
   const response = await GET(new Request(
-    "http://localhost/api/mobile/products/catalog?sinceRevision=41",
+    "http://localhost/api/mobile/products/catalog?sinceRevision=41&sinceScope=store-a%3Acashier-a%3Acashier",
   ));
   const body = await response.json();
   expect(response.status).toBe(200);
@@ -99,14 +109,14 @@ test("journal gaps or full-required changes fall back to complete catalog", asyn
   authorized = true; shouldFail = false;
   deltaResult = null; deltaThrows = false; snapshotRequests = 0;
   const response = await GET(new Request(
-    "http://localhost/api/mobile/products/catalog?sinceRevision=38",
+    "http://localhost/api/mobile/products/catalog?sinceRevision=38&sinceScope=store-a%3Acashier-a%3Acashier",
   ));
   expect((await response.json()).data.mode).toBe("full");
   expect(snapshotRequests).toBe(1);
 
   deltaThrows = true; snapshotRequests = 0;
   const fallback = await GET(new Request(
-    "http://localhost/api/mobile/products/catalog?sinceRevision=38",
+    "http://localhost/api/mobile/products/catalog?sinceRevision=38&sinceScope=store-a%3Acashier-a%3Acashier",
   ));
   expect((await fallback.json()).data.mode).toBe("full");
   expect(snapshotRequests).toBe(1);
