@@ -164,6 +164,7 @@ async function buildProductCatalogSnapshot(
         imageUpdatedAt: products.imageUpdatedAt,
         specs: products.specs,
         parentProductId: products.parentProductId,
+        relatedProductId: products.relatedProductId,
         variantName: products.variantName,
         isVariantParent: products.isVariantParent,
         m2PerUnit: products.m2PerUnit,
