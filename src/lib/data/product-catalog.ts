@@ -8,8 +8,10 @@ import {
   orderItems,
   orders,
   productPrices,
+  productSuppliers,
   products,
   productUnits,
+  suppliers,
   stockLevels,
   warehouses,
 } from "@/db/schema";
@@ -41,8 +43,9 @@ export async function getProductCatalogSnapshot(
   storeId: string,
   userId: string,
   role: string,
+  options: { includeInactive?: boolean } = {},
 ): Promise<ProductCatalogSnapshot> {
-  return buildProductCatalogSnapshot(storeId, userId, role, 0);
+  return buildProductCatalogSnapshot(storeId, userId, role, 0, options);
 }
 
 async function buildProductCatalogSnapshot(
@@ -50,6 +53,7 @@ async function buildProductCatalogSnapshot(
   userId: string,
   role: string,
   attempt: number,
+  options: { includeInactive?: boolean },
 ): Promise<ProductCatalogSnapshot> {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const revisionBefore = await getProductCatalogRevision(storeId);
@@ -61,6 +65,19 @@ async function buildProductCatalogSnapshot(
         barcode: products.barcode,
         name: products.name,
         productKind: products.productKind,
+        isActive: products.isActive,
+        lifecycleStatus: products.lifecycleStatus,
+        trackBatches: products.trackBatches,
+        supplierId: products.supplierId,
+        supplierName: suppliers.name,
+        supplierIDs: sql<string[]> `coalesce((
+          select json_agg(distinct ${productSuppliers.supplierId})
+          from ${productSuppliers}
+          where ${productSuppliers.storeId} = ${storeId}::uuid
+            and ${productSuppliers.productId} = ${products.id}
+        ), '[]')`,
+        minStock: products.minStock,
+        totalStock: products.totalStock,
         brandId: products.brandId,
         brandName: brands.name,
         model: sql<string | null>`${products.specs} ->> 'model'`,
@@ -106,7 +123,8 @@ async function buildProductCatalogSnapshot(
             'multiplier', ${productUnits.multiplier},
             'sku', ${productUnits.sku},
             'barcode', ${productUnits.barcode},
-            'priceOverride', ${productUnits.priceOverride}
+            'priceOverride', ${productUnits.priceOverride},
+            'directSale', ${productUnits.directSale}
           ) order by ${productUnits.sortOrder})
           from ${productUnits}
           where ${productUnits.storeId} = ${storeId}::uuid
@@ -134,7 +152,11 @@ async function buildProductCatalogSnapshot(
       .from(products)
       .leftJoin(brands, eq(products.brandId, brands.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(and(eq(products.storeId, storeId), eq(products.isActive, true)))
+      .leftJoin(suppliers, eq(products.supplierId, suppliers.id))
+      .where(and(
+        eq(products.storeId, storeId),
+        options.includeInactive ? undefined : eq(products.isActive, true),
+      ))
       .orderBy(asc(products.name), asc(products.id)),
     db
       .select({
@@ -164,7 +186,7 @@ async function buildProductCatalogSnapshot(
   const revisionAfter = await getProductCatalogRevision(storeId);
   if (revisionBefore !== revisionAfter) {
     if (attempt >= 2) throw new Error("PRODUCT_CATALOG_CHANGED_DURING_SNAPSHOT");
-    return buildProductCatalogSnapshot(storeId, userId, role, attempt + 1);
+    return buildProductCatalogSnapshot(storeId, userId, role, attempt + 1, options);
   }
 
   const lastSoldAtByProduct = new Map<string, Date | string>();
