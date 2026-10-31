@@ -100,7 +100,7 @@ FOR EACH ROW EXECUTE FUNCTION public.bump_product_catalog_revision();
 -- Metadata used by the snapshot but not owned by a product row also
 -- invalidates the catalog. A full marker is safer than silently omitting
 -- a renamed supplier, changed media URL or recent-sales sorting change.
-DO $
+DO $catalog_delta_triggers$
 DECLARE
   table_name text;
 BEGIN
@@ -118,7 +118,7 @@ BEGIN
       table_name, table_name
     );
   END LOOP;
-END $;
+END $catalog_delta_triggers$;
 --> statement-breakpoint
 -- Restrict direct client reads/writes of the journal. Only server-side DB
 -- credentials may read it; authenticated users access the gated API instead.
