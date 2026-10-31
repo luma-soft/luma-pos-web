@@ -97,6 +97,28 @@ CREATE TRIGGER product_media_catalog_revision
 AFTER INSERT OR UPDATE OR DELETE ON public.product_media
 FOR EACH ROW EXECUTE FUNCTION public.bump_product_catalog_revision();
 --> statement-breakpoint
+-- Metadata used by the snapshot but not owned by a product row also
+-- invalidates the catalog. A full marker is safer than silently omitting
+-- a renamed supplier, changed media URL or recent-sales sorting change.
+DO $
+DECLARE
+  table_name text;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY[
+    'suppliers', 'media_objects', 'orders', 'order_items',
+    'product_variant_groups'
+  ] LOOP
+    EXECUTE format(
+      'DROP TRIGGER IF EXISTS %I_catalog_revision ON public.%I',
+      table_name, table_name
+    );
+    EXECUTE format(
+      'CREATE TRIGGER %I_catalog_revision AFTER INSERT OR UPDATE OR DELETE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.bump_product_catalog_revision()',
+      table_name, table_name
+    );
+  END LOOP;
+END $;
+--> statement-breakpoint
 -- Restrict direct client reads/writes of the journal. Only server-side DB
 -- credentials may read it; authenticated users access the gated API instead.
 ALTER TABLE public.catalog_delta_events ENABLE ROW LEVEL SECURITY;
@@ -128,12 +150,14 @@ BEGIN
   ), floors AS (
     SELECT store_id, max(revision) AS revision
     FROM old_rows GROUP BY store_id
+  ), updated_floors AS (
+    INSERT INTO public.catalog_delta_floors (store_id, floor_revision)
+    SELECT store_id, revision FROM floors
+    ON CONFLICT (store_id) DO UPDATE SET floor_revision =
+      greatest(public.catalog_delta_floors.floor_revision, excluded.floor_revision)
+    RETURNING store_id
   )
-  INSERT INTO public.catalog_delta_floors (store_id, floor_revision)
-  SELECT store_id, revision FROM floors
-  ON CONFLICT (store_id) DO UPDATE SET floor_revision =
-    greatest(public.catalog_delta_floors.floor_revision, excluded.floor_revision);
-  GET DIAGNOSTICS removed = ROW_COUNT;
+  SELECT count(*) INTO removed FROM old_rows;
   RETURN removed;
 END;
 $$;
