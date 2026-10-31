@@ -31,7 +31,7 @@ mock.module("@/lib/data/product-catalog", () => ({
     requestedOptions = args;
     if (shouldFail) throw new Error("snapshot changed during sync");
     return {
-      schemaVersion: 9,
+      schemaVersion: 10,
       revision,
       userId: args[1],
       scopeId: "store-a:cashier-a:cashier",
@@ -87,7 +87,7 @@ test("changed product or hard-delete returns replayable delta without full snaps
   authorized = true; shouldFail = false;
   snapshotRequests = 0; deltaRequests.length = 0;
   deltaResult = {
-    baseRevision: "41", revision: "42", schemaVersion: 9,
+    baseRevision: "41", revision: "42", schemaVersion: 10,
     userId: "cashier-a", scopeId: "store-a:cashier-a:cashier",
     upserts: [{ id: "product-a", retailPrice: "15000" }],
     deletedIds: ["product-deleted"],
