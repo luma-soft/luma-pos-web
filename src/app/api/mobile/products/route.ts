@@ -56,7 +56,9 @@ export async function GET(request: Request) {
       includeLastPurchaseNetPrice: includePurchasePrices,
       includeThumbnailUrl: true,
       stock: searchParam(request, "stock") as "instock" | "low" | "out" | undefined,
-      sort: parseProductListSort(searchParam(request, "sort")),
+      sort: searchParam(request, "sort") === "recent_sales"
+        ? "recent_sales"
+        : parseProductListSort(searchParam(request, "sort")),
       productKind: searchParam(request, "productKind") as "product" | "service" | "combo" | undefined,
       status: (searchParam(request, "status") ?? searchParam(request, "lifecycle")) as ProductStatusFilter | undefined,
       view: searchParam(request, "view") as ProductListView | undefined,

@@ -49,6 +49,10 @@ import {
   selectRelatedProducts,
 } from "@/lib/products/related-products";
 import { projectVariantGroup, type StoredVariantGroup, type StoredVariantMember, type VariantCatalogEntry } from "@/lib/products/variant-group-read";
+import {
+  lastCompletedProductSaleAt,
+  recentProductSaleOrder,
+} from "@/lib/data/recent-product-sales";
 
 export const PRODUCTS_PAGE_SIZE = 20;
 
@@ -68,7 +72,9 @@ export interface ProductListFilters extends PriceComparison {
   supplierId?: string;
   productKind?: "product" | "service" | "combo";
   stock?: "instock" | "low" | "out";
-  sort?: ProductListSort;
+  // `recent_sales` is an internal mobile catalog order used by POS search;
+  // it is intentionally not exposed as an Inventory filter choice.
+  sort?: ProductListSort | "recent_sales";
   status?: ProductStatusFilter;
   view?: ProductListView;
   /** Keep legacy clients flat for imported KiotViet related-product families. */
@@ -258,6 +264,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
         isActive: products.isActive,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
+        lastSoldAt: lastCompletedProductSaleAt(),
         categoryName: categories.name,
         brandName: brands.name,
         location: products.location,
@@ -357,14 +364,16 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
       .leftJoin(stockLevels, stockJoin)
       .where(where)
       .groupBy(products.id, categories.name, brands.name)
-      .orderBy(
-        sort === "stock"
-          ? sql`${groupStockForSort} desc nulls last`
-          : sort === "updated"
-            ? desc(products.updatedAt)
-            : asc(products.name),
-        asc(products.id),
-      )
+      .orderBy(...(sort === "recent_sales"
+        ? recentProductSaleOrder()
+        : [
+            sort === "stock"
+              ? sql`${groupStockForSort} desc nulls last`
+              : sort === "updated"
+                ? desc(products.updatedAt)
+                : asc(products.name),
+            asc(products.id),
+          ]))
       .limit(size)
       .offset((page - 1) * size),
     db.select({ total: count() }).from(products).where(where),
@@ -408,6 +417,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
             isActive: products.isActive,
             createdAt: products.createdAt,
             updatedAt: products.updatedAt,
+            lastSoldAt: lastCompletedProductSaleAt(),
             categoryName: categories.name,
             brandName: brands.name,
             location: products.location,
@@ -459,14 +469,16 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
           .leftJoin(stockLevels, stockJoin)
           .where(and(eq(products.storeId, storeId), inArray(products.parentProductId, parentIds)))
           .groupBy(products.id, categories.name, brands.name)
-          .orderBy(
-            sort === "stock"
-              ? desc(products.totalStock)
-              : sort === "updated"
-                ? desc(products.updatedAt)
-                : asc(products.name),
-            asc(products.id),
-          )
+          .orderBy(...(sort === "recent_sales"
+            ? recentProductSaleOrder()
+            : [
+                sort === "stock"
+                  ? desc(products.totalStock)
+                  : sort === "updated"
+                    ? desc(products.updatedAt)
+                    : asc(products.name),
+                asc(products.id),
+              ]))
       : [];
 
   const purchaseNetPriceByProductId = filters.includeLastPurchaseNetPrice === false
