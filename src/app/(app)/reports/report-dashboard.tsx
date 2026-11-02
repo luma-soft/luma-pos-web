@@ -191,8 +191,15 @@ function ChartLegend({ items }: { items: [string, string, boolean?][] }) { retur
 function LineChart({ rows, previous, series, fullWidth }: { rows: ReportsData["byDay"]; previous?: ReportsData["byDay"]; series: { key: "revenue" | "grossProfit"; color: string; previousColor?: string }[]; fullWidth?: boolean }) {
   const all = [...rows, ...(previous ?? [])];
   const max = Math.max(1, ...all.flatMap((row) => series.map((item) => Math.abs(row[item.key]))));
-  const points = (data: ReportsData["byDay"], key: "revenue" | "grossProfit") => data.map((row, index) => `${(index / Math.max(1, data.length - 1)) * 960 + 20},${190 - Math.max(0, row[key]) / max * 160}`).join(" ");
-  return <div className="overflow-x-auto"><svg viewBox="0 0 1000 220" role="img" aria-label="Biểu đồ doanh thu và lãi gộp theo ngày" className={cn("h-48 min-w-[640px] w-full", fullWidth && "lg:aspect-[1000/220] lg:h-auto")}><g stroke="#e5e7eb" strokeWidth="1">{[30,70,110,150,190].map((y) => <line key={y} x1="20" y1={y} x2="980" y2={y} />)}</g>{previous && series.map((item) => <polyline key={`p-${item.key}`} fill="none" stroke={item.previousColor ?? item.color} strokeWidth="2" strokeDasharray="4 5" points={points(previous, item.key)} />)}{series.map((item) => <polyline key={item.key} fill="none" stroke={item.color} strokeWidth="2.5" points={points(rows, item.key)} />)}{rows.map((row, index) => <text key={row.day} x={(index / Math.max(1, rows.length - 1)) * 960 + 20} y="214" textAnchor="middle" fontSize="9" fill="#64748b">{row.day.slice(8)}</text>)}</svg></div>;
+  const xFor = (index: number, length: number) => length === 1 ? 500 : (index / (length - 1)) * 960 + 20;
+  const yFor = (value: number) => 190 - Math.max(0, value) / max * 160;
+  const points = (data: ReportsData["byDay"], key: "revenue" | "grossProfit") => data.map((row, index) => `${xFor(index, data.length)},${yFor(row[key])}`).join(" ");
+  const singlePoint = (data: ReportsData["byDay"], key: "revenue" | "grossProfit", color: string, label: string) => {
+    if (data.length !== 1) return null;
+    const row = data[0];
+    return <circle cx={xFor(0, data.length)} cy={yFor(row[key])} r="4.5" fill={color} stroke="white" strokeWidth="1.5"><title>{`${label}: ${compactMoney(row[key])} · ${row.day}`}</title></circle>;
+  };
+  return <div className="overflow-x-auto"><svg viewBox="0 0 1000 220" role="img" aria-label="Biểu đồ doanh thu và lãi gộp theo ngày" className={cn("h-48 min-w-[640px] w-full", fullWidth && "lg:aspect-[1000/220] lg:h-auto")}><g stroke="#e5e7eb" strokeWidth="1">{[30,70,110,150,190].map((y) => <line key={y} x1="20" y1={y} x2="980" y2={y} />)}</g>{previous && series.map((item) => <g key={`p-${item.key}`}><polyline fill="none" stroke={item.previousColor ?? item.color} strokeWidth="2" strokeDasharray="4 5" points={points(previous, item.key)} />{singlePoint(previous, item.key, item.previousColor ?? item.color, `Kỳ trước · ${item.key === "revenue" ? "Doanh thu thuần" : "Lãi gộp"}`)}</g>)}{series.map((item) => <g key={item.key}><polyline fill="none" stroke={item.color} strokeWidth="2.5" points={points(rows, item.key)} />{singlePoint(rows, item.key, item.color, item.key === "revenue" ? "Doanh thu thuần" : "Lãi gộp")}</g>)}{rows.map((row, index) => <text key={row.day} x={xFor(index, rows.length)} y="214" textAnchor="middle" fontSize="9" fill="#64748b">{row.day.slice(8)}</text>)}</svg></div>;
 }
 
 function OrderChart({ rows }: { rows: ReportsData["byDay"] }) {
