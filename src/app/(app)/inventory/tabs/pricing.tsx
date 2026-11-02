@@ -113,6 +113,7 @@ async function PricingContent({
         total={total}
         filters={filters}
         canViewPurchasePrices={includePurchasePrices}
+        canEditCostPrice={includePurchasePrices}
         resetScrollKey={[
           params.q,
           params.category,

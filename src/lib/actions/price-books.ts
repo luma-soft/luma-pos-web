@@ -1,8 +1,10 @@
 "use server";
 
+import { recordManualInventoryCost } from "@/lib/inventory/cost-valuation";
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
+import { z } from "zod";
 import { priceBooks, productPrices, productUnits, products } from "@/db/schema";
 import { type ActionResult, requireManager, toMoney } from "./common";
 import { Routes } from "@/lib/routes";
@@ -235,4 +237,59 @@ export async function setProductPrice(input: {
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
   } catch (e) { console.error("setProductPrice failed:", e); return { ok: false, error: "errors.serverError" }; }
+}
+
+/** Update the product's editable cost source from the pricing setup screen. */
+export async function setProductCostPrice(input: {
+  productId: string;
+  costPrice: number;
+  expectedCostPrice?: number;
+}): Promise<ActionResult> {
+  const gate = await requireManager(); if (!gate.ok) return gate;
+  const parsed = z.object({
+    productId: z.uuid(),
+    costPrice: z.number().finite().min(0),
+    expectedCostPrice: z.number().finite().min(0).optional(),
+  }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const { productId, costPrice, expectedCostPrice } = parsed.data;
+  const nextCost = Number(toMoney(costPrice));
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [product] = await tx.select({ name: products.name, sku: products.sku, costPrice: products.costPrice })
+        .from(products)
+        .where(and(eq(products.storeId, gate.storeId), eq(products.id, productId)))
+        .limit(1)
+        .for("update");
+      if (!product) return "errors.invalidData";
+      const currentCost = Number(product.costPrice);
+      if (expectedCostPrice !== undefined && currentCost !== Number(toMoney(expectedCostPrice))) {
+        return "pricing.errors.priceChanged";
+      }
+      if (currentCost === nextCost) return null;
+
+      await recordManualInventoryCost(tx, gate.storeId, productId, nextCost);
+      await tx.update(products).set({ costPrice: toMoney(nextCost), updatedAt: sql`now()` })
+        .where(and(eq(products.storeId, gate.storeId), eq(products.id, productId)));
+      await recordActivity(tx, {
+        storeId: gate.storeId,
+        actorId: gate.userId,
+        action: "product.prices.updated",
+        entityType: "product",
+        entityId: productId,
+        before: { name: product.name, sku: product.sku, costPrice: currentCost },
+        after: { name: product.name, sku: product.sku, costPrice: nextCost },
+        metadata: { field: "costPrice" },
+      });
+      return null;
+    });
+    if (result) return { ok: false, error: result };
+    for (const path of [Routes.Pricing, Routes.Products, Routes.Inventory, Routes.POS, Routes.Reports]) {
+      revalidatePath(path);
+    }
+    return { ok: true, data: undefined };
+  } catch (e) {
+    console.error("setProductCostPrice failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
 }
