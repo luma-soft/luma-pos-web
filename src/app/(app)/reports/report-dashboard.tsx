@@ -173,7 +173,7 @@ function KpiGrid({ children, mobileCarousel }: { children: React.ReactNode; mobi
 }
 
 function KpiCard({ label, value, suffix, delta, featured, wideMobile, thirdMobile, point, inverse }: { label: string; value: string; suffix?: string; delta: number | null; featured?: boolean; wideMobile?: boolean; thirdMobile?: boolean; point?: boolean; inverse?: boolean }) {
-  return <div className={cn("col-span-3 min-h-[112px] snap-start rounded-xl border bg-surface p-4 lg:col-span-1", featured ? "border-primary-500" : "border-border", wideMobile && "col-span-6", thirdMobile && "col-span-2 p-3 lg:p-4")}><div className="text-xs font-bold text-slate-700">{label} <span className="ml-1 text-slate-400">ⓘ</span></div><div className={cn("mt-2 font-black tabular-nums tracking-tight", featured ? "text-3xl text-primary-700" : "text-[clamp(1.3rem,2vw,1.8rem)]", thirdMobile && "text-lg lg:text-[clamp(1.3rem,2vw,1.8rem)]")}>{value}<span className="text-base">{suffix}</span></div><Delta value={delta} point={point} inverse={inverse} /></div>;
+  return <div className={cn("col-span-3 min-h-[112px] snap-start rounded-xl border bg-surface p-4 lg:col-span-1", featured ? "border-primary-500" : "border-border", wideMobile && "col-span-6", thirdMobile && "col-span-2 p-3 lg:p-4")}><div className="text-xs font-bold text-slate-700">{label}</div><div className={cn("mt-2 font-black tabular-nums tracking-tight", featured ? "text-3xl text-primary-700" : "text-[clamp(1.3rem,2vw,1.8rem)]", thirdMobile && "text-lg lg:text-[clamp(1.3rem,2vw,1.8rem)]")}>{value}<span className="text-base">{suffix}</span></div><Delta value={delta} point={point} inverse={inverse} /></div>;
 }
 
 function Delta({ value, point, inverse }: { value: number | null; point?: boolean; inverse?: boolean }) {
