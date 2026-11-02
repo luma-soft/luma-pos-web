@@ -34,18 +34,34 @@ function AlternatePriceEditor({ row, book, retailId, unitName, disabled, onCommi
     className="min-h-10 w-full rounded-md border border-border bg-surface px-2 text-right text-sm tabular-nums disabled:opacity-60" />;
 }
 
-/** Every book repeats the same unit order, preserving product-level table rows. */
-export function PricingUnitEditors({ row, book, retailId, disabled = false, onCommit }: {
+/** Show unit prices in a stack or as one compact cell for a unit-specific row. */
+export function PricingUnitEditors({ row, book, retailId, disabled = false, onCommit, unitName, compact = false }: {
   row: PricingRow; book: PricingBook; retailId: string; disabled?: boolean;
   onCommit: (value: number | null, unitName: string) => void;
+  unitName?: string;
+  compact?: boolean;
 }) {
-  const units = (row.units ?? []).filter((unit) => unit.unitName !== row.baseUnit);
+  const units = (row.units ?? []).filter((unit) => unit.unitName !== row.baseUnit && (!unitName || unit.unitName === unitName));
   if (!units.length) return null;
-  return <div className="mt-2 space-y-2 text-left" onClick={stopRowToggle}>
+  return <div className={compact ? "min-w-0 text-left" : "mt-2 space-y-2 text-left"} onClick={stopRowToggle}>
     {units.map((unit) => {
       const editable = canEditPricingUnit(row, book, retailId, unit.unitName);
       const readOnly = isPriceBookReadOnly(book);
       const fixed = systemPriceBookType(book) === "retail" && unit.priceOverride != null;
+      const value = pricingUnitValue(row, book, retailId, unit.unitName);
+      if (compact) {
+        return <div key={unit.id ?? unit.unitName} className="min-w-0">
+          {editable ? <AlternatePriceEditor row={row} book={book} retailId={retailId} unitName={unit.unitName} disabled={disabled} onCommit={onCommit} />
+            : <span aria-label={`${book.name} / ${unit.unitName}`} className="block min-h-11 py-2 text-right text-sm tabular-nums"
+              title={!readOnly ? "Không thể quy ngược khi giá chung hoặc giá riêng bằng 0. Hãy sửa giá đơn vị gốc." : undefined}>
+              {pricingMoneyLabel(value)}
+            </span>}
+          <p className="mt-1 min-h-4 text-right text-[11px] leading-4 text-slate-500">
+            {value == null ? "Chưa có dữ liệu" : fixed ? "Giá riêng" : "Quy đổi"}
+          </p>
+          {!editable && !readOnly && <p className="text-right text-[11px] leading-4 text-slate-500">Sửa giá tại {row.baseUnit}</p>}
+        </div>;
+      }
       return <div key={unit.id ?? unit.unitName} className="border-t border-border-soft pt-2">
         <div className="mb-1 flex items-baseline justify-between gap-1 text-xs">
           <span className="font-semibold">{unit.unitName}</span>
@@ -55,7 +71,7 @@ export function PricingUnitEditors({ row, book, retailId, disabled = false, onCo
         {editable ? <AlternatePriceEditor row={row} book={book} retailId={retailId} unitName={unit.unitName} disabled={disabled} onCommit={onCommit} />
           : <span aria-label={`${book.name} / ${unit.unitName}`} className="block min-h-11 py-2 text-right text-sm tabular-nums"
             title={!readOnly ? "Không thể quy ngược khi giá chung hoặc giá riêng bằng 0. Hãy sửa giá đơn vị gốc." : undefined}>
-            {pricingMoneyLabel(pricingUnitValue(row, book, retailId, unit.unitName))}
+            {pricingMoneyLabel(value)}
           </span>}
         <p className="h-4 text-[11px] leading-4 text-slate-500">{!editable && !readOnly ? `Sửa giá tại ${row.baseUnit}` : null}</p>
       </div>;

@@ -53,6 +53,10 @@ function priceColumnWidth(book: PricingBook): number {
   }
 }
 
+function pricingQuantity(value: number): string {
+  return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 4 }).format(value);
+}
+
 function PricingBookLabel({ book }: { book: PricingBook }) {
   const type = systemPriceBookType(book);
   const description = type === "purchase"
@@ -163,12 +167,13 @@ function PriceBookBaseEditor({
   );
 }
 
-export function PriceBookEditor(props: Parameters<typeof PriceBookBaseEditor>[0] & { onUnitCommit?: (value: number | null, unitName: string) => void }) {
-  const hasAlternates = systemPriceBookType(props.book) !== "cost" && props.row.units?.some((unit) => unit.unitName !== props.row.baseUnit);
+export function PriceBookEditor(props: Parameters<typeof PriceBookBaseEditor>[0] & { onUnitCommit?: (value: number | null, unitName: string) => void; showAlternateUnits?: boolean }) {
+  const showAlternateUnits = props.showAlternateUnits ?? true;
+  const hasAlternates = showAlternateUnits && systemPriceBookType(props.book) !== "cost" && props.row.units?.some((unit) => unit.unitName !== props.row.baseUnit);
   return <div className="min-w-0">
     {hasAlternates && <p className="mb-1 text-left text-xs font-semibold">{props.row.baseUnit} <span className="font-normal text-slate-500">· Đơn vị gốc</span></p>}
     <div className="min-h-11"><PriceBookBaseEditor {...props} /></div>
-    {systemPriceBookType(props.book) !== "cost" && <PricingUnitEditors row={props.row} book={props.book} retailId={props.defaultBookId} disabled={props.saving}
+    {showAlternateUnits && systemPriceBookType(props.book) !== "cost" && <PricingUnitEditors row={props.row} book={props.book} retailId={props.defaultBookId} disabled={props.saving}
       onCommit={(value, unitName) => props.onUnitCommit?.(value, unitName)} />}
   </div>;
 }
@@ -200,39 +205,67 @@ export function PricingMobileRow({
   onCostPriceChange: (rowId: string, value: number | null) => void;
   onCostPriceCommit: (row: PricingRow, value: number | null) => void;
 }) {
+  const units: EditablePriceUnit[] = [
+    { id: `base:${row.id}`, unitName: row.baseUnit, multiplier: 1 },
+    ...(row.units ?? []).filter((unit) => unit.unitName !== row.baseUnit),
+  ];
+
   return (
     <article className="min-w-0 p-4">
       <div className="min-w-0">
         <h3 className="break-words text-sm font-semibold">{row.name}</h3>
-        <p className="mt-1 text-xs text-slate-500">{row.sku} · {row.baseUnit}</p>
+        <p className="mt-1 text-xs text-slate-500">{row.sku}</p>
       </div>
-      <div className="mt-3 grid min-w-0 gap-3">
-        {[...books].sort(comparePriceBooks).map((book) => {
-          const key = `${row.id}:${book.id}`;
+      <div className="mt-3 divide-y divide-border-soft border-y border-border-soft">
+        {units.map((unit) => {
+          const isBaseUnit = unit.unitName === row.baseUnit;
           return (
-            <div key={book.id} className="min-w-0">
-              <div className="mb-1.5 break-words text-xs font-semibold text-slate-600 dark:text-slate-300">
-                <PricingBookLabel book={book} />
+            <section key={unit.id ?? unit.unitName} className="py-3 first:pt-2 last:pb-2">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold">{unit.unitName}
+                  {isBaseUnit && <span className="ml-1.5 text-xs font-normal text-slate-500">· Đơn vị gốc</span>}
+                </div>
+                {!isBaseUnit && <p className="mt-0.5 text-xs text-slate-500">
+                  1 {unit.unitName} = {pricingQuantity(unit.multiplier)} {row.baseUnit}
+                </p>}
               </div>
-              <PriceBookEditor
-                row={row}
-                book={book}
-                defaultBookId={defaultBookId}
-                saving={savingCell.has(key)}
-                saved={savedCell.has(key)}
-                canEditCostPrice={canEditCostPrice}
-                mobile
-                labels={labels}
-                onOpenFormula={() => onOpenFormula(row.id, book.id)}
-                onChange={(value) => systemPriceBookType(book) === "cost"
-                  ? onCostPriceChange(row.id, value)
-                  : onPriceChange(row.id, book.id, value)}
-                onCommit={(value) => systemPriceBookType(book) === "cost"
-                  ? onCostPriceCommit(row, value)
-                  : onPriceCommit(row, book.id, value)}
-                onUnitCommit={(value, unitName) => onPriceCommit(row, book.id, value, unitName)}
-              />
-            </div>
+              <div className="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-3">
+                {[...books].sort(comparePriceBooks).map((book) => {
+                  const key = `${row.id}:${book.id}`;
+                  return <div key={book.id} className="min-w-0">
+                    <div className="mb-1 break-words text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      <PricingBookLabel book={book} />
+                    </div>
+                    {isBaseUnit ? <PriceBookEditor
+                      row={row}
+                      book={book}
+                      defaultBookId={defaultBookId}
+                      saving={savingCell.has(key)}
+                      saved={savedCell.has(key)}
+                      canEditCostPrice={canEditCostPrice}
+                      mobile
+                      labels={labels}
+                      showAlternateUnits={false}
+                      onOpenFormula={() => onOpenFormula(row.id, book.id)}
+                      onChange={(value) => systemPriceBookType(book) === "cost"
+                        ? onCostPriceChange(row.id, value)
+                        : onPriceChange(row.id, book.id, value)}
+                      onCommit={(value) => systemPriceBookType(book) === "cost"
+                        ? onCostPriceCommit(row, value)
+                        : onPriceCommit(row, book.id, value)}
+                    /> : <PricingUnitEditors
+                      row={row}
+                      book={book}
+                      retailId={defaultBookId}
+                      disabled={savingCell.has(key)}
+                      unitName={unit.unitName}
+                      compact
+                      onCommit={(value, unitName) => onPriceCommit(row, book.id, value, unitName)}
+                    />}
+                  </div>;
+                })}
+              </div>
+            </section>
           );
         })}
       </div>
@@ -536,7 +569,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
       render: (r) => (
         <div className="whitespace-normal break-words">
           <div className="font-medium">{r.name}</div>
-          <div className="text-xs text-slate-400">{r.sku} · {[r.baseUnit, ...(r.units ?? []).filter((unit) => unit.unitName !== r.baseUnit).map((unit) => unit.unitName)].join(" / ")}</div>
+          <div className="text-xs text-slate-400">{r.sku} · {r.baseUnit} <span className="text-slate-500">· Đơn vị gốc</span></div>
         </div>
       ),
     },
@@ -562,11 +595,54 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
             onChange={(value) => systemPriceBookType(b) === "cost" ? updateCostCell(r.id, value) : updateCell(r.id, b.id, value)}
             onCommit={(value) => systemPriceBookType(b) === "cost" ? requestSaveCostPrice(r, value) : requestSaveCell(r, b.id, value)}
             onUnitCommit={(value, unitName) => requestSaveCell(r, b.id, value, unitName)}
+            showAlternateUnits={false}
           />
         );
       },
     })),
   ];
+
+  function renderPricingUnitRows(row: PricingRow, visibleColumns: DataTableColumn<PricingRow>[]) {
+    return (row.units ?? [])
+      .filter((unit) => unit.unitName !== row.baseUnit)
+      .map((unit) => (
+        <tr key={`${row.id}:unit:${unit.id ?? unit.unitName}`} className="border-t border-border-soft hover:bg-surface-2">
+          {visibleColumns.map((column) => {
+            const cellClassName = typeof column.cellClassName === "function" ? column.cellClassName(row) : column.cellClassName;
+            const className = cn(
+              "px-3 py-3 align-middle",
+              column.wrap ? "whitespace-normal break-words" : "truncate",
+              column.align === "right" && "text-right tabular-nums",
+              column.align === "center" && "text-center",
+              cellClassName,
+            );
+            if (column.key === "product") {
+              return <td key={column.key} className={className}>
+                <div className="border-l-2 border-primary-200 py-0.5 pl-3 dark:border-primary-800">
+                  <div className="font-semibold">{unit.unitName}</div>
+                  <div className="text-xs text-slate-500">1 {unit.unitName} = {pricingQuantity(unit.multiplier)} {row.baseUnit}</div>
+                </div>
+              </td>;
+            }
+            const book = books.find((candidate) => column.key === `book:${candidate.id}`);
+            if (!book) return <td key={column.key} className={className}>{column.render(row)}</td>;
+            const key = cellKey(row.id, book.id);
+            return <td key={column.key} className={className}>
+              <PricingUnitEditors
+                row={row}
+                book={book}
+                retailId={defaultBookId}
+                disabled={savingCell.has(key)}
+                unitName={unit.unitName}
+                compact
+                onCommit={(value, unitName) => requestSaveCell(row, book.id, value, unitName)}
+              />
+            </td>;
+          })}
+        </tr>
+      ));
+  }
+
   const visibleBooks = books.filter(
     (book) => isSystemPriceBook(book) || visibleColumnKeys?.has(`book:${book.id}`),
   );
@@ -713,6 +789,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
         rows={rows}
         columns={columns}
         embedded
+        renderFollowingRows={renderPricingUnitRows}
         visibleColumnKeys={visibleColumnKeys}
         onColumnVisibilityChange={setVisibleColumnKeys}
         getRowId={(row) => row.id}
