@@ -53,6 +53,10 @@ function priceColumnWidth(book: PricingBook): number {
   }
 }
 
+function pricingInputWidthClass(book: PricingBook): "w-28" | "w-32" {
+  return systemPriceBookType(book) === "list" ? "w-32" : "w-28";
+}
+
 function pricingQuantity(value: number): string {
   return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 4 }).format(value);
 }
@@ -105,6 +109,7 @@ function PriceBookBaseEditor({
     );
   }
   const catalogue = systemPriceBookType(book) === "list";
+  const inputWidthClass = pricingInputWidthClass(book);
   const fallback = !isSystemPriceBook(book) && book.id !== defaultBookId && value == null;
   const belowCost = !costSource && row.costPrice != null && value != null && value > 0 && value < row.costPrice;
 
@@ -128,7 +133,7 @@ function PriceBookBaseEditor({
       >
         <Calculator className="h-3.5 w-3.5" />
       </button>}
-      <div className={cn("relative min-w-0", mobile ? "flex-1" : catalogue ? "w-32" : "w-28")}>
+      <div className={cn("relative min-w-0", mobile ? "flex-1" : inputWidthClass)}>
         <MoneyInput
           decimals={2}
           value={value ?? ""}
@@ -260,6 +265,7 @@ export function PricingMobileRow({
                       disabled={savingCell.has(key)}
                       unitName={unit.unitName}
                       compact
+                      mobile
                       onCommit={(value, unitName) => onPriceCommit(row, book.id, value, unitName)}
                     />}
                   </div>;
@@ -635,6 +641,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
                 disabled={savingCell.has(key)}
                 unitName={unit.unitName}
                 compact
+                compactWidthClass={pricingInputWidthClass(book)}
                 onCommit={(value, unitName) => requestSaveCell(row, book.id, value, unitName)}
               />
             </td>;
