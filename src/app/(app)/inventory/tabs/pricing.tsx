@@ -19,6 +19,7 @@ import type { PricingSort } from "@/lib/pricing/pricing-policy";
 
 type SP = Record<string, string | undefined>;
 type PriceBook = Awaited<ReturnType<typeof getPriceBooks>>[number];
+const DEFAULT_PRICING_SORT: PricingSort = "updated";
 
 /** Inventory URL aliases must become the same validated predicate for list and bulk. */
 export function inventoryPricingFilters(params: SP) {
@@ -74,7 +75,7 @@ async function PricingContent({
   const filters = includePurchasePrices
     ? requestedFilters
     : { ...requestedFilters, priceCondition: undefined, priceAgainst: undefined };
-  const { rows, total, pageCount } = await getPricingPage(context.storeId, { ...filters, sort: (params.sort ?? "name") as PricingSort, page, pageSize });
+  const { rows, total, pageCount } = await getPricingPage(context.storeId, { ...filters, sort: (params.sort ?? DEFAULT_PRICING_SORT) as PricingSort, page, pageSize });
 
   const visibleIds = rows.map((p) => p.id);
   const overrideByBook = await getPriceOverridesForProducts(context.storeId, visibleIds);
@@ -103,7 +104,7 @@ async function PricingContent({
         <h2 className="shrink-0 text-sm font-bold">{t("pricing.booksCount", { n: books.length })}</h2>
         <ListSearchFilterBar
           search={<InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
-          filter={<InventoryFilterDrawer title="Bộ lọc thiết lập giá" values={params} defaultSort="name" countEndpoint="/api/inventory/pricing/count" showPriceComparison={includePurchasePrices} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort", "price"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
+          filter={<InventoryFilterDrawer title="Bộ lọc thiết lập giá" values={params} defaultSort={DEFAULT_PRICING_SORT} countEndpoint="/api/inventory/pricing/count" showPriceComparison={includePurchasePrices} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort", "price"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
         />
       </div>
       <PricingTable
