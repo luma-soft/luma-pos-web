@@ -58,7 +58,6 @@ export function PricingUnitEditors({ row, book, retailId, disabled = false, onCo
     {units.map((unit) => {
       const editable = canEditPricingUnit(row, book, retailId, unit.unitName);
       const readOnly = isPriceBookReadOnly(book);
-      const fixed = systemPriceBookType(book) === "retail" && unit.priceOverride != null;
       const value = pricingUnitValue(row, book, retailId, unit.unitName);
       if (compact) {
         return <div key={unit.id ?? unit.unitName} className="min-w-0">
@@ -67,17 +66,12 @@ export function PricingUnitEditors({ row, book, retailId, disabled = false, onCo
               title={!readOnly ? "Không thể quy ngược khi giá chung hoặc giá riêng bằng 0. Hãy sửa giá đơn vị gốc." : undefined}>
               {pricingMoneyLabel(value)}
             </span>}
-          <p className="mt-1 min-h-4 text-right text-[11px] leading-4 text-slate-500">
-            {value == null ? "Chưa có dữ liệu" : fixed ? "Giá riêng" : "Quy đổi"}
-          </p>
+          {value == null && <p className="mt-1 text-right text-[11px] leading-4 text-slate-500">Chưa có dữ liệu</p>}
           {!editable && !readOnly && <p className="text-right text-[11px] leading-4 text-slate-500">Sửa giá tại {row.baseUnit}</p>}
         </div>;
       }
       return <div key={unit.id ?? unit.unitName} className="border-t border-border-soft pt-2">
-        <div className="mb-1 flex items-baseline justify-between gap-1 text-xs">
-          <span className="font-semibold">{unit.unitName}</span>
-          <span className="text-slate-500">{fixed ? "Giá riêng" : "Quy đổi"}</span>
-        </div>
+        <div className="mb-1 text-xs font-semibold">{unit.unitName}</div>
         <p className="mb-1 text-[11px] leading-4 text-slate-500">1 {unit.unitName} = {quantity(unit.multiplier)} {row.baseUnit}</p>
         {editable ? <AlternatePriceEditor row={row} book={book} retailId={retailId} unitName={unit.unitName} disabled={disabled} onCommit={onCommit} />
           : <span aria-label={`${book.name} / ${unit.unitName}`} className="block min-h-11 py-2 text-right text-sm tabular-nums"
