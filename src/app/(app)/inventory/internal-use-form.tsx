@@ -3,7 +3,7 @@
 import { productDisplayName } from "@/lib/products/variant-presentation";
 import { catalogTextByFlag, legacyTextByFlag } from "@/lib/i18n/catalog-text";
 
-import { type ReactNode, useCallback, useMemo, useState, useTransition } from "react";
+import { type ReactNode, useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Trash2, Check, Save } from "lucide-react";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
@@ -53,6 +53,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
   const router = useRouter();
   const catalog = useProductCatalog();
   const [pending, start] = useTransition();
+  const submitInFlightRef = useRef(false);
 
   const [documentDate] = useState(() => (initial ? new Date(initial.createdAt) : new Date()).toLocaleDateString("vi-VN"));
   const [department, setDepartment] = useState(initial?.department ?? "");
@@ -173,7 +174,9 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
   };
 
   function submit(intent?: "draft" | "complete") {
-    if (lines.length === 0) return;
+    if (lines.length === 0 || pending || submitInFlightRef.current) return;
+    submitInFlightRef.current = true;
+    let navigatingAway = false;
     start(async () => {
       const payload = {
         intent,
@@ -187,16 +190,16 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
       const res = await (initial ? updateInternalUse(initial.id, payload) : createInternalUse(payload));
       if (res.ok) {
         void catalog.refresh();
-        setToast(res.data.status === "draft" || res.data.status === "pending" ? (legacyTextByFlag(L, "ed46e541d6a1")) : t("internalUse.submitted"));
-        setLines([]); setNote(""); setReason(""); setDepartment("");
-        router.push(`${Routes.Inventory}?tab=internal${initial ? `&expanded=${initial.id}` : ""}`);
-        router.refresh();
-        setTimeout(() => setToast(""), 3500);
+        router.push(Routes.internalUseDetail(res.data.id));
+        navigatingAway = true;
       } else {
         setToast(t(res.error as never));
         setTimeout(() => setToast(""), 3500);
       }
       } catch { setToast("Không thể lưu phiếu. Vui lòng thử lại."); }
+      finally {
+        if (!navigatingAway) submitInFlightRef.current = false;
+      }
     });
   }
 

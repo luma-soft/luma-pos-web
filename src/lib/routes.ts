@@ -93,6 +93,8 @@ export const Routes = {
   stocktakeCopy: (id: string) => `/stocktakes/new?copy=${encodeURIComponent(id)}` as const,
   stocktakePrint: (id: string) => `/stocktakes/${encodeURIComponent(id)}/print` as const,
   stocktakeDetail: (id: string) => `/inventory?tab=stock&expanded=${encodeURIComponent(id)}` as const,
+  internalUseDetail: (id: string) => `/inventory?tab=internal&expanded=${encodeURIComponent(id)}` as const,
+  purchaseReturnDetail: (id: string) => `/inventory?tab=purchase-returns&expanded=${encodeURIComponent(id)}` as const,
   posForProducts: (
     kind: "invoice" | "booking" | "return_quick" | "quote",
     ids: readonly string[],

@@ -5,7 +5,7 @@ import { productDisplayName } from "@/lib/products/variant-presentation";
 import { getCatalogWarehouseStock } from "@/lib/product-catalog";
 import { positiveQuantityOrDefault } from "@/lib/quantity";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Trash2 } from "lucide-react";
@@ -99,6 +99,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   const [editedDebt, setEditedDebt] = useState(Number(initial?.debtAmount ?? 0));
   const [note, setNote] = useState(initial?.note ?? "");
   const [busy, setBusy] = useState(false);
+  const submitInFlightRef = useRef(false);
   const [error, setError] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
 
@@ -203,12 +204,13 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   }
 
   async function submit() {
-    if (busy || !supplierId || !warehouseId || lines.length === 0) return;
+    if (busy || submitInFlightRef.current || !supplierId || !warehouseId || lines.length === 0) return;
     const invalid = lines.some((line) => line.quantity <= 0 || line.returnUnitCost < 0 || line.quantity > totalStock(line) + 1e-9);
     if (invalid) {
       setError(t("purchaseReturns.errors.insufficientStock"));
       return;
     }
+    submitInFlightRef.current = true;
     setBusy(true);
     setError("");
     const payload = {
@@ -231,17 +233,22 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
         returnUnitCost: line.returnUnitCost,
       })),
     };
+    let navigatingAway = false;
     try {
     const res = await (initial ? updatePurchaseReturn(initial.id, payload) : createPurchaseReturn(payload));
-    setBusy(false);
     if (res.ok) {
       void catalog.refresh();
-      router.push(`${Routes.Inventory}?tab=purchase-returns&expanded=${res.data.id}`);
-      router.refresh();
+      router.push(Routes.purchaseReturnDetail(res.data.id));
+      navigatingAway = true;
     }
     else setError(t(res.error as never));
     } catch { setError("Không thể lưu phiếu. Vui lòng thử lại."); }
-    finally { setBusy(false); }
+    finally {
+      if (!navigatingAway) {
+        submitInFlightRef.current = false;
+        setBusy(false);
+      }
+    }
   }
 
   const numCls = "no-spinner min-h-11 w-full px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums lg:min-h-0";

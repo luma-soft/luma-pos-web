@@ -2,7 +2,7 @@
 
 import { productDisplayName } from "@/lib/products/variant-presentation";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Check, ClipboardCheck, PackageSearch, Save, Trash2 } from "lucide-react";
@@ -84,6 +84,7 @@ export function StocktakeForm({
   const [lines, setLines] = useState<Line[]>(initialLines);
   const [note, setNote] = useState(initialNote);
   const [busy, setBusy] = useState<"draft" | "balance" | null>(null);
+  const submitInFlightRef = useRef(false);
   const [error, setError] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
 
@@ -173,29 +174,44 @@ export function StocktakeForm({
   }, [lines]);
 
   async function submit(balanceNow: boolean) {
-    if (lines.length === 0 || busy) return;
+    if (lines.length === 0 || busy || submitInFlightRef.current) return;
+    submitInFlightRef.current = true;
     if (balanceNow) {
       const ok = await dialog.confirm({
         description: t("stocktakes.balanceConfirm"),
         confirmLabel: t("stocktakes.balance"),
         variant: "warning",
       });
-      if (!ok) return;
+      if (!ok) {
+        submitInFlightRef.current = false;
+        return;
+      }
     }
     setBusy(balanceNow ? "balance" : "draft");
     setError("");
-    const res = await createStocktake({
-      warehouseId,
-      note: note || undefined,
-      balanceNow,
-      items: lines.map((l) => ({ productId: l.product.id, actualQty: l.actualQty })),
-    });
-    setBusy(null);
-    if (res.ok) {
-      void catalog.refresh();
-      router.push(Routes.Stocktakes);
+    let navigatingAway = false;
+    try {
+      const res = await createStocktake({
+        warehouseId,
+        note: note || undefined,
+        balanceNow,
+        items: lines.map((l) => ({ productId: l.product.id, actualQty: l.actualQty })),
+      });
+      if (res.ok) {
+        void catalog.refresh();
+        router.push(Routes.stocktakeDetail(res.data.id));
+        navigatingAway = true;
+      } else {
+        setError(t(res.error as never));
+      }
+    } catch {
+      setError(t("common.error"));
+    } finally {
+      if (!navigatingAway) {
+        submitInFlightRef.current = false;
+        setBusy(null);
+      }
     }
-    else setError(t(res.error as never));
   }
 
   return (

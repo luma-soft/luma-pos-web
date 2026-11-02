@@ -93,6 +93,7 @@ export async function createStocktake(
     }
 
     revalidatePath(Routes.Stocktakes);
+    revalidatePath(Routes.Inventory);
     return { ok: true, data: result };
   } catch (e) {
     console.error("createStocktake failed:", e);
