@@ -265,6 +265,7 @@ export function PurchaseForm({
   const [payFull, setPayFull] = useState(false);
   const [note, setNote] = useState(initialValues?.note ?? "");
   const [pendingAction, setPendingAction] = useState<"receive" | "draft" | null>(null);
+  const submitInFlightRef = useRef(false);
   const busy = pendingAction !== null;
   const [error, setError] = useState("");
   const [aiPendingLines, setAiPendingLines] = useState<AiPendingLine[]>([]);
@@ -496,7 +497,8 @@ export function PurchaseForm({
   ));
 
   async function submit(action: "receive" | "draft" = "receive") {
-    if (!canSubmit || busy || (action === "draft" && !canSaveDraft)) return;
+    if (!canSubmit || busy || submitInFlightRef.current || (action === "draft" && !canSaveDraft)) return;
+    submitInFlightRef.current = true;
     setPendingAction(action); setError("");
     const payload = {
       supplierId, warehouseId,
@@ -515,6 +517,7 @@ export function PurchaseForm({
       })),
     };
 
+    let navigatingAway = false;
     try {
       const res = action === "draft"
         ? await savePurchaseDraft({ ...payload, ...(mode === "edit" && purchaseId ? { id: purchaseId } : {}) })
@@ -524,15 +527,18 @@ export function PurchaseForm({
       if (res.ok) {
         if (action === "receive") void catalog.refresh();
         const savedId = mode === "edit" && purchaseId ? purchaseId : "id" in res.data ? res.data.id : undefined;
-        if (savedId) router.push(Routes.purchase(savedId));
-        router.refresh();
+        router.push(savedId ? Routes.purchaseDetail(savedId) : Routes.Purchases);
+        navigatingAway = true;
       } else {
         setError(t(res.error as never));
       }
     } catch {
       setError(t("common.error"));
     } finally {
-      setPendingAction(null);
+      if (!navigatingAway) {
+        submitInFlightRef.current = false;
+        setPendingAction(null);
+      }
     }
   }
 
