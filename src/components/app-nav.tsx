@@ -16,7 +16,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { Routes } from "@/lib/routes";
-import { ONLINE_SALES_ENABLED } from "@/lib/features";
+import { FNB_UI_ENABLED, ONLINE_SALES_ENABLED } from "@/lib/features";
 import { cn } from "@/lib/utils";
 import { Text } from "@/components/ui/text";
 import type { StoreFeatureSet } from "@/lib/tenancy/store-features";
@@ -83,7 +83,7 @@ export function AppNav({
   const t = useTranslations();
   const pathname = usePathname();
   const [notificationCount, setNotificationCount] = useState(0);
-  const isFnb = industry === "restaurant" || industry === "cafe";
+  const isFnb = FNB_UI_ENABLED && (industry === "restaurant" || industry === "cafe");
 
   useEffect(() => {
     let active = true;

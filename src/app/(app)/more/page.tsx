@@ -33,7 +33,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { LogoutButton } from "@/components/logout-button";
 import { getMode, getTheme } from "@/lib/theme/cookie";
 import { requireStoreContext } from "@/lib/auth/store-context";
-import { SHIFT_MANAGEMENT_UI_ENABLED } from "@/lib/features";
+import { FNB_UI_ENABLED, SHIFT_MANAGEMENT_UI_ENABLED } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +50,7 @@ export default async function MorePage() {
   const manager = role === "owner" || role === "manager";
   const stock = manager || role === "warehouse";
   const sales = manager || role === "cashier";
-  const fnb = store.industry === "restaurant" || store.industry === "cafe";
+  const fnb = FNB_UI_ENABLED && (store.industry === "restaurant" || store.industry === "cafe");
 
   return (
     <div className="min-h-full bg-canvas lg:p-6">

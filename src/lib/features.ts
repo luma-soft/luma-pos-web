@@ -14,3 +14,6 @@ export const EINVOICE_UI_ENABLED =
 
 /** Keep shift management hidden while its customer-facing experience is paused. */
 export const SHIFT_MANAGEMENT_UI_ENABLED = false;
+
+/** Keep the F&B experience hidden temporarily while its customer-facing flows are paused. */
+export const FNB_UI_ENABLED = false;

@@ -10,6 +10,7 @@ import { Text } from "@/components/ui/text";
 import { TablesFloor } from "./tables-floor";
 import { ModifiersManage } from "./modifiers-manage";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { FNB_UI_ENABLED } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ const FNB = new Set(["restaurant", "cafe"]);
 export default async function TablesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const context = await requireStoreContext();
   const store = await getStoreSettings(context.storeId);
-  if (!FNB.has(store.industry)) redirect("/dashboard");
+  if (!FNB_UI_ENABLED || !FNB.has(store.industry)) redirect("/dashboard");
   const t = await getTranslations();
   const params = await searchParams;
 
