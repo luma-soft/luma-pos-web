@@ -9,9 +9,10 @@ export function catalogItemToPosProduct(
   catalog: readonly ProductCatalogItem[],
   warehouseId: string | null,
   costPriceBookIds: readonly string[] = [],
+  childrenByParentId?: ReadonlyMap<string, readonly ProductCatalogItem[]>,
 ): PosProduct {
   const children = product.isVariantParent
-    ? catalog.filter((candidate) => candidate.parentProductId === product.id)
+    ? childrenByParentId?.get(product.id) ?? catalog.filter((candidate) => candidate.parentProductId === product.id)
     : [];
   const childPrices = children.map((child) => Number(child.retailPrice));
   const stock = product.isVariantParent
@@ -55,8 +56,7 @@ export function catalogItemToPosProduct(
     m2PerUnit: product.m2PerUnit,
     categoryId: product.categoryId,
     categoryName: product.categoryName,
-    // Catalog offline không có lịch sử bán; thứ tự fallback vẫn theo tên sản phẩm.
-    lastSoldAt: null,
+    lastSoldAt: product.lastSoldAt ? new Date(product.lastSoldAt) : null,
     comboItems: product.comboItems,
     childCount: children.length,
     minRetailPrice: String(childPrices.length > 0 ? Math.min(...childPrices) : Number(product.retailPrice)),

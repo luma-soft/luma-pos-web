@@ -50,6 +50,7 @@ import {
   posUnitSuffix,
 } from "@/components/pos/pos-mobile-layout";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
+import { PRODUCT_SEARCH_DEBOUNCE_MS } from "@/components/product-search/product-search-state";
 import { LumaWebPicker } from "@/app/(app)/sales/tabs/filter-drawer-shared";
 import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
 import { ProductCreateMenu, type ProductKind } from "@/app/(app)/inventory/tabs/product-create-menu";
@@ -99,6 +100,7 @@ import {
 } from "@/lib/pos/line-price-editor";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
+import type { ProductCatalogItem } from "@/lib/product-catalog";
 import {
   PosAmountModeInput,
   PosPrintSizePicker,
@@ -1129,27 +1131,54 @@ export function PosClient({
     () => expandPosSearchUnitResults(sortSearchProducts(data.products)),
     [data.products, sortSearchProducts],
   );
-  const loadPosSearchResults = useCallback(async (query: string): Promise<PosSearchUnitResult<PosProduct>[]> => {
-      const costPriceBookIds = data.priceBooks.filter((book) => book.costBased).map((book) => book.id);
-      const cachedResults = () => productCatalog.search(query, { limit: productCatalog.products.length }).map((product) =>
-        catalogItemToPosProduct(product, productCatalog.products, data.warehouse?.id ?? null, costPriceBookIds)
-      );
-      let products: PosProduct[];
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        products = hasPosPriceComparison ? [] : cachedResults();
-      } else {
-        try {
-          products = await searchPosProducts(query, {
-            priceCondition: hasPosPriceComparison ? posPriceCondition : undefined,
-            priceAgainst: hasPosPriceComparison ? posPriceAgainst : undefined,
-            priceBookId: hasPosPriceComparison ? effectivePosPriceBookId : undefined,
-          });
-        } catch {
-          products = hasPosPriceComparison ? [] : cachedResults();
-        }
-      }
-      return rankProductSearchUnitResults(expandPosSearchUnitResults(sortSearchProducts(products)), query, productDisplayName, { sellableOnly: true });
-  }, [data.priceBooks, data.warehouse?.id, effectivePosPriceBookId, hasPosPriceComparison, posPriceAgainst, posPriceCondition, productCatalog, sortSearchProducts]);
+  const costPriceBookIds = useMemo(
+    () => data.priceBooks.filter((book) => book.costBased).map((book) => book.id),
+    [data.priceBooks],
+  );
+  const catalogProducts = productCatalog.products;
+  const searchProductCatalogItems = productCatalog.search;
+  const catalogChildrenByParentId = useMemo(() => {
+    const childrenByParentId = new Map<string, ProductCatalogItem[]>();
+    for (const product of catalogProducts) {
+      if (!product.parentProductId) continue;
+      const siblings = childrenByParentId.get(product.parentProductId) ?? [];
+      siblings.push(product);
+      childrenByParentId.set(product.parentProductId, siblings);
+    }
+    return childrenByParentId;
+  }, [catalogProducts]);
+  const cachedPosSearchProducts = useCallback((query: string) => searchProductCatalogItems(
+    query,
+    { limit: catalogProducts.length },
+  ).map((product) => catalogItemToPosProduct(
+    product,
+    catalogProducts,
+    data.warehouse?.id ?? null,
+    costPriceBookIds,
+    catalogChildrenByParentId,
+  )), [catalogChildrenByParentId, catalogProducts, costPriceBookIds, data.warehouse?.id, searchProductCatalogItems]);
+  const loadPosSearchResults = useCallback((query: string): readonly PosSearchUnitResult<PosProduct>[] | Promise<readonly PosSearchUnitResult<PosProduct>[]> => {
+    const formatResults = (products: readonly PosProduct[]) => rankProductSearchUnitResults(
+      expandPosSearchUnitResults(sortSearchProducts(products)),
+      query,
+      productDisplayName,
+      { sellableOnly: true },
+    );
+    const getCatalogResults = () => formatResults(cachedPosSearchProducts(query));
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      return hasPosPriceComparison ? [] : getCatalogResults();
+    }
+    if (!hasPosPriceComparison && catalogProducts.length > 0) {
+      return getCatalogResults();
+    }
+
+    return searchPosProducts(query, {
+      priceCondition: hasPosPriceComparison ? posPriceCondition : undefined,
+      priceAgainst: hasPosPriceComparison ? posPriceAgainst : undefined,
+      priceBookId: hasPosPriceComparison ? effectivePosPriceBookId : undefined,
+    }).then(formatResults).catch(() => hasPosPriceComparison ? [] : getCatalogResults());
+  }, [cachedPosSearchProducts, catalogProducts, effectivePosPriceBookId, hasPosPriceComparison, posPriceAgainst, posPriceCondition, sortSearchProducts]);
 
   const syncingRef = useRef(false);
   async function flushOutbox() {
@@ -2520,6 +2549,7 @@ export function PosClient({
               loadingMessage={t("common.loading")}
               unavailableMessage={t("common.error")}
               closeLabel={t("common.close")}
+              debounceMs={hasPosPriceComparison ? PRODUCT_SEARCH_DEBOUNCE_MS : 50}
               className="flex-1"
               renderItem={(result) => {
                 const p = result.product;

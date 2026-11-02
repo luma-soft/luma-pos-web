@@ -1,4 +1,4 @@
-import { normalizeSearch, matchesSearchTokens } from "@/lib/normalize";
+import { normalizeSearch, searchTokens } from "@/lib/normalize";
 
 export const PRODUCT_CATALOG_SCHEMA_VERSION = 10;
 
@@ -109,6 +109,28 @@ export type ProductCatalogSearchOptions = {
   limit?: number;
 };
 
+const searchableTextByProduct = new WeakMap<ProductCatalogItem, string>();
+
+function productSearchText(product: ProductCatalogItem): string {
+  const cached = searchableTextByProduct.get(product);
+  if (cached != null) return cached;
+
+  const searchable = normalizeSearch([
+    product.name,
+    product.sku,
+    product.barcode ?? "",
+    product.variantName ?? "",
+    product.model ?? "",
+    product.brandName ?? "",
+    product.categoryName ?? "",
+    product.baseUnit ?? "",
+    JSON.stringify(product.specs ?? {}),
+    ...product.units.flatMap((unit) => [unit.unitName, unit.sku ?? "", unit.barcode ?? ""]),
+  ].join(" "));
+  searchableTextByProduct.set(product, searchable);
+  return searchable;
+}
+
 export function searchProductCatalog(
   products: readonly ProductCatalogItem[],
   query: string,
@@ -116,25 +138,16 @@ export function searchProductCatalog(
 ): ProductCatalogItem[] {
   const normalizedQuery = normalizeSearch(query);
   if (!normalizedQuery) return [];
+  const tokens = searchTokens(normalizedQuery);
+  if (tokens.length === 0) return [];
 
   const result: ProductCatalogItem[] = [];
   for (const product of products) {
     if (options.stockManagedOnly && !product.isStockManaged) continue;
     if (options.excludeIds?.has(product.id)) continue;
 
-    const searchable = normalizeSearch([
-      product.name,
-      product.sku,
-      product.barcode ?? "",
-      product.variantName ?? "",
-      product.model ?? "",
-      product.brandName ?? "",
-      product.categoryName ?? "",
-      product.baseUnit ?? "",
-      JSON.stringify(product.specs ?? {}),
-      ...product.units.flatMap((unit) => [unit.unitName, unit.sku ?? "", unit.barcode ?? ""]),
-    ].join(" "));
-    if (!matchesSearchTokens(searchable, normalizedQuery)) continue;
+    const searchable = productSearchText(product);
+    if (!tokens.every((token) => searchable.includes(token))) continue;
 
     result.push(product);
     if (result.length >= (options.limit ?? 20)) break;
