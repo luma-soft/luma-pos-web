@@ -236,7 +236,8 @@ export function TableOrder({
                     <div className="font-mono text-xs text-slate-400">{product.sku}</div>
                     {stockManaged && <ProductSearchStockLabel
                       quantity={stock}
-                      unit={product.baseUnit}
+                      unit={selectedUnit}
+                      unitMultiplier={multiplier}
                       label={defaultWarehouseId ? t("pos.stockLabel") : t("products.variants.totalStock")}
                       location={stockWarehouse?.name}
                     />}

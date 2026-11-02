@@ -4,19 +4,23 @@ import { cn, formatNumber } from "@/lib/utils";
 export function ProductSearchStockLabel({
   quantity,
   unit,
+  unitMultiplier = 1,
   label,
   location,
   className,
 }: {
   quantity: number | string;
   unit: string;
+  /** Number of base units represented by one displayed unit. */
+  unitMultiplier?: number;
   label: string;
   location?: string | null;
   className?: string;
 }) {
+  const multiplier = Number.isFinite(unitMultiplier) && unitMultiplier > 0 ? unitMultiplier : 1;
   return (
     <div className={cn("text-xs text-slate-400 tabular-nums", className)}>
-      {label}: {formatNumber(quantity)} {unit}{location ? ` · ${location}` : ""}
+      {label}: {formatNumber(Number(quantity) / multiplier)} {unit}{location ? ` · ${location}` : ""}
     </div>
   );
 }

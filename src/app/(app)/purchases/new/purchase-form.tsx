@@ -616,7 +616,8 @@ export function PurchaseForm({
                           <div className="font-mono text-xs text-slate-400">{product.sku}</div>
                           {product.isStockManaged && <ProductSearchStockLabel
                             quantity={stock}
-                            unit={product.baseUnit}
+                            unit={selectedUnit}
+                            unitMultiplier={multiplier}
                             label={warehouseId ? t("pos.stockLabel") : t("products.variants.totalStock")}
                             location={warehouse?.name}
                           />}

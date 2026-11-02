@@ -2547,7 +2547,8 @@ export function PosClient({
                         ) : null}
                         {stockManaged && <ProductSearchStockLabel
                           quantity={stock}
-                          unit={p.baseUnit}
+                          unit={resultUnit ?? p.baseUnit}
+                          unitMultiplier={Number(result.alternateUnit?.multiplier) || 1}
                           label={t("pos.stockLabel")}
                           className={stockInsufficient ? "text-er" : undefined}
                         />}

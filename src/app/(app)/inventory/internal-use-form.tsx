@@ -238,7 +238,8 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                           <div className="font-mono text-xs text-slate-400">{product.sku}</div>
                           {product.isStockManaged && <ProductSearchStockLabel
                             quantity={stock}
-                            unit={product.baseUnit}
+                            unit={selectedUnit}
+                            unitMultiplier={multiplier}
                             label={warehouse ? t("pos.stockLabel") : t("products.variants.totalStock")}
                             location={warehouse?.name}
                           />}
