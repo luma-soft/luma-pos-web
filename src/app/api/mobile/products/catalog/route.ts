@@ -6,8 +6,8 @@ import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 // inventory. The existing /products and /pos routes remain available during
 // migration; consumers must not merge partial/delta snapshots as full lists.
 //
-// Delta is intentionally NOT advertised until the backend persists product
-// tombstones, stock/price changes and revision-stamped mutation history.
+// Replay a delta only for the same actor scope and a contiguous retained
+// revision range. Fall back to a full snapshot whenever replay is unsafe.
 export async function GET(request: Request) {
   const gate = await requireMobileStockReadAccess();
   if (!gate.ok) return mobileGate(gate)!;
