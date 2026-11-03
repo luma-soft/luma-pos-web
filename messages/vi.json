@@ -4115,7 +4115,8 @@
       "notifications": "Thông báo",
       "zalo": "Zalo OA",
       "shopee": "App sàn TMĐT",
-      "ai": "AI"
+      "ai": "AI",
+      "databaseBackups": "Sao lưu database"
     },
     "payments": {
       "sepay": {
@@ -4650,7 +4651,8 @@
           "notifications": "Thông báo",
           "zalo": "Zalo OA",
           "shopee": "App sàn TMĐT",
-          "ai": "AI"
+          "ai": "AI",
+          "databaseBackups": "Sao lưu database"
         }
       },
       "sections": {
@@ -4705,6 +4707,10 @@
         "ai": {
           "title": "Cấu hình AI",
           "subtitle": "API key, model vision và bucket lưu file AI"
+        },
+        "databaseBackups": {
+          "title": "Sao lưu database",
+          "subtitle": "Lịch tự động, sao lưu thủ công và lịch sử thực hiện"
         }
       },
       "industries": {

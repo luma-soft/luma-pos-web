@@ -27,6 +27,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       store={store}
       canManage={canManage}
       canEditAi={canEditAi}
+      canManageBackups={context.role === "owner"}
       notificationChannels={resolveNotificationChannels()}
       cameraQuoteOptions={cameraQuoteOptions}
       initialTab={params.tab}

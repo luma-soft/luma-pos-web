@@ -24,6 +24,7 @@ import { normalizeSearch } from "@/lib/normalize";
 import { selectAllInputOnClick } from "@/lib/input-selection";
 import { settingsTextByFlag } from "@/lib/i18n/settings-text";
 import { useAppDataQuery } from "@/components/use-app-data-query";
+import { DatabaseBackupsPanel } from "./database-backups-panel";
 import {
   deletePaymentBankAccount,
   loadSettingsAiUsage,
@@ -237,7 +238,7 @@ function formatAiTestMessage(message: string, L: boolean) {
   return map[message] ? settingsTextByFlag(L, `ui.aiTest.${map[message]}`) : message;
 }
 
-type SectionId = "store" | "staff" | "pos" | "cameraQuote" | "hardware" | "payments" | "print" | "promotions" | "tax" | "notifications" | "zalo" | "shopee" | "ai";
+type SectionId = "store" | "staff" | "pos" | "cameraQuote" | "hardware" | "payments" | "print" | "promotions" | "tax" | "notifications" | "zalo" | "shopee" | "ai" | "databaseBackups";
 
 const NAV: { groupKey: string; items: { id: SectionId; ico: string; labelKey: string; badge?: string }[] }[] = [
   { groupKey: "store", items: [
@@ -262,6 +263,7 @@ const NAV: { groupKey: string; items: { id: SectionId; ico: string; labelKey: st
       ? [{ id: "shopee" as const, ico: "🧩", labelKey: "shopee" }]
       : []),
     { id: "ai", ico: "✨", labelKey: "ai" },
+    { id: "databaseBackups", ico: "🗄️", labelKey: "databaseBackups" },
   ] },
 ];
 const SEC_META: Record<SectionId, { titleKey: string; subtitleKey: string }> = {
@@ -278,9 +280,11 @@ const SEC_META: Record<SectionId, { titleKey: string; subtitleKey: string }> = {
   zalo: { titleKey: "zalo", subtitleKey: "zalo" },
   shopee: { titleKey: "shopee", subtitleKey: "shopee" },
   ai: { titleKey: "ai", subtitleKey: "ai" },
+  databaseBackups: { titleKey: "databaseBackups", subtitleKey: "databaseBackups" },
 };
 
-function isVisibleSection(id: SectionId) {
+function isVisibleSection(id: SectionId, canManageBackups: boolean) {
+  if (id === "databaseBackups") return canManageBackups;
   return ONLINE_SALES_ENABLED || id !== "shopee";
 }
 
@@ -329,6 +333,7 @@ export function SettingsClient({
   store,
   canManage,
   canEditAi,
+  canManageBackups,
   notificationChannels,
   initialTab,
   promotionsContent,
@@ -337,6 +342,7 @@ export function SettingsClient({
   store: StoreSettings;
   canManage: boolean;
   canEditAi: boolean;
+  canManageBackups: boolean;
   notificationChannels: { id: string; configured: boolean }[];
   initialTab?: string;
   promotionsContent: React.ReactNode;
@@ -347,10 +353,13 @@ export function SettingsClient({
   const L = locale === "vi";
   const normalizedInitialTab = initialTab
     && SEC_META[initialTab as SectionId]
-    && isVisibleSection(initialTab as SectionId)
+    && isVisibleSection(initialTab as SectionId, canManageBackups)
     ? initialTab as SectionId
     : null;
   const [active, setActive] = useState<SectionId>(normalizedInitialTab ?? "store");
+  const visibleNav = useMemo(() => NAV
+    .map((group) => ({ ...group, items: group.items.filter((item) => isVisibleSection(item.id, canManageBackups)) }))
+    .filter((group) => group.items.length > 0), [canManageBackups]);
   const { state: staffQuery } = useAppDataQuery(active === "staff" ? "staff" : null, readSettingsStaff);
   const { state: bankQuery } = useAppDataQuery(active === "payments" ? "payments" : null, readSettingsBankAccounts);
   const { state: usageQuery } = useAppDataQuery(active === "ai" ? "ai" : null, readSettingsAiUsage);
@@ -363,8 +372,8 @@ export function SettingsClient({
     if (normalizedInitialTab) return;
     const saved = localStorage.getItem("lp-settings-active") as SectionId | null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client sync of persisted section (SSR-safe)
-    if (saved && SEC_META[saved] && isVisibleSection(saved)) setActive(saved);
-  }, [normalizedInitialTab]);
+    if (saved && SEC_META[saved] && isVisibleSection(saved, canManageBackups)) setActive(saved);
+  }, [normalizedInitialTab, canManageBackups]);
   const pick = (id: SectionId) => { setActive(id); localStorage.setItem("lp-settings-active", id); };
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -374,7 +383,7 @@ export function SettingsClient({
           <div className="text-sm font-extrabold">{settingsTextByFlag(L, "legacy.55a9ce6867eb")}</div>
           <div className="text-[10px] italic text-slate-400 mt-0.5">{settingsTextByFlag(L, "legacy.4511c97881b0")}</div>
         </div>
-        {NAV.map((grp, gi) => (
+        {visibleNav.map((grp, gi) => (
           <div key={gi}>
             <div className="px-3 pt-2.5 pb-1 text-[9px] font-bold uppercase tracking-[0.07em] text-slate-400">{settingsTextByFlag(L, `ui.nav.groups.${grp.groupKey}`)}</div>
             {grp.items.map((it) => (
@@ -407,7 +416,7 @@ export function SettingsClient({
             <Select
               value={active}
               onChange={(e) => pick(e.target.value as SectionId)}
-              options={NAV.flatMap((g) => g.items).map((it) => ({ value: it.id, label: settingsTextByFlag(L, `ui.nav.items.${it.labelKey}`) }))}
+              options={visibleNav.flatMap((g) => g.items).map((it) => ({ value: it.id, label: settingsTextByFlag(L, `ui.nav.items.${it.labelKey}`) }))}
               aria-label={settingsTextByFlag(L, "legacy.21fca9114fb3")}
               className="min-h-11"
             />
@@ -437,6 +446,7 @@ export function SettingsClient({
         {active === "zalo" && <ZaloSection L={L} prefs={store.prefs.zalo} canEdit={canEditAi} />}
         {ONLINE_SALES_ENABLED && active === "shopee" && <ShopeeSettingsSection L={L} prefs={store.prefs.shopee} canEdit={canEditAi} />}
         {active === "ai" && (aiUsage ? <AiSection L={L} prefs={store.prefs.ai} canEdit={canEditAi} usage={aiUsage} /> : <LazySectionState L={L} loading={Boolean(lazyLoading.ai)} error={lazyError.ai} />)}
+        {canManageBackups && active === "databaseBackups" && <DatabaseBackupsPanel />}
         </div>
       </div>
     </div>

@@ -1,0 +1,116 @@
+name: Database backups
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+    - cron: "17 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lumapos-database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_PRIVATE_BUCKET: ${{ secrets.R2_PRIVATE_BUCKET }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Prepare session database connection
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import urllib.parse
+
+          value = os.environ.get("DATABASE_URL", "").strip()
+          if not value:
+              raise SystemExit("Missing DATABASE_URL repository secret")
+          parsed = urllib.parse.urlsplit(value)
+          if parsed.scheme not in {"postgres", "postgresql"}:
+              raise SystemExit("DATABASE_URL must be a PostgreSQL URL")
+          host = parsed.hostname or ""
+          if not host.endswith(".pooler.supabase.com"):
+              raise SystemExit("Use the Supabase session pooler URL for DATABASE_URL")
+          if parsed.port not in {5432, 6543}:
+              raise SystemExit("DATABASE_URL must use pooler port 5432 or 6543")
+          netloc = parsed.netloc.rsplit(":", 1)[0] + ":5432"
+          session_url = urllib.parse.urlunsplit(parsed._replace(netloc=netloc))
+          print(f"::add-mask::{session_url}")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
+              env_file.write(f"SESSION_DATABASE_URL={session_url}\n")
+          PY
+
+      - name: Create scheduled backup request
+        if: github.event_name == 'schedule' && github.event.schedule == '17 18 * * *'
+        shell: bash
+        run: |
+          set -euo pipefail
+          schedule_key="daily:$(TZ=Asia/Ho_Chi_Minh date +%F)"
+          psql "$SESSION_DATABASE_URL" -v ON_ERROR_STOP=1 -v schedule_key="$schedule_key" -q <<'SQL' >/dev/null
+          INSERT INTO public.database_backup_runs (trigger_type, status, schedule_key)
+          SELECT 'scheduled', 'queued', :'schedule_key'
+          WHERE NOT EXISTS (
+            SELECT 1 FROM public.database_backup_runs WHERE status IN ('queued', 'running')
+          )
+          ON CONFLICT (schedule_key) WHERE schedule_key IS NOT NULL DO NOTHING;
+          SQL
+
+      - name: Create manual Actions request
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          action_key="action:${GITHUB_RUN_ID}"
+          psql "$SESSION_DATABASE_URL" -v ON_ERROR_STOP=1 -v schedule_key="$action_key" -q <<'SQL' >/dev/null
+          INSERT INTO public.database_backup_runs (trigger_type, status, schedule_key)
+          SELECT 'manual', 'queued', :'schedule_key'
+          WHERE NOT EXISTS (
+            SELECT 1 FROM public.database_backup_runs WHERE status IN ('queued', 'running')
+          )
+          ON CONFLICT (schedule_key) WHERE schedule_key IS NOT NULL DO NOTHING;
+          SQL
+
+      - name: Check for queued backup
+        id: queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$SESSION_DATABASE_URL" -v ON_ERROR_STOP=1 -q <<'SQL' >/dev/null
+          UPDATE public.database_backup_runs
+          SET status = 'failed', finished_at = clock_timestamp(),
+              duration_milliseconds = greatest(0, floor(extract(epoch from (clock_timestamp() - started_at)) * 1000)::integer),
+              failure_code = 'worker_timeout'
+          WHERE status = 'running' AND started_at < clock_timestamp() - interval '45 minutes';
+          SQL
+          queued="$(psql "$SESSION_DATABASE_URL" -v ON_ERROR_STOP=1 -Atq -c "SELECT EXISTS (SELECT 1 FROM public.database_backup_runs WHERE status = 'queued')")"
+          echo "queued=${queued}" >> "$GITHUB_OUTPUT"
+
+      - uses: supabase/setup-cli@v3
+        if: steps.queue.outputs.queued == 't'
+        with:
+          version: v2.stable
+
+      - name: Install R2 copy tools
+        if: steps.queue.outputs.queued == 't'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq rclone postgresql-client
+
+      - name: Process queued backup
+        if: steps.queue.outputs.queued == 't'
+        shell: bash
+        run: bash scripts/database-backup-worker.sh

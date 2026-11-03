@@ -13,6 +13,15 @@ import type { MediaFileMetadata } from "@/lib/media/file-metadata-types";
 export type ServiceTradeRecordData = Record<string, unknown>;
 export type InstalledAssetSpecs = Record<string, unknown>;
 
+export type DatabaseBackupStatus = "queued" | "running" | "succeeded" | "failed";
+export type DatabaseBackupTrigger = "manual" | "scheduled";
+export type DatabaseBackupManifest = {
+  format: "supabase-cli-logical";
+  included: string[];
+  excluded: string[];
+  files: Array<{ name: string; sizeBytes: number; sha256: string }>;
+};
+
 function missingStoreId(): string {
   if (process.env.NODE_ENV === "test" && process.env.LUMA_TEST_STORE_ID) {
     return process.env.LUMA_TEST_STORE_ID;
@@ -117,6 +126,40 @@ export const profiles = pgTable("profiles", {
     .on(t.phoneNormalized)
     .where(sql`${t.phoneNormalized} is not null`),
   unique("profiles_store_id_id_unique").on(t.storeId, t.id),
+]);
+
+// Project-wide database backup job history. This table stores operational
+// metadata only; the backup worker excludes its rows from data.sql.
+export const databaseBackupRuns = pgTable("database_backup_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  triggerType: text("trigger_type").$type<DatabaseBackupTrigger>().notNull(),
+  status: text("status").$type<DatabaseBackupStatus>().notNull().default("queued"),
+  requestedByUserId: uuid("requested_by_user_id").references(() => profiles.id, { onDelete: "set null" }),
+  requestedByStoreId: uuid("requested_by_store_id").references(() => stores.id, { onDelete: "set null" }),
+  scheduleKey: text("schedule_key"),
+  requestedAt: timestamp("requested_at", { withTimezone: true }).defaultNow().notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  durationMilliseconds: integer("duration_milliseconds"),
+  archiveKey: text("archive_key"),
+  archiveSizeBytes: bigint("archive_size_bytes", { mode: "number" }),
+  sha256: varchar("sha256", { length: 64 }),
+  manifest: jsonb("manifest").$type<DatabaseBackupManifest>().notNull().default(sql`'{}'::jsonb`),
+  failureCode: text("failure_code"),
+}, (t) => [
+  check("database_backup_runs_trigger_check", sql`${t.triggerType} in ('manual', 'scheduled')`),
+  check("database_backup_runs_status_check", sql`${t.status} in ('queued', 'running', 'succeeded', 'failed')`),
+  check("database_backup_runs_duration_check", sql`${t.durationMilliseconds} is null or ${t.durationMilliseconds} >= 0`),
+  check("database_backup_runs_archive_size_check", sql`${t.archiveSizeBytes} is null or ${t.archiveSizeBytes} >= 0`),
+  check("database_backup_runs_sha256_check", sql`${t.sha256} is null or ${t.sha256} ~ '^[0-9a-f]{64}$'`),
+  uniqueIndex("database_backup_runs_schedule_key_unique")
+    .on(t.scheduleKey)
+    .where(sql`${t.scheduleKey} is not null`),
+  uniqueIndex("database_backup_runs_one_active_idx")
+    .on(sql`(true)`)
+    .where(sql`${t.status} in ('queued', 'running')`),
+  index("database_backup_runs_status_requested_at_idx").on(t.status, t.requestedAt),
+  index("database_backup_runs_requested_by_idx").on(t.requestedByStoreId, t.requestedAt),
 ]);
 
 // ============= Canonical media registry =============
