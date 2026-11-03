@@ -274,8 +274,8 @@ input[type="number"] {
   @page { margin: 0; }
   /* Use physical page margins so every fragmented page gets the same safe area.
      Padding on one long .print-document only applies to its first/last fragment. */
-  @page print-a4 { size: A4 portrait; margin: 12mm; }
-  @page print-a5 { size: A5 portrait; margin: 10mm; }
+  @page print-a4 { margin: 12mm; }
+  @page print-a5 { margin: 10mm; }
 
   /* Bản xem trước chứng từ chạy trong layout app: chỉ cho phép nội dung phiếu đi vào máy in. */
   body:has(.print-document-root) .app-sidebar,
@@ -365,8 +365,8 @@ input[type="number"] {
   body.pos-printing {
     display: block !important;
   }
-  /* POS injects an unnamed @page rule for the selected paper size. Keep the
-     whole portal on that page context instead of switching named pages mid-flow. */
+  /* POS injects an unnamed @page rule for the selected print profile's margins.
+     Keep the portal on that page context instead of switching named pages mid-flow. */
   body.pos-printing,
   body.pos-printing .pos-print-root,
   body.pos-printing .print-document {

@@ -598,9 +598,9 @@ export function PosClient({
     const pageStyle = document.createElement("style");
     pageStyle.dataset.posPrintPage = "true";
     pageStyle.textContent = printSize === "a4"
-      ? "@page { size: A4 portrait; margin: 12mm; }"
+      ? "@page { margin: 12mm; }"
       : printSize === "a5"
-        ? "@page { size: A5 portrait; margin: 10mm; }"
+        ? "@page { margin: 10mm; }"
         : "@page { margin: 0; }";
     document.head.appendChild(pageStyle);
     document.body.classList.add("pos-printing");
