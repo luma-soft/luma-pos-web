@@ -7,7 +7,7 @@ import { getStoreSettings } from "@/lib/data/settings";
 import { getOrder } from "@/lib/data/orders";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { sourceInvoicePriceBookId } from "@/lib/pos/source-invoice-price-book";
-import { getPrintTemplate } from "@/lib/print/template";
+import { getPrintTemplatesForDoc } from "@/lib/print/template";
 import { Routes } from "@/lib/routes";
 import { formatDate } from "@/lib/utils";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -129,7 +129,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
     ...aiProductIds,
     ...(validCreatedProductId ? [validCreatedProductId] : []),
   ];
-  const [data, settings, t, orderPrintTemplate, quotePrintTemplate, bookingPrintTemplate, returnPrintTemplate] = await Promise.all([
+  const [data, settings, t, orderPrintTemplates, quotePrintTemplates, bookingPrintTemplates, returnPrintTemplates] = await Promise.all([
     getPosData(context.storeId, {
       includeProductIds,
       includeProductSkus: CAMERA_QUOTE_UTILITY_SKUS,
@@ -138,10 +138,10 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
     }),
     getStoreSettings(context.storeId),
     getTranslations(),
-    getPrintTemplate(context.storeId, "order"),
-    getPrintTemplate(context.storeId, "quote"),
-    getPrintTemplate(context.storeId, "booking"),
-    getPrintTemplate(context.storeId, "return"),
+    getPrintTemplatesForDoc(context.storeId, "order"),
+    getPrintTemplatesForDoc(context.storeId, "quote"),
+    getPrintTemplatesForDoc(context.storeId, "booking"),
+    getPrintTemplatesForDoc(context.storeId, "return"),
   ]);
   const bulkItems = bulkProductIds.flatMap((productId) => {
     const product = data.products.find((candidate) => candidate.id === productId);
@@ -197,10 +197,10 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
         <PosClient
           storageScope={`${context.storeId}:${context.userId}:${context.role}`}
           data={data}
-          printTemplate={orderPrintTemplate}
-          quotePrintTemplate={quotePrintTemplate}
-          bookingPrintTemplate={bookingPrintTemplate}
-          returnPrintTemplate={returnPrintTemplate}
+          orderPrintTemplates={orderPrintTemplates}
+          quotePrintTemplates={quotePrintTemplates}
+          bookingPrintTemplates={bookingPrintTemplates}
+          returnPrintTemplates={returnPrintTemplates}
           initialSourceInvoice={sourceInvoice}
           initialContext={initialContext}
           createdProductId={validCreatedProductId}

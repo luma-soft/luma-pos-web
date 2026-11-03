@@ -1978,7 +1978,10 @@
       "agent": "Giá đại lý"
     },
     "printSlip": "In",
-    "defaultPrintTemplate": "Mẫu in mặc định",
+    "printTemplate": "Mẫu in",
+    "printTemplateDefaultBadge": "Mặc định",
+    "printPaperSize": "Khổ giấy",
+    "searchPrintTemplates": "Tìm mẫu in",
     "tempSlipTitle": "PHIẾU TẠM TÍNH",
     "printA4": "In hóa đơn A4",
     "printA5": "In phiếu A5",

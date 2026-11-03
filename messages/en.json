@@ -1978,7 +1978,10 @@
       "agent": "Agent"
     },
     "printSlip": "Print",
-    "defaultPrintTemplate": "Default print template",
+    "printTemplate": "Print template",
+    "printTemplateDefaultBadge": "Default",
+    "printPaperSize": "Paper size",
+    "searchPrintTemplates": "Search print templates",
     "tempSlipTitle": "PROVISIONAL SLIP",
     "printA4": "Print A4 invoice",
     "printA5": "Print A5",
