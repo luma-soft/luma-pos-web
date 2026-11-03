@@ -161,6 +161,8 @@ type PosPrintJob = {
   paid: number;
   remaining: number;
   payMethod: PayMethod;
+  isTemporarySlip: boolean;
+  showPaymentTotals: boolean;
   paymentQr?: PrintPaymentQr | null;
 };
 type SepayCheckout = {
@@ -1346,7 +1348,7 @@ export function PosClient({
     setPrintSize(size);
   }
 
-  function buildPrintJob(input: { template: PrintTemplate; title: string; code: string; paymentQr?: PrintPaymentQr | null }): PosPrintJob {
+  function buildPrintJob(input: { template: PrintTemplate; title: string; code: string; paymentQr?: PrintPaymentQr | null; isTemporarySlip?: boolean }): PosPrintJob {
     const printLines = isReturnDraft ? cart.filter((line) => line.quantity > 0) : cart;
     return {
       template: input.template,
@@ -1383,6 +1385,8 @@ export function PosClient({
       paid: isInvoiceDraft ? payableAmount : 0,
       remaining: isInvoiceDraft ? remaining : total,
       payMethod: isInvoiceDraft ? payMethod : "credit",
+      isTemporarySlip: input.isTemporarySlip === true,
+      showPaymentTotals: isInvoiceDraft,
       paymentQr: input.paymentQr !== undefined ? input.paymentQr : buildPrintPaymentQr({
         enabled: input.template.options.showPaymentQr,
         alwaysShow: input.template.options.alwaysShowPaymentQr,
@@ -2029,6 +2033,7 @@ export function PosClient({
       template: printTemplate,
       title: t("pos.tempSlipTitle"),
       code,
+      isTemporarySlip: true,
     }), size);
   };
 
@@ -3189,10 +3194,13 @@ export function PosClient({
             grandTotalLabel={t(printJob.template.docType === "return" ? "returns.totalRefund" : "print.grandTotal")}
             grandTotal={printJob.grandTotal}
             paymentQr={printJob.paymentQr}
-            afterTotals={printJob.template.options.showDebt && printJob.payMethod !== "credit" && printJob.paid > 0
+            afterTotals={printJob.template.options.showDebt && printJob.showPaymentTotals
+              && (printJob.isTemporarySlip || (printJob.payMethod !== "credit" && printJob.paid > 0))
               ? [
                   { label: t("print.paid"), value: printJob.paid },
-                  ...(printJob.remaining > 0 ? [{ label: t("print.remaining"), value: printJob.remaining, bold: true }] : []),
+                  ...(printJob.isTemporarySlip || printJob.remaining > 0
+                    ? [{ label: t("print.remaining"), value: printJob.remaining, bold: true }]
+                    : []),
                 ]
               : []}
             inWordsLabel={t("print.inWords")}
