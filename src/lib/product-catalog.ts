@@ -90,6 +90,46 @@ export type ProductCatalogSnapshot = {
   warehouses: ProductCatalogWarehouse[];
 };
 
+export type ProductCatalogDelta = {
+  baseRevision: string;
+  revision: string;
+  schemaVersion: number;
+  userId: string;
+  scopeId: string;
+  upserts: ProductCatalogItem[];
+  deletedIds: string[];
+};
+
+export function sortByRecentProductSale<T extends Pick<ProductCatalogItem, "id" | "name" | "lastSoldAt">>(
+  rows: readonly T[],
+): T[] {
+  const timestamp = (value: string | null) => value ? new Date(value).getTime() : 0;
+  return [...rows].sort((left, right) => (
+    timestamp(right.lastSoldAt) - timestamp(left.lastSoldAt)
+    || left.name.localeCompare(right.name, "vi")
+    || left.id.localeCompare(right.id)
+  ));
+}
+
+export function mergeProductCatalogDelta(
+  snapshot: ProductCatalogSnapshot,
+  delta: ProductCatalogDelta,
+): ProductCatalogSnapshot | null {
+  if (
+    snapshot.revision !== delta.baseRevision
+    || snapshot.scopeId !== delta.scopeId
+    || snapshot.userId !== delta.userId
+    || snapshot.schemaVersion !== delta.schemaVersion
+    || !catalogRevisionChanged(delta.baseRevision, delta.revision)
+  ) return null;
+
+  const productsById = new Map(snapshot.products.map((product) => [product.id, product]));
+  for (const id of delta.deletedIds) productsById.delete(id);
+  for (const product of delta.upserts) productsById.set(product.id, product);
+  const products = sortByRecentProductSale([...productsById.values()]);
+  return { ...snapshot, revision: delta.revision, savedAt: Date.now(), products };
+}
+
 export function catalogRevisionChanged(
   localRevision: string | null | undefined,
   remoteRevision: string | null | undefined,

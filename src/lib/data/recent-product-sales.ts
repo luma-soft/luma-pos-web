@@ -22,19 +22,3 @@ export function lastCompletedProductSaleAt() {
 export function recentProductSaleOrder() {
   return [sql`${lastCompletedProductSaleAt()} desc nulls last`, asc(products.name), asc(products.id)] as const;
 }
-
-export function sortByRecentProductSale<T extends { id: string; name: string }>(
-  rows: readonly T[],
-  lastSoldAtByProduct: ReadonlyMap<string, Date | string | null>,
-): T[] {
-  const timestamp = (id: string) => {
-    const value = lastSoldAtByProduct.get(id);
-    return value ? new Date(value).getTime() : 0;
-  };
-
-  return [...rows].sort((left, right) => (
-    timestamp(right.id) - timestamp(left.id)
-    || left.name.localeCompare(right.name, "vi")
-    || left.id.localeCompare(right.id)
-  ));
-}

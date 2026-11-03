@@ -19,6 +19,7 @@ import {
 } from "@/lib/offline/product-catalog-store";
 import {
   catalogRevisionChanged,
+  mergeProductCatalogDelta,
   searchProductCatalog,
   type ProductCatalogItem,
   type ProductCatalogSearchOptions,
@@ -28,6 +29,7 @@ import { createClient } from "@/lib/supabase/client";
 import { createRefreshQueue } from "@/lib/sync/refresh-queue";
 
 type ProductCatalogStatus = "loading" | "cached" | "synced" | "unavailable";
+type ProductCatalogSyncValue = Awaited<ReturnType<typeof syncProductCatalog>>;
 
 type ProductCatalogContextValue = {
   snapshot: ProductCatalogSnapshot | null;
@@ -62,20 +64,47 @@ export function ProductCatalogProvider({
 }) {
   const [snapshot, setSnapshot] = useState<ProductCatalogSnapshot | null>(null);
   const [status, setStatus] = useState<ProductCatalogStatus>("loading");
-  const syncQueueRef = useRef<ReturnType<typeof createRefreshQueue<ProductCatalogSnapshot | null>> | null>(null);
+  const syncQueueRef = useRef<ReturnType<typeof createRefreshQueue<ProductCatalogSyncValue>> | null>(null);
   const checkingRef = useRef<Promise<void> | null>(null);
+  const snapshotRef = useRef<ProductCatalogSnapshot | null>(null);
   const revisionRef = useRef<string | null>(null);
   const realtimeConnectedRef = useRef(false);
 
   useEffect(() => {
     const queue = createRefreshQueue({
-      load: syncProductCatalog,
-      apply: async (fresh) => {
+      load: () => syncProductCatalog(revisionRef.current),
+      apply: async (result) => {
+        let fresh: ProductCatalogSnapshot | null = result?.mode === "full"
+          ? result.snapshot
+          : null;
+
+        if (result?.mode === "unchanged") {
+          const current = snapshotRef.current;
+          if (
+            current?.userId === result.userId
+            && current.scopeId === result.scopeId
+            && current.revision === result.revision
+          ) {
+            setStatus("synced");
+            return;
+          }
+        } else if (result?.mode === "delta") {
+          const current = snapshotRef.current;
+          fresh = current ? mergeProductCatalogDelta(current, result.delta) : null;
+        }
+
+        // A stale/mismatched local snapshot or unavailable delta journal must
+        // never be persisted as a partial catalog. Recover with the full path.
+        if (!fresh && result) {
+          const recovered = await syncProductCatalog();
+          fresh = recovered?.mode === "full" ? recovered.snapshot : null;
+        }
         if (!fresh || fresh.userId !== userId || fresh.scopeId !== scopeId) {
           setStatus((current) => current === "cached" ? current : "unavailable");
           return;
         }
         if (catalogRevisionChanged(fresh.revision, revisionRef.current)) return;
+        snapshotRef.current = fresh;
         setSnapshot(fresh);
         setStatus("synced");
         revisionRef.current = fresh.revision;
@@ -110,6 +139,7 @@ export function ProductCatalogProvider({
           shared?.userId === userId && shared.scopeId === scopeId &&
           !catalogRevisionChanged(shared.revision, expectedRevision)
         ) {
+          snapshotRef.current = shared;
           setSnapshot(shared);
           setStatus("cached");
           revisionRef.current = shared.revision;
@@ -149,8 +179,9 @@ export function ProductCatalogProvider({
 
     readProductCatalogSnapshot(scopeId).then((cached) => {
       if (cancelled) return;
-      if (cached && cached.userId === userId) {
+      if (cached && cached.userId === userId && cached.scopeId === scopeId) {
         if (catalogRevisionChanged(cached.revision, revisionRef.current)) return;
+        snapshotRef.current = cached;
         setSnapshot(cached);
         setStatus("cached");
         revisionRef.current = cached.revision;
@@ -235,11 +266,12 @@ export function ProductCatalogProvider({
       }
       readProductCatalogSnapshot(scopeId).then((shared) => {
         if (
-          cancelled || !shared || shared.userId !== userId ||
+          cancelled || !shared || shared.userId !== userId || shared.scopeId !== scopeId ||
           !catalogRevisionChanged(revisionRef.current, shared.revision)
         ) {
           return;
         }
+        snapshotRef.current = shared;
         setSnapshot(shared);
         setStatus("cached");
         revisionRef.current = shared.revision;

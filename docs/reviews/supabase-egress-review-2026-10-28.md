@@ -343,10 +343,11 @@ As of 2026-10-29, three items remained gated by evidence or production access:
   invalidation source.
 - The production project showed 0 GB Storage size and no Storage egress in the
   reviewed billing cycle. The 598 objects previously found through local
-  `.env.local` belong to the old project `qnazjwycsdaezamlejxn`, so no R2 copy,
-  cutover, or source deletion had been run as of this review. As confirmed by
-  the user on 2026-11-04, all LumaPOS-managed media has since been migrated to
-  R2; whether retained Supabase source copies were deleted is unconfirmed.
+  `.env.local` belong to the old project `qnazjwycsdaezamlejxn`; no R2 copy,
+  cutover, or source deletion had been run as of the 2026-10-29 review. The user
+  confirmed on 2026-11-04 that all LumaPOS-managed media has since been
+  migrated to R2; whether retained Supabase source copies were deleted is
+  unconfirmed.
 - The Supabase advisor warnings for `sepay_payment_sessions` and
   `_migrations` were not changed. Vercel's production environment did not
   provide readable database credentials to the isolated check process, while
@@ -376,3 +377,27 @@ This removes avoidable rows and response fields from the shared pooler path.
 The exact reduction cannot be quantified from Query Performance; compare
 Shared Pooler egress in the next representative billing window to measure the
 production effect.
+
+## Egress follow-up — 2026-11-04
+
+The production Usage view now shows 3.138 GB uncached egress out of 5 GB for
+the 2026-10-04–2026-11-04 billing cycle; cached egress and Supabase Storage
+egress are both 0 GB, and database size is about 87.44 MB. This is 0.488 GB
+above the 2.65 GB reading in the 2026-11-03 screenshot. All LumaPOS-managed
+media is served from R2. Product image URLs still come from the Postgres media
+registry, but image bytes are served by R2 rather than Supabase Storage.
+
+The Query Performance view's leading `products` query showed 1,005 calls,
+97,404 rows processed, 31m 27s total time, and 1,879 ms mean time at review
+time. Its SQL projection matches the paginated inventory product read and its
+R2 thumbnail lookup. These query statistics are not byte counts and cannot
+attribute the 3.138 GB to that request; they identify a separate expensive
+read path to investigate with query plans or response-size samples.
+
+Web catalog refreshes now return an unchanged revision when the local catalog
+is current, replay a retained product delta when available, and use a full
+snapshot when the journal is unavailable, too old, global, oversized, or the
+cached scope does not match. The delta retains inactive products to match the
+existing full-snapshot contract. This should reduce repeated catalog payloads;
+the production egress change is not yet measurable and needs comparison over a
+representative window.

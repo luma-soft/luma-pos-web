@@ -22,6 +22,8 @@ import { canViewPurchasePrices, resolvePriceBookPrice, systemPriceBookType } fro
 import { UNMANAGED_STOCK_CATEGORY_NAME } from "@/lib/product-stock";
 import {
   PRODUCT_CATALOG_SCHEMA_VERSION,
+  sortByRecentProductSale,
+  type ProductCatalogDelta,
   type CatalogUnit,
   type CatalogWarehouseStock,
   type ProductCatalogSnapshot,
@@ -29,7 +31,6 @@ import {
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 import { latestPurchaseNetPrices } from "@/lib/pricing/last-purchase-net-price";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
-import { sortByRecentProductSale } from "@/lib/data/recent-product-sales";
 import { changedCatalogProductIds } from "@/lib/catalog-delta";
 
 export async function getProductCatalogRevision(storeId: string): Promise<string> {
@@ -40,16 +41,6 @@ export async function getProductCatalogRevision(storeId: string): Promise<string
     .limit(1);
   return String(state?.revision ?? 0);
 }
-
-export type ProductCatalogDelta = {
-  baseRevision: string;
-  revision: string;
-  schemaVersion: number;
-  userId: string;
-  scopeId: string;
-  upserts: ProductCatalogSnapshot["products"];
-  deletedIds: string[];
-};
 
 // Only replay a contiguous, retained revision range. A global catalog
 // mutation, a pre-journal client, a pruned gap, or a large delta falls back
@@ -275,7 +266,10 @@ async function buildProductCatalogSnapshot(
   const orderedProductRows = sortByRecentProductSale(productRows.map((product) => ({
     ...product,
     lastPurchaseNetPrice: purchaseNetPriceByProductId.get(product.id) ?? null,
-  })), lastSoldAtByProduct);
+    lastSoldAt: lastSoldAtByProduct.get(product.id)
+      ? new Date(lastSoldAtByProduct.get(product.id)!).toISOString()
+      : null,
+  })));
 
   return {
     schemaVersion: PRODUCT_CATALOG_SCHEMA_VERSION,
