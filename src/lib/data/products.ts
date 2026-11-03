@@ -42,6 +42,7 @@ import {
   productCompatibilityImageUrls,
   productCompatibilityThumbnailUrl,
   productManagedImageDescriptors,
+  type ProductManagedImageDescriptor,
 } from "@/lib/products/product-media-read";
 import {
   buildRelatedProductLookup,
@@ -90,6 +91,16 @@ export const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
 
 function productMediaCoordinates(storeId: string) {
   return productManagedImageDescriptors(storeId);
+}
+
+function withProductMedia<
+  T extends { imageMediaRecords: ProductManagedImageDescriptor[] },
+>(row: T) {
+  const { imageMediaRecords, ...product } = row;
+  return {
+    ...product,
+    imageMedia: imageMediaRecords,
+  };
 }
 
 function productComplianceFields(hasColumns: boolean) {
@@ -698,10 +709,9 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
 
   return {
     rows: rowsWithPurchasePrices.map((row) => {
-      const productRow = withProductMedia(row);
       const relatedProducts = selectRelatedProducts(row, relatedCandidates);
       return {
-        ...productRow,
+        ...row,
         children: childrenByParent.get(row.id) ?? [],
         stockLocations: Array.from(
           stockLocationsByDisplay.get(row.id)?.values() ?? [],
