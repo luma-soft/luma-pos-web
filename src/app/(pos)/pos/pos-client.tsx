@@ -103,7 +103,6 @@ import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
 import type { ProductCatalogItem } from "@/lib/product-catalog";
 import {
   PosAmountModeInput,
-  PosPrintSizePicker,
   PosStockQuantityTooltip,
   PosSummaryAdjustRow,
 } from "@/components/pos/pos-summary-controls";
@@ -149,10 +148,8 @@ type PayMethod = "cash" | "bank_transfer" | "credit";
 type PosDraftKind = "invoice" | "quote" | "booking" | "return_quick" | "return_invoice";
 type PosPrintDocType = "order" | "quote" | "booking" | "return";
 type PosPrintTemplateSelections = Record<PosPrintDocType, string>;
-type PosPrintPaperSizes = Record<PosPrintDocType, PaperSize>;
 type SavedPosPrintSettings = {
   templates?: Partial<PosPrintTemplateSelections>;
-  paperSizes?: Partial<PosPrintPaperSizes>;
 };
 type PosPrintJob = {
   template: PrintTemplate;
@@ -263,7 +260,6 @@ interface PosDraft {
 
 const INV_KEY = LEGACY_POS_DRAFTS_KEY;
 const ACT_KEY = LEGACY_POS_ACTIVE_DRAFT_KEY;
-const PRINT_SIZE_KEY = "pos-print-default-size";
 const PRINT_SETTINGS_KEY = "pos-print-settings";
 const AI_POS_DRAFT_KEY = "luma-pos-ai-cart-draft";
 const FIRST_INV_ID = "inv-1"; // id ổn định cho SSR (tránh hydration mismatch)
@@ -523,13 +519,6 @@ export function PosClient({
     booking: defaultPosPrintTemplate(bookingPrintTemplates).id,
     return: defaultPosPrintTemplate(returnPrintTemplates).id,
   }), [orderPrintTemplates, quotePrintTemplates, bookingPrintTemplates, returnPrintTemplates]);
-  const defaultPaperSizes = useMemo<PosPrintPaperSizes>(() => ({
-    order: defaultPosPrintTemplate(orderPrintTemplates).paperDefault,
-    quote: defaultPosPrintTemplate(quotePrintTemplates).paperDefault,
-    booking: defaultPosPrintTemplate(bookingPrintTemplates).paperDefault,
-    return: defaultPosPrintTemplate(returnPrintTemplates).paperDefault,
-  }), [orderPrintTemplates, quotePrintTemplates, bookingPrintTemplates, returnPrintTemplates]);
-
   const [search, setSearch] = useState("");
   const [posPriceCondition, setPosPriceCondition] = useState("");
   const [posPriceAgainst, setPosPriceAgainst] = useState("");
@@ -583,7 +572,6 @@ export function PosClient({
   const [addMenuPosition, setAddMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [printSize, setPrintSize] = useState<PaperSize | null>(null); // đang in phiếu tạm
   const [selectedPrintTemplateIds, setSelectedPrintTemplateIds] = useState<PosPrintTemplateSelections>(defaultPrintTemplates);
-  const [printPaperSizes, setPrintPaperSizes] = useState<PosPrintPaperSizes>(defaultPaperSizes);
   const [printJob, setPrintJob] = useState<PosPrintJob | null>(null);
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -613,33 +601,22 @@ export function PosClient({
     queueMicrotask(() => {
       if (cancelled) return;
       let saved: SavedPosPrintSettings = {};
-      let legacyOrderSize: PaperSize | null = null;
       try {
         const parsed = JSON.parse(localStorage.getItem(scopedStorageKey(PRINT_SETTINGS_KEY, storageScope)) ?? "null") as SavedPosPrintSettings | null;
         saved = parsed ?? {};
-        const legacy = localStorage.getItem(scopedStorageKey(PRINT_SIZE_KEY, storageScope));
-        if (legacy === "a4" || legacy === "a5" || legacy === "k80") legacyOrderSize = legacy;
       } catch { /* localStorage unavailable or invalid */ }
 
       const validTemplate = (type: PosPrintDocType, value: string | undefined) =>
         value && printTemplatesByType[type].some((template) => template.id === value) ? value : defaultPrintTemplates[type];
-      const validPaperSize = (value: PaperSize | undefined) =>
-        value === "a4" || value === "a5" || value === "k80" ? value : undefined;
       setSelectedPrintTemplateIds({
         order: validTemplate("order", saved.templates?.order),
         quote: validTemplate("quote", saved.templates?.quote),
         booking: validTemplate("booking", saved.templates?.booking),
         return: validTemplate("return", saved.templates?.return),
       });
-      setPrintPaperSizes({
-        order: validPaperSize(saved.paperSizes?.order) ?? legacyOrderSize ?? defaultPaperSizes.order,
-        quote: validPaperSize(saved.paperSizes?.quote) ?? defaultPaperSizes.quote,
-        booking: validPaperSize(saved.paperSizes?.booking) ?? defaultPaperSizes.booking,
-        return: validPaperSize(saved.paperSizes?.return) ?? defaultPaperSizes.return,
-      });
     });
     return () => { cancelled = true; };
-  }, [storageScope, orderPrintTemplates, quotePrintTemplates, bookingPrintTemplates, returnPrintTemplates, printTemplatesByType, defaultPrintTemplates, defaultPaperSizes]);
+  }, [storageScope, orderPrintTemplates, quotePrintTemplates, bookingPrintTemplates, returnPrintTemplates, printTemplatesByType, defaultPrintTemplates]);
   // In phiếu tạm: ẩn app, chỉ hiện phiếu, gọi in trình duyệt rồi khôi phục.
   useEffect(() => {
     if (!printSize || !printJob) return;
@@ -881,7 +858,6 @@ export function PosClient({
     printTemplatesByType[type].find((template) => template.id === selectedPrintTemplates[type]) ?? defaultPosPrintTemplate(printTemplatesByType[type]);
   const activePrintTemplates = printTemplatesByType[activePrintDocType];
   const activePrintTemplate = printTemplateForType(activePrintDocType);
-  const activePrintPaperSize = printPaperSizes[activePrintDocType];
   const isReturnInvoiceDraft = activeKind === "return_invoice";
   const canAddCatalogProducts = canAddCatalogProductsToPosDraft(activeKind);
   const canEditPriceBook = canEditPriceBookForPosDraft(activeKind);
@@ -1400,9 +1376,9 @@ export function PosClient({
   const payableAmount = Math.min(Math.max(0, paid), total);
   const remaining = Math.max(0, total - paid);
 
-  function persistPosPrintSettings(templates: PosPrintTemplateSelections, paperSizes: PosPrintPaperSizes) {
+  function persistPosPrintSettings(templates: PosPrintTemplateSelections) {
     try {
-      localStorage.setItem(scopedStorageKey(PRINT_SETTINGS_KEY, storageScope), JSON.stringify({ templates, paperSizes } satisfies SavedPosPrintSettings));
+      localStorage.setItem(scopedStorageKey(PRINT_SETTINGS_KEY, storageScope), JSON.stringify({ templates } satisfies SavedPosPrintSettings));
     } catch { /* localStorage unavailable */ }
   }
 
@@ -1410,21 +1386,13 @@ export function PosClient({
     const template = activePrintTemplates.find((candidate) => candidate.id === templateId);
     if (!template) return;
     const nextTemplates = { ...selectedPrintTemplateIds, [activePrintDocType]: template.id };
-    const nextPaperSizes = { ...printPaperSizes, [activePrintDocType]: template.paperDefault };
     setSelectedPrintTemplateIds(nextTemplates);
-    setPrintPaperSizes(nextPaperSizes);
-    persistPosPrintSettings(nextTemplates, nextPaperSizes);
+    persistPosPrintSettings(nextTemplates);
   }
 
-  function changePrintPaperSize(size: PaperSize) {
-    const nextPaperSizes = { ...printPaperSizes, [activePrintDocType]: size };
-    setPrintPaperSizes(nextPaperSizes);
-    persistPosPrintSettings(selectedPrintTemplateIds, nextPaperSizes);
-  }
-
-  function startPrint(job: PosPrintJob, size = activePrintPaperSize) {
+  function startPrint(job: PosPrintJob) {
     setPrintJob(job);
-    setPrintSize(size);
+    setPrintSize(job.template.paperDefault);
   }
 
   function buildPrintJob(input: { template: PrintTemplate; title: string; code: string; paymentQr?: PrintPaymentQr | null; isTemporarySlip?: boolean }): PosPrintJob {
@@ -1902,8 +1870,7 @@ export function PosClient({
           });
           closeInvoice(activeId);
           setSepayCheckout({ ...paymentJson.data, orderId: res.data.id, orderCode: res.data.code, });
-          setPrintJob(printJob);
-          setPrintSize(printPaperSizes.order);
+          startPrint(printJob);
           return;
         }
         const submittedPrintType: PosPrintDocType = submitMode === "quote" ? "quote" : submitMode === "booking" ? "booking" : "order";
@@ -1920,7 +1887,7 @@ export function PosClient({
           setSepayCheckoutLoading(false);
         }
         closeInvoice(activeId);
-        startPrint(printJob, printPaperSizes[submittedPrintType]);
+        startPrint(printJob);
       } catch {
         // The server already created the order. Never enqueue it again after a payment/print error.
         setSubmittingMode(null);
@@ -2087,7 +2054,7 @@ export function PosClient({
         });
         setSubmittingMode(null);
         closeInvoice(activeId);
-        startPrint(printJob, printPaperSizes.return);
+        startPrint(printJob);
       } else {
         setSubmittingMode(null);
         setError(t(res.error));
@@ -2107,15 +2074,15 @@ export function PosClient({
       : submitOrder(isQuoteDraft ? "quote" : isBookingDraft ? "booking" : "sale");
   };
 
-  /** Mở in phiếu tạm theo khổ đã chọn. */
-  const doPrint = (size: PaperSize = activePrintPaperSize) => {
+  /** Mở in phiếu tạm theo khổ của mẫu in. */
+  const doPrint = () => {
     const code = makeTempSlipCode();
     startPrint(buildPrintJob({
       template: printTemplateForType(activePrintDocType),
       title: t("pos.tempSlipTitle"),
       code,
       isTemporarySlip: true,
-    }), size);
+    }));
   };
 
   const closeSearch = () => { setBrowsing(false); setSearch(""); };
@@ -3028,18 +2995,6 @@ export function PosClient({
               size="sm"
               rootClassName="w-44 shrink-0"
               className="w-full min-w-0"
-            />
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-slate-500">{t("pos.printPaperSize")}</span>
-            <PosPrintSizePicker
-              value={activePrintPaperSize}
-              options={[
-                { value: "a4", label: t("pos.printA4Short") },
-                { value: "a5", label: t("pos.printA5Short") },
-                { value: "k80", label: t("pos.printK80Short") },
-              ]}
-              onChange={changePrintPaperSize}
             />
           </div>
           {error && <p className="text-xs text-red-600">{error}</p>}

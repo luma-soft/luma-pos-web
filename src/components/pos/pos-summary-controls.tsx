@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { CheckCircle2, ChevronDown } from "lucide-react";
+import type { ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Text } from "@/components/ui/text";
-import type { PaperSize } from "@/lib/print/template-shared";
 import { cn, formatNumber } from "@/lib/utils";
 
 export function PosSummaryAdjustRow({
@@ -58,77 +57,6 @@ export function PosStockQuantityTooltip({
       <div>{`Tồn: ${formatNumber(stock)} ${unit}`}</div>
       <div>{`Trong đơn: ${formatNumber(ordered)} ${unit}`}</div>
       <div>{`Đã giữ: ${formatNumber(reserved)} ${unit}`}</div>
-    </div>
-  );
-}
-
-export function PosPrintSizePicker({
-  value,
-  options,
-  onChange,
-}: {
-  value: PaperSize;
-  options: { value: PaperSize; label: string }[];
-  onChange: (value: PaperSize) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const selected = options.find((option) => option.value === value) ?? options[0];
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative w-28">
-      <button
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-        className="flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface px-2.5 text-left text-xs font-semibold transition hover:bg-surface-2 focus:border-primary-600 focus:outline-none lg:h-8"
-      >
-        <span className="whitespace-normal break-words">{selected?.label}</span>
-        <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div role="listbox" className="absolute bottom-full right-0 z-50 mb-1 w-32 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-e2">
-          {options.map((option) => {
-            const active = option.value === value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={active}
-                onClick={() => {
-                  onChange(option.value);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-surface-2 lg:min-h-0",
-                  active && "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200",
-                )}
-              >
-                <span>{option.label}</span>
-                {active && <CheckCircle2 className="h-4 w-4 text-primary-600" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
