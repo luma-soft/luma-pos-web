@@ -202,8 +202,8 @@ async function safeResponseBody(response: Response): Promise<unknown> {
   }
 }
 
-export async function sendNotificationToDevice(
-  input: DeviceNotificationInput,
+async function sendFcmMessage(
+  message: unknown,
   signal?: AbortSignal,
 ): Promise<DeviceNotificationResult> {
   const account = resolveFirebaseServiceAccount();
@@ -219,9 +219,7 @@ export async function sendNotificationToDevice(
           authorization: `Bearer ${accessToken}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify(
-          isEventInput(input) ? buildFcmMessage(input) : legacyFcmMessage(input),
-        ),
+        body: JSON.stringify(message),
         signal: signal ?? AbortSignal.timeout(15_000),
       },
     );
@@ -240,6 +238,43 @@ export async function sendNotificationToDevice(
     if (error instanceof FirebaseAuthFailure) return error.result;
     return { kind: "retry", code: "FCM_NETWORK" };
   }
+}
+
+export async function sendNotificationToDevice(
+  input: DeviceNotificationInput,
+  signal?: AbortSignal,
+): Promise<DeviceNotificationResult> {
+  return sendFcmMessage(
+    isEventInput(input) ? buildFcmMessage(input) : legacyFcmMessage(input),
+    signal,
+  );
+}
+
+export async function sendTestPushToDevice(
+  input: { fid: string; locale?: string | null },
+  signal?: AbortSignal,
+): Promise<DeviceNotificationResult> {
+  const isEnglish = input.locale?.toLowerCase().startsWith("en") ?? false;
+  return sendFcmMessage({
+    message: {
+      fid: input.fid,
+      notification: {
+        title: "Hải Đăng POS",
+        body: isEnglish
+          ? "This is a test notification for this device."
+          : "Đây là thông báo thử cho thiết bị này.",
+      },
+      data: { kind: "push_test" },
+      android: { priority: "high" },
+      apns: {
+        headers: {
+          "apns-priority": "10",
+          "apns-push-type": "alert",
+        },
+        payload: { aps: { sound: "default" } },
+      },
+    },
+  }, signal);
 }
 
 export async function dispatchPushNotification(input: {
