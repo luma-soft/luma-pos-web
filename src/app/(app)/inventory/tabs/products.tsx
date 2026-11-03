@@ -4,7 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { PackageOpen } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
-import { getProduct, getProducts, getProductFormOptions } from "@/lib/data/products";
+import { getProduct, getProductCount, getProducts, getProductFormOptions } from "@/lib/data/products";
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
@@ -75,13 +75,13 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
   if (!cameraMaterials && catalogView === "categories") {
     const page = Number(params.page) || 1;
     const pageSize = parsePageSize(params.size);
-    const [categoryData, productData] = await Promise.all([
+    const [categoryData, productCount] = await Promise.all([
       getCategoriesWithCounts(context.storeId, { page, pageSize }),
-      getProducts(context.storeId, { status: "active", view: "grouped", sort: DEFAULT_PRODUCT_LIST_SORT, page: 1, pageSize: 15, includeLastPurchaseNetPrice: false }),
+      getProductCount(context.storeId, { status: "active", view: "grouped" }),
     ]);
     return (
       <>
-        <ProductCatalogSwitcher activeView="categories" productCount={productData.total} categoryCount={categoryData.total} />
+        <ProductCatalogSwitcher activeView="categories" productCount={productCount} categoryCount={categoryData.total} />
         <CategoriesManager categories={categoryData.rows} parentOptions={categoryData.roots} total={categoryData.total} />
         <Pagination page={page} pageCount={categoryData.pageCount} total={categoryData.total} pageSize={pageSize} unitLabel={t("categories.unitLabel")} />
       </>
@@ -297,10 +297,15 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
     view,
     page,
     pageSize,
+    includeThumbnailUrl: true,
     includeLastPurchaseNetPrice: showPriceComparison,
     productSkus: cameraMaterials ? [...CAMERA_QUOTE_MATERIAL_SKUS, ...CAMERA_QUOTE_DETAIL_MATERIAL_SKUS] : undefined,
     cameraMaterial: cameraMaterials,
     ...(showPriceComparison ? parsePriceComparisonParams(params) : {}),
+  }, {
+    includeDetails: false,
+    includeImageUrls: false,
+    includeComboItems: false,
   });
 
   return (

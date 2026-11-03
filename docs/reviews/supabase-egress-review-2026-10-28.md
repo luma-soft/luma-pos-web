@@ -349,3 +349,23 @@ Three items remain gated by evidence or production access:
 The changed web files pass ESLint. TypeScript still reports only the existing
 `bun:test` type resolution and `priceBook` fixture errors in test files. The
 native app rebuilt and reinstalled successfully on the booted iPhone simulator.
+
+## Egress follow-up — 2026-11-03
+
+The current billing-cycle screenshot shows 2.65 GB of uncached egress against
+the Free Plan's 5 GB allowance. The Usage and Query Performance views identify
+Shared Pooler traffic and wide product-list queries as the main areas to
+optimize, but do not attribute bytes to a specific web or mobile request.
+
+The product-list read path now has a count-only mode. The inventory count API
+and category tab reuse the existing filter predicate while selecting only the
+count, instead of hydrating product rows and their related details. Web and
+mobile browse reads also request a compact projection: one thumbnail, no media
+descriptor or combo-item payload, and no stock-history/location, related-item,
+or duplicate child-row hydration. Product detail reads retain their full
+projection.
+
+This removes avoidable rows and response fields from the shared pooler path.
+The exact reduction cannot be quantified from Query Performance; compare
+Shared Pooler egress in the next representative billing window to measure the
+production effect.

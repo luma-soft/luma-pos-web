@@ -42,17 +42,13 @@ import {
   productCompatibilityImageUrls,
   productCompatibilityThumbnailUrl,
   productManagedImageDescriptors,
-  type ProductManagedImageDescriptor,
 } from "@/lib/products/product-media-read";
 import {
   buildRelatedProductLookup,
   selectRelatedProducts,
 } from "@/lib/products/related-products";
 import { projectVariantGroup, type StoredVariantGroup, type StoredVariantMember, type VariantCatalogEntry } from "@/lib/products/variant-group-read";
-import {
-  lastCompletedProductSaleAt,
-  recentProductSaleOrder,
-} from "@/lib/data/recent-product-sales";
+import { recentProductSaleOrder } from "@/lib/data/recent-product-sales";
 
 export const PRODUCTS_PAGE_SIZE = 20;
 
@@ -94,16 +90,6 @@ export const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
 
 function productMediaCoordinates(storeId: string) {
   return productManagedImageDescriptors(storeId);
-}
-
-function withProductMedia<
-  T extends { imageMediaRecords: ProductManagedImageDescriptor[] },
->(row: T) {
-  const { imageMediaRecords, ...product } = row;
-  return {
-    ...product,
-    imageMedia: imageMediaRecords,
-  };
 }
 
 function productComplianceFields(hasColumns: boolean) {
@@ -179,7 +165,13 @@ function productFilterPredicate(
   return and(...conditions) ?? sql`true`;
 }
 
-async function getBaseProducts(storeId: string, filters: ProductListFilters = {}, internal: { productIds?: readonly string[]; includeDetails?: boolean } = {}) {
+type ProductListReadOptions = {
+  includeDetails?: boolean;
+  includeImageUrls?: boolean;
+  includeComboItems?: boolean;
+};
+
+async function getBaseProducts(storeId: string, filters: ProductListFilters = {}, internal: { productIds?: readonly string[]; countOnly?: boolean } & ProductListReadOptions = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = internal.productIds ? Math.max(1, internal.productIds.length) : coercePageSize(filters.pageSize, DEFAULT_PAGE_SIZE);
   const sort = filters.sort ?? "name";
@@ -192,6 +184,12 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
   const relatedProductIdField = hasRelatedProducts
     ? products.relatedProductId
     : sql<string | null>`null`;
+  const thumbnailImageUrl = filters.includeThumbnailUrl || internal.includeImageUrls === false
+    ? productCompatibilityThumbnailUrl(storeId)
+    : sql<string | null>`null`;
+  const imageUrls = internal.includeImageUrls === false
+    ? sql<string[]>`case when ${thumbnailImageUrl} is null then '[]'::json else json_build_array(${thumbnailImageUrl}) end`
+    : productCompatibilityImageUrls(storeId);
   const groupRelated = filters.groupRelated !== false;
   const conditions: SQL[] = [eq(products.storeId, storeId)];
   const exactProductId = filters.exactProductId;
@@ -224,6 +222,17 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
   }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const countQuery = () => db.select({ total: count() }).from(products).where(where);
+  if (internal.countOnly) {
+    const [{ total }] = await countQuery();
+    return {
+      rows: [],
+      total,
+      page,
+      pageSize: size,
+      pageCount: Math.max(1, Math.ceil(total / size)),
+    };
+  }
   const groupStockForSort = view === "grouped" && !exactProductId && !internal.productIds
     ? sql`(select case when count(distinct member.base_unit) <= 1 then coalesce(sum(group_stock.quantity), 0) else null end
         from products member left join stock_levels group_stock on group_stock.product_id = member.id and group_stock.store_id = ${storeId}
@@ -264,20 +273,16 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
         isActive: products.isActive,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
-        lastSoldAt: lastCompletedProductSaleAt(),
         categoryName: categories.name,
         brandName: brands.name,
         location: products.location,
         weight: products.weight,
         dimensions: products.dimensions,
         specs: products.specs,
-        imageUrls: productCompatibilityImageUrls(storeId),
-        thumbnailImageUrl: filters.includeThumbnailUrl
-          ? productCompatibilityThumbnailUrl(storeId)
-          : sql<string | null>`null`,
-        imageMediaRecords: productMediaCoordinates(storeId),
+        imageUrls,
+        thumbnailImageUrl,
         imageUpdatedAt: products.imageUpdatedAt,
-        comboItems: sql<Array<{
+        comboItems: internal.includeComboItems === false ? sql<never[]>`'[]'::json` : sql<Array<{
           productId: string;
           name: string;
           sku: string;
@@ -376,7 +381,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
           ]))
       .limit(size)
       .offset((page - 1) * size),
-    db.select({ total: count() }).from(products).where(where),
+    countQuery(),
   ]);
 
   const parentIds =
@@ -384,7 +389,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
       ? rows.filter((row) => row.isVariantParent).map((row) => row.id)
       : [];
   const children =
-    parentIds.length > 0
+    parentIds.length > 0 && internal.includeDetails !== false
       ? await db
           .select({
             id: products.id,
@@ -417,18 +422,14 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
             isActive: products.isActive,
             createdAt: products.createdAt,
             updatedAt: products.updatedAt,
-            lastSoldAt: lastCompletedProductSaleAt(),
             categoryName: categories.name,
             brandName: brands.name,
             location: products.location,
             weight: products.weight,
             dimensions: products.dimensions,
             specs: products.specs,
-            imageUrls: productCompatibilityImageUrls(storeId),
-            thumbnailImageUrl: filters.includeThumbnailUrl
-              ? productCompatibilityThumbnailUrl(storeId)
-              : sql<string | null>`null`,
-            imageMediaRecords: productMediaCoordinates(storeId),
+            imageUrls,
+            thumbnailImageUrl,
             imageUpdatedAt: products.imageUpdatedAt,
             comboItems: sql<never[]>`'[]'::json`,
             childCount: sql<number>`0`,
@@ -701,7 +702,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
       const relatedProducts = selectRelatedProducts(row, relatedCandidates);
       return {
         ...productRow,
-        children: (childrenByParent.get(row.id) ?? []).map(withProductMedia),
+        children: childrenByParent.get(row.id) ?? [],
         stockLocations: Array.from(
           stockLocationsByDisplay.get(row.id)?.values() ?? [],
         ),
@@ -716,6 +717,11 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
   };
 }
 
+export async function getProductCount(storeId: string, filters: ProductListFilters = {}) {
+  const result = await getBaseProducts(storeId, filters, { countOnly: true });
+  return result.total;
+}
+
 type BaseProductListResult = Awaited<ReturnType<typeof getBaseProducts>>;
 type BaseProductListRow = BaseProductListResult["rows"][number];
 export type ProductVariantGroup = ReturnType<typeof projectVariantGroup<BaseProductListRow>>;
@@ -726,8 +732,8 @@ export type ProductListRow = BaseProductListRow & {
 };
 export type ProductListResult = Omit<BaseProductListResult, "rows"> & { rows: ProductListRow[] };
 
-export async function getProducts(storeId: string, filters: ProductListFilters = {}): Promise<ProductListResult> {
-  const result = await getBaseProducts(storeId, filters);
+export async function getProducts(storeId: string, filters: ProductListFilters = {}, readOptions: ProductListReadOptions = {}): Promise<ProductListResult> {
+  const result = await getBaseProducts(storeId, filters, readOptions);
   if (!result.rows.length) return { ...result, rows: [] };
   const hasRelated = await hasProductRelatedColumn();
   const keys = [...new Set(result.rows.map((row) => row.parentProductId ?? row.relatedProductId ?? row.id))];
@@ -756,7 +762,12 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
       warehouseId: filters.warehouseId,
       includeLastPurchaseNetPrice: filters.includeLastPurchaseNetPrice,
       includeThumbnailUrl: filters.includeThumbnailUrl,
-    }, { productIds: batchIds, includeDetails: false }),
+    }, {
+      productIds: batchIds,
+      includeDetails: false,
+      includeImageUrls: readOptions.includeImageUrls,
+      includeComboItems: readOptions.includeComboItems,
+    }),
     db.execute<{ id: string; name: string; aliases: string[] }>(sql`select a.id, a.name,
       coalesce((select json_agg(alias.name_key) from product_attribute_aliases alias where alias.store_id = a.store_id and alias.attribute_id = a.id), '[]'::json) as aliases
       from product_attributes a where a.store_id = ${storeId}`),
@@ -815,11 +826,15 @@ export async function getProduct(storeId: string, id: string) {
 export type ProductDetail = NonNullable<Awaited<ReturnType<typeof getProduct>>>;
 
 export async function getMobileProducts(storeId: string, filters: ProductListFilters = {}) {
-  // Keep mobile and web on the same grouped variant projection.
+  // Mobile browse uses the product detail endpoint for expanded inventory data.
   return getProducts(storeId, {
     ...filters,
     sort: filters.sort ?? DEFAULT_PRODUCT_LIST_SORT,
     view: "grouped",
+  }, {
+    includeDetails: false,
+    includeImageUrls: false,
+    includeComboItems: false,
   });
 }
 
