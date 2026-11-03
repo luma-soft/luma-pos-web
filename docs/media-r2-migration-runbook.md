@@ -2,6 +2,14 @@
 
 This runbook moves only Luma-owned Supabase media to the managed R2 buckets. External vendor/CDN URLs are inventoried as `skipped` and are never downloaded or rewritten.
 
+## Current production status
+
+As confirmed by the user on 2026-11-04, all LumaPOS-managed media has been
+migrated to R2. This records migration/cutover completion; it does not confirm
+that retained Supabase source copies have been physically deleted. Use the
+source-deletion procedure below only for any remaining copies and keep its
+retention and rollback gates.
+
 ## Safety model
 
 - Every package command is dry-run by default.

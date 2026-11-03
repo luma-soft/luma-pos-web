@@ -110,7 +110,7 @@ Recommendation: update the clock locally without refreshing server data. Fetch
 ticket changes on a longer interval or through a narrowly scoped change feed,
 and pause refresh while the page is hidden.
 
-### P2 — Supabase product Storage still contains a material set of files
+### Historical P2 — Supabase product Storage contained files during the Oct 28 review
 
 The local database reports 598 objects in the `products` Supabase Storage
 bucket totalling about 84.3 MB, alongside R2 media metadata with 454 ready
@@ -119,6 +119,12 @@ objects. The repository has an R2 migration and read paths, but local
 not match the new project ref recorded in the project-switch note. These
 figures describe that local configuration only; they do not establish which
 files are served in production or how much egress they produce.
+
+As confirmed by the user on 2026-11-04, all LumaPOS-managed media has since
+been migrated to R2. Treat the object counts and recommendation below as a
+historical snapshot, not the current media state. This confirmation records
+the migration; it does not establish whether any retained Supabase source
+copies have been physically deleted.
 
 Evidence: [media migration runbook](/Users/cvthien/project/LumaPOS/luma-pos-web/docs/media-r2-migration-runbook.md), [storage provider selection](/Users/cvthien/project/LumaPOS/luma-pos-web/src/lib/media/storage.ts:12), and [project switch note](/Users/cvthien/project/LumaPOS/luma-pos-web/docs/supabase-project-switch-2026-10-28.md).
 
@@ -329,7 +335,7 @@ combo-item picker requests searchable 50-row pages and does not transfer image
 URLs or stock projections for the whole catalog; it loads details for existing
 combo items separately so cost-price calculations continue to work.
 
-Three items remain gated by evidence or production access:
+As of 2026-10-29, three items remained gated by evidence or production access:
 
 - A catalog revision change still requires one full snapshot. Replacing that
   with deltas requires a complete change feed for stock, prices, product
@@ -338,8 +344,9 @@ Three items remain gated by evidence or production access:
 - The production project showed 0 GB Storage size and no Storage egress in the
   reviewed billing cycle. The 598 objects previously found through local
   `.env.local` belong to the old project `qnazjwycsdaezamlejxn`, so no R2 copy,
-  cutover, or source deletion was run. Follow the media runbook if production
-  Storage usage changes.
+  cutover, or source deletion had been run as of this review. As confirmed by
+  the user on 2026-11-04, all LumaPOS-managed media has since been migrated to
+  R2; whether retained Supabase source copies were deleted is unconfirmed.
 - The Supabase advisor warnings for `sepay_payment_sessions` and
   `_migrations` were not changed. Vercel's production environment did not
   provide readable database credentials to the isolated check process, while
