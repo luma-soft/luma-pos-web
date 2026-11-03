@@ -11,7 +11,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ShieldCheck, SlidersHorizontal, Star } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import { Combobox } from "@/components/combobox";
@@ -2982,13 +2982,18 @@ export function PosClient({
           <div className="flex items-center justify-between gap-2">
             <span className="text-slate-500">{t("pos.printTemplate")}</span>
             <Select
-              aria-label={t("pos.printTemplate")}
+              aria-label={`${t("pos.printTemplate")}: ${activePrintTemplate.name}${activePrintTemplate.isDefault ? `, ${t("pos.printTemplateDefaultBadge")}` : ""}`}
               value={activePrintTemplate.id}
               onValueChange={changePrintTemplate}
               options={activePrintTemplates.map((template) => ({
                 value: template.id,
                 label: template.name,
-                description: template.isDefault ? t("pos.printTemplateDefaultBadge") : undefined,
+                labelIcon: template.isDefault ? (
+                  <>
+                    <Star className="h-3.5 w-3.5 fill-current text-primary-600" aria-hidden="true" />
+                    <span className="sr-only">{t("pos.printTemplateDefaultBadge")}</span>
+                  </>
+                ) : undefined,
               }))}
               searchable
               searchPlaceholder={t("pos.searchPrintTemplates")}

@@ -14,6 +14,8 @@ export interface SelectOption {
   label: string;
   /** Secondary context displayed below the label in both trigger and menu. */
   description?: string;
+  /** Inline icon displayed beside the label in the trigger and menu. */
+  labelIcon?: React.ReactNode;
   /** i18n key for label */
   labelTx?: string;
 }
@@ -279,7 +281,10 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
           )}
           {...props}
         >
-          <span className={cn("block", wrapLabel ? "whitespace-normal break-words pr-1" : "truncate")}>{selectedLabel ?? "—"}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className={cn("min-w-0", wrapLabel ? "whitespace-normal break-words" : "truncate")}>{selectedLabel ?? "—"}</span>
+            {selected?.labelIcon && <span className="inline-flex shrink-0 items-center">{selected.labelIcon}</span>}
+          </span>
           {selected?.description && <span className="mt-1 block whitespace-normal text-xs font-normal text-slate-500">{selected.description}</span>}
           <ChevronDown className={cn("absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none transition-transform", open && "rotate-180")} />
         </button>
@@ -342,6 +347,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                       onSelect={() => pick(option.value)}
                       className={optionClassName}
                       label={optionLabel(option, t)}
+                      labelIcon={option.labelIcon}
                       description={option.description}
                     />
                   );
@@ -380,6 +386,7 @@ export function SelectOptionRow({
   onSelect,
   className,
   label,
+  labelIcon,
   description,
 }: {
   active: boolean;
@@ -387,6 +394,7 @@ export function SelectOptionRow({
   onSelect: () => void;
   className?: string;
   label: React.ReactNode;
+  labelIcon?: React.ReactNode;
   description?: string;
 }) {
   return (
@@ -404,8 +412,11 @@ export function SelectOptionRow({
         "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
       )}
     >
-      <span className={cn("min-w-0", wrapLabel ? "whitespace-normal break-words" : "truncate")}>
-        <span className="block">{label}</span>
+      <span className="min-w-0">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className={cn("min-w-0", wrapLabel ? "whitespace-normal break-words" : "truncate")}>{label}</span>
+          {labelIcon && <span className="inline-flex shrink-0 items-center">{labelIcon}</span>}
+        </span>
         {description && <span className="mt-1 block whitespace-normal text-xs font-normal text-slate-500">{description}</span>}
       </span>
       {active && <Check className="h-4 w-4 shrink-0 text-primary-600" />}
