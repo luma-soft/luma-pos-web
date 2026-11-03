@@ -77,6 +77,11 @@ import {
   savePosDraftSnapshot,
 } from "@/lib/pos/draft-storage";
 import {
+  sharedPosRecordToDraft,
+  webDraftToSharedPayload,
+  type SharedPosDraftRecord,
+} from "@/lib/pos/shared-drafts-wire";
+import {
   canSwitchPosDraftKind,
   isSwitchablePosDraftKind,
   switchPosDraftKind,
@@ -256,6 +261,7 @@ interface PosDraft {
   returnOrderId?: string;
   returnOrderCode?: string;
   heldAt?: string;
+  syncUpdatedAt?: string;
 }
 
 const INV_KEY = LEGACY_POS_DRAFTS_KEY;
@@ -264,6 +270,19 @@ const PRINT_SETTINGS_KEY = "pos-print-settings";
 const AI_POS_DRAFT_KEY = "luma-pos-ai-cart-draft";
 const FIRST_INV_ID = "inv-1"; // id ổn định cho SSR (tránh hydration mismatch)
 const SOURCE_INV_ID = "inv-source";
+
+function orderSharedDraftRecords(records: readonly SharedPosDraftRecord[]) {
+  return [...records].sort((left, right) => {
+    const leftNumber = Number(left.payload.number);
+    const rightNumber = Number(right.payload.number);
+    const hasLeftNumber = Number.isFinite(leftNumber);
+    const hasRightNumber = Number.isFinite(rightNumber);
+    if (hasLeftNumber && hasRightNumber && leftNumber !== rightNumber) return leftNumber - rightNumber;
+    if (hasLeftNumber !== hasRightNumber) return hasLeftNumber ? -1 : 1;
+    const timeOrder = Date.parse(left.updatedAt) - Date.parse(right.updatedAt);
+    return Number.isFinite(timeOrder) && timeOrder !== 0 ? timeOrder : left.id.localeCompare(right.id);
+  });
+}
 
 /** Đơn rỗng. id truyền vào để lần đầu dùng id cố định, các tab sau dùng Date.now. */
 function makeDraft(id?: string, kind: PosDraftKind = "invoice", defaultTaxRate = 0): PosDraft {
@@ -671,6 +690,10 @@ export function PosClient({
   ]);
   const [activeId, setActiveId] = useState(initialSourceInvoice || initialContext ? SOURCE_INV_ID : FIRST_INV_ID);
   const hydratedScopeRef = useRef<string | null>(null);
+  const sharedDraftRecordsRef = useRef<Map<string, SharedPosDraftRecord>>(new Map());
+  const sharedDraftSyncReadyRef = useRef(false);
+  const sharedDraftSyncPendingRef = useRef(false);
+  const [sharedDraftRetryVersion, setSharedDraftRetryVersion] = useState(0);
   const [draftHydrated, setDraftHydrated] = useState(Boolean(initialSourceInvoice));
   const latestDraftStateRef = useRef({ invoices, activeId });
   useLayoutEffect(() => {
@@ -684,38 +707,71 @@ export function PosClient({
     if (hydratedScopeRef.current === storageScope) return;
     let cancelled = false;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("aiDraft") === "1" && !initialContext) {
-      hydratedScopeRef.current = storageScope;
-      queueMicrotask(() => {
-        if (!cancelled) setDraftHydrated(true);
-      });
-      return () => { cancelled = true; };
-    }
+    const isAiDraftEntry = params.get("aiDraft") === "1" && !initialContext;
     queueMicrotask(() => {
+      void (async () => {
       if (cancelled) return;
       // Legacy unscoped drafts cannot be assigned to a tenant safely.
       localStorage.removeItem(INV_KEY);
       localStorage.removeItem(ACT_KEY);
       if (params.get("aiDraft") !== "1") localStorage.removeItem(AI_POS_DRAFT_KEY);
-      const snapshot = loadPosDraftSnapshot(localStorage, storageScope);
+      const snapshot = isAiDraftEntry ? null : loadPosDraftSnapshot(localStorage, storageScope);
       const currentProducts = flattenProducts(data.products);
-      const saved = snapshot
+      const localDrafts = snapshot
         ? ensureInvoiceFirst(snapshot.drafts.map(normalizeInvoice))
+        : [];
+      let remoteRecords: SharedPosDraftRecord[] = [];
+      try {
+        const response = await fetch("/api/pos/drafts", {
+          cache: "no-store",
+          signal: AbortSignal.timeout(5_000),
+        });
+        if (response.ok) {
+          const body = await response.json() as { drafts?: SharedPosDraftRecord[] };
+          remoteRecords = Array.isArray(body.drafts) ? body.drafts : [];
+        }
+      } catch {
+        // The local snapshot remains available when the shared service is offline.
+      }
+      if (cancelled) return;
+      remoteRecords = orderSharedDraftRecords(remoteRecords);
+      sharedDraftRecordsRef.current = new Map(remoteRecords.map((record) => [record.id, record]));
+      sharedDraftSyncReadyRef.current = true;
+
+      const localByID = new Map(localDrafts.map((draft) => [draft.id, draft]));
+      const mergedByID = new Map<string, PosDraft>(localDrafts.map((draft) => [draft.id, draft]));
+      for (const record of remoteRecords) {
+        const localDraft = localByID.get(record.id);
+        if (record.deleted) {
+          if (localDraft && Date.parse(localDraft.syncUpdatedAt ?? snapshot?.updatedAt ?? "") > Date.parse(record.updatedAt)) {
+            mergedByID.set(record.id, localDraft);
+          } else {
+            mergedByID.delete(record.id);
+          }
+          continue;
+        }
+        const remoteDraft = sharedPosRecordToDraft(record);
+        if (!remoteDraft) continue;
+        const localUpdatedAt = Date.parse(localDraft?.syncUpdatedAt ?? snapshot?.updatedAt ?? "") || 0;
+        const remoteUpdatedAt = Date.parse(record.updatedAt) || 0;
+        mergedByID.set(record.id, localDraft && localUpdatedAt > remoteUpdatedAt
+          ? normalizeInvoice(localDraft as unknown as Record<string, unknown>)
+          : normalizeInvoice(remoteDraft));
+      }
+      const saved = mergedByID.size > 0
+        ? ensureInvoiceFirst([...mergedByID.values()])
         : [];
       const refreshed = snapshot
         ? reconcilePosDraftTaxDefaults(
-            saved.map((draft) => ({
-              ...draft,
-              cart: rehydrateCartProducts(draft.cart, currentProducts),
-            })),
+            saved.map((draft) => ({ ...draft, cart: rehydrateCartProducts(draft.cart, currentProducts) })),
             {
               previousDefaultRate: snapshot.taxDefaultRate,
               currentDefaultRate: defaultDraftTaxRate,
             },
           )
-        : [];
-      let nextInvoices = snapshot ? refreshed : invoices;
-      let nextActiveId = snapshot?.activeId && refreshed.some((draft) => draft.id === snapshot.activeId)
+        : saved.map((draft) => ({ ...draft, cart: rehydrateCartProducts(draft.cart, currentProducts) }));
+      let nextInvoices = snapshot || saved.length ? refreshed : invoices;
+      let nextActiveId = snapshot?.activeId && nextInvoices.some((draft) => draft.id === snapshot.activeId)
         ? snapshot.activeId
         : nextInvoices[0].id;
 
@@ -754,18 +810,188 @@ export function PosClient({
         }
       }
       setDraftHydrated(true);
+      })();
     });
     return () => { cancelled = true; };
-  }, [data.products, defaultDraftTaxRate, initialContext, initialSourceInvoice, storageScope]);
+  }, [data.products, defaultDraftTaxRate, initialContext, initialSourceInvoice, invoices, storageScope]);
 
   // Ghi atomically cả danh sách và tab active sau khi đã đọc snapshot cũ.
   useEffect(() => {
     if (initialSourceInvoice) return;
     if (hydratedScopeRef.current !== storageScope) return;
-    savePosDraftSnapshot(localStorage, storageScope, invoices, activeId, {
+    const didSave = savePosDraftSnapshot(localStorage, storageScope, invoices, activeId, {
       taxDefaultRate: defaultDraftTaxRate,
     });
+    if (!didSave) return;
   }, [activeId, defaultDraftTaxRate, invoices, initialSourceInvoice, storageScope]);
+
+  useEffect(() => {
+    if (initialSourceInvoice || !draftHydrated || !sharedDraftSyncReadyRef.current) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const snapshot = loadPosDraftSnapshot(localStorage, storageScope);
+      if (!snapshot) return;
+      const customerRows = customerOptions as unknown as Record<string, unknown>[];
+      const persistedDrafts = snapshot.drafts.map(normalizeInvoice);
+      const shareableDrafts = persistedDrafts.filter((draft) =>
+        draft.cart.length > 0
+        || Boolean(draft.customerId || draft.projectId || draft.projectName.trim() || draft.note?.trim() || draft.displayName?.trim() || draft.source),
+      );
+      const outbound = shareableDrafts.map((draft, index) => {
+        const payload = webDraftToSharedPayload(draft, index, customerRows);
+        return {
+          id: String(payload.id),
+          payload,
+          modifiedAt: typeof draft.syncUpdatedAt === "string" ? draft.syncUpdatedAt : snapshot.updatedAt,
+        };
+      });
+      const currentIDs = new Set(outbound.map((draft) => draft.id));
+      const deletedIds = [...sharedDraftRecordsRef.current.values()]
+        .filter((record) => !record.deleted && !currentIDs.has(record.id))
+        .map((record) => ({
+          id: record.id,
+          modifiedAt: snapshot.updatedAt ?? new Date().toISOString(),
+        }));
+
+      try {
+        const response = await fetch("/api/pos/drafts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ drafts: outbound, deletedIds }),
+        });
+        if (!response.ok) {
+          sharedDraftSyncPendingRef.current = true;
+          return;
+        }
+        if (cancelled) return;
+        const body = await response.json() as { drafts?: SharedPosDraftRecord[] };
+        const records = orderSharedDraftRecords(Array.isArray(body.drafts) ? body.drafts : []);
+        sharedDraftSyncPendingRef.current = false;
+        sharedDraftRecordsRef.current = new Map(records.map((record) => [record.id, record]));
+        const remoteByID = new Map(records.map((record) => [record.id, record]));
+        const localUpdatedAtByID = new Map(loadPosDraftSnapshot(localStorage, storageScope)?.drafts.flatMap((draft) =>
+          typeof draft.id === "string" && typeof draft.syncUpdatedAt === "string"
+            ? [[draft.id, draft.syncUpdatedAt] as const]
+            : [],
+        ) ?? []);
+        setInvoices((current) => {
+          let changed = false;
+          const next = current.flatMap((draft) => {
+            const record = remoteByID.get(draft.id);
+            if (!record) return [draft];
+            const localTime = Date.parse(localUpdatedAtByID.get(draft.id) ?? draft.syncUpdatedAt ?? "") || 0;
+            const remoteTime = Date.parse(record.updatedAt) || 0;
+            if (record.deleted && remoteTime >= localTime) {
+              changed = true;
+              return [];
+            }
+            if (record.deleted) return [draft];
+            if (remoteTime > localTime) {
+              const remote = sharedPosRecordToDraft(record);
+              if (remote) {
+                changed = true;
+                return [normalizeInvoice(remote)];
+              }
+            }
+            if (draft.syncUpdatedAt !== record.updatedAt) {
+              changed = true;
+              return [{ ...draft, syncUpdatedAt: record.updatedAt }];
+            }
+            return [draft];
+          });
+          for (const record of records) {
+            if (record.deleted || current.some((draft) => draft.id === record.id)) continue;
+            const remote = sharedPosRecordToDraft(record);
+            if (remote) {
+              changed = true;
+              next.push(normalizeInvoice(remote));
+            }
+          }
+          return changed ? ensureInvoiceFirst(next) : current;
+        });
+      } catch {
+        // Keep local changes and retry on the next state change or foreground refresh.
+        sharedDraftSyncPendingRef.current = true;
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [activeId, customerOptions, draftHydrated, invoices, initialSourceInvoice, sharedDraftRetryVersion, storageScope]);
+
+  useEffect(() => {
+    if (initialSourceInvoice || !draftHydrated) return;
+    let inFlight = false;
+    const refresh = async () => {
+      if (inFlight || document.visibilityState === "hidden") return;
+      inFlight = true;
+      try {
+        const response = await fetch("/api/pos/drafts", {
+          cache: "no-store",
+          signal: AbortSignal.timeout(5_000),
+        });
+        if (!response.ok) return;
+        const body = await response.json() as { drafts?: SharedPosDraftRecord[] };
+        const records = orderSharedDraftRecords(Array.isArray(body.drafts) ? body.drafts : []);
+        if (sharedDraftSyncPendingRef.current) {
+          sharedDraftSyncPendingRef.current = false;
+          setSharedDraftRetryVersion((version) => version + 1);
+        }
+        sharedDraftRecordsRef.current = new Map(records.map((record) => [record.id, record]));
+        const remoteByID = new Map(records.map((record) => [record.id, record]));
+        const localUpdatedAtByID = new Map(loadPosDraftSnapshot(localStorage, storageScope)?.drafts.flatMap((draft) =>
+          typeof draft.id === "string" && typeof draft.syncUpdatedAt === "string"
+            ? [[draft.id, draft.syncUpdatedAt] as const]
+            : [],
+        ) ?? []);
+        setInvoices((current) => {
+          let changed = false;
+          const next = current.flatMap((draft) => {
+            const record = remoteByID.get(draft.id);
+            if (!record) return [draft];
+            const localTime = Date.parse(localUpdatedAtByID.get(draft.id) ?? draft.syncUpdatedAt ?? "") || 0;
+            const remoteTime = Date.parse(record.updatedAt) || 0;
+            if (record.deleted && remoteTime >= localTime) {
+              changed = true;
+              return [];
+            }
+            if (record.deleted || remoteTime <= localTime) return [draft];
+            const remote = sharedPosRecordToDraft(record);
+            if (!remote) return [draft];
+            changed = true;
+            return [normalizeInvoice(remote)];
+          });
+          for (const record of records) {
+            if (record.deleted || current.some((draft) => draft.id === record.id)) continue;
+            const remote = sharedPosRecordToDraft(record);
+            if (remote) {
+              changed = true;
+              next.push(normalizeInvoice(remote));
+            }
+          }
+          if (!changed) return current;
+          const normalized = ensureInvoiceFirst(next);
+          if (!normalized.some((draft) => draft.id === activeId)) {
+            setActiveId(normalized[0].id);
+          }
+          return normalized;
+        });
+      } catch {
+        // The local draft remains usable while the shared service is unavailable.
+      } finally {
+        inFlight = false;
+      }
+    };
+    const interval = window.setInterval(() => { void refresh(); }, 10_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [activeId, draftHydrated, initialSourceInvoice, storageScope]);
 
   // Flush snapshot mới nhất khi rời POS hoặc browser đưa trang xuống nền.
   useEffect(() => {

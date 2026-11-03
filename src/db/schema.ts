@@ -128,6 +128,25 @@ export const profiles = pgTable("profiles", {
   unique("profiles_store_id_id_unique").on(t.storeId, t.id),
 ]);
 
+export const posSharedDrafts = pgTable("pos_shared_drafts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "cascade" }),
+  ownerUserId: uuid("owner_user_id").notNull(),
+  draftId: text("draft_id").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  updatedBy: uuid("updated_by").references(() => profiles.id, { onDelete: "set null" }),
+}, (t) => [
+  foreignKey({
+    name: "pos_shared_drafts_owner_profile_fk",
+    columns: [t.storeId, t.ownerUserId],
+    foreignColumns: [profiles.storeId, profiles.id],
+  }).onDelete("cascade"),
+  uniqueIndex("pos_shared_drafts_account_id_unique").on(t.storeId, t.ownerUserId, t.draftId),
+  index("pos_shared_drafts_account_updated_idx").on(t.storeId, t.ownerUserId, t.updatedAt),
+]);
+
 // Project-wide database backup job history. This table stores operational
 // metadata only; the backup worker excludes its rows from data.sql.
 export const databaseBackupRuns = pgTable("database_backup_runs", {
