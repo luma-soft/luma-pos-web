@@ -3021,10 +3021,7 @@ export function PosClient({
               options={activePrintTemplates.map((template) => ({
                 value: template.id,
                 label: template.name,
-                description: [
-                  `${t("pos.printPaperSize")}: ${t(template.paperDefault === "a4" ? "pos.printA4Short" : template.paperDefault === "a5" ? "pos.printA5Short" : "pos.printK80Short")}`,
-                  ...(template.isDefault ? [t("pos.printTemplateDefaultBadge")] : []),
-                ].join(" · "),
+                description: template.isDefault ? t("pos.printTemplateDefaultBadge") : undefined,
               }))}
               searchable
               searchPlaceholder={t("pos.searchPrintTemplates")}
