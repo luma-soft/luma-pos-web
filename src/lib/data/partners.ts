@@ -10,6 +10,7 @@ import {
   orders,
   payments,
   profiles,
+  products,
   purchaseOrders,
   returnItems,
   returns,
@@ -614,23 +615,51 @@ export async function getCustomer(storeId: string, id: string) {
     .limit(1);
   if (!customer) return null;
 
-  const customerOrders = await db
-    .select({
-      id: orders.id,
-      code: orders.code,
-      status: orders.status,
-      paymentStatus: orders.paymentStatus,
-      projectName: orders.projectName,
-      total: orders.total,
-      amountPaid: orders.amountPaid,
-      createdAt: orders.createdAt,
-    })
-    .from(orders)
-    .where(and(eq(orders.customerId, id), eq(orders.storeId, storeId)))
-    .orderBy(desc(orders.createdAt))
-    .limit(50);
+  const [customerOrders, [profitRow], [returnedProfitRow]] = await Promise.all([
+    db
+      .select({
+        id: orders.id,
+        code: orders.code,
+        status: orders.status,
+        paymentStatus: orders.paymentStatus,
+        projectName: orders.projectName,
+        total: orders.total,
+        amountPaid: orders.amountPaid,
+        createdAt: orders.createdAt,
+      })
+      .from(orders)
+      .where(and(eq(orders.customerId, id), eq(orders.storeId, storeId)))
+      .orderBy(desc(orders.createdAt))
+      .limit(50),
+    db
+      .select({
+        grossProfit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .innerJoin(products, eq(orderItems.productId, products.id))
+      .where(and(
+        eq(orders.storeId, storeId),
+        eq(orders.customerId, id),
+        eq(orders.documentType, "sale"),
+        inArray(orders.status, ["completed", "returned"]),
+      )),
+    db
+      .select({
+        returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      })
+      .from(returnItems)
+      .innerJoin(returns, eq(returnItems.returnId, returns.id))
+      .innerJoin(products, eq(returnItems.productId, products.id))
+      .where(and(
+        eq(returns.storeId, storeId),
+        eq(returns.customerId, id),
+        eq(returns.status, "completed"),
+      )),
+  ]);
 
-  return { ...customer, ...resolveStoreAddress(customer), orders: customerOrders };
+  const grossProfit = Number(profitRow?.grossProfit ?? 0) - Number(returnedProfitRow?.returnedProfit ?? 0);
+  return { ...customer, ...resolveStoreAddress(customer), grossProfit, orders: customerOrders };
 }
 
 export type CustomerListResult = Awaited<ReturnType<typeof getCustomers>>;
