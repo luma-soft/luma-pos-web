@@ -36,6 +36,8 @@ export const createOrderSchema = z.object({
   mode: z.enum(["sale", "quote", "booking"]).default("sale"),
   // id sinh ở client để khử trùng khi đồng bộ offline (sync lại không tạo đơn trùng)
   clientId: z.string().max(40).optional(),
+  // Promotes a previously saved POS draft in place when checkout succeeds.
+  posDraftId: z.string().trim().min(1).max(128).optional(),
   source: z.object({
     mode: z.enum(["edit", "copy"]),
     orderId: z.uuid(),

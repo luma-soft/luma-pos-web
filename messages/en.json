@@ -328,7 +328,22 @@
   },
   "notifications": {
     "title": "Notifications",
-    "operationalAlert": "You have a new operational alert.",
+    "operationalPush": {
+      "titles": {
+        "lowStock": "Low stock needs attention",
+        "einvoiceError": "E-invoice could not be issued",
+        "shiftClose": "Sales shift needs review",
+        "syncDone": "Data sync completed",
+        "serviceDue": "Warranty or maintenance needs review"
+      },
+      "bodies": {
+        "lowStock": "Some items are at or near their restock threshold. Open Hải Đăng POS to review what needs replenishing.",
+        "einvoiceError": "An e-invoice could not be issued successfully. Open Hải Đăng POS to review its status and try again.",
+        "shiftClose": "Review the shift status and closing totals in Hải Đăng POS.",
+        "syncDone": "The data on this device has synced. Open Hải Đăng POS to review the latest status.",
+        "serviceDue": "A warranty request or maintenance task needs attention. Open Hải Đăng POS to review it."
+      }
+    },
     "subtitle": "Previews, alerts, and actions from mobile, POS, and AI that need review",
     "filters": "Filters",
     "allSources": "All sources",
@@ -1783,7 +1798,8 @@
       "creditNeedsCustomer": "Credit sales require a saved customer.",
       "pricingChanged": "Prices, promotions or unit conversions changed. The order has not been saved or paid; your cart is preserved. Refresh and review the prices before submitting again.",
       "unitUnavailable": "This unit is no longer available for direct sale. Choose another unit that is for sale.",
-      "emptyCart": "Cart is empty."
+      "emptyCart": "Cart is empty.",
+      "draftAlreadyFinalized": "This saved order has already been checked out or deleted. Refresh the order list before continuing."
     },
     "pricingConflict": {
       "refresh": "Refresh prices to reselect",
@@ -3089,6 +3105,8 @@
     "submitForApproval": "Submit for approval",
     "confirm": "Confirm issue",
     "submitted": "Internal issue posted.",
+    "savedDraft": "Internal-use draft saved.",
+    "openSaved": "Open internal-use issue",
     "submittedPending": "Submitted — awaiting manager approval.",
     "historyTitle": "Internal-use history",
     "historyCount": "{n} issues",
@@ -3502,6 +3520,8 @@
     "autoCode": "Auto-generated code",
     "saveDraft": "Save draft",
     "complete": "Complete",
+    "savedMessage": "Purchase return saved.",
+    "openSavedReturn": "Open purchase return",
     "draftTodo": "Draft saving will be added when draft management is needed.",
     "emptyLinesTitle": "Add returned products",
     "emptyLinesHint": "Search by product code or name to add items.",
@@ -5587,6 +5607,9 @@
     },
     "saveDraft": "Save draft",
     "complete": "Complete (balance stock)",
+    "savedDraftMessage": "Stocktake draft saved.",
+    "savedBalancedMessage": "Stocktake saved and inventory balanced.",
+    "openSavedStocktake": "Open stocktake",
     "balance": "Balance stock",
     "balanceConfirm": "Balance now? Stock will be SET to counted quantities; differences logged as adjustments.",
     "cancelConfirm": "Cancel this draft stocktake?",
@@ -5623,16 +5646,26 @@
   },
   "internalNotifications": {
     "titles": {
-      "invoiceCreated": "A new invoice was created",
-      "invoiceCancelled": "An invoice was cancelled",
-      "purchaseReceived": "A purchase receipt was recorded",
-      "purchaseCancelled": "A purchase receipt was cancelled",
-      "debtChanged": "A debt balance was updated",
-      "paymentReceived": "Payment received",
+      "invoiceCreated": "Invoice completed",
+      "invoiceCancelled": "Invoice canceled",
+      "purchaseReceived": "Purchase receipt recorded",
+      "purchaseCancelled": "Purchase receipt canceled",
+      "debtChanged": "Debt balance updated",
+      "paymentReceived": "Payment recorded",
       "qrPaymentConfirmed": "QR payment confirmed",
-      "qrPaymentException": "QR payment needs review"
+      "qrPaymentException": "QR transaction needs review"
     },
-    "body": "Open Hải Đăng POS to view details."
+    "body": "Open Hải Đăng POS to view details.",
+    "categoryBodies": {
+      "invoiceCreated": "A completed sale was recorded as an invoice. Open Hải Đăng POS to review it.",
+      "invoiceCancelled": "The invoice was canceled. Open Hải Đăng POS to review its status and history.",
+      "purchaseReceived": "A purchase receipt was recorded. Open Hải Đăng POS to review the received items.",
+      "purchaseCancelled": "The purchase receipt was canceled. Open Hải Đăng POS to review its updated status.",
+      "debtChanged": "A customer or supplier balance changed. Open Hải Đăng POS to review the update.",
+      "paymentReceived": "A payment was recorded. Open Hải Đăng POS to review the related transaction.",
+      "qrPaymentConfirmed": "The QR payment was confirmed. Open Hải Đăng POS to view the related invoice.",
+      "qrPaymentException": "The transaction could not be matched automatically. Open Hải Đăng POS to reconcile it."
+    }
   },
   "serviceRequestPortal": {
     "title": "Project support request",

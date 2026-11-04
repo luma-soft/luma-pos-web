@@ -135,6 +135,28 @@ export async function createOrderForUser(
           .where(and(eq(orders.storeId, storeId), eq(orders.clientId, v.clientId))).limit(1);
         if (existing) return { order: existing, notification: null };
       }
+      let savedDraft: {
+        id: string;
+        code: string;
+        status: string;
+        posDraftPayload: Record<string, unknown> | null;
+      } | undefined;
+      if (v.posDraftId) {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`pos-draft:${storeId}:${v.posDraftId}`}, 0))`);
+        [savedDraft] = await tx.select({
+          id: orders.id,
+          code: orders.code,
+          status: orders.status,
+          posDraftPayload: orders.posDraftPayload,
+        }).from(orders)
+          .where(and(eq(orders.storeId, storeId), eq(orders.posDraftId, v.posDraftId)))
+          .limit(1)
+          .for("update");
+      }
+      if (savedDraft && (savedDraft.status !== "draft" || savedDraft.posDraftPayload == null)) {
+        if (savedDraft.status === "cancelled") throw new Error("POS_DRAFT_FINALIZED");
+        return { order: { id: savedDraft.id, code: savedDraft.code }, notification: null };
+      }
       // Resolve and fence prices in this same transaction BEFORE any edit
       // restoration, inventory, order, payment or audit write.
       const { items: trustedItems, vatRateByProduct } = await prepareCheckoutPricing(
@@ -267,8 +289,10 @@ export async function createOrderForUser(
 
       const orderInsert: typeof orders.$inferInsert = {
         storeId,
-        code: generateCode(isQuote ? "BG" : "DH"),
+        code: savedDraft?.code ?? generateCode(isQuote ? "BG" : "DH"),
         clientId: v.clientId ?? null,
+        posDraftId: v.posDraftId ?? null,
+        posDraftPayload: null,
         documentType: isQuote ? "quote" : isBooking ? "booking" : "sale",
         status: isQuote
           ? "quote"
@@ -299,7 +323,20 @@ export async function createOrderForUser(
       };
       if (v.source?.mode === "edit") orderInsert.createdAt = sourceOrder.createdAt;
 
-      const [order] = await tx.insert(orders).values(orderInsert).returning({ id: orders.id, code: orders.code });
+      let order: { id: string; code: string };
+      if (savedDraft) {
+        const [updated] = await tx.update(orders).set({
+          ...orderInsert,
+          createdAt: orderInsert.createdAt ?? new Date(),
+          updatedAt: sql`now()`,
+        }).where(and(eq(orders.storeId, storeId), eq(orders.id, savedDraft.id)))
+          .returning({ id: orders.id, code: orders.code });
+        order = updated;
+        await tx.delete(orderItems).where(and(eq(orderItems.storeId, storeId), eq(orderItems.orderId, order.id)));
+      } else {
+        const [inserted] = await tx.insert(orders).values(orderInsert).returning({ id: orders.id, code: orders.code });
+        order = inserted;
+      }
 
       if (v.source?.mode === "edit") {
         await tx.update(orders).set({
@@ -526,6 +563,7 @@ export async function createOrderForUser(
       PAYMENT_SESSION_NOT_CONFIRMABLE: "payments.errors.notConfirmable",
       BANK_ACCOUNT_NOT_FOUND: "payments.errors.bankAccountNotFound",
       INSUFFICIENT_BATCH_STOCK: "pos.errors.insufficientStock",
+      POS_DRAFT_FINALIZED: "pos.errors.draftAlreadyFinalized",
     };
     const msg = e instanceof Error ? e.message : "";
     if (msg === CHECKOUT_PRICING_CHANGED || msg === CHECKOUT_CATALOG_RACE || ["40001", "40P01", "55P03"].includes(pgErrorCode(e) ?? "")) {

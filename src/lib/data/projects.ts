@@ -48,7 +48,7 @@ const projectRowSelection = (storeId: string) => ({
   siteContactPhone: projects.siteContactPhone,
   customerName: customers.name,
   orderCount: sql<number>`(select count(*) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} != 'cancelled')::int`,
-  totalValue: sql<string>`coalesce((select sum(${orders.total}) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} not in ('cancelled','quote','merged')), 0)`,
+  totalValue: sql<string>`coalesce((select sum(${orders.total}) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} not in ('draft','cancelled','quote','merged')), 0)`,
   remaining: sql<string>`coalesce((select sum(${orders.total} - ${orders.amountPaid}) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} = 'completed'), 0)`,
   createdAt: projects.createdAt,
 });
@@ -98,7 +98,7 @@ export async function getProjectDetail(storeId: string, id: string) {
     siteContactPhone: projects.siteContactPhone,
     customerName: customers.name,
     orderCount: sql<number>`(select count(*) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} != 'cancelled')::int`,
-    totalValue: sql<string>`coalesce((select sum(${orders.total}) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} not in ('cancelled','quote','merged')), 0)`,
+    totalValue: sql<string>`coalesce((select sum(${orders.total}) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} not in ('draft','cancelled','quote','merged')), 0)`,
     remaining: sql<string>`coalesce((select sum(${orders.total} - ${orders.amountPaid}) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} = 'completed'), 0)`,
     createdAt: projects.createdAt,
   }).from(projects).leftJoin(customers, and(eq(projects.customerId, customers.id), eq(customers.storeId, storeId))).where(and(eq(projects.id, id), eq(projects.storeId, storeId))).limit(1);

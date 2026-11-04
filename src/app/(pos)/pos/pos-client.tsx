@@ -264,6 +264,12 @@ interface PosDraft {
   syncUpdatedAt?: string;
 }
 
+type POSOrderDraftRecord = SharedPosDraftRecord & {
+  orderId: string;
+  code: string;
+  status: string;
+};
+
 const INV_KEY = LEGACY_POS_DRAFTS_KEY;
 const ACT_KEY = LEGACY_POS_ACTIVE_DRAFT_KEY;
 const PRINT_SETTINGS_KEY = "pos-print-settings";
@@ -271,7 +277,7 @@ const AI_POS_DRAFT_KEY = "luma-pos-ai-cart-draft";
 const FIRST_INV_ID = "inv-1"; // id ổn định cho SSR (tránh hydration mismatch)
 const SOURCE_INV_ID = "inv-source";
 
-function orderSharedDraftRecords(records: readonly SharedPosDraftRecord[]) {
+function orderSharedDraftRecords<T extends SharedPosDraftRecord>(records: readonly T[]): T[] {
   return [...records].sort((left, right) => {
     const leftNumber = Number(left.payload.number);
     const rightNumber = Number(right.payload.number);
@@ -690,10 +696,10 @@ export function PosClient({
   ]);
   const [activeId, setActiveId] = useState(initialSourceInvoice || initialContext ? SOURCE_INV_ID : FIRST_INV_ID);
   const hydratedScopeRef = useRef<string | null>(null);
-  const sharedDraftRecordsRef = useRef<Map<string, SharedPosDraftRecord>>(new Map());
-  const sharedDraftSyncReadyRef = useRef(false);
-  const sharedDraftSyncPendingRef = useRef(false);
-  const [sharedDraftRetryVersion, setSharedDraftRetryVersion] = useState(0);
+  const serverDraftIdsRef = useRef<Set<string>>(new Set());
+  const pendingDraftDeleteIdsRef = useRef<Set<string>>(new Set());
+  const draftApiRetryPendingRef = useRef(false);
+  const [draftApiRetryVersion, setDraftApiRetryVersion] = useState(0);
   const [draftHydrated, setDraftHydrated] = useState(Boolean(initialSourceInvoice));
   const latestDraftStateRef = useRef({ invoices, activeId });
   useLayoutEffect(() => {
@@ -720,14 +726,14 @@ export function PosClient({
       const localDrafts = snapshot
         ? ensureInvoiceFirst(snapshot.drafts.map(normalizeInvoice))
         : [];
-      let remoteRecords: SharedPosDraftRecord[] = [];
+      let remoteRecords: POSOrderDraftRecord[] = [];
       try {
-        const response = await fetch("/api/pos/drafts", {
+        const response = await fetch("/api/pos/order-drafts", {
           cache: "no-store",
           signal: AbortSignal.timeout(5_000),
         });
         if (response.ok) {
-          const body = await response.json() as { drafts?: SharedPosDraftRecord[] };
+          const body = await response.json() as { drafts?: POSOrderDraftRecord[] };
           remoteRecords = Array.isArray(body.drafts) ? body.drafts : [];
         }
       } catch {
@@ -735,19 +741,14 @@ export function PosClient({
       }
       if (cancelled) return;
       remoteRecords = orderSharedDraftRecords(remoteRecords);
-      sharedDraftRecordsRef.current = new Map(remoteRecords.map((record) => [record.id, record]));
-      sharedDraftSyncReadyRef.current = true;
+      serverDraftIdsRef.current = new Set(remoteRecords.filter((record) => !record.deleted).map((record) => record.id));
 
       const localByID = new Map(localDrafts.map((draft) => [draft.id, draft]));
       const mergedByID = new Map<string, PosDraft>(localDrafts.map((draft) => [draft.id, draft]));
       for (const record of remoteRecords) {
         const localDraft = localByID.get(record.id);
         if (record.deleted) {
-          if (localDraft && Date.parse(localDraft.syncUpdatedAt ?? snapshot?.updatedAt ?? "") > Date.parse(record.updatedAt)) {
-            mergedByID.set(record.id, localDraft);
-          } else {
-            mergedByID.delete(record.id);
-          }
+          mergedByID.delete(record.id);
           continue;
         }
         const remoteDraft = sharedPosRecordToDraft(record);
@@ -826,99 +827,41 @@ export function PosClient({
   }, [activeId, defaultDraftTaxRate, invoices, initialSourceInvoice, storageScope]);
 
   useEffect(() => {
-    if (initialSourceInvoice || !draftHydrated || !sharedDraftSyncReadyRef.current) return;
+    if (initialSourceInvoice || !draftHydrated) return;
+    const savedDrafts = invoices.filter((draft) => draft.heldAt || serverDraftIdsRef.current.has(draft.id));
+    if (!savedDrafts.length) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
-      const snapshot = loadPosDraftSnapshot(localStorage, storageScope);
-      if (!snapshot) return;
       const customerRows = customerOptions as unknown as Record<string, unknown>[];
-      const persistedDrafts = snapshot.drafts.map(normalizeInvoice);
-      const shareableDrafts = persistedDrafts.filter((draft) =>
-        draft.cart.length > 0
-        || Boolean(draft.customerId || draft.projectId || draft.projectName.trim() || draft.note?.trim() || draft.displayName?.trim() || draft.source),
-      );
-      const outbound = shareableDrafts.map((draft, index) => {
+      let failed = false;
+      await Promise.all(savedDrafts.map(async (draft, index) => {
+        if (pendingDraftDeleteIdsRef.current.has(draft.id)) return;
         const payload = webDraftToSharedPayload(draft, index, customerRows);
-        return {
-          id: String(payload.id),
-          payload,
-          modifiedAt: typeof draft.syncUpdatedAt === "string" ? draft.syncUpdatedAt : snapshot.updatedAt,
-        };
-      });
-      const currentIDs = new Set(outbound.map((draft) => draft.id));
-      const deletedIds = [...sharedDraftRecordsRef.current.values()]
-        .filter((record) => !record.deleted && !currentIDs.has(record.id))
-        .map((record) => ({
-          id: record.id,
-          modifiedAt: snapshot.updatedAt ?? new Date().toISOString(),
-        }));
-
-      try {
-        const response = await fetch("/api/pos/drafts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ drafts: outbound, deletedIds }),
-        });
-        if (!response.ok) {
-          sharedDraftSyncPendingRef.current = true;
-          return;
-        }
-        if (cancelled) return;
-        const body = await response.json() as { drafts?: SharedPosDraftRecord[] };
-        const records = orderSharedDraftRecords(Array.isArray(body.drafts) ? body.drafts : []);
-        sharedDraftSyncPendingRef.current = false;
-        sharedDraftRecordsRef.current = new Map(records.map((record) => [record.id, record]));
-        const remoteByID = new Map(records.map((record) => [record.id, record]));
-        const localUpdatedAtByID = new Map(loadPosDraftSnapshot(localStorage, storageScope)?.drafts.flatMap((draft) =>
-          typeof draft.id === "string" && typeof draft.syncUpdatedAt === "string"
-            ? [[draft.id, draft.syncUpdatedAt] as const]
-            : [],
-        ) ?? []);
-        setInvoices((current) => {
-          let changed = false;
-          const next = current.flatMap((draft) => {
-            const record = remoteByID.get(draft.id);
-            if (!record) return [draft];
-            const localTime = Date.parse(localUpdatedAtByID.get(draft.id) ?? draft.syncUpdatedAt ?? "") || 0;
-            const remoteTime = Date.parse(record.updatedAt) || 0;
-            if (record.deleted && remoteTime >= localTime) {
-              changed = true;
-              return [];
-            }
-            if (record.deleted) return [draft];
-            if (remoteTime > localTime) {
-              const remote = sharedPosRecordToDraft(record);
-              if (remote) {
-                changed = true;
-                return [normalizeInvoice(remote)];
-              }
-            }
-            if (draft.syncUpdatedAt !== record.updatedAt) {
-              changed = true;
-              return [{ ...draft, syncUpdatedAt: record.updatedAt }];
-            }
-            return [draft];
+        try {
+          const response = await fetch("/api/pos/order-drafts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "save", draftId: draft.id, payload }),
           });
-          for (const record of records) {
-            if (record.deleted || current.some((draft) => draft.id === record.id)) continue;
-            const remote = sharedPosRecordToDraft(record);
-            if (remote) {
-              changed = true;
-              next.push(normalizeInvoice(remote));
-            }
+          if (!response.ok) {
+            failed = true;
+            return;
           }
-          return changed ? ensureInvoiceFirst(next) : current;
-        });
-      } catch {
-        // Keep local changes and retry on the next state change or foreground refresh.
-        sharedDraftSyncPendingRef.current = true;
-      }
+          const body = await response.json() as { draft?: POSOrderDraftRecord };
+          if (!cancelled && body.draft && !body.draft.deleted) {
+            serverDraftIdsRef.current.add(draft.id);
+          }
+        } catch {
+          failed = true;
+        }
+      }));
+      if (!cancelled) draftApiRetryPendingRef.current = failed;
     }, 350);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [activeId, customerOptions, draftHydrated, invoices, initialSourceInvoice, sharedDraftRetryVersion, storageScope]);
+  }, [activeId, customerOptions, draftApiRetryVersion, draftHydrated, invoices, initialSourceInvoice, storageScope]);
 
   useEffect(() => {
     if (initialSourceInvoice || !draftHydrated) return;
@@ -927,18 +870,26 @@ export function PosClient({
       if (inFlight || document.visibilityState === "hidden") return;
       inFlight = true;
       try {
-        const response = await fetch("/api/pos/drafts", {
+        for (const id of pendingDraftDeleteIdsRef.current) {
+          const deleted = await fetch("/api/pos/order-drafts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "delete", draftId: id }),
+          });
+          if (deleted.ok) pendingDraftDeleteIdsRef.current.delete(id);
+        }
+        const response = await fetch("/api/pos/order-drafts", {
           cache: "no-store",
           signal: AbortSignal.timeout(5_000),
         });
         if (!response.ok) return;
-        const body = await response.json() as { drafts?: SharedPosDraftRecord[] };
+        const body = await response.json() as { drafts?: POSOrderDraftRecord[] };
         const records = orderSharedDraftRecords(Array.isArray(body.drafts) ? body.drafts : []);
-        if (sharedDraftSyncPendingRef.current) {
-          sharedDraftSyncPendingRef.current = false;
-          setSharedDraftRetryVersion((version) => version + 1);
+        serverDraftIdsRef.current = new Set(records.filter((record) => !record.deleted).map((record) => record.id));
+        if (draftApiRetryPendingRef.current) {
+          draftApiRetryPendingRef.current = false;
+          setDraftApiRetryVersion((version) => version + 1);
         }
-        sharedDraftRecordsRef.current = new Map(records.map((record) => [record.id, record]));
         const remoteByID = new Map(records.map((record) => [record.id, record]));
         const localUpdatedAtByID = new Map(loadPosDraftSnapshot(localStorage, storageScope)?.drafts.flatMap((draft) =>
           typeof draft.id === "string" && typeof draft.syncUpdatedAt === "string"
@@ -950,20 +901,21 @@ export function PosClient({
           const next = current.flatMap((draft) => {
             const record = remoteByID.get(draft.id);
             if (!record) return [draft];
+            if (pendingDraftDeleteIdsRef.current.has(draft.id)) return [draft];
             const localTime = Date.parse(localUpdatedAtByID.get(draft.id) ?? draft.syncUpdatedAt ?? "") || 0;
             const remoteTime = Date.parse(record.updatedAt) || 0;
-            if (record.deleted && remoteTime >= localTime) {
+            if (record.deleted) {
               changed = true;
               return [];
             }
-            if (record.deleted || remoteTime <= localTime) return [draft];
+            if (remoteTime <= localTime) return [draft];
             const remote = sharedPosRecordToDraft(record);
             if (!remote) return [draft];
             changed = true;
             return [normalizeInvoice(remote)];
           });
           for (const record of records) {
-            if (record.deleted || current.some((draft) => draft.id === record.id)) continue;
+            if (record.deleted || pendingDraftDeleteIdsRef.current.has(record.id) || current.some((draft) => draft.id === record.id)) continue;
             const remote = sharedPosRecordToDraft(record);
             if (remote) {
               changed = true;
@@ -1182,7 +1134,22 @@ export function PosClient({
   }
 
   /** Đóng 1 tab; luôn giữ tối thiểu 1 đơn. */
-  function closeInvoice(id: string) {
+  function closeInvoice(id: string, preserveServerDraft = false) {
+    const closingDraft = invoices.find((invoice) => invoice.id === id);
+    if (!preserveServerDraft && (closingDraft?.heldAt || serverDraftIdsRef.current.has(id))) {
+      serverDraftIdsRef.current.delete(id);
+      pendingDraftDeleteIdsRef.current.add(id);
+      void fetch("/api/pos/order-drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", draftId: id }),
+      }).then((response) => {
+        if (response.ok) pendingDraftDeleteIdsRef.current.delete(id);
+        else draftApiRetryPendingRef.current = true;
+      }).catch(() => {
+        draftApiRetryPendingRef.current = true;
+      });
+    }
     setInvoices((list) => {
       const closingFirstInvoice = list.length > 1 && list[0]?.id === id && (list[0].kind ?? "invoice") === "invoice";
       if (closingFirstInvoice) {
@@ -1971,7 +1938,7 @@ export function PosClient({
     await enqueueOrder(storageScope, { localId: payload.clientId ?? makeClientId(), payload, savedAt: currentTimestamp() });
     setSubmittingMode(null);
     setPending((c) => c + 1);
-    closeInvoice(activeId);
+    closeInvoice(activeId, true);
     setOfflineSaved(true);
     setTimeout(() => setOfflineSaved(false), 3500);
   }
@@ -2014,6 +1981,9 @@ export function PosClient({
     const payload = {
       mode: submitMode,
       clientId: makeClientId(), // khử trùng khi đồng bộ offline
+      posDraftId: invoices.some((invoice) => invoice.id === activeId && (invoice.heldAt || serverDraftIdsRef.current.has(activeId)))
+        ? activeId
+        : undefined,
       source: orderSource,
       customerId: customerId || null,
       warehouseId: data.warehouse.id,

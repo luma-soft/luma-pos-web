@@ -1170,6 +1170,10 @@ export const orders = pgTable("orders", {
   // Khử trùng đơn khi đồng bộ offline: mỗi đơn từ POS có 1 clientId; sync lại
   // không tạo đơn trùng (unique). Xem supabase/order-client-id.sql.
   clientId: varchar("client_id", { length: 40 }),
+  // Server-backed POS drafts keep their stable client-side identity and full
+  // editable snapshot until checkout promotes this same row into a real order.
+  posDraftId: text("pos_draft_id"),
+  posDraftPayload: jsonb("pos_draft_payload").$type<Record<string, unknown> | null>(),
   status: orderStatusEnum("status").notNull().default("draft"),
   documentType: orderDocumentTypeEnum("document_type").notNull().default("sale"),
   paymentStatus: paymentStatusEnum("payment_status").notNull().default("unpaid"),
@@ -1204,6 +1208,7 @@ export const orders = pgTable("orders", {
 }, (t) => [
   uniqueIndex("orders_store_code_unique").on(t.storeId, t.code),
   uniqueIndex("orders_store_client_id_unique").on(t.storeId, t.clientId).where(sql`${t.clientId} is not null`),
+  uniqueIndex("orders_store_pos_draft_id_unique").on(t.storeId, t.posDraftId).where(sql`${t.posDraftId} is not null`),
   index("orders_status_idx").on(t.status),
   index("orders_document_type_status_idx").on(t.documentType, t.status),
   index("orders_customer_idx").on(t.customerId),
