@@ -47,7 +47,14 @@ function rangeFor(period: Period, now = new Date()): DateRange {
   }
 }
 
-export function CustomerGrossProfit({ customerId }: { customerId: string }) {
+type CustomerGrossProfitProps =
+  | { customerId: string; walkIn?: false }
+  | { customerId?: never; walkIn: true };
+
+export function CustomerGrossProfit({
+  customerId,
+  walkIn = false,
+}: CustomerGrossProfitProps) {
   const t = useTranslations("customerProfit");
   const tDashboard = useTranslations("dashboard");
   const tCommon = useTranslations("common");
@@ -67,31 +74,37 @@ export function CustomerGrossProfit({ customerId }: { customerId: string }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError(false);
-    setGrossProfit(null);
-    const query = new URLSearchParams();
-    if (range.from) query.set("from", range.from);
-    if (range.to) query.set("to", range.to);
-    fetch(`/api/partners/customers/${encodeURIComponent(customerId)}/gross-profit?${query.toString()}`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error("Unable to load gross profit");
-        setGrossProfit(Number(payload.data.grossProfit) || 0);
+    void Promise.resolve().then(() => {
+      if (controller.signal.aborted) return;
+      setLoading(true);
+      setError(false);
+      setGrossProfit(null);
+      const query = new URLSearchParams();
+      if (range.from) query.set("from", range.from);
+      if (range.to) query.set("to", range.to);
+      const endpoint = walkIn
+        ? "/api/partners/customers/walk-in/gross-profit"
+        : `/api/partners/customers/${encodeURIComponent(customerId!)}/gross-profit`;
+      return fetch(`${endpoint}?${query.toString()}`, {
+        cache: "no-store",
+        signal: controller.signal,
       })
-      .catch((cause: unknown) => {
-        if (controller.signal.aborted) return;
-        setError(true);
-        setGrossProfit(null);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
+        .then(async (response) => {
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error("Unable to load gross profit");
+          setGrossProfit(Number(payload.data.grossProfit) || 0);
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return;
+          setError(true);
+          setGrossProfit(null);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
+    });
     return () => controller.abort();
-  }, [customerId, range]);
+  }, [customerId, range, walkIn]);
 
   useEffect(() => {
     if (!open) return;
@@ -121,7 +134,7 @@ export function CustomerGrossProfit({ customerId }: { customerId: string }) {
       window.removeEventListener("resize", reposition);
       window.removeEventListener("scroll", reposition, true);
     };
-  }, [open]);
+  }, [open, popupId]);
 
   const periodLabel = period === "custom" && customFrom && customTo
     ? new Intl.DateTimeFormat(locale, { dateStyle: "short" }).format(new Date(`${customFrom}T12:00:00`))
@@ -187,7 +200,7 @@ export function CustomerGrossProfit({ customerId }: { customerId: string }) {
         ) : error ? (
           <span className="text-sm text-slate-400">—</span>
         ) : grossProfit !== null ? (
-          <ProfitVisibility key={`${customerId}:${range.from ?? "all"}:${range.to ?? "all"}`} label="" value={grossProfit} className="gap-1" />
+          <ProfitVisibility key={`${walkIn ? "walk-in" : customerId}:${range.from ?? "all"}:${range.to ?? "all"}`} label="" value={grossProfit} className="gap-1" />
         ) : null}
       </div>
 

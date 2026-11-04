@@ -697,6 +697,54 @@ export async function getCustomerGrossProfit(
   return Number(profitRow?.grossProfit ?? 0) - Number(returnedProfitRow?.returnedProfit ?? 0);
 }
 
+export async function getWalkInGrossProfit(
+  storeId: string,
+  range: { from?: string; to?: string } = {},
+) {
+  const salesDateConditions = [
+    eq(orders.storeId, storeId),
+    isNull(orders.customerId),
+    eq(orders.documentType, "sale"),
+    inArray(orders.status, ["completed", "returned"]),
+  ];
+  const returnsDateConditions = [
+    eq(returns.storeId, storeId),
+    isNull(returns.customerId),
+    eq(returns.status, "completed"),
+  ];
+  const from = parseDateBound(range.from);
+  const to = parseDateBound(range.to, true);
+  if (from) {
+    salesDateConditions.push(gte(orders.createdAt, from));
+    returnsDateConditions.push(gte(returns.createdAt, from));
+  }
+  if (to) {
+    salesDateConditions.push(lte(orders.createdAt, to));
+    returnsDateConditions.push(lte(returns.createdAt, to));
+  }
+
+  const [[profitRow], [returnedProfitRow]] = await Promise.all([
+    db
+      .select({
+        grossProfit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .innerJoin(products, and(eq(orderItems.productId, products.id), eq(products.storeId, storeId)))
+      .where(and(...salesDateConditions)),
+    db
+      .select({
+        returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      })
+      .from(returnItems)
+      .innerJoin(returns, eq(returnItems.returnId, returns.id))
+      .innerJoin(products, and(eq(returnItems.productId, products.id), eq(products.storeId, storeId)))
+      .where(and(...returnsDateConditions)),
+  ]);
+
+  return Number(profitRow?.grossProfit ?? 0) - Number(returnedProfitRow?.returnedProfit ?? 0);
+}
+
 export async function getCustomer(storeId: string, id: string, profitRange: { from?: string; to?: string } = {}) {
   const [customer] = await db
     .select({

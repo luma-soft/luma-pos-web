@@ -5,7 +5,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -527,6 +527,9 @@ function WalkInCustomerDetail({
 }) {
   const t = useTranslations();
   const locale = useLocale();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  const loadingMoreRef = useRef(false);
   const [orders, setOrders] = useState<WalkInOrderRow[]>([]);
   const [page, setPage] = useState(0);
   const [pageCount, setPageCount] = useState(1);
@@ -535,7 +538,11 @@ function WalkInCustomerDetail({
   const [error, setError] = useState<string | null>(null);
 
   const loadPage = useCallback(async (nextPage: number, append: boolean) => {
-    if (append) setIsLoadingMore(true);
+    if (append) {
+      if (loadingMoreRef.current) return;
+      loadingMoreRef.current = true;
+      setIsLoadingMore(true);
+    }
     else setIsLoading(true);
     setError(null);
     try {
@@ -547,17 +554,32 @@ function WalkInCustomerDetail({
       const message = loadError instanceof Error ? loadError.message : "errors.notFound";
       setError(t.has(message) ? t(message as never) : t("errors.notFound"));
     } finally {
+      loadingMoreRef.current = false;
       setIsLoading(false);
       setIsLoadingMore(false);
     }
   }, [t]);
 
   useEffect(() => {
-    void loadPage(1, false);
+    void Promise.resolve().then(() => loadPage(1, false));
   }, [loadPage]);
 
+  useEffect(() => {
+    const root = scrollContainerRef.current;
+    const target = loadMoreTriggerRef.current;
+    if (!root || !target || page >= pageCount || isLoading || isLoadingMore || error) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) void loadPage(page + 1, true);
+      },
+      { root, rootMargin: "240px 0px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [error, isLoading, isLoadingMore, loadPage, orders.length, page, pageCount]);
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto p-4">
+    <div ref={scrollContainerRef} className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto p-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Metric
           label={t("customers.walkInCount")}
@@ -574,6 +596,8 @@ function WalkInCustomerDetail({
           value={formatCurrency(Number(summary.netSales))}
         />
       </div>
+
+      <CustomerGrossProfit walkIn />
 
       <section className="min-h-0">
         <h3 className="mb-2 text-sm font-bold">{t("customers.history.title")}</h3>
@@ -607,7 +631,7 @@ function WalkInCustomerDetail({
             </div>
           )}
 
-          {!isLoading && error && (
+          {!isLoading && error && orders.length === 0 && (
             <div className="p-4 text-sm text-er" role="alert">{error}</div>
           )}
 
@@ -623,15 +647,21 @@ function WalkInCustomerDetail({
           >
             {t("common.retry")}
           </button>
-        ) : page < pageCount ? (
+        ) : error ? (
           <button
             type="button"
             onClick={() => void loadPage(page + 1, true)}
             disabled={isLoadingMore}
             className="mt-3 min-h-11 w-full rounded-lg px-3 text-sm font-semibold text-primary-600 hover:bg-surface-2 disabled:opacity-60"
           >
-            {isLoadingMore ? t("common.loading") : t("common.loadMore")}
+            {t("common.retry")}
           </button>
+        ) : isLoadingMore ? (
+          <div className="mt-3 space-y-2" aria-label={t("common.loading")}>
+            <div className="h-16 animate-pulse rounded-lg bg-surface-2" />
+          </div>
+        ) : page < pageCount ? (
+          <div ref={loadMoreTriggerRef} className="h-px" aria-hidden="true" />
         ) : null}
       </section>
     </div>
