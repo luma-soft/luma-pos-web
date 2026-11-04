@@ -3461,6 +3461,9 @@
     "amountPaid": "Đã trả NCC",
     "currentSupplierDebt": "Nợ phải trả hiện tại",
     "complete": "Hoàn thành",
+    "savedMessage": "Đã lưu phiếu nhập {code}.",
+    "draftSavedMessage": "Đã lưu nháp phiếu nhập {code}.",
+    "openSavedReceipt": "Mở phiếu nhập",
     "receiveHint": "Nhận hàng ngay: cộng tồn kho, tính giá vốn bình quân gồm chiết khấu, VAT và phí nhập; phần chưa trả ghi vào nợ NCC.",
     "errors": {
       "emptyItems": "Phiếu nhập cần ít nhất 1 sản phẩm.",

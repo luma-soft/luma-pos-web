@@ -3461,6 +3461,9 @@
     "amountPaid": "Paid to supplier",
     "currentSupplierDebt": "Current supplier payable",
     "complete": "Complete",
+    "savedMessage": "Purchase receipt {code} saved.",
+    "draftSavedMessage": "Draft purchase receipt {code} saved.",
+    "openSavedReceipt": "Open purchase receipt",
     "receiveHint": "Receive now: stock is added, average cost includes discounts, VAT and freight; unpaid balance is recorded as supplier debt.",
     "errors": {
       "emptyItems": "Add at least 1 product.",

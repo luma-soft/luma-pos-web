@@ -265,6 +265,7 @@ export function PurchaseForm({
   const [payFull, setPayFull] = useState(false);
   const [note, setNote] = useState(initialValues?.note ?? "");
   const [pendingAction, setPendingAction] = useState<"receive" | "draft" | null>(null);
+  const [savedReceipt, setSavedReceipt] = useState<{ href: string; code: string; isDraft: boolean } | null>(null);
   const submitInFlightRef = useRef(false);
   const busy = pendingAction !== null;
   const [error, setError] = useState("");
@@ -490,7 +491,7 @@ export function PurchaseForm({
   }
 
   const canSaveDraft = mode !== "edit" || purchaseStatus === "draft";
-  const canSubmit = Boolean(supplierId && warehouseId && lines.length > 0 && lines.every((line) =>
+  const canSubmit = !savedReceipt && Boolean(supplierId && warehouseId && lines.length > 0 && lines.every((line) =>
     Number.isFinite(line.quantity) && line.quantity > 0 &&
     Number.isFinite(line.multiplier) && line.multiplier > 0 &&
     Number.isFinite(line.unitCost) && line.unitCost >= 0
@@ -517,7 +518,7 @@ export function PurchaseForm({
       })),
     };
 
-    let navigatingAway = false;
+    let savedSuccessfully = false;
     try {
       const res = action === "draft"
         ? await savePurchaseDraft({ ...payload, ...(mode === "edit" && purchaseId ? { id: purchaseId } : {}) })
@@ -525,20 +526,24 @@ export function PurchaseForm({
           ? await updatePurchase({ id: purchaseId, ...payload })
           : await createPurchase(payload);
       if (res.ok) {
+        savedSuccessfully = true;
         if (action === "receive") void catalog.refresh();
         const savedId = mode === "edit" && purchaseId ? purchaseId : "id" in res.data ? res.data.id : undefined;
-        router.push(savedId ? Routes.purchaseDetail(savedId) : Routes.Purchases);
-        navigatingAway = true;
+        const destination = savedId ? Routes.purchaseDetail(savedId) : Routes.Purchases;
+        setSavedReceipt({
+          href: destination,
+          code: "code" in res.data ? res.data.code : purchaseCode ?? "",
+          isDraft: action === "draft",
+        });
+        router.push(destination);
       } else {
         setError(t(res.error as never));
       }
     } catch {
-      setError(t("common.error"));
+      if (!savedSuccessfully) setError(t("common.error"));
     } finally {
-      if (!navigatingAway) {
-        submitInFlightRef.current = false;
-        setPendingAction(null);
-      }
+      if (!savedSuccessfully) submitInFlightRef.current = false;
+      setPendingAction(null);
     }
   }
 
@@ -911,15 +916,28 @@ export function PurchaseForm({
           </div>
 
           <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 shrink-0 border-t border-border bg-surface p-3 sm:p-4 lg:static">
-            {canSaveDraft && <p className="mb-2 text-xs text-slate-500">{t("purchases.draftHint")}</p>}
-            <div className="flex gap-2">
-              {canSaveDraft && <Button type="button" onClick={() => void submit("draft")} disabled={!canSubmit || busy} loading={pendingAction === "draft"} variant="outline" className="h-12 shrink-0 rounded-card font-semibold">
-                {t("purchases.saveDraft")}
-              </Button>}
-              <Button type="button" onClick={() => void submit("receive")} disabled={!canSubmit || busy} loading={pendingAction === "receive"} className="h-12 min-w-0 flex-1 rounded-card font-semibold">
-                {mode === "edit" && purchaseStatus !== "draft" ? t("purchases.saveChanges") : t("purchases.complete")}
-              </Button>
-            </div>
+            {savedReceipt ? (
+              <div role="status" className="rounded-card border border-primary-600/20 bg-primary-600/5 p-3">
+                <p className="text-sm font-semibold text-primary-700 dark:text-primary-300">
+                  {t(savedReceipt.isDraft ? "purchases.draftSavedMessage" : "purchases.savedMessage", { code: savedReceipt.code })}
+                </p>
+                <a href={savedReceipt.href} className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-card bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
+                  {t("purchases.openSavedReceipt")}
+                </a>
+              </div>
+            ) : (
+              <>
+                {canSaveDraft && <p className="mb-2 text-xs text-slate-500">{t("purchases.draftHint")}</p>}
+                <div className="flex gap-2">
+                  {canSaveDraft && <Button type="button" onClick={() => void submit("draft")} disabled={!canSubmit || busy} loading={pendingAction === "draft"} variant="outline" className="h-12 shrink-0 rounded-card font-semibold">
+                    {t("purchases.saveDraft")}
+                  </Button>}
+                  <Button type="button" onClick={() => void submit("receive")} disabled={!canSubmit || busy} loading={pendingAction === "receive"} className="h-12 min-w-0 flex-1 rounded-card font-semibold">
+                    {mode === "edit" && purchaseStatus !== "draft" ? t("purchases.saveChanges") : t("purchases.complete")}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
