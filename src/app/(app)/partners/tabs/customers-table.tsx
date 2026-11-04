@@ -579,7 +579,7 @@ function WalkInCustomerDetail({
   }, [error, isLoading, isLoadingMore, loadPage, orders.length, page, pageCount]);
 
   return (
-    <div ref={scrollContainerRef} className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto p-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Metric
           label={t("customers.walkInCount")}
@@ -599,8 +599,8 @@ function WalkInCustomerDetail({
 
       <CustomerGrossProfit walkIn />
 
-      <section className="min-h-0">
-        <h3 className="mb-2 text-sm font-bold">{t("customers.history.title")}</h3>
+      <section ref={scrollContainerRef} className="min-h-0 flex-1 overflow-auto">
+        <h3 className="sticky top-0 z-10 mb-2 bg-surface py-1 text-sm font-bold">{t("customers.history.title")}</h3>
         <div className="divide-y divide-border-soft rounded-card border border-border-soft">
           {orders.map((order) => (
             <article key={order.id} className="space-y-2 p-3">

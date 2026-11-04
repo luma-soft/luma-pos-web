@@ -2,6 +2,7 @@
   "common": {
     "appName": "Hải Đăng POS",
     "loading": "Đang tải...",
+    "loadMore": "Tải thêm",
     "save": "Lưu",
     "cancel": "Hủy",
     "delete": "Xóa",
