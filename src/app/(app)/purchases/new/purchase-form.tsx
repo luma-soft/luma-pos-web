@@ -539,7 +539,7 @@ export function PurchaseForm({
           code: "code" in res.data ? res.data.code : purchaseCode ?? "",
           isDraft: action === "draft",
         });
-        router.push(destination);
+        window.location.assign(destination);
       } else {
         setError(t(res.error as never));
       }
