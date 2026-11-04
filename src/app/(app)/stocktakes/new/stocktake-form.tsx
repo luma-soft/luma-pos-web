@@ -84,6 +84,7 @@ export function StocktakeForm({
   const [lines, setLines] = useState<Line[]>(initialLines);
   const [note, setNote] = useState(initialNote);
   const [busy, setBusy] = useState<"draft" | "balance" | null>(null);
+  const [savedResult, setSavedResult] = useState<{ href: string; balanced: boolean } | null>(null);
   const submitInFlightRef = useRef(false);
   const [error, setError] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
@@ -189,7 +190,7 @@ export function StocktakeForm({
     }
     setBusy(balanceNow ? "balance" : "draft");
     setError("");
-    let navigatingAway = false;
+    let savedSuccessfully = false;
     try {
       const res = await createStocktake({
         warehouseId,
@@ -198,19 +199,19 @@ export function StocktakeForm({
         items: lines.map((l) => ({ productId: l.product.id, actualQty: l.actualQty })),
       });
       if (res.ok) {
+        savedSuccessfully = true;
         void catalog.refresh();
-        router.push(Routes.stocktakeDetail(res.data.id));
-        navigatingAway = true;
+        const destination = Routes.stocktakeDetail(res.data.id);
+        setSavedResult({ href: destination, balanced: balanceNow });
+        router.push(destination);
       } else {
         setError(t(res.error as never));
       }
     } catch {
-      setError(t("common.error"));
+      if (!savedSuccessfully) setError(t("common.error"));
     } finally {
-      if (!navigatingAway) {
-        submitInFlightRef.current = false;
-        setBusy(null);
-      }
+      if (!savedSuccessfully) submitInFlightRef.current = false;
+      setBusy(null);
     }
   }
 
@@ -473,25 +474,38 @@ export function StocktakeForm({
           </div>
 
           <div className="sticky bottom-0 z-10 -mx-5 mt-4 grid gap-2 bg-surface px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:static lg:mx-0 lg:bg-transparent lg:p-0">
-            <Button
-              type="button"
-              onClick={() => submit(true)} disabled={!!busy || lines.length === 0}
-              loading={busy === "balance"}
-              block
-            >
-              {busy !== "balance" && <Check className="h-4 w-4" />}
-              {t("stocktakes.complete")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => submit(false)} disabled={!!busy || lines.length === 0}
-              loading={busy === "draft"}
-              block
-            >
-              {busy !== "draft" && <Save className="h-4 w-4" />}
-              {t("stocktakes.saveDraft")}
-            </Button>
+            {savedResult ? (
+              <div role="status" className="rounded-card border border-primary-600/20 bg-primary-600/5 p-3">
+                <p className="text-sm font-semibold text-primary-700 dark:text-primary-300">
+                  {t(savedResult.balanced ? "stocktakes.savedBalancedMessage" : "stocktakes.savedDraftMessage")}
+                </p>
+                <a href={savedResult.href} className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-card bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
+                  {t("stocktakes.openSavedStocktake")}
+                </a>
+              </div>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  onClick={() => submit(true)} disabled={!!busy || lines.length === 0}
+                  loading={busy === "balance"}
+                  block
+                >
+                  {busy !== "balance" && <Check className="h-4 w-4" />}
+                  {t("stocktakes.complete")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => submit(false)} disabled={!!busy || lines.length === 0}
+                  loading={busy === "draft"}
+                  block
+                >
+                  {busy !== "draft" && <Save className="h-4 w-4" />}
+                  {t("stocktakes.saveDraft")}
+                </Button>
+              </>
+            )}
           </div>
         </aside>
       </div>

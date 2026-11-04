@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
-import { after } from "next/server";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -294,14 +293,7 @@ export async function createPurchase(
     });
 
     if (result.notification?.created) {
-      const eventId = result.notification.eventId;
-      after(async () => {
-        try {
-          await publishCommittedNotification(eventId);
-        } catch {
-          console.error("Purchase notification publication failed");
-        }
-      });
+      await publishCommittedNotification(result.notification.eventId);
     }
     revalidatePurchasePaths(result.po.id);
     return { ok: true, data: result.po };

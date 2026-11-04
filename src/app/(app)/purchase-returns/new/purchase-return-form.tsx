@@ -99,6 +99,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   const [editedDebt, setEditedDebt] = useState(Number(initial?.debtAmount ?? 0));
   const [note, setNote] = useState(initial?.note ?? "");
   const [busy, setBusy] = useState(false);
+  const [savedHref, setSavedHref] = useState<string | null>(null);
   const submitInFlightRef = useRef(false);
   const [error, setError] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
@@ -233,21 +234,23 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
         returnUnitCost: line.returnUnitCost,
       })),
     };
-    let navigatingAway = false;
+    let savedSuccessfully = false;
     try {
     const res = await (initial ? updatePurchaseReturn(initial.id, payload) : createPurchaseReturn(payload));
     if (res.ok) {
+      savedSuccessfully = true;
       void catalog.refresh();
-      router.push(Routes.purchaseReturnDetail(res.data.id));
-      navigatingAway = true;
+      const destination = Routes.purchaseReturnDetail(res.data.id);
+      setSavedHref(destination);
+      router.push(destination);
     }
     else setError(t(res.error as never));
-    } catch { setError("Không thể lưu phiếu. Vui lòng thử lại."); }
+    } catch {
+      if (!savedSuccessfully) setError("Không thể lưu phiếu. Vui lòng thử lại.");
+    }
     finally {
-      if (!navigatingAway) {
-        submitInFlightRef.current = false;
-        setBusy(false);
-      }
+      if (!savedSuccessfully) submitInFlightRef.current = false;
+      setBusy(false);
     }
   }
 
@@ -534,12 +537,23 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
           {error && <Text as="p" variant="destructive" text={error} />}
 
           <div className="sticky bottom-0 z-10 -mx-3 mt-auto grid grid-cols-2 gap-3 bg-surface px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:static lg:mx-0 lg:bg-transparent lg:p-0">
-              {!initial && <Button type="button" variant="outline" disabled title={t("purchaseReturns.draftTodo")} className="h-12 rounded-card font-semibold">
-                {t("purchaseReturns.saveDraft")}
-              </Button>}
-              <Button type="button" onClick={submit} disabled={lines.length === 0 || !supplierId || !warehouseId} loading={busy} className="h-12 rounded-card font-semibold">
-                {initial ? (initial.status === "draft" ? "Hoàn tất phiếu trả" : "Lưu thay đổi") : t("purchaseReturns.complete")}
-              </Button>
+              {savedHref ? (
+                <div role="status" className="col-span-2 rounded-card border border-primary-600/20 bg-primary-600/5 p-3">
+                  <p className="text-sm font-semibold text-primary-700 dark:text-primary-300">{t("purchaseReturns.savedMessage")}</p>
+                  <a href={savedHref} className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-card bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
+                    {t("purchaseReturns.openSavedReturn")}
+                  </a>
+                </div>
+              ) : (
+                <>
+                  {!initial && <Button type="button" variant="outline" disabled title={t("purchaseReturns.draftTodo")} className="h-12 rounded-card font-semibold">
+                    {t("purchaseReturns.saveDraft")}
+                  </Button>}
+                  <Button type="button" onClick={submit} disabled={lines.length === 0 || !supplierId || !warehouseId} loading={busy} className="h-12 rounded-card font-semibold">
+                    {initial ? (initial.status === "draft" ? "Hoàn tất phiếu trả" : "Lưu thay đổi") : t("purchaseReturns.complete")}
+                  </Button>
+                </>
+              )}
           </div>
         </aside>
       </div>

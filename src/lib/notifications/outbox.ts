@@ -1,4 +1,5 @@
 import { db } from "@/db";
+import { after } from "next/server";
 import type { NotificationQueueMessageV1 } from "@/lib/notifications/contracts";
 import { createNotificationOutboxCore } from "@/lib/notifications/outbox-core";
 import { resolveNotificationQueue } from "@/lib/notifications/queue/config";
@@ -43,8 +44,15 @@ function productionCore() {
   }
 }
 
+/** Queue the durable outbox event after the response so push latency cannot hold a business mutation open. */
 export async function publishCommittedNotification(eventId: string): Promise<void> {
-  await productionCore().publishCommittedNotification(eventId);
+  after(async () => {
+    try {
+      await productionCore().publishCommittedNotification(eventId);
+    } catch {
+      console.error("Committed notification publication failed");
+    }
+  });
 }
 
 export async function recoverDueNotifications(limit = 50): Promise<number> {

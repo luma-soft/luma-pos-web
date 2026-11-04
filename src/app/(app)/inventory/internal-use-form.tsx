@@ -67,6 +67,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
   }) ?? []);
   const [q, setQ] = useState("");
   const [toast, setToast] = useState("");
+  const [savedResult, setSavedResult] = useState<{ href: string; message: string } | null>(null);
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
 
   const deptOpts: { value: string; label: string }[] = DEPARTMENTS.map((value) => ({ value, label: catalogTextByFlag(L, `inventory.internalUse.departments.${value}`) }));
@@ -176,7 +177,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
   function submit(intent?: "draft" | "complete") {
     if (lines.length === 0 || pending || submitInFlightRef.current) return;
     submitInFlightRef.current = true;
-    let navigatingAway = false;
+    let savedSuccessfully = false;
     start(async () => {
       const payload = {
         intent,
@@ -189,16 +190,23 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
       try {
       const res = await (initial ? updateInternalUse(initial.id, payload) : createInternalUse(payload));
       if (res.ok) {
+        savedSuccessfully = true;
         void catalog.refresh();
-        router.push(Routes.internalUseDetail(res.data.id));
-        navigatingAway = true;
+        const destination = Routes.internalUseDetail(res.data.id);
+        setSavedResult({
+          href: destination,
+          message: intent === "draft" ? t("internalUse.savedDraft") : t("internalUse.submitted"),
+        });
+        router.push(destination);
       } else {
         setToast(t(res.error as never));
         setTimeout(() => setToast(""), 3500);
       }
-      } catch { setToast("Không thể lưu phiếu. Vui lòng thử lại."); }
+      } catch {
+        if (!savedSuccessfully) setToast("Không thể lưu phiếu. Vui lòng thử lại.");
+      }
       finally {
-        if (!navigatingAway) submitInFlightRef.current = false;
+        if (!savedSuccessfully) submitInFlightRef.current = false;
       }
     });
   }
@@ -417,14 +425,25 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
           />
 
           <div className="sticky bottom-0 z-10 -mx-3 mt-auto grid grid-cols-2 gap-3 bg-surface px-3 pt-6 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0">
-            {initial?.status !== "approved" && <Button type="button" variant="outline" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={() => submit("draft")} block>
-              {!pending && <Save className="h-4 w-4" />}
-              {t("stocktakes.saveDraft")}
-            </Button>}
-            {(initial?.status !== "pending" || canCompletePending) && <Button type="button" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={() => submit("complete")} block>
-              {!pending && <Check className="w-4 h-4" />}
-              {initial?.status === "approved" ? (legacyTextByFlag(L, "2320a5a3ea8c")) : t("internalUse.complete")}
-            </Button>}
+            {savedResult ? (
+              <div role="status" className="col-span-2 w-full rounded-card border border-primary-600/20 bg-primary-600/5 p-3">
+                <p className="text-sm font-semibold text-primary-700 dark:text-primary-300">{savedResult.message}</p>
+                <a href={savedResult.href} className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-card bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
+                  {t("internalUse.openSaved")}
+                </a>
+              </div>
+            ) : (
+              <>
+                {initial?.status !== "approved" && <Button type="button" variant="outline" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={() => submit("draft")} block>
+                  {!pending && <Save className="h-4 w-4" />}
+                  {t("stocktakes.saveDraft")}
+                </Button>}
+                {(initial?.status !== "pending" || canCompletePending) && <Button type="button" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={() => submit("complete")} block>
+                  {!pending && <Check className="w-4 h-4" />}
+                  {initial?.status === "approved" ? (legacyTextByFlag(L, "2320a5a3ea8c")) : t("internalUse.complete")}
+                </Button>}
+              </>
+            )}
           </div>
       </aside>
 
