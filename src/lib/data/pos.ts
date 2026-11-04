@@ -469,6 +469,8 @@ export async function searchPosProductRows(
     );
   };
 
+  // Merge and order standalone rows once below. Ordering these two queries
+  // separately repeats the correlated latest-sale calculation for every match.
   const [childRows, rootRows] = await Promise.all([
     db
       .select(posProductSelect(storeId, defaultWh?.id ?? null, hasComplianceColumns))
@@ -481,8 +483,7 @@ export async function searchPosProductRows(
         sellableUnitCondition(),
         match,
         directFilters,
-      ))
-      .orderBy(...recentProductSaleOrder()),
+      )),
     db
       .select(posProductSelect(storeId, defaultWh?.id ?? null, hasComplianceColumns))
       .from(products)
@@ -512,8 +513,7 @@ export async function searchPosProductRows(
             )`,
           ),
         ),
-      ))
-      .orderBy(...recentProductSaleOrder()),
+      )),
   ]);
 
   const parentIds = rootRows.filter((p) => p.isVariantParent).map((p) => p.id);

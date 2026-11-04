@@ -1,4 +1,4 @@
-import { searchTokens } from "@/lib/normalize";
+import { normalizeSearch, searchTokens } from "@/lib/normalize";
 
 export type PosSearchUnitLike = {
   unitName: string;
@@ -22,6 +22,25 @@ export type PosSearchUnitResult<TProduct extends PosSearchProductLike> = {
   alternateUnit: TProduct["units"][number] | null;
 };
 
+function normalizedSearchKey(value: string): string {
+  const normalized = normalizeSearch(value)
+    .replace(/(^|\D)(\d{2})\s*[*x×]\s*(\d{2})(?=\D|$)/gu, "$1$2 $3")
+    .replace(/(^|\D)(\d{2})(\d{2})(?=\D|$)/gu, "$1$2 $3");
+  return searchTokens(normalized).join(" ");
+}
+
+function countMatches(tokens: readonly string[], candidates: ReadonlySet<string>): number {
+  let count = 0;
+  for (const token of tokens) {
+    for (const candidate of candidates) {
+      if (!candidate.includes(token)) continue;
+      count += 1;
+      break;
+    }
+  }
+  return count;
+}
+
 /** Rank expanded product/unit rows the same way across product pickers. */
 export function rankProductSearchUnitResults<TProduct extends PosSearchProductLike>(
   results: readonly PosSearchUnitResult<TProduct>[],
@@ -32,32 +51,43 @@ export function rankProductSearchUnitResults<TProduct extends PosSearchProductLi
   const tokens = searchTokens(query);
   if (tokens.length === 0) return [...results];
 
-  const queryKey = tokens.join(" ");
+  const queryKey = normalizedSearchKey(query);
+  const productFacts = new Map<TProduct, {
+    label: string;
+    productTokens: Set<string>;
+    metadataTokens: Set<string>;
+  }>();
   const ranked = results.map((result, index) => {
-    const label = productLabel(result.product);
-    const productTokens = new Set(searchTokens(label));
+    let facts = productFacts.get(result.product);
+    if (!facts) {
+      const label = productLabel(result.product);
+      const productTokens = new Set(searchTokens(label));
+      const units = result.product.units.filter((unit) => !sellableOnly || unit.directSale === true);
+      const includeBaseMetadata = !sellableOnly || (!result.product.isVariantParent && result.product.baseUnitDirectSale === true);
+      const metadataTokens = new Set(searchTokens([
+        result.product.sku,
+        ...(includeBaseMetadata ? [result.product.barcode, result.product.baseUnit] : []),
+        ...units.flatMap((unit) => [unit.unitName, unit.sku, unit.barcode]),
+      ].filter(Boolean).join(" ")));
+      facts = { label, productTokens, metadataTokens };
+      productFacts.set(result.product, facts);
+    }
+
     const unitTokens = new Set(searchTokens(result.unitName ?? ""));
-    const visibleTokens = new Set([...productTokens, ...unitTokens]);
-    const units = result.product.units.filter((unit) => !sellableOnly || unit.directSale === true);
-    const includeBaseMetadata = !sellableOnly || (!result.product.isVariantParent && result.product.baseUnitDirectSale === true);
-    const metadataTokens = new Set(searchTokens([
-      result.product.sku,
-      ...(includeBaseMetadata ? [result.product.barcode, result.product.baseUnit] : []),
-      ...units.flatMap((unit) => [unit.unitName, unit.sku, unit.barcode]),
-    ].filter(Boolean).join(" ")));
-    const countMatches = (candidates: ReadonlySet<string>) =>
-      tokens.filter((token) => [...candidates].some((candidate) => candidate.includes(token))).length;
-    const rowLabel = searchTokens(`${label} ${result.unitName ?? ""}`).join(" ");
+    const visibleTokens = new Set([...facts.productTokens, ...unitTokens]);
+    const productLabelKey = normalizedSearchKey(facts.label);
+    const rowLabel = normalizedSearchKey(`${facts.label} ${result.unitName ?? ""}`);
 
     return {
       result,
       index,
       rank: [
+        Number(productLabelKey === queryKey),
         Number(rowLabel === queryKey),
-        countMatches(visibleTokens),
-        countMatches(productTokens),
-        countMatches(unitTokens),
-        countMatches(metadataTokens),
+        countMatches(tokens, visibleTokens),
+        countMatches(tokens, facts.productTokens),
+        countMatches(tokens, unitTokens),
+        countMatches(tokens, facts.metadataTokens),
       ],
     };
   });

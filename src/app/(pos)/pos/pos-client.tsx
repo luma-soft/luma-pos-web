@@ -1393,8 +1393,10 @@ export function PosClient({
     catalogChildrenByParentId,
   )), [catalogChildrenByParentId, catalogProducts, costPriceBookIds, data.warehouse?.id, searchProductCatalogItems]);
   const loadPosSearchResults = useCallback((query: string): readonly PosSearchUnitResult<PosProduct>[] | Promise<readonly PosSearchUnitResult<PosProduct>[]> => {
+    // The server search and catalog snapshot both preserve recent-sale order.
+    // Sorting them again here adds a full O(n log n) pass to every keystroke.
     const formatResults = (products: readonly PosProduct[]) => rankProductSearchUnitResults(
-      expandPosSearchUnitResults(sortSearchProducts(products)),
+      expandPosSearchUnitResults(products),
       query,
       productDisplayName,
       { sellableOnly: true },
@@ -1413,7 +1415,7 @@ export function PosClient({
       priceAgainst: hasPosPriceComparison ? posPriceAgainst : undefined,
       priceBookId: hasPosPriceComparison ? effectivePosPriceBookId : undefined,
     }).then(formatResults).catch(() => hasPosPriceComparison ? [] : getCatalogResults());
-  }, [cachedPosSearchProducts, catalogProducts, effectivePosPriceBookId, hasPosPriceComparison, posPriceAgainst, posPriceCondition, sortSearchProducts]);
+  }, [cachedPosSearchProducts, catalogProducts, effectivePosPriceBookId, hasPosPriceComparison, posPriceAgainst, posPriceCondition]);
 
   const syncingRef = useRef(false);
   async function flushOutbox() {
