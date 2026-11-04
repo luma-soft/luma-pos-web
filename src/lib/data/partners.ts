@@ -140,6 +140,23 @@ function buildCustomerConditions(storeId: string, filters: CustomerFilters, incl
 const saleOrderStatus = sql`${orders.status} in ('completed', 'returned')`;
 const customerHistoryOrderStatus = sql`${orders.status} in ('completed', 'returned', 'cancelled')`;
 
+function hasActiveCustomerFilters(filters: CustomerFilters) {
+  return Boolean(
+    filters.customerId ||
+      filters.q?.trim() ||
+      (filters.type && filters.type !== "all") ||
+      filters.owing ||
+      filters.createdFrom ||
+      filters.createdTo ||
+      filters.lastTxFrom ||
+      filters.lastTxTo ||
+      filters.totalFrom ||
+      filters.totalTo ||
+      filters.debtFrom ||
+      filters.debtTo,
+  );
+}
+
 export async function getCustomers(
   storeId: string,
   filters: CustomerFilters = {},
@@ -147,10 +164,35 @@ export async function getCustomers(
 ) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize);
+  const includeWalkInSummary = !hasActiveCustomerFilters(filters);
   const conditions = buildCustomerConditions(storeId, filters, options.includeInactive === true && Boolean(filters.customerId));
   const where = and(...conditions);
+  const walkInSalesQuery = includeWalkInSummary
+    ? db
+        .select({
+          grossSales: sql<string>`coalesce(sum(${orders.total}), 0)`,
+          orderCount: sql<number>`count(*)::int`,
+        })
+        .from(orders)
+        .where(and(
+          eq(orders.storeId, storeId),
+          eq(orders.documentType, "sale"),
+          isNull(orders.customerId),
+          saleOrderStatus,
+        ))
+    : Promise.resolve([{ grossSales: "0", orderCount: 0 }]);
+  const walkInReturnsQuery = includeWalkInSummary
+    ? db
+        .select({ refundTotal: sql<string>`coalesce(sum(${returns.totalRefund}), 0)` })
+        .from(returns)
+        .where(and(
+          eq(returns.storeId, storeId),
+          isNull(returns.customerId),
+          eq(returns.status, "completed"),
+        ))
+    : Promise.resolve([{ refundTotal: "0" }]);
 
-  const [baseRows, [{ total }], [moneyAgg], [grossAgg]] = await Promise.all([
+  const [baseRows, [{ total }], [moneyAgg], [grossAgg], [walkInSalesAgg], [walkInReturnsAgg]] = await Promise.all([
     db
       .select({
         id: customers.id,
@@ -221,7 +263,22 @@ export async function getCustomers(
       .from(orders)
       .innerJoin(customers, eq(orders.customerId, customers.id))
       .where(and(eq(orders.storeId, storeId), where, saleOrderStatus)),
+    walkInSalesQuery,
+    walkInReturnsQuery,
   ]);
+
+  const walkInGrossSales = Number(walkInSalesAgg?.grossSales ?? 0);
+  const walkInNetSales = Math.max(
+    walkInGrossSales - Number(walkInReturnsAgg?.refundTotal ?? 0),
+    0,
+  );
+  const walkInSummary = includeWalkInSummary && Number(walkInSalesAgg?.orderCount ?? 0) > 0
+    ? {
+        orderCount: Number(walkInSalesAgg?.orderCount ?? 0),
+        grossSales: walkInGrossSales,
+        netSales: walkInNetSales,
+      }
+    : null;
 
   const customerIds = baseRows.map((row) => row.id);
   let rows = baseRows.map((row) => ({
@@ -239,8 +296,9 @@ export async function getCustomers(
     pageSize: size,
     pageCount: Math.max(1, Math.ceil(total / size)),
     totalDebt: Number(moneyAgg.totalDebt),
-    totalGrossSales: Number(grossAgg.totalGrossSales),
-    totalNetSales: Number(moneyAgg.totalNetSales),
+    totalGrossSales: Number(grossAgg.totalGrossSales) + (walkInSummary?.grossSales ?? 0),
+    totalNetSales: Number(moneyAgg.totalNetSales) + (walkInSummary?.netSales ?? 0),
+    walkInSummary,
     stats: {
       retail: Number(moneyAgg.retailCount),
       wholesale: Number(moneyAgg.wholesaleCount),
