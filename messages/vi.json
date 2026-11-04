@@ -329,7 +329,22 @@
   },
   "notifications": {
     "title": "Thông báo",
-    "operationalAlert": "Bạn có cảnh báo vận hành mới.",
+    "operationalPush": {
+      "titles": {
+        "lowStock": "Tồn kho thấp cần bổ sung",
+        "einvoiceError": "Phát hành hóa đơn điện tử thất bại",
+        "shiftClose": "Ca bán hàng cần kiểm tra",
+        "syncDone": "Đồng bộ dữ liệu hoàn tất",
+        "serviceDue": "Bảo hành, bảo trì cần xử lý"
+      },
+      "bodies": {
+        "lowStock": "Một số mặt hàng đã chạm ngưỡng tồn hoặc sắp hết. Mở Hải Đăng POS để xem danh sách cần bổ sung.",
+        "einvoiceError": "Có hóa đơn điện tử chưa phát hành thành công. Mở Hải Đăng POS để kiểm tra trạng thái và thử lại.",
+        "shiftClose": "Kiểm tra trạng thái ca và số liệu chốt quỹ trong Hải Đăng POS.",
+        "syncDone": "Dữ liệu trên thiết bị đã được đồng bộ. Mở Hải Đăng POS để xem trạng thái mới nhất.",
+        "serviceDue": "Có yêu cầu bảo hành hoặc lịch bảo trì cần chú ý. Mở Hải Đăng POS để xem công việc cần xử lý."
+      }
+    },
     "subtitle": "Các preview, cảnh báo và thao tác cần kiểm tra từ mobile, POS và AI",
     "filters": "Bộ lọc",
     "allSources": "Tất cả nguồn",
@@ -1784,7 +1799,8 @@
       "creditNeedsCustomer": "Ghi nợ cần chọn khách hàng có hồ sơ.",
       "pricingChanged": "Giá bán, khuyến mại hoặc quy đổi đơn vị đã thay đổi. Đơn chưa được lưu/thanh toán; giỏ hàng vẫn được giữ. Hãy làm mới và kiểm tra lại giá trước khi chốt.",
       "unitUnavailable": "Đơn vị này đã ngừng bán trực tiếp. Hãy chọn đơn vị khác đang bán.",
-      "emptyCart": "Giỏ hàng trống."
+      "emptyCart": "Giỏ hàng trống.",
+      "draftAlreadyFinalized": "Đơn tạm này đã được thanh toán hoặc xóa. Hãy làm mới danh sách đơn trước khi tiếp tục."
     },
     "pricingConflict": {
       "refresh": "Làm mới giá để chọn lại",
@@ -5666,16 +5682,26 @@
   },
   "internalNotifications": {
     "titles": {
-      "invoiceCreated": "Hóa đơn mới đã được tạo",
+      "invoiceCreated": "Hóa đơn bán hàng hoàn tất",
       "invoiceCancelled": "Hóa đơn đã bị hủy",
-      "purchaseReceived": "Đã ghi nhận phiếu nhập hàng",
+      "purchaseReceived": "Phiếu nhập đã được ghi nhận",
       "purchaseCancelled": "Phiếu nhập đã bị hủy",
-      "debtChanged": "Công nợ vừa được cập nhật",
-      "paymentReceived": "Đã nhận thanh toán",
-      "qrPaymentConfirmed": "Đã xác nhận thanh toán QR",
-      "qrPaymentException": "Cần kiểm tra giao dịch QR"
+      "debtChanged": "Công nợ đã thay đổi",
+      "paymentReceived": "Đã ghi nhận thanh toán",
+      "qrPaymentConfirmed": "Thanh toán QR thành công",
+      "qrPaymentException": "Giao dịch QR cần đối soát"
     },
-    "body": "Mở Hải Đăng POS để xem chi tiết."
+    "body": "Mở Hải Đăng POS để xem chi tiết.",
+    "categoryBodies": {
+      "invoiceCreated": "Đơn bán hàng đã hoàn tất và được ghi nhận thành hóa đơn. Mở Hải Đăng POS để xem chi tiết.",
+      "invoiceCancelled": "Hóa đơn đã bị hủy. Mở Hải Đăng POS để xem trạng thái và lịch sử.",
+      "purchaseReceived": "Phiếu nhập hàng đã được ghi nhận. Mở Hải Đăng POS để kiểm tra thông tin nhập.",
+      "purchaseCancelled": "Phiếu nhập hàng đã bị hủy. Mở Hải Đăng POS để xem trạng thái cập nhật.",
+      "debtChanged": "Công nợ khách hàng hoặc nhà cung cấp đã thay đổi. Mở Hải Đăng POS để kiểm tra.",
+      "paymentReceived": "Một khoản thanh toán mới đã được ghi nhận. Mở Hải Đăng POS để xem giao dịch liên quan.",
+      "qrPaymentConfirmed": "Thanh toán QR đã được xác nhận. Mở Hải Đăng POS để xem hóa đơn liên quan.",
+      "qrPaymentException": "Giao dịch QR chưa thể khớp tự động và cần đối soát. Mở Hải Đăng POS để xử lý."
+    }
   },
   "serviceRequestPortal": {
     "title": "Yêu cầu hỗ trợ công trình",

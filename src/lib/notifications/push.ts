@@ -24,7 +24,10 @@ import {
 import { deliverPushDeviceCore } from "@/lib/notifications/push-delivery";
 import { isWithinQuietHours } from "@/lib/notifications/policy";
 import type { StorePrefs } from "@/lib/schemas/settings";
-import { catalogText } from "@/lib/i18n/catalog-text";
+import {
+  localizedLegacyPushCopy,
+  type LegacyPushCategory,
+} from "@/lib/notifications/notification-copy";
 
 let cachedAccessToken: { value: string; expiresAt: number } | null = null;
 let accessTokenRefresh: Promise<string> | null = null;
@@ -121,12 +124,7 @@ async function firebaseAccessToken(account: FirebaseServiceAccount) {
   }
 }
 
-export type PushCategory =
-  | "lowStock"
-  | "einvoiceError"
-  | "shiftClose"
-  | "syncDone"
-  | "serviceDue";
+export type PushCategory = LegacyPushCategory;
 
 type LegacyDeviceNotificationInput = {
   token: string;
@@ -161,13 +159,13 @@ function isEventInput(
 }
 
 function legacyFcmMessage(input: LegacyDeviceNotificationInput) {
-  const locale = input.locale?.toLowerCase().startsWith("en") ? "en" : "vi";
+  const copy = localizedLegacyPushCopy(input.category, input.locale);
   return {
     message: {
       token: input.token,
       notification: {
-        title: "Hải Đăng POS",
-        body: catalogText(locale, "notifications.operationalAlert"),
+        title: copy.title,
+        body: copy.body,
       },
       data: {
         kind: "operational_alert",

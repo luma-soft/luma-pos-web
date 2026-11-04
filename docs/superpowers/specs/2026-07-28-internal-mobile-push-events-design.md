@@ -268,13 +268,13 @@ Lock-screen content is generic and localized:
 
 | Category | Vietnamese title | English title |
 | --- | --- | --- |
-| `invoiceCreated` | Hóa đơn mới đã được tạo | A new invoice was created |
-| `purchaseReceived` | Đã ghi nhận phiếu nhập hàng | A purchase receipt was recorded |
-| `debtChanged` | Công nợ vừa được cập nhật | A debt balance was updated |
+| `invoiceCreated` | Hóa đơn bán hàng hoàn tất | Invoice completed |
+| `purchaseReceived` | Phiếu nhập đã được ghi nhận | Purchase receipt recorded |
+| `debtChanged` | Công nợ đã thay đổi | Debt balance updated |
 | `qrPaymentConfirmed` | Đã xác nhận thanh toán QR | QR payment confirmed |
-| `qrPaymentException` | Cần kiểm tra giao dịch QR | QR payment needs review |
+| `qrPaymentException` | Giao dịch QR cần đối soát | QR transaction needs review |
 
-The lock-screen body asks the user to open LumaPOS. It does not include customer or supplier names, phone numbers, addresses, invoice totals, payment amounts, debt balances, bank accounts, webhook references, or notes.
+The localized lock-screen body identifies the event type and directs the user to open Hải Đăng POS for its in-app details. It does not include customer or supplier names, phone numbers, addresses, invoice totals, payment amounts, debt balances, bank accounts, webhook references, or notes.
 
 The FCM data payload contains only string values:
 
