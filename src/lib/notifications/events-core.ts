@@ -1,4 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { headers } from "next/headers";
 import {
   notificationEvents,
   notificationOutbox,
@@ -37,6 +38,10 @@ export type CreateNotificationEventInput = {
   occurredAt?: Date;
 };
 
+const notificationSourceDeviceMetadataKey = "_notificationSourceDeviceId";
+const notificationSourceDeviceHeader = "x-luma-device-id";
+const notificationSourceDeviceIdPattern = /^[A-Za-z0-9_-]{8,120}$/;
+
 type CreatedNotificationEvent = { eventId: string; created: boolean };
 
 export function debtEventKey(input: {
@@ -67,6 +72,20 @@ export async function createNotificationEventInTx(
 
   if (!prefs.notifications[input.category]) return null;
 
+  const metadata = { ...(input.metadata ?? {}) };
+  // This field is internal delivery context, never caller supplied metadata.
+  delete metadata[notificationSourceDeviceMetadataKey];
+  try {
+    const sourceDeviceId = (await headers())
+      .get(notificationSourceDeviceHeader)
+      ?.trim();
+    if (sourceDeviceId && notificationSourceDeviceIdPattern.test(sourceDeviceId)) {
+      metadata[notificationSourceDeviceMetadataKey] = sourceDeviceId;
+    }
+  } catch {
+    // Background jobs and non-request callers have no originating device.
+  }
+
   const [inserted] = await tx
     .insert(notificationEvents)
     .values({
@@ -79,7 +98,7 @@ export async function createNotificationEventInTx(
       target: input.target,
       priority: input.priority,
       quietHoursPolicy: input.quietHoursPolicy,
-      metadata: input.metadata ?? {},
+      metadata,
       occurredAt: input.occurredAt,
     })
     .onConflictDoNothing({ target: [notificationEvents.storeId, notificationEvents.eventKey] })

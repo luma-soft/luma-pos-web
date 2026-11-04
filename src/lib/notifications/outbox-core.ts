@@ -376,6 +376,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
           entityType: notificationEvents.entityType,
           entityId: notificationEvents.entityId,
           quietHoursPolicy: notificationEvents.quietHoursPolicy,
+          metadata: notificationEvents.metadata,
         })
         .from(notificationEvents)
         .where(and(eq(notificationEvents.storeId, claim.storeId), eq(notificationEvents.id, message.eventId)))
@@ -394,6 +395,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         entityType: string;
         entityId: string;
         quietHoursPolicy: string;
+        metadata: Record<string, unknown>;
       } | undefined,
       { prefs: unknown } | undefined,
     ];
@@ -408,6 +410,9 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
       return { completed: true };
     }
     const category = event.category;
+    const sourceDeviceId = typeof event.metadata?._notificationSourceDeviceId === "string"
+      ? event.metadata._notificationSourceDeviceId
+      : null;
 
     const prefs = parseStorePrefs(settings?.prefs);
     const notifications = prefs.notifications;
@@ -519,6 +524,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
     const devices = await database
       .select({
         id: mobilePushDevices.id,
+        deviceId: mobilePushDevices.deviceId,
         userId: mobilePushDevices.userId,
         effectiveUserId: mobilePushDevices.effectiveUserId,
         token: mobilePushDevices.token,
@@ -540,20 +546,25 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         eq(effectiveProfiles.isActive, true),
       ));
 
-    if (devices.length === 0) {
-      await completeOutbox(claim.id, claim.leaseExpiresAt, now());
-      return { completed: true };
-    }
-
-    const notificationKey = `event:${message.eventId}`;
     const typedDevices = devices as Array<{
       id: string;
+      deviceId: string;
       userId: string;
       effectiveUserId: string;
       token: string;
       locale: string | null;
       bindingGeneration: number;
     }>;
+    const recipientDevices = sourceDeviceId
+      ? typedDevices.filter((device) => device.deviceId !== sourceDeviceId)
+      : typedDevices;
+
+    if (recipientDevices.length === 0) {
+      await completeOutbox(claim.id, claim.leaseExpiresAt, now());
+      return { completed: true };
+    }
+
+    const notificationKey = `event:${message.eventId}`;
     const deviceClaims: Array<{
       device: (typeof typedDevices)[number];
       claim:
@@ -562,7 +573,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         | { kind: "retry"; code: string; retryAfterMs: number };
     }> = [];
 
-    for (const device of typedDevices) {
+    for (const device of recipientDevices) {
       const deviceClaimAt = now();
       const deviceClaim = await database.transaction(async (tx: DatabaseLike) => {
         const [owner] = await tx
