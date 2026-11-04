@@ -11,7 +11,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ShieldCheck, SlidersHorizontal, Star } from "lucide-react";
+import { Search, Plus, ListPlus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ShieldCheck, SlidersHorizontal, Star } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import { Combobox } from "@/components/combobox";
@@ -29,6 +29,7 @@ import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-acti
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import { CustomerCreateDialog, type CustomerCreateResult } from "@/components/partners/customer-create-dialog";
 import { CameraQuotePanel, type CameraQuotePackage } from "@/components/pos/camera-quote-panel";
+import { PosQuickLineDialog, type QuickPosLineInput } from "@/components/pos/pos-quick-line-dialog";
 import {
   CAMERA_QUOTE_CARD_SKUS,
   CAMERA_QUOTE_DETAIL_MATERIAL_SKUS,
@@ -134,6 +135,7 @@ type CartLine = {
   lineDiscountMode?: LineDiscountMode;
   lineDiscountValue?: number;
   manualPrice?: boolean;  // đã sửa đơn giá tay → bỏ qua KM tự động
+  isQuickLine?: boolean;
   /** undefined = theo bảng giá của hóa đơn; "" = Giá Chung được chọn riêng. */
   priceBook?: PriceBook;
   /** Giá cần khôi phục khi thu ngân tắt trạng thái miễn phí. */
@@ -548,6 +550,7 @@ export function PosClient({
   const [posPriceCondition, setPosPriceCondition] = useState("");
   const [posPriceAgainst, setPosPriceAgainst] = useState("");
   const [posPriceFilterOpen, setPosPriceFilterOpen] = useState(false);
+  const [quickLineOpen, setQuickLineOpen] = useState(false);
   const posPriceFilterRef = useRef<HTMLDivElement>(null);
   const [submittingMode, setSubmittingMode] = useState<"sale" | "quote" | "booking" | "return" | null>(null);
   const submitting = submittingMode !== null;
@@ -748,6 +751,7 @@ export function PosClient({
       for (const record of remoteRecords) {
         const localDraft = localByID.get(record.id);
         if (record.deleted) {
+          if (localDraft?.cart.some((line) => line.isQuickLine)) continue;
           mergedByID.delete(record.id);
           continue;
         }
@@ -755,6 +759,10 @@ export function PosClient({
         if (!remoteDraft) continue;
         const localUpdatedAt = Date.parse(localDraft?.syncUpdatedAt ?? snapshot?.updatedAt ?? "") || 0;
         const remoteUpdatedAt = Date.parse(record.updatedAt) || 0;
+        if (localDraft?.cart.some((line) => line.isQuickLine)) {
+          mergedByID.set(record.id, normalizeInvoice(localDraft as unknown as Record<string, unknown>));
+          continue;
+        }
         mergedByID.set(record.id, localDraft && localUpdatedAt > remoteUpdatedAt
           ? normalizeInvoice(localDraft as unknown as Record<string, unknown>)
           : normalizeInvoice(remoteDraft));
@@ -828,7 +836,10 @@ export function PosClient({
 
   useEffect(() => {
     if (initialSourceInvoice || !draftHydrated) return;
-    const savedDrafts = invoices.filter((draft) => draft.heldAt || serverDraftIdsRef.current.has(draft.id));
+    const savedDrafts = invoices.filter((draft) =>
+      !draft.cart.some((line) => line.isQuickLine) &&
+      (draft.heldAt || serverDraftIdsRef.current.has(draft.id)),
+    );
     if (!savedDrafts.length) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
@@ -902,6 +913,7 @@ export function PosClient({
             const record = remoteByID.get(draft.id);
             if (!record) return [draft];
             if (pendingDraftDeleteIdsRef.current.has(draft.id)) return [draft];
+            if (draft.cart.some((line) => line.isQuickLine)) return [draft];
             const localTime = Date.parse(localUpdatedAtByID.get(draft.id) ?? draft.syncUpdatedAt ?? "") || 0;
             const remoteTime = Date.parse(record.updatedAt) || 0;
             if (record.deleted) {
@@ -1810,6 +1822,62 @@ export function PosClient({
     addToCart(p, unitName);
   }
 
+  function addQuickPosLine(input: QuickPosLineInput) {
+    const id = `quick-${crypto.randomUUID()}`;
+    const priceText = String(input.price);
+    const product = {
+      id,
+      sku: "",
+      barcode: null,
+      name: input.name,
+      productKind: "service",
+      imageUrls: [],
+      imageUpdatedAt: new Date(),
+      specs: {},
+      parentProductId: null,
+      variantName: null,
+      isVariantParent: false,
+      baseUnit: input.unit,
+      baseUnitDirectSale: true,
+      costPrice: "0",
+      lastPurchasePrice: null,
+      lastPurchaseNetPrice: null,
+      retailPrice: priceText,
+      wholesalePrice: null,
+      contractorPrice: null,
+      agentPrice: null,
+      priceByWeight: false,
+      m2PerUnit: null,
+      categoryId: null,
+      categoryName: null,
+      vatRate: null,
+      lastSoldAt: null,
+      comboItems: [],
+      childCount: 0,
+      minRetailPrice: priceText,
+      maxRetailPrice: priceText,
+      stock: "0",
+      booked: "0",
+      units: [],
+      priceBookTypes: {},
+      prices: {},
+      children: [],
+    } as PosProduct;
+
+    setCart((current) => [...current, {
+      key: id,
+      product,
+      unitName: input.unit,
+      unitMultiplier: 1,
+      unitPrice: input.price,
+      quantity: 1,
+      manualPrice: true,
+      isQuickLine: true,
+      priceBook,
+    }]);
+    setError("");
+  }
+
   function openProductCreator(productKind: ProductKind) {
     const params = new URLSearchParams(window.location.search);
     for (const key of ["createdProductId", "productModal", "productKind", "returnTo"]) {
@@ -1951,6 +2019,10 @@ export function PosClient({
     paymentSessionId?: string,
   ) {
     if (cart.length === 0 || !data.warehouse || submitting || refreshingPricing || pricingRoutePending) return;
+    if (cart.some((line) => line.isQuickLine)) {
+      setError(t("pos.quickLine.cannotSubmit"));
+      return;
+    }
     const submitMode = sourceInvoice ? sourceInvoice.kind === "quote" ? "quote" : sourceInvoice.kind === "booking" ? "booking" : mode : mode;
     if (submitMode === "sale" && selectedPayMethod === "bank_transfer" && !paymentSessionId) {
       // Opening the QR flow is a preview-only action. The real sale is sent
@@ -2112,6 +2184,10 @@ export function PosClient({
 
   async function startSepayCheckout() {
     if (submitting || sepayCheckout || sepayCheckoutLoading) return;
+    if (cart.some((line) => line.isQuickLine)) {
+      setError(t("pos.quickLine.cannotSubmit"));
+      return;
+    }
     const attempt = ++sepaySetupAttemptRef.current;
     const amount = Math.min(Math.max(0, paidInput ?? total), total);
     setSepayCheckout(null);
@@ -2443,15 +2519,22 @@ export function PosClient({
               <div className="p-3 lg:hidden">
                 <div className="flex items-start gap-2">
                   <span className="mt-0.5 w-5 shrink-0 text-center text-xs tabular-nums text-slate-400">{idx + 1}</span>
-                  <Link
-                    href={Routes.productDetail(l.product.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block min-h-11 min-w-0 flex-1 text-left hover:text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                  >
-                    <p className={cn("text-sm font-semibold leading-5", stockInsufficient && "text-er")}>{productDisplayName(l.product)}</p>
-                    <p className="mt-0.5 truncate text-xs text-slate-400">{l.product.sku ?? ""}</p>
-                  </Link>
+                  {l.isQuickLine ? (
+                    <div className="min-h-11 min-w-0 flex-1 text-left">
+                      <p className={cn("text-sm font-semibold leading-5", stockInsufficient && "text-er")}>{productDisplayName(l.product)}</p>
+                      <span className="mt-1 inline-flex rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{t("pos.quickLine.badge")}</span>
+                    </div>
+                  ) : (
+                    <Link
+                      href={Routes.productDetail(l.product.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block min-h-11 min-w-0 flex-1 text-left hover:text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    >
+                      <p className={cn("text-sm font-semibold leading-5", stockInsufficient && "text-er")}>{productDisplayName(l.product)}</p>
+                      <p className="mt-0.5 truncate text-xs text-slate-400">{l.product.sku ?? ""}</p>
+                    </Link>
+                  )}
                   <button
                     type="button"
                     disabled={isCameraQuoteDraft}
@@ -2539,17 +2622,24 @@ export function PosClient({
                   >
                     <GripVertical className="w-3.5 h-3.5" />
                   </button>
-                  <Link
-                    href={Routes.productDetail(l.product.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={cn(
-                      "inline-flex min-h-11 min-w-11 items-center text-left text-sm font-medium whitespace-normal break-words hover:text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
-                      stockInsufficient && "text-er",
-                    )}
-                  >
-                    {productDisplayName(l.product)}
-                  </Link>
+                  {l.isQuickLine ? (
+                    <span className={cn("inline-flex min-h-11 min-w-11 items-center gap-2 text-left text-sm font-medium whitespace-normal break-words", stockInsufficient && "text-er")}>
+                      {productDisplayName(l.product)}
+                      <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{t("pos.quickLine.badge")}</span>
+                    </span>
+                  ) : (
+                    <Link
+                      href={Routes.productDetail(l.product.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "inline-flex min-h-11 min-w-11 items-center text-left text-sm font-medium whitespace-normal break-words hover:text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                        stockInsufficient && "text-er",
+                      )}
+                    >
+                      {productDisplayName(l.product)}
+                    </Link>
+                  )}
                   {eff.pct > 0 && (
                     <span className={cn(
                       "shrink-0 text-xs font-bold rounded px-1",
@@ -2935,6 +3025,15 @@ export function PosClient({
                 )}
               </div>
             )}
+            <button
+              type="button"
+              aria-label={t("pos.quickLine.open")}
+              title={t("pos.quickLine.open")}
+              onClick={() => setQuickLineOpen(true)}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary-200 bg-primary-50 text-primary-700 transition-colors hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:h-10 lg:w-10"
+            >
+              <ListPlus className="h-4 w-4" />
+            </button>
             <ProductCreateMenu
               label={t("pos.addProduct")}
               showLabel={false}
@@ -3266,6 +3365,12 @@ export function PosClient({
         onClose={() => setAiQuickOpen(false)}
         onApply={applyAiCartPreview}
       />
+      {quickLineOpen && (
+        <PosQuickLineDialog
+          onClose={() => setQuickLineOpen(false)}
+          onAdd={addQuickPosLine}
+        />
+      )}
       <CustomerCreateDialog
         open={customerCreateOpen}
         onOpenChange={setCustomerCreateOpen}

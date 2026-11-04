@@ -1999,6 +1999,19 @@
       "sourceSelected": "Đang trả theo hóa đơn {code}",
       "invoiceCatalogLocked": "Phiếu trả hàng chỉ gồm sản phẩm từ hóa đơn gốc. Điều chỉnh số lượng cần trả ở danh sách bên dưới.",
       "onlineRequired": "Lập phiếu trả hàng cần có mạng để đồng bộ ngay."
+    },
+    "quickLine": {
+      "open": "Thêm nhanh",
+      "title": "Thêm sản phẩm nhanh",
+      "name": "Tên sản phẩm",
+      "unit": "Đơn vị tính",
+      "price": "Giá bán",
+      "add": "Thêm vào đơn",
+      "cancel": "Hủy",
+      "badge": "Tạm",
+      "localOnly": "Dòng này chỉ được giữ trong nháp trên thiết bị hiện tại, không lưu vào danh mục sản phẩm.",
+      "cannotSubmit": "Hãy xóa dòng nhập nhanh trước khi hoàn tất hóa đơn, báo giá hoặc phiếu đặt hàng.",
+      "invalid": "Nhập tên, đơn vị tính và giá bán hợp lệ."
     }
   },
   "stub": {

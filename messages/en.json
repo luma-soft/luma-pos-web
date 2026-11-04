@@ -2015,6 +2015,19 @@
       "sourceSelected": "Returning against invoice {code}",
       "invoiceCatalogLocked": "Invoice returns only contain products from the source invoice. Adjust the return quantities in the list below.",
       "onlineRequired": "Creating returns requires an online connection."
+    },
+    "quickLine": {
+      "open": "Quick add",
+      "title": "Add a product quickly",
+      "name": "Product name",
+      "unit": "Unit",
+      "price": "Selling price",
+      "add": "Add to order",
+      "cancel": "Cancel",
+      "badge": "Temp",
+      "localOnly": "This line stays in the current draft on this device and is not saved to the product catalog.",
+      "cannotSubmit": "Remove the quick line before completing the invoice, quote, or booking.",
+      "invalid": "Enter a valid product name, unit, and selling price."
     }
   },
   "stub": {
