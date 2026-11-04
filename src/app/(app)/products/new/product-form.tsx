@@ -64,6 +64,7 @@ import type { PriceBookRow } from "@/lib/data/price-books";
 import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai-assistant/utils";
 import { useTenantClientScope } from "@/components/tenant-client-scope";
 import { useRefreshAppDataOnReturn } from "@/components/app-data-sync-provider";
+import { useDismissProductModalAfterSave } from "@/components/product-modal-frame";
 import {
   changedProductStock,
   MIN_STOCK_QUANTITY,
@@ -189,6 +190,7 @@ export function NewProductForm({
   const scheduleAppDataRefreshOnReturn = useRefreshAppDataOnReturn();
   const t = useTranslations();
   const router = useRouter();
+  const dismissProductModalAfterSave = useDismissProductModalAfterSave();
   const [tab, setTab] = useState<Tab>(initialValues?.variantOperation === "add" ? "variants" : "info");
   const [submitIntent, setSubmitIntent] = useState<"save" | "sameType">("save");
   const [formGeneration, setFormGeneration] = useState(0);
@@ -368,6 +370,7 @@ export function NewProductForm({
         navigateAfterModal(sameTypeHref(result.data.createdProductId ?? result.data.id));
         return;
       }
+      if (isModal && submitIntent === "save") dismissProductModalAfterSave?.();
       navigateAfterModal(
         submitIntent === "sameType"
           ? sameTypeHref(result.data.id)
@@ -460,6 +463,7 @@ export function NewProductForm({
             : isModal
               ? doneHref
               : Routes.product(productId);
+        if (isModal && submitIntent === "save") dismissProductModalAfterSave?.();
         if (isModal) navigateAfterModal(href);
         else router.push(href);
         return;
@@ -474,6 +478,7 @@ export function NewProductForm({
         router.refresh();
         return;
       }
+      if (isModal) dismissProductModalAfterSave?.();
       navigateAfterModal(createdProductHref(res.data.id) ?? doneHref);
       return;
     }

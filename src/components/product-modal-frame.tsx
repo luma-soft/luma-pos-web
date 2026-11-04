@@ -1,10 +1,24 @@
 "use client";
 
-import { type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useRef } from "react";
+import {
+  createContext,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 type ProductModalNavigation = "back" | "push" | "replace";
+const ProductModalDismissContext = createContext<(() => void) | null>(null);
+
+export function useDismissProductModalAfterSave() {
+  return useContext(ProductModalDismissContext);
+}
 
 export function shouldHandleProductModalEscape(
   event: Pick<KeyboardEvent, "key" | "defaultPrevented">,
@@ -42,6 +56,8 @@ export function ProductModalFrame({
 }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const [dismissed, setDismissed] = useState(false);
+  const dismiss = useCallback(() => setDismissed(true), []);
   const close = useCallback(() => {
     if (closeNavigation === "back") router.back();
     else if (closeHref && closeNavigation === "push") router.push(closeHref);
@@ -93,25 +109,29 @@ export function ProductModalFrame({
     if (closeOnBackdrop && event.target === event.currentTarget) close();
   }
 
+  if (dismissed) return null;
+
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-5"
-      onMouseDown={onBackdropMouseDown}
-    >
+    <ProductModalDismissContext.Provider value={dismiss}>
       <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={labelledBy}
-        tabIndex={-1}
-        className={cn(
-          "flex h-dvh w-full max-w-7xl flex-col overflow-hidden bg-surface shadow-2xl outline-none sm:h-[min(92dvh,920px)] sm:rounded-2xl",
-          className,
-        )}
-        onMouseDown={(event) => event.stopPropagation()}
+        className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-5"
+        onMouseDown={onBackdropMouseDown}
       >
-        {children}
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={labelledBy}
+          tabIndex={-1}
+          className={cn(
+            "flex h-dvh w-full max-w-7xl flex-col overflow-hidden bg-surface shadow-2xl outline-none sm:h-[min(92dvh,920px)] sm:rounded-2xl",
+            className,
+          )}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          {children}
+        </div>
       </div>
-    </div>
+    </ProductModalDismissContext.Provider>
   );
 }
