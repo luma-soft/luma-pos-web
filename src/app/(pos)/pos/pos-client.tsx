@@ -1827,7 +1827,7 @@ export function PosClient({
     const priceText = String(input.price);
     const product = {
       id,
-      sku: "",
+      sku: input.sku,
       barcode: null,
       name: input.name,
       productKind: "service",
@@ -1859,12 +1859,12 @@ export function PosClient({
       stock: "0",
       booked: "0",
       units: [],
-      priceBookTypes: {},
-      prices: {},
+      priceBookTypes: Object.fromEntries(data.priceBooks.map((book) => [book.id, book.systemType ?? "retail"])),
+      prices: Object.fromEntries(data.priceBooks.map((book) => [book.id, priceText])),
       children: [],
     } as PosProduct;
 
-    setCart((current) => [...current, {
+    setCart((current) => [{
       key: id,
       product,
       unitName: input.unit,
@@ -1873,8 +1873,7 @@ export function PosClient({
       quantity: 1,
       manualPrice: true,
       isQuickLine: true,
-      priceBook,
-    }]);
+    }, ...current]);
     setError("");
   }
 
@@ -2488,7 +2487,7 @@ export function PosClient({
             selectedUnitName: l.unitName,
             unavailableLabel: t("products.units.stoppedSale"),
           });
-          const linePriceBookName = l.priceBook === undefined
+          const linePriceBookName = l.isQuickLine || l.priceBook === undefined
             ? null
             : data.priceBooks.find((book) => (book.isDefault ? "" : book.id) === l.priceBook)?.name ?? "Giá Chung";
           return (
@@ -3933,7 +3932,7 @@ function LinePriceEditor({
             wrapLabel
             menuMinWidth={240}
             onChange={(event) => { void changeBook(event.target.value); }}
-            disabled={editor.free}
+            disabled={editor.free || line.isQuickLine}
             size="sm"
             className="w-40"
             options={[

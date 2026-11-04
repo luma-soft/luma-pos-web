@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 
 export type QuickPosLineInput = {
   name: string;
+  sku: string;
   unit: string;
   price: number;
 };
@@ -21,6 +22,7 @@ export function PosQuickLineDialog({ onClose, onAdd }: PosQuickLineDialogProps) 
   const t = useTranslations("pos.quickLine");
   const locale = useLocale();
   const [name, setName] = useState("");
+  const [sku, setSku] = useState("");
   const [unit, setUnit] = useState(locale === "vi" ? "cái" : "piece");
   const [price, setPrice] = useState("");
   const [invalid, setInvalid] = useState(false);
@@ -43,7 +45,12 @@ export function PosQuickLineDialog({ onClose, onAdd }: PosQuickLineDialogProps) 
       setInvalid(true);
       return;
     }
-    onAdd({ name: name.trim(), unit: unit.trim(), price: parsedPrice });
+    onAdd({
+      name: name.trim(),
+      sku: sku.trim(),
+      unit: unit.trim(),
+      price: parsedPrice,
+    });
     onClose();
   };
 
@@ -68,6 +75,10 @@ export function PosQuickLineDialog({ onClose, onAdd }: PosQuickLineDialogProps) 
           <label className="block space-y-1.5 text-sm font-medium">
             <span>{t("name")}</span>
             <Input autoFocus value={name} onChange={(event) => { setName(event.target.value); setInvalid(false); }} autoComplete="off" />
+          </label>
+          <label className="block space-y-1.5 text-sm font-medium">
+            <span>{t("sku")}</span>
+            <Input value={sku} onChange={(event) => { setSku(event.target.value); setInvalid(false); }} autoComplete="off" autoCapitalize="characters" />
           </label>
           <label className="block space-y-1.5 text-sm font-medium">
             <span>{t("unit")}</span>

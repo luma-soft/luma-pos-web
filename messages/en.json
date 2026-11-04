@@ -2020,6 +2020,7 @@
       "open": "Quick add",
       "title": "Add a product quickly",
       "name": "Product name",
+      "sku": "Product code",
       "unit": "Unit",
       "price": "Selling price",
       "add": "Add to order",

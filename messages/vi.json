@@ -2004,6 +2004,7 @@
       "open": "Thêm nhanh",
       "title": "Thêm sản phẩm nhanh",
       "name": "Tên sản phẩm",
+      "sku": "Mã sản phẩm",
       "unit": "Đơn vị tính",
       "price": "Giá bán",
       "add": "Thêm vào đơn",
