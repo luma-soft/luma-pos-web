@@ -7,6 +7,7 @@ import {
   getTableColumns,
   gte,
   inArray,
+  isNull,
   lte,
   ne,
   notInArray,
@@ -56,6 +57,7 @@ export interface OrderListFilters {
   orderId?: string;
   q?: string;
   customerId?: string;
+  walkIn?: boolean;
   productId?: string;
   projectId?: string;
   customerQuery?: string;
@@ -113,7 +115,10 @@ export async function getOrders(storeId: string, filters: OrderListFilters = {})
     );
     if (c) conditions.push(c);
   }
-  if (isUuid(filters.customerId)) {
+  if (filters.walkIn) {
+    conditions.push(isNull(orders.customerId));
+    conditions.push(inArray(orders.status, ["completed", "returned"]));
+  } else if (isUuid(filters.customerId)) {
     conditions.push(eq(orders.customerId, filters.customerId));
   }
   if (isUuid(filters.productId)) {

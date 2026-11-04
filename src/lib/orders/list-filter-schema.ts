@@ -68,6 +68,7 @@ export const orderListFilterSchema = z.object({
   orderId: optionalUuid,
   q: optionalText,
   customerId: optionalUuid,
+  walkIn: booleanParam.default(false),
   productId: optionalUuid,
   projectId: optionalUuid,
   customerQuery: optionalText,

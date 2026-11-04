@@ -5,10 +5,10 @@ import { DateInput } from "@/components/ui/date-input";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Ban,
   CalendarDays,
@@ -195,6 +195,7 @@ function CustomerRows({
   initialDetailCustomer: CustomerRow | null;
 }) {
   const t = useTranslations();
+  const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [createOpen, setCreateOpen] = useState(aiPreview);
@@ -207,6 +208,7 @@ function CustomerRows({
     (initialDetailCustomer?.id === selectedCustomerId
       ? initialDetailCustomer
       : null);
+  const isWalkInSelected = selectedCustomerId === WALK_IN_ROW_ID;
   const walkInRow = data.walkInSummary?.orderCount
     ? ({
         id: WALK_IN_ROW_ID,
@@ -218,7 +220,7 @@ function CustomerRows({
         totalSpent: String(data.walkInSummary.netSales),
       } as unknown as CustomerRow)
     : null;
-  const tableRows = walkInRow ? [...data.rows, walkInRow] : data.rows;
+  const tableRows = walkInRow ? [walkInRow, ...data.rows] : data.rows;
   function closeCustomer() {
     setSelectedCustomerId(null);
     if (searchParams.has("detailCustomerId")) {
@@ -230,7 +232,10 @@ function CustomerRows({
     }
   }
   function openCustomer(customer: CustomerRow) {
-    if (customer.id === WALK_IN_ROW_ID) return;
+    if (customer.id === WALK_IN_ROW_ID) {
+      setSelectedCustomerId(WALK_IN_ROW_ID);
+      return;
+    }
     setSelectedCustomerId(customer.id);
     setDetailTab("info");
     const next = new URLSearchParams(searchParams.toString());
@@ -268,7 +273,7 @@ function CustomerRows({
         <div>
           <div className="font-semibold">{t("orders.walkIn")}</div>
           <div className="mt-1 text-xs font-normal text-slate-500">
-            {t("customers.walkInSummary", { count: data.walkInSummary?.orderCount ?? 0 })}
+            {new Intl.NumberFormat(locale).format(data.walkInSummary?.orderCount ?? 0)} {t("customers.walkInCount")}
           </div>
         </div>
       ) : (
@@ -389,10 +394,9 @@ function CustomerRows({
           <article className="w-full p-3 text-left min-h-11">
             <div className="font-semibold">{t("orders.walkIn")}</div>
             <div className="mt-1 text-xs text-slate-500">
-              {t("customers.walkInSummary", { count: data.walkInSummary?.orderCount ?? 0 })}
+              {new Intl.NumberFormat(locale).format(data.walkInSummary?.orderCount ?? 0)} {t("customers.walkInCount")}
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-              <Metric label={t("customers.walkInCount")} value={String(data.walkInSummary?.orderCount ?? 0)} />
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
               <Metric label={t("customers.cols.totalGrossSales")} value={formatCurrency(Number(customer.grossSales))} tone="blue" />
               <Metric label={t("customers.cols.totalSalesNet")} value={formatCurrency(Number(customer.totalSpent))} />
             </div>
@@ -447,7 +451,7 @@ function CustomerRows({
       <RowPreviewModal
         open={Boolean(selectedCustomerId)}
         onClose={closeCustomer}
-        title={selectedCustomer?.name ?? t("customers.expand.profile")}
+        title={isWalkInSelected ? t("orders.walkIn") : selectedCustomer?.name ?? t("customers.expand.profile")}
         subtitle={
           selectedCustomer
             ? [selectedCustomer.code, selectedCustomer.phone]
@@ -463,7 +467,9 @@ function CustomerRows({
           )
         }
       >
-        {selectedCustomer ? (
+        {isWalkInSelected && data.walkInSummary ? (
+          <WalkInCustomerDetail summary={data.walkInSummary} />
+        ) : selectedCustomer ? (
           <CustomerDetail
             customer={selectedCustomer}
             tab={detailTab}
@@ -477,6 +483,158 @@ function CustomerRows({
         )}
       </RowPreviewModal>
     </>
+  );
+}
+
+type WalkInOrderRow = {
+  id: string;
+  code: string;
+  status: string;
+  paymentStatus: string;
+  total: number | string;
+  createdAt: string;
+  productNames: string;
+  itemCount: number;
+};
+
+type WalkInOrderPage = {
+  rows: WalkInOrderRow[];
+  total: number;
+  page: number;
+  pageCount: number;
+};
+
+async function fetchWalkInOrders(page: number): Promise<WalkInOrderPage> {
+  const response = await fetch(
+    `/api/partners/customers/walk-in/orders?page=${page}&pageSize=20`,
+    { headers: { Accept: "application/json" } },
+  );
+  const payload = (await response.json()) as {
+    ok?: boolean;
+    error?: string;
+    data?: WalkInOrderPage;
+  };
+  if (!response.ok || !payload.ok || !payload.data) {
+    throw new Error(payload.error ?? "errors.notFound");
+  }
+  return payload.data;
+}
+
+function WalkInCustomerDetail({
+  summary,
+}: {
+  summary: NonNullable<CustomerListResult["walkInSummary"]>;
+}) {
+  const t = useTranslations();
+  const locale = useLocale();
+  const [orders, setOrders] = useState<WalkInOrderRow[]>([]);
+  const [page, setPage] = useState(0);
+  const [pageCount, setPageCount] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadPage = useCallback(async (nextPage: number, append: boolean) => {
+    if (append) setIsLoadingMore(true);
+    else setIsLoading(true);
+    setError(null);
+    try {
+      const result = await fetchWalkInOrders(nextPage);
+      setOrders((current) => append ? [...current, ...result.rows] : result.rows);
+      setPage(result.page);
+      setPageCount(result.pageCount);
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : "errors.notFound";
+      setError(t.has(message) ? t(message as never) : t("errors.notFound"));
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void loadPage(1, false);
+  }, [loadPage]);
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto p-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Metric
+          label={t("customers.walkInCount")}
+          value={new Intl.NumberFormat(locale).format(summary.orderCount)}
+          tone="muted"
+        />
+        <Metric
+          label={t("customers.cols.totalGrossSales")}
+          value={formatCurrency(Number(summary.grossSales))}
+          tone="blue"
+        />
+        <Metric
+          label={t("customers.cols.totalSalesNet")}
+          value={formatCurrency(Number(summary.netSales))}
+        />
+      </div>
+
+      <section className="min-h-0">
+        <h3 className="mb-2 text-sm font-bold">{t("customers.history.title")}</h3>
+        <div className="divide-y divide-border-soft rounded-card border border-border-soft">
+          {orders.map((order) => (
+            <article key={order.id} className="space-y-2 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <OrderDetailLink
+                  orderId={order.id}
+                  className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  {order.code}
+                </OrderDetailLink>
+                <OrderStatusBadge status={order.status} />
+              </div>
+              <div className="text-xs text-slate-500">{formatDate(order.createdAt)}</div>
+              <div className="text-sm text-slate-600 dark:text-slate-300">
+                {order.productNames || t("customers.emptyValue")}
+              </div>
+              <div className="text-right text-sm font-semibold tabular-nums">
+                {formatCurrency(Number(order.total))}
+              </div>
+            </article>
+          ))}
+
+          {isLoading && orders.length === 0 && (
+            <div className="space-y-3 p-4" aria-label={t("common.loading")}>
+              {[0, 1, 2].map((item) => (
+                <div key={item} className="h-16 animate-pulse rounded-lg bg-surface-2" />
+              ))}
+            </div>
+          )}
+
+          {!isLoading && error && (
+            <div className="p-4 text-sm text-er" role="alert">{error}</div>
+          )}
+
+          {!isLoading && !error && orders.length === 0 && (
+            <div className="p-4 text-sm text-slate-500">{t("customers.expand.emptySales")}</div>
+          )}
+        </div>
+        {error && orders.length === 0 ? (
+          <button
+            type="button"
+            onClick={() => void loadPage(1, false)}
+            className="mt-3 min-h-11 rounded-lg px-3 text-sm font-semibold text-primary-600 hover:bg-surface-2"
+          >
+            {t("common.retry")}
+          </button>
+        ) : page < pageCount ? (
+          <button
+            type="button"
+            onClick={() => void loadPage(page + 1, true)}
+            disabled={isLoadingMore}
+            className="mt-3 min-h-11 w-full rounded-lg px-3 text-sm font-semibold text-primary-600 hover:bg-surface-2 disabled:opacity-60"
+          >
+            {isLoadingMore ? t("common.loading") : t("common.loadMore")}
+          </button>
+        ) : null}
+      </section>
+    </div>
   );
 }
 
