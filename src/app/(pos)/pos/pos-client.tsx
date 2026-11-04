@@ -3024,15 +3024,6 @@ export function PosClient({
                 )}
               </div>
             )}
-            <button
-              type="button"
-              aria-label={t("pos.quickLine.open")}
-              title={t("pos.quickLine.open")}
-              onClick={() => setQuickLineOpen(true)}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary-200 bg-primary-50 text-primary-700 transition-colors hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:h-10 lg:w-10"
-            >
-              <ListPlus className="h-4 w-4" />
-            </button>
             <ProductCreateMenu
               label={t("pos.addProduct")}
               showLabel={false}
@@ -3041,6 +3032,15 @@ export function PosClient({
                 { kind: "product", label: t("products.kind.labels.product"), hint: t("products.kind.hints.product") },
                 { kind: "service", label: t("products.kind.labels.service"), hint: t("products.kind.hints.service") },
                 { kind: "combo", label: t("products.kind.labels.combo"), hint: t("products.kind.hints.combo") },
+              ]}
+              additionalActions={[
+                {
+                  id: "quick-line",
+                  label: t("pos.quickLine.title"),
+                  hint: t("pos.quickLine.localOnly"),
+                  icon: ListPlus,
+                  onSelect: () => setQuickLineOpen(true),
+                },
               ]}
             />
             <AiQuickActionButton

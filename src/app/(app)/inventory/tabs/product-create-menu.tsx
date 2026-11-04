@@ -21,6 +21,14 @@ type ProductCreateMenuItem = {
   href?: string;
 };
 
+type ProductCreateMenuAction = {
+  id: string;
+  label: string;
+  hint: string;
+  icon: LucideIcon;
+  onSelect: () => void;
+};
+
 const icons: Record<ProductKind, LucideIcon> = {
   product: PackagePlus,
   service: Wrench,
@@ -32,11 +40,13 @@ export function ProductCreateMenu({
   items,
   onSelect,
   showLabel = true,
+  additionalActions = [],
 }: {
   label: string;
   items: ProductCreateMenuItem[];
   onSelect?: (kind: ProductKind) => void;
   showLabel?: boolean;
+  additionalActions?: ProductCreateMenuAction[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -115,6 +125,38 @@ export function ProductCreateMenu({
               </button>
             );
           })}
+          {additionalActions.length > 0 && (
+            <>
+              <div role="separator" className="my-1 border-t border-border" />
+              {additionalActions.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <button
+                    key={action.id}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      action.onSelect();
+                    }}
+                    className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+                  >
+                    <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary-50 text-primary-600 dark:bg-primary-950/40">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-semibold">
+                        {action.label}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        {action.hint}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
       )}
     </div>
