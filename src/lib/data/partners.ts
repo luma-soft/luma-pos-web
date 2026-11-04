@@ -641,7 +641,63 @@ export async function getCustomerPartnerDetail(storeId: string, id: string) {
   return result.rows[0] ?? null;
 }
 
-export async function getCustomer(storeId: string, id: string) {
+export async function getCustomerGrossProfit(
+  storeId: string,
+  id: string,
+  range: { from?: string; to?: string } = {},
+) {
+  const [customer] = await db
+    .select({ id: customers.id })
+    .from(customers)
+    .where(and(eq(customers.id, id), eq(customers.storeId, storeId)))
+    .limit(1);
+  if (!customer) return null;
+
+  const salesDateConditions = [
+    eq(orders.storeId, storeId),
+    eq(orders.customerId, id),
+    eq(orders.documentType, "sale"),
+    inArray(orders.status, ["completed", "returned"]),
+  ];
+  const returnsDateConditions = [
+    eq(returns.storeId, storeId),
+    eq(returns.customerId, id),
+    eq(returns.status, "completed"),
+  ];
+  const from = parseDateBound(range.from);
+  const to = parseDateBound(range.to, true);
+  if (from) {
+    salesDateConditions.push(gte(orders.createdAt, from));
+    returnsDateConditions.push(gte(returns.createdAt, from));
+  }
+  if (to) {
+    salesDateConditions.push(lte(orders.createdAt, to));
+    returnsDateConditions.push(lte(returns.createdAt, to));
+  }
+
+  const [[profitRow], [returnedProfitRow]] = await Promise.all([
+    db
+      .select({
+        grossProfit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .innerJoin(products, and(eq(orderItems.productId, products.id), eq(products.storeId, storeId)))
+      .where(and(...salesDateConditions)),
+    db
+      .select({
+        returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      })
+      .from(returnItems)
+      .innerJoin(returns, eq(returnItems.returnId, returns.id))
+      .innerJoin(products, and(eq(returnItems.productId, products.id), eq(products.storeId, storeId)))
+      .where(and(...returnsDateConditions)),
+  ]);
+
+  return Number(profitRow?.grossProfit ?? 0) - Number(returnedProfitRow?.returnedProfit ?? 0);
+}
+
+export async function getCustomer(storeId: string, id: string, profitRange: { from?: string; to?: string } = {}) {
   const [customer] = await db
     .select({
       id: customers.id,
@@ -673,7 +729,7 @@ export async function getCustomer(storeId: string, id: string) {
     .limit(1);
   if (!customer) return null;
 
-  const [customerOrders, [profitRow], [returnedProfitRow]] = await Promise.all([
+  const [customerOrders, grossProfit] = await Promise.all([
     db
       .select({
         id: orders.id,
@@ -689,34 +745,9 @@ export async function getCustomer(storeId: string, id: string) {
       .where(and(eq(orders.customerId, id), eq(orders.storeId, storeId)))
       .orderBy(desc(orders.createdAt))
       .limit(50),
-    db
-      .select({
-        grossProfit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
-      })
-      .from(orderItems)
-      .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .innerJoin(products, eq(orderItems.productId, products.id))
-      .where(and(
-        eq(orders.storeId, storeId),
-        eq(orders.customerId, id),
-        eq(orders.documentType, "sale"),
-        inArray(orders.status, ["completed", "returned"]),
-      )),
-    db
-      .select({
-        returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
-      })
-      .from(returnItems)
-      .innerJoin(returns, eq(returnItems.returnId, returns.id))
-      .innerJoin(products, eq(returnItems.productId, products.id))
-      .where(and(
-        eq(returns.storeId, storeId),
-        eq(returns.customerId, id),
-        eq(returns.status, "completed"),
-      )),
+    getCustomerGrossProfit(storeId, id, profitRange),
   ]);
 
-  const grossProfit = Number(profitRow?.grossProfit ?? 0) - Number(returnedProfitRow?.returnedProfit ?? 0);
   return { ...customer, ...resolveStoreAddress(customer), grossProfit, orders: customerOrders };
 }
 

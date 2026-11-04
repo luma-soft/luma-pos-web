@@ -12,14 +12,18 @@ import {
 } from "@/lib/mobile/response";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const gate = await requireMobileSalesAccess();
   if (!gate.ok) return mobileGate(gate)!;
 
   const { id } = await params;
-  const customer = await getCustomer(gate.storeId, id);
+  const search = new URL(request.url).searchParams;
+  const customer = await getCustomer(gate.storeId, id, {
+    from: search.get("profitFrom") ?? undefined,
+    to: search.get("profitTo") ?? undefined,
+  });
   if (!customer) return mobileError("errors.notFound", 404);
   return mobileOk(customer);
 }

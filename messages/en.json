@@ -3239,6 +3239,26 @@
     },
     "unitLabel": "orders"
   },
+  "customerProfit": {
+    "show": "Show gross profit",
+    "hide": "Hide gross profit",
+    "periods": {
+      "all": "All time",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "7days": "Last 7 days",
+      "30days": "Last 30 days",
+      "thisWeek": "This week",
+      "lastWeek": "Last week",
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "thisYear": "This year",
+      "lastYear": "Last year",
+      "custom": "Custom range"
+    },
+    "from": "From",
+    "to": "To"
+  },
   "customers": {
     "title": "Customers",
     "total": "{total} customers",
@@ -3290,6 +3310,8 @@
     },
     "debtOfLimit": "{pct}% of {limit} limit",
     "orderCount": "{count} recent orders",
+    "walkInSummary": "{count} orders without a selected customer",
+    "walkInCount": "Orders",
     "owingOrders": "{count} orders owing",
     "collectHint": "Open each order to record collections.",
     "orderHistory": "Order history",

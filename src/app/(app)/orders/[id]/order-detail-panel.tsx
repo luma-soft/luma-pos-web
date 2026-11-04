@@ -14,6 +14,7 @@ import { OrderActions, PaymentForm, SendOrderZaloButton } from "./order-actions"
 import { SharePrintDocButton } from "./share-print-doc-button";
 import { buttonVariants, modalActionSizeClassName } from "@/components/ui/button-variants";
 import { OrderDetailActionGroup } from "@/components/order-detail-action-group";
+import { ProfitVisibility } from "@/components/profit-visibility";
 import { OrderProductLink } from "@/components/order-product-link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { productDisplayName } from "@/lib/products/variant-presentation";
@@ -310,6 +311,7 @@ export async function OrderDetailPanel({
             <InfoLine label={t("pos.total")} value={formatCurrency(total)} valueClassName="text-base text-primary-600" strong />
             {!isQuote && <InfoLine label={t("orders.detail.paid")} value={formatCurrency(paid)} valueClassName={paid > 0 ? "text-ok" : "text-slate-500"} strong />}
             {!isQuote && <InfoLine label={t("orders.detail.remaining")} value={formatCurrency(remaining)} valueClassName={remaining > 0 ? "text-er" : "text-ok"} strong />}
+            {order.grossProfit !== null && <ProfitVisibility label={t("dashboard.grossProfit")} value={Number(order.grossProfit)} className="border-t border-border-soft pt-2" />}
           </div>
 
         </div>

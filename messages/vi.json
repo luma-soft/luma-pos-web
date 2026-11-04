@@ -3223,6 +3223,26 @@
     },
     "unitLabel": "đơn hàng"
   },
+  "customerProfit": {
+    "show": "Hiện lợi nhuận gộp",
+    "hide": "Ẩn lợi nhuận gộp",
+    "periods": {
+      "all": "Toàn thời gian",
+      "today": "Hôm nay",
+      "yesterday": "Hôm qua",
+      "7days": "7 ngày gần đây",
+      "30days": "30 ngày gần đây",
+      "thisWeek": "Tuần này",
+      "lastWeek": "Tuần trước",
+      "thisMonth": "Tháng này",
+      "lastMonth": "Tháng trước",
+      "thisYear": "Năm nay",
+      "lastYear": "Năm trước",
+      "custom": "Tùy chọn"
+    },
+    "from": "Từ ngày",
+    "to": "Đến ngày"
+  },
   "customers": {
     "title": "Khách hàng",
     "total": "{total} khách",
@@ -3274,6 +3294,8 @@
     },
     "debtOfLimit": "{pct}% hạn mức {limit}",
     "orderCount": "{count} đơn gần nhất",
+    "walkInSummary": "{count} đơn không chọn khách hàng",
+    "walkInCount": "Số đơn",
     "owingOrders": "{count} đơn còn nợ",
     "collectHint": "Mở từng đơn để ghi nhận thu nợ.",
     "orderHistory": "Lịch sử đơn hàng",

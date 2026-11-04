@@ -386,7 +386,7 @@ export async function getOrder(storeId: string, id: string) {
 
   if (!order) return null;
 
-  const [items, paymentRows, returnRows] = await Promise.all([
+  const [items, paymentRows, returnRows, [profitRow], [returnedProfitRow]] = await Promise.all([
     db
       .select({
         ...getTableColumns(orderItems),
@@ -432,7 +432,26 @@ export async function getOrder(storeId: string, id: string) {
       .from(returns)
       .where(and(eq(returns.orderId, id), eq(returns.storeId, storeId)))
       .orderBy(desc(returns.createdAt)),
+    db
+      .select({
+        grossProfit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      })
+      .from(orderItems)
+      .innerJoin(products, and(eq(products.id, orderItems.productId), eq(products.storeId, storeId)))
+      .where(and(eq(orderItems.orderId, id), eq(orderItems.storeId, storeId))),
+    db
+      .select({
+        returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      })
+      .from(returnItems)
+      .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
+      .innerJoin(products, and(eq(products.id, returnItems.productId), eq(products.storeId, storeId)))
+      .where(and(eq(returns.orderId, id), eq(returns.storeId, storeId))),
   ]);
+
+  const grossProfit = order.documentType === "sale" && ["completed", "returned"].includes(order.status)
+    ? Number(profitRow?.grossProfit ?? 0) - Number(returnedProfitRow?.returnedProfit ?? 0)
+    : null;
 
   // SL đã trả theo từng dòng hàng
   const itemIds = items.map((i) => i.id);
@@ -460,6 +479,7 @@ export async function getOrder(storeId: string, id: string) {
     payments: paymentRows,
     returns: returnRows,
     returnedByItem,
+    grossProfit,
   };
 }
 

@@ -47,6 +47,7 @@ import { OrderStatusBadge } from "../../orders/status-badges";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { CustomerReceivableActions } from "@/components/partners/customer-receivable-actions";
+import { CustomerGrossProfit } from "@/components/customer-gross-profit";
 import { CancelFinancialVoucherButton } from "@/components/partners/cancel-financial-voucher-button";
 import {
   DEFAULT_PARTNER_DEBT_FILTER,
@@ -55,6 +56,7 @@ import {
 } from "@/components/partners/partner-debt-filter";
 
 type CustomerRow = CustomerListResult["rows"][number];
+const WALK_IN_ROW_ID = "__walk_in_customer_summary__";
 type CustomerExpandTab = "info" | "sales" | "debt";
 const CUSTOMER_EXPAND_TABS: CustomerExpandTab[] = ["info", "sales", "debt"];
 const CUSTOMER_TYPES = ["retail", "wholesale", "contractor", "agent"] as const;
@@ -205,6 +207,18 @@ function CustomerRows({
     (initialDetailCustomer?.id === selectedCustomerId
       ? initialDetailCustomer
       : null);
+  const walkInRow = data.walkInSummary?.orderCount
+    ? ({
+        id: WALK_IN_ROW_ID,
+        name: t("orders.walkIn"),
+        code: null,
+        phone: null,
+        currentDebt: "0",
+        grossSales: String(data.walkInSummary.grossSales),
+        totalSpent: String(data.walkInSummary.netSales),
+      } as unknown as CustomerRow)
+    : null;
+  const tableRows = walkInRow ? [...data.rows, walkInRow] : data.rows;
   function closeCustomer() {
     setSelectedCustomerId(null);
     if (searchParams.has("detailCustomerId")) {
@@ -216,6 +230,7 @@ function CustomerRows({
     }
   }
   function openCustomer(customer: CustomerRow) {
+    if (customer.id === WALK_IN_ROW_ID) return;
     setSelectedCustomerId(customer.id);
     setDetailTab("info");
     const next = new URLSearchParams(searchParams.toString());
@@ -234,11 +249,13 @@ function CustomerRows({
       width: "44px",
       align: "center",
       render: (customer) => (
-        <Checkbox
-          className="h-4 w-4"
-          aria-label={customer.name}
-          onClick={stopRowToggle}
-        />
+        customer.id === WALK_IN_ROW_ID ? null : (
+          <Checkbox
+            className="h-4 w-4"
+            aria-label={customer.name}
+            onClick={stopRowToggle}
+          />
+        )
       ),
     },
     {
@@ -247,7 +264,14 @@ function CustomerRows({
       required: true,
       width: "300px",
       wrap: true,
-      render: (customer) => (
+      render: (customer) => customer.id === WALK_IN_ROW_ID ? (
+        <div>
+          <div className="font-semibold">{t("orders.walkIn")}</div>
+          <div className="mt-1 text-xs font-normal text-slate-500">
+            {t("customers.walkInSummary", { count: data.walkInSummary?.orderCount ?? 0 })}
+          </div>
+        </div>
+      ) : (
         <PartnerDetailLink
           kind="customer"
           partnerId={customer.id}
@@ -262,7 +286,7 @@ function CustomerRows({
       label: t("customers.cols.code"),
       defaultVisible: true,
       width: "130px",
-      render: (customer) => (
+      render: (customer) => customer.id === WALK_IN_ROW_ID ? "—" : (
         <span className="font-medium">{customer.code ?? "—"}</span>
       ),
     },
@@ -271,7 +295,7 @@ function CustomerRows({
       label: t("customers.cols.phone"),
       defaultVisible: true,
       width: "130px",
-      render: (customer) => (
+      render: (customer) => customer.id === WALK_IN_ROW_ID ? "—" : (
         <span className="text-slate-600 dark:text-slate-300">
           {customer.phone ?? "—"}
         </span>
@@ -295,6 +319,7 @@ function CustomerRows({
       defaultVisible: true,
       align: "right",
       width: "170px",
+      cellClassName: "font-semibold text-primary-600",
       render: (customer) => formatCurrency(Number(customer.grossSales)),
     },
     {
@@ -311,7 +336,7 @@ function CustomerRows({
     <>
       <DataTableShell
         tableId="partners.customers"
-        rows={data.rows}
+        rows={tableRows}
         columns={columns}
         getRowId={(customer) => customer.id}
         onRowClick={openCustomer}
@@ -324,8 +349,8 @@ function CustomerRows({
           </div>
         }
         summaryCells={[
-          { key: "debt", content: formatCurrency(data.totalDebt) },
-          { key: "grossSales", content: formatCurrency(data.totalGrossSales) },
+          { key: "debt", content: <span className="font-semibold text-er">{formatCurrency(data.totalDebt)}</span> },
+          { key: "grossSales", content: <span className="font-semibold text-primary-600">{formatCurrency(data.totalGrossSales)}</span> },
           { key: "netSales", content: formatCurrency(data.totalNetSales) },
         ]}
         toolbar={
@@ -360,7 +385,19 @@ function CustomerRows({
             </div>
           </div>
         }
-        renderMobileRow={({ row: customer }) => (
+        renderMobileRow={({ row: customer }) => customer.id === WALK_IN_ROW_ID ? (
+          <article className="w-full p-3 text-left min-h-11">
+            <div className="font-semibold">{t("orders.walkIn")}</div>
+            <div className="mt-1 text-xs text-slate-500">
+              {t("customers.walkInSummary", { count: data.walkInSummary?.orderCount ?? 0 })}
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+              <Metric label={t("customers.walkInCount")} value={String(data.walkInSummary?.orderCount ?? 0)} />
+              <Metric label={t("customers.cols.totalGrossSales")} value={formatCurrency(Number(customer.grossSales))} tone="blue" />
+              <Metric label={t("customers.cols.totalSalesNet")} value={formatCurrency(Number(customer.totalSpent))} />
+            </div>
+          </article>
+        ) : (
           <article className="w-full p-3 text-left min-h-11">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -388,6 +425,7 @@ function CustomerRows({
               <Metric
                 label={t("customers.cols.totalGrossSales")}
                 value={formatCurrency(Number(customer.grossSales))}
+                tone="blue"
               />
               <Metric
                 label={t("customers.cols.totalSalesNet")}
@@ -556,6 +594,8 @@ function CustomerInfoPanel({ customer }: { customer: CustomerRow }) {
             </div>
           </div>
         </div>
+
+        <CustomerGrossProfit customerId={customer.id} />
 
         <div className="border-t border-border-soft pt-4">
           <h4 className="mb-3 text-sm font-bold text-primary-600">
@@ -1291,7 +1331,7 @@ function Metric({
 }: {
   label: string;
   value: string;
-  tone?: "default" | "danger" | "muted";
+  tone?: "default" | "danger" | "muted" | "blue";
 }) {
   return (
     <span>
@@ -1299,7 +1339,9 @@ function Metric({
       <span
         className={cn(
           "mt-0.5 block truncate font-semibold tabular-nums",
-          tone === "danger"
+          tone === "blue"
+            ? "text-primary-600"
+            : tone === "danger"
             ? "text-er"
             : tone === "muted"
               ? "text-slate-500"

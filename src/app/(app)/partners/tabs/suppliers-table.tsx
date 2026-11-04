@@ -216,6 +216,7 @@ export function SuppliersTable({
       defaultVisible: true,
       align: "right",
       width: "180px",
+      cellClassName: "font-semibold text-primary-600",
       render: (row) => formatCurrency(Number(row.totalPurchase)),
     },
     {
@@ -223,7 +224,7 @@ export function SuppliersTable({
       label: t("suppliers.cols.debt"),
       defaultVisible: true,
       align: "right",
-      cellClassName: (row) => Number(row.currentDebt) > 0 ? "font-semibold text-warn" : "text-slate-400",
+      cellClassName: (row) => Number(row.currentDebt) > 0 ? "font-semibold text-er" : "text-slate-400",
       render: (row) => Number(row.currentDebt) > 0 ? formatCurrency(Number(row.currentDebt)) : "—",
     },
   ];
@@ -304,7 +305,7 @@ export function SuppliersTable({
         rowClickMode="row"
         minWidth="1040px"
         summaryCells={[
-          { key: "totalPurchase", content: formatCurrency(totalPurchase) },
+          { key: "totalPurchase", content: <span className="font-semibold text-primary-600">{formatCurrency(totalPurchase)}</span> },
           { key: "debt", content: formatCurrency(totalDebt) },
         ]}
         empty={(
@@ -355,7 +356,7 @@ export function SuppliersTable({
                 </div>
                 <div className="shrink-0 space-y-1 text-right">
                   <div className="text-xs text-slate-500">
-                    {t("suppliers.cols.totalPurchase")} <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-200">{formatCurrency(purchase)}</span>
+                    {t("suppliers.cols.totalPurchase")} <span className="font-semibold tabular-nums text-primary-600">{formatCurrency(purchase)}</span>
                   </div>
                   <div className={cn("text-xs tabular-nums", debt > 0 ? "font-semibold text-warn" : "text-slate-400")}>
                     {t("suppliers.cols.debt")} {debt > 0 ? formatCurrency(debt) : "—"}
