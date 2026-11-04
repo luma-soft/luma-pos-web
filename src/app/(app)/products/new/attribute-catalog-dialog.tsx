@@ -64,10 +64,14 @@ export function AttributeCatalogDialog({ attributes, create, draftAttributeIds, 
       if (view.kind === "create") {
         const result = await createProductAttribute(name);
         if (!result.ok) { setError(result.error); return; }
-        await onChanged();
         onCreated(result.data.name, result.data.id);
-        if (create) onClose();
-        else open({ kind: "list" });
+        if (create) {
+          onClose();
+          void onChanged();
+        } else {
+          await onChanged();
+          open({ kind: "list" });
+        }
       } else {
         const result = view.kind === "edit"
           ? await renameProductAttribute(view.attribute.id, name)

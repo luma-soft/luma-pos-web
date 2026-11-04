@@ -125,8 +125,8 @@ function SupplierPaymentDialog({
         setError("Không thể ghi nhận thanh toán. Vui lòng kiểm tra số tiền, phân bổ và quyền thao tác.");
         return;
       }
-      await onChanged();
       onClose();
+      void onChanged();
     });
   }
 
@@ -238,8 +238,8 @@ function SupplierAdjustmentDialog({
         setError("Không thể điều chỉnh công nợ. Thao tác này yêu cầu quyền quản lý.");
         return;
       }
-      await onChanged();
       onClose();
+      void onChanged();
     });
   }
 

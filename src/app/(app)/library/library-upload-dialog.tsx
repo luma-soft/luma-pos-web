@@ -155,18 +155,19 @@ export function LibraryUploadDialog({
     setProgress(null);
     try {
       if (!failed.length) {
-        await onUploaded({
+        const notice = {
           tone: "success",
           text: t("uploaded", { count: success }),
-        });
+        } as const;
         onClose();
+        void onUploaded(notice).catch(() => {});
       } else {
         setError(t("partialUpload", { success, failed: failed.length }));
         if (success)
-          await onUploaded({
+          void onUploaded({
             tone: "success",
             text: t("uploaded", { count: success }),
-          });
+          }).catch(() => {});
       }
     } finally {
       setBusy(false);

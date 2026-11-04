@@ -7,6 +7,7 @@ const newPage = readFileSync(new URL("./new/page.tsx", import.meta.url), "utf8")
 const routes = readFileSync(new URL("../../../lib/routes.ts", import.meta.url), "utf8");
 const aiActions = readFileSync(new URL("../../../lib/ai/actions.ts", import.meta.url), "utf8");
 const productForm = readFileSync(new URL("./new/product-form.tsx", import.meta.url), "utf8");
+const productModalFrame = readFileSync(new URL("../../../components/product-modal-frame.tsx", import.meta.url), "utf8");
 const productsModal = readFileSync(new URL("../inventory/tabs/products.tsx", import.meta.url), "utf8");
 const productsTable = readFileSync(new URL("../inventory/tabs/products-table.tsx", import.meta.url), "utf8");
 const interceptedDetailPage = readFileSync(new URL("../@productModal/(.)products/[id]/page.tsx", import.meta.url), "utf8");
@@ -106,6 +107,41 @@ test("save actions show loading only on the submitted action", () => {
   expect(productForm.match(/submitIntent={submitIntent}/g)?.length).toBe(2);
   expect(formActions).toContain('loading={loading && submitIntent === "sameType"}');
   expect(formActions).toContain('loading={loading && submitIntent === "save"}');
+});
+
+test("successful modal saves dismiss before navigation while create-another stays open", () => {
+  expect(productModalFrame).toContain("const [dismissed, setDismissed] = useState(false);");
+  expect(productModalFrame).toContain("if (dismissed) return null;");
+  expect(productModalFrame).toContain("<ProductModalDismissContext.Provider value={dismiss}>");
+  expect(productForm).toContain("const dismissProductModalAfterSave = useDismissProductModalAfterSave();");
+
+  const variantSave = productForm.slice(
+    productForm.indexOf("if (values.variantGroupId || values.variantChildren.length > 0)"),
+    productForm.indexOf("if (isEdit && productId)"),
+  );
+  const variantDismiss = variantSave.indexOf("dismissProductModalAfterSave?.();");
+  expect(variantSave.indexOf('if (!isEdit && submitIntent === "sameType")')).toBeLessThan(variantDismiss);
+  const variantSaveNavigation = variantSave.indexOf("navigateAfterModal(", variantDismiss);
+  expect(variantSaveNavigation).toBeGreaterThan(variantDismiss);
+
+  const editSave = productForm.slice(
+    productForm.indexOf("if (isEdit && productId)"),
+    productForm.indexOf("const res = await createProduct(values)"),
+  );
+  const editDismiss = editSave.indexOf("dismissProductModalAfterSave?.();");
+  expect(editDismiss).toBeGreaterThan(-1);
+  expect(editDismiss).toBeLessThan(editSave.indexOf("navigateAfterModal(href)"));
+
+  const createSave = productForm.slice(
+    productForm.indexOf("const res = await createProduct(values)"),
+    productForm.indexOf("function resetForNextProduct"),
+  );
+  const createAnother = createSave.indexOf('if (submitIntent === "sameType")');
+  const createDismiss = createSave.indexOf("dismissProductModalAfterSave?.();");
+  expect(createAnother).toBeGreaterThan(-1);
+  expect(createAnother).toBeLessThan(createDismiss);
+  expect(createSave.indexOf("resetForNextProduct();")).toBeLessThan(createDismiss);
+  expect(createDismiss).toBeLessThan(createSave.indexOf("navigateAfterModal(createdProductHref"));
 });
 
 // Replay the navigation callback used by the form with a browser-history model.
