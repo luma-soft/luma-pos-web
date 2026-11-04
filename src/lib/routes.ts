@@ -34,12 +34,19 @@ export const Routes = {
   ProductNew: "/inventory?tab=products&productModal=create",
   productCreateForReturn: (returnTo: string, productKind: "product" | "service" | "combo" = "product") => {
     const params = new URLSearchParams({
-      tab: "products",
       productModal: "create",
       productKind,
       returnTo,
     });
-    return `/inventory?${params.toString()}` as const;
+    return `/products/new?${params.toString()}` as const;
+  },
+  productSameTypeForReturn: (returnTo: string, sameTypeAs: string) => {
+    const params = new URLSearchParams({
+      productModal: "sameType",
+      sameTypeAs,
+      returnTo,
+    });
+    return `/products/new?${params.toString()}` as const;
   },
   Categories: "/products/categories",
   Pricing: "/pricing",

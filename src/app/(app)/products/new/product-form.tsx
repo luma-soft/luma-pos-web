@@ -499,6 +499,7 @@ export function NewProductForm({
 
   function sameTypeHref(id: string) {
     if (!isModal) return Routes.productSameType(id);
+    if (createdProductReturnTo) return Routes.productSameTypeForReturn(createdProductReturnTo, id);
     const [path, query = ""] = doneHref.split("?");
     const sp = new URLSearchParams(query);
     sp.set("tab", "products");

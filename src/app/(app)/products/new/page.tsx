@@ -24,6 +24,7 @@ export default async function NewProductPage({ searchParams }: Props) {
   }
   if (typeof sp.productKind === "string") target.set("productKind", sp.productKind);
   if (typeof sp.source === "string") target.set("source", sp.source);
+  if (typeof sp.returnTo === "string") target.set("returnTo", sp.returnTo);
 
   redirect(`${Routes.Inventory}?${target.toString()}`);
 }

@@ -283,11 +283,15 @@ export function PurchaseForm({
       void catalog.refresh();
     }
 
-    // The server page includes this product in initialProducts, which seeds
-    // the initial line state above. Only remove the hand-off query after that
-    // authoritative row is present, then the next search can use the refreshed
-    // catalog without re-entering the creation flow.
-    if (!initialProducts.some((product) => product.id === createdProductId)) return;
+    // The server page includes the created product in initialProducts. Add it
+    // to the existing draft after the product modal closes, then remove the
+    // hand-off query so the refreshed catalog can serve later searches.
+    const createdProduct = initialProducts.find((product) => product.id === createdProductId);
+    if (!createdProduct) return;
+
+    setLines((currentLines) => currentLines.some((line) => line.productId === createdProduct.id)
+      ? currentLines
+      : [productToLine(createdProduct), ...currentLines]);
 
     const params = new URLSearchParams(window.location.search);
     if (!params.has("createdProductId")) return;
