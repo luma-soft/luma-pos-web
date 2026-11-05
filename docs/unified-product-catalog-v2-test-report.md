@@ -34,15 +34,20 @@ certify a production rollout.
 - The app target's Release configuration defaults
   `LUMA_UNIFIED_CATALOG_ENABLED` to **NO**. `luma.catalog.forceLegacySync`
   remains the device rollback switch.
-- A Release Simulator build with the flag explicitly set to **YES** passed on
-  Xcode 27.2; the built app's Info.plist contained `YES`.
-- The full `NativeInventoryProductBrowseModelTests` suite passed **58/58** on
-  an iPhone Simulator. It covers offline cache use, full/delta synchronization,
+- The local iOS gate on Xcode 27.2 built the whole app and passed **59/59**
+  tests on the booted iPhone 17 Simulator (58 catalog-model tests plus the
+  product-picker rendering test). The updated app was installed and launched
+  on that simulator.
+- [GitHub Actions run #24](https://github.com/luma-soft/luma-pos-mobile/actions/runs/42110386019)
+  passed both jobs on the Xcode 27.0 preview image: 59 tests passed, and the
+  Release Simulator build with V2 opt-in verified
+  `LUMA_UNIFIED_CATALOG_ENABLED=YES` in the compiled Info.plist. The workflow
+  also verifies that Release defaults to **NO**. This is an ad hoc Simulator
+  build, not a signed TestFlight archive or upload.
+- The model tests cover offline cache use, full/delta synchronization,
   tombstones, cross-screen cache sharing, POS prices and units, release
   fallback, SQLite rollback, retry after a failed sync, relevance ordering,
-  and catalog paging. The product-picker rendering test passed separately.
-- The local Release Simulator build with V2 explicitly enabled produced an app
-  bundle whose Info.plist contains `YES`.
+  and catalog paging.
 - The native synthetic relevance benchmark reported **84 ms**, **830 ms**, and
   **4,210 ms** for 1k, 10k, and 50k candidates on the final Simulator run. These are
   local microbenchmark timings, not device or production screen-open latency.
