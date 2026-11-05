@@ -297,15 +297,21 @@ export function PurchaseForm({
     const createdProduct = initialProducts.find((product) => product.id === createdProductId);
     if (!createdProduct) return;
 
-    setLines((currentLines) => currentLines.some((line) => line.productId === createdProduct.id)
-      ? currentLines
-      : [productToLine(createdProduct), ...currentLines]);
+    // Defer the handoff to the next frame, and consume the URL only after
+    // the new item has been queued in the draft. This avoids setState inside
+    // effect setup without changing the product modal handoff contract.
+    const frame = window.requestAnimationFrame(() => {
+      setLines((currentLines) => currentLines.some((line) => line.productId === createdProduct.id)
+        ? currentLines
+        : [productToLine(createdProduct), ...currentLines]);
 
-    const params = new URLSearchParams(window.location.search);
-    if (!params.has("createdProductId")) return;
-    params.delete("createdProductId");
-    const query = params.toString();
-    router.replace(`${window.location.pathname}${query ? `?${query}` : ""}`, { scroll: false });
+      const params = new URLSearchParams(window.location.search);
+      if (!params.has("createdProductId")) return;
+      params.delete("createdProductId");
+      const query = params.toString();
+      router.replace(`${window.location.pathname}${query ? `?${query}` : ""}`, { scroll: false });
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [catalog, createdProductId, initialProducts, mode, router]);
 
   useEffect(() => {
