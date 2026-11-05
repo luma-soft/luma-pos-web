@@ -106,8 +106,10 @@ function groupKey(product: ProductCatalogItem): { id: string; kind: "native" | "
   return null;
 }
 
-function buildGroups(products: readonly ProductCatalogItem[]) {
-  const byId = new Map(products.map((product) => [product.id, product]));
+function buildGroups(
+  products: readonly ProductCatalogItem[],
+  byId: ReadonlyMap<string, ProductCatalogItem>,
+) {
   const groups = new Map<string, CatalogGroup>();
   for (const product of products) {
     const key = groupKey(product);
@@ -231,6 +233,28 @@ function compareNumbers(left: string, right: string, descending: boolean) {
 // Cache its variant-filtered search view by that identity so the trigram
 // index can be reused across keystrokes, filters, sorting and pagination.
 const inventorySearchViews = new WeakMap<readonly ProductCatalogItem[], readonly ProductCatalogItem[]>();
+const inventoryProjections = new WeakMap<readonly ProductCatalogItem[], {
+  byId: ReadonlyMap<string, ProductCatalogItem>;
+  groups: ReadonlyMap<string, CatalogGroup>;
+}>();
+const warehouseViews = new WeakMap<readonly ProductCatalogWarehouse[], ReadonlyMap<string, ProductCatalogWarehouse>>();
+
+function getInventoryProjection(products: readonly ProductCatalogItem[]) {
+  const cached = inventoryProjections.get(products);
+  if (cached) return cached;
+  const byId = new Map(products.map((product) => [product.id, product]));
+  const projection = { byId, groups: buildGroups(products, byId) };
+  inventoryProjections.set(products, projection);
+  return projection;
+}
+
+function getWarehouseView(warehouses: readonly ProductCatalogWarehouse[]) {
+  const cached = warehouseViews.get(warehouses);
+  if (cached) return cached;
+  const view = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse]));
+  warehouseViews.set(warehouses, view);
+  return view;
+}
 
 export function getInventorySearchableProducts(
   products: readonly ProductCatalogItem[],
@@ -252,13 +276,14 @@ export function exploreProductCatalog(
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = Math.max(1, filters.pageSize ?? 20);
   const view = filters.view ?? "grouped";
-  const byId = new Map(products.map((product) => [product.id, product]));
-  const warehouseById = new Map(warehouseRows.map((warehouse) => [warehouse.id, warehouse]));
-  const groups = buildGroups(products);
+  const { byId, groups } = getInventoryProjection(products);
+  const warehouseById = getWarehouseView(warehouseRows);
   const q = filters.query?.trim() ?? "";
   const searchable = getInventorySearchableProducts(products);
   const searchRows = q ? searchProductCatalog(searchable, q, { limit: searchable.length }) : searchable;
-  const searchRank = new Map(searchRows.map((product, index) => [product.id, index]));
+  const searchRank = q
+    ? new Map(searchRows.map((product, index) => [product.id, index]))
+    : new Map<string, number>();
   const matched = new Set(searchRows.filter((product) => matchesProduct(product, filters)).map((product) => product.id));
 
   const candidates: Array<{ product: ProductCatalogItem; rank: number }> = [];
