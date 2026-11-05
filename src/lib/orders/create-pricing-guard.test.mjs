@@ -118,6 +118,34 @@ test("stale checkout rejects before order, cash, stock and audit writes", async 
   expect(Object.values(await effects())).toEqual([0, 0, 0, 0, 0, 0]);
 });
 
+test("editing a draft keeps it as a draft without applying sale effects", async () => {
+  const draftId = randomUUID();
+  const draftCode = "DH-DRAFT-001";
+  await database.insert(schema.orders).values({
+    id: draftId,
+    storeId,
+    code: draftCode,
+    status: "draft",
+    documentType: "sale",
+    paymentStatus: "unpaid",
+    warehouseId,
+    subtotal: "90000",
+    total: "90000",
+    amountPaid: "0",
+  });
+
+  const result = await createOrderForUser(userId, request({
+    source: { mode: "draft_edit", orderId: draftId },
+    payment: { method: "credit", amount: 0 },
+  }));
+
+  expect(result).toEqual({ ok: true, data: { id: draftId, code: draftCode } });
+  expect((await pg.query("select code, status, replaced_by_order_id from orders")).rows[0])
+    .toEqual({ code: draftCode, status: "draft", replaced_by_order_id: null });
+  expect(await effects()).toEqual({ orders: 1, order_items: 1, payments: 0, stock_levels: 0, stock_movements: 0, qa_effects: 1 });
+  expect((await pg.query("select kind from qa_effects")).rows.map((row) => row.kind)).toEqual(["audit"]);
+});
+
 test("a transient catalog revision race retries with the same checkout snapshot", async () => {
   const originalTransaction = database.transaction.bind(database);
   let attempts = 0;

@@ -35,7 +35,7 @@ async function sourceInvoiceFromParams(storeId: string, params: PosSearchParams)
   const mode = one(params.sourceMode);
   const kind = one(params.sourceKind);
   const orderId = one(params.sourceOrderId);
-  if ((mode !== "edit" && mode !== "copy" && mode !== "return") || !orderId || !UUID_RE.test(orderId)) return null;
+  if ((mode !== "edit" && mode !== "draft_edit" && mode !== "copy" && mode !== "return") || !orderId || !UUID_RE.test(orderId)) return null;
   const order = await getOrder(storeId, orderId);
   if (!order) return null;
   const sourceKind = mode === "return"

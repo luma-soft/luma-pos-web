@@ -65,7 +65,7 @@ export async function OrderDetailPanel({
   const shareHref = shareTemplate
     ? `${Routes.order(order.id)}/print?${new URLSearchParams({ templateId: shareTemplate.id, size: shareTemplate.paperDefault }).toString()}`
     : null;
-  const posSourceHref = (mode: "edit" | "copy" | "return", sourceKindOverride?: string) => {
+  const posSourceHref = (mode: "edit" | "draft_edit" | "copy" | "return", sourceKindOverride?: string) => {
     const sp = new URLSearchParams({
       sourceMode: mode,
       sourceKind: sourceKindOverride ?? sourceKind,
@@ -361,8 +361,14 @@ export async function OrderDetailPanel({
             className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}
           />
           {(order.status === "completed" || order.status === "quote" || order.status === "confirmed" || editableDraft) && order.returns.length === 0 && (
-            <Link href={posSourceHref("edit")} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName, "bg-white dark:bg-surface")}>
-              {isQuote ? t("quotes.edit") : isBooking ? t("bookings.edit") : t("orderEdit.action")}
+            <Link href={posSourceHref(editableDraft ? "draft_edit" : "edit")} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName, "bg-white dark:bg-surface")}>
+              {isQuote
+                ? t("quotes.edit")
+                : isBooking
+                  ? t("bookings.edit")
+                  : editableDraft
+                    ? t("orderEdit.editDraftAction")
+                    : t("orderEdit.action")}
             </Link>
           )}
           {!cancelled && (

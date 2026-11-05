@@ -195,7 +195,7 @@ type SepayCheckout = {
 type PosCustomer = PosData["customers"][number];
 export type PosSourceInvoice = {
   id?: string;
-  mode: "edit" | "copy" | "return";
+  mode: "edit" | "draft_edit" | "copy" | "return";
   kind: PosDraftKind;
   code: string;
   saleTime?: string;
@@ -2048,7 +2048,7 @@ export function PosClient({
       setError(t("pos.invoiceEdit.onlineRequired"));
       return;
     }
-    const orderSource = sourceInvoice?.id && (sourceInvoice.mode === "edit" || sourceInvoice.mode === "copy")
+    const orderSource = sourceInvoice?.id && (sourceInvoice.mode === "edit" || sourceInvoice.mode === "draft_edit" || sourceInvoice.mode === "copy")
       ? { mode: sourceInvoice.mode, orderId: sourceInvoice.id }
       : undefined;
     const payload = {
@@ -2103,6 +2103,11 @@ export function PosClient({
     const res = await requestPosOrder(payload, createOrder);
     if (res.kind === "created") {
       try {
+        if (sourceInvoice?.mode === "draft_edit" && sourceInvoice.id) {
+          setSubmittingMode(null);
+          window.location.assign(Routes.salesOrder(sourceInvoice.id, "draft"));
+          return;
+        }
         void productCatalog.refresh();
         if (submitMode === "sale" && selectedPayMethod === "bank_transfer" && !paymentSessionId) {
           const paymentRes = await fetch("/api/payments/sepay", {
@@ -2364,22 +2369,29 @@ export function PosClient({
   };
 
   const closeSearch = () => { setBrowsing(false); setSearch(""); };
-  const isEditMode = sourceInvoice?.mode === "edit";
+  const isDraftEditMode = sourceInvoice?.mode === "draft_edit";
+  const isEditMode = sourceInvoice?.mode === "edit" || isDraftEditMode;
   const isCopyMode = sourceInvoice?.mode === "copy";
   const showSourceInvoiceBanner = Boolean(sourceInvoice && sourceInvoice.mode !== "return");
   const sourceKind = sourceInvoice?.kind ?? "invoice";
-  const sourceTitleTx = sourceKind === "quote"
+  const sourceTitleTx = isDraftEditMode
+    ? "pos.invoiceEdit.editingDraftFrom"
+    : sourceKind === "quote"
     ? isEditMode ? "pos.invoiceEdit.editingQuoteFrom" : "pos.invoiceEdit.copyingQuoteFrom"
     : sourceKind === "booking"
       ? isEditMode ? "pos.invoiceEdit.editingBookingFrom" : "pos.invoiceEdit.copyingBookingFrom"
       : isEditMode ? "pos.invoiceEdit.editingFrom" : "pos.invoiceEdit.copyingFrom";
-  const sourceDescriptionTx = sourceKind === "quote"
+  const sourceDescriptionTx = isDraftEditMode
+    ? "pos.invoiceEdit.editDraftDescription"
+    : sourceKind === "quote"
     ? isEditMode ? "pos.invoiceEdit.editQuoteDescription" : "pos.invoiceEdit.copyQuoteDescription"
     : sourceKind === "booking"
       ? isEditMode ? "pos.invoiceEdit.editBookingDescription" : "pos.invoiceEdit.copyBookingDescription"
       : isEditMode ? "pos.invoiceEdit.editDescription" : "pos.invoiceEdit.copyDescription";
-  const sourcePrimaryLabel = isEditMode
-    ? sourceKind === "quote" ? t("pos.invoiceEdit.saveEditedQuote") : sourceKind === "booking" ? t("pos.invoiceEdit.saveEditedBooking") : t("pos.invoiceEdit.saveEdited")
+  const sourcePrimaryLabel = isDraftEditMode
+    ? t("pos.invoiceEdit.saveEditedDraft")
+    : isEditMode
+      ? sourceKind === "quote" ? t("pos.invoiceEdit.saveEditedQuote") : sourceKind === "booking" ? t("pos.invoiceEdit.saveEditedBooking") : t("pos.invoiceEdit.saveEdited")
     : isCopyMode
       ? sourceKind === "quote" ? t("pos.invoiceEdit.createQuoteCopy") : sourceKind === "booking" ? t("pos.invoiceEdit.createBookingCopy") : t("pos.invoiceEdit.createCopy")
       : null;
@@ -3207,7 +3219,11 @@ export function PosClient({
 
         {/* phương thức + nút — ghim đáy panel */}
         <div className="p-3 border-t border-border space-y-2 text-sm">
-          {isReturnDraft ? (
+          {isDraftEditMode ? (
+            <div className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-slate-500">
+              {t("pos.invoiceEdit.draftPaymentHint")}
+            </div>
+          ) : isReturnDraft ? (
             <>
               <div className="grid grid-cols-3 gap-1.5">
                 {(["cash", "bank_transfer", "credit"] as PayMethod[]).map((m) => (
@@ -3349,7 +3365,7 @@ export function PosClient({
             </button>
           </div>
           {isEditMode && (
-            <Text as="p" variant="muted" className="text-[11px] text-right" tx="pos.invoiceEdit.editFootnote" />
+            <Text as="p" variant="muted" className="text-[11px] text-right" tx={isDraftEditMode ? "pos.invoiceEdit.editDraftFootnote" : "pos.invoiceEdit.editFootnote"} />
           )}
         </div>
       </PosCartScrollSurface>

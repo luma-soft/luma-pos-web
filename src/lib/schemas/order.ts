@@ -42,7 +42,7 @@ export const createOrderSchema = z.object({
   // Promotes a previously saved POS draft in place when checkout succeeds.
   posDraftId: z.string().trim().min(1).max(128).optional(),
   source: z.object({
-    mode: z.enum(["edit", "copy"]),
+    mode: z.enum(["edit", "draft_edit", "copy"]),
     orderId: z.uuid(),
   }).optional(),
   customerId: z.uuid().nullable().optional(),

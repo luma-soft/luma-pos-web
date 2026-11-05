@@ -1,9 +1,9 @@
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   orders, orderItems, payments, customers, products, stockLevels, stockMovements, einvoices, returns,
-  paymentBankAccounts, sepayPaymentSessions,
+  paymentBankAccounts, posSharedDrafts, sepayPaymentSessions,
 } from "@/db/schema";
 import { createOrderSchema, type CreateOrderInput } from "@/lib/schemas/order";
 import {
@@ -111,6 +111,9 @@ export async function createOrderForUser(
   ) {
     return { ok: false, error: "errors.invalidData" };
   }
+  if (v.source?.mode === "draft_edit" && (v.mode !== "sale" || v.payment.amount !== 0 || paymentPending || paymentSessionId)) {
+    return { ok: false, error: "errors.invalidData" };
+  }
 
   // Khử trùng: nếu đơn với clientId này đã tạo (đồng bộ lại) → trả về đơn cũ, không tạo trùng.
   if (v.clientId) {
@@ -120,6 +123,7 @@ export async function createOrderForUser(
 
   const isQuote = v.mode === "quote";
   const isBooking = v.mode === "booking";
+  const isDraftEdit = v.source?.mode === "draft_edit";
 
   try {
     const profileId = await getProfileId(userId);
@@ -226,10 +230,12 @@ export async function createOrderForUser(
         if (sourceOrder.status === "cancelled" || sourceOrder.status === "merged") throw new Error("SOURCE_NOT_COPYABLE");
       }
 
-      if (v.source?.mode === "edit") {
-        const sourceMatchesMode = (isQuote && sourceIsQuote)
-          || (isBooking && sourceIsBooking)
-          || (!isQuote && !isBooking && (sourceIsSale || sourceIsDraftSale));
+      if (v.source?.mode === "edit" || isDraftEdit) {
+        const sourceMatchesMode = isDraftEdit
+          ? sourceIsDraftSale
+          : (isQuote && sourceIsQuote)
+            || (isBooking && sourceIsBooking)
+            || (!isQuote && !isBooking && (sourceIsSale || sourceIsDraftSale));
         if (!sourceMatchesMode) throw new Error("SOURCE_NOT_EDITABLE");
         const [draftPayment] = sourceIsDraftSale
           ? await tx.select({ id: payments.id }).from(payments)
@@ -299,20 +305,20 @@ export async function createOrderForUser(
 
       const orderInsert: typeof orders.$inferInsert = {
         storeId,
-        code: savedDraft?.code ?? generateCode(isQuote ? "BG" : "DH"),
+        code: isDraftEdit ? sourceOrder?.code ?? generateCode("DH") : savedDraft?.code ?? generateCode(isQuote ? "BG" : "DH"),
         clientId: v.clientId ?? null,
-        posDraftId: v.posDraftId ?? null,
+        posDraftId: isDraftEdit ? null : v.posDraftId ?? null,
         posDraftPayload: null,
         documentType: isQuote ? "quote" : isBooking ? "booking" : "sale",
         status: isQuote
           ? "quote"
           : isBooking
             ? "confirmed"
-            : paymentPending
+            : paymentPending || isDraftEdit
               ? "draft"
               : "completed",
         paymentStatus,
-        shiftId: currentShift?.id ?? null,
+        shiftId: isDraftEdit ? sourceOrder?.shiftId ?? null : currentShift?.id ?? null,
         customerId: v.customerId ?? null,
         warehouseId: v.warehouseId,
         projectId: v.projectId ?? null,
@@ -325,16 +331,40 @@ export async function createOrderForUser(
         shippingFee: toMoney(v.shippingFee),
         total: toMoney(total),
         amountPaid: toMoney(paid),
-        sourceOrderId: v.source?.orderId ?? null,
-        sourceMode: v.source?.mode ?? null,
+        sourceOrderId: isDraftEdit ? null : v.source?.orderId ?? null,
+        sourceMode: isDraftEdit ? null : v.source?.mode ?? null,
         sourceSaleTime: v.source?.mode === "edit" ? sourceOrder.createdAt : null,
         note: v.note || null,
-        createdBy: profileId,
+        createdBy: isDraftEdit ? sourceOrder?.createdBy ?? profileId : profileId,
       };
-      if (v.source?.mode === "edit") orderInsert.createdAt = sourceOrder.createdAt;
+      if (v.source?.mode === "edit" || isDraftEdit) orderInsert.createdAt = sourceOrder.createdAt;
 
       let order: { id: string; code: string };
-      if (savedDraft) {
+      if (isDraftEdit) {
+        const sourceOrderId = sourceOrder!.id;
+        await tx.delete(orderItems).where(and(eq(orderItems.storeId, storeId), eq(orderItems.orderId, sourceOrderId)));
+        const [updated] = await tx.update(orders).set({
+          ...orderInsert,
+          createdAt: sourceOrder!.createdAt,
+          updatedAt: sql`now()`,
+        }).where(and(
+          eq(orders.storeId, storeId),
+          eq(orders.id, sourceOrderId),
+          eq(orders.status, "draft"),
+        )).returning({ id: orders.id, code: orders.code });
+        if (!updated) throw new Error("SOURCE_NOT_EDITABLE");
+        order = updated;
+
+        if (sourceOrder!.posDraftId) {
+          const now = new Date();
+          await tx.update(posSharedDrafts).set({ deletedAt: now, updatedAt: now, updatedBy: profileId })
+            .where(and(
+              eq(posSharedDrafts.storeId, storeId),
+              eq(posSharedDrafts.draftId, sourceOrder!.posDraftId),
+              isNull(posSharedDrafts.deletedAt),
+            ));
+        }
+      } else if (savedDraft) {
         const [updated] = await tx.update(orders).set({
           ...orderInsert,
           createdAt: orderInsert.createdAt ?? new Date(),
@@ -430,9 +460,9 @@ export async function createOrderForUser(
 
       await recordActivity(tx, {
         storeId, actorId: profileId,
-        action: `${orderActivityType(orderInsert)}.${v.source?.mode === "edit" ? "updated" : "created"}`,
+        action: `${orderActivityType(orderInsert)}.${v.source?.mode === "edit" || isDraftEdit ? "updated" : "created"}`,
         entityType: "order", entityId: order.id,
-        before: v.source?.mode === "edit" ? orderActivitySnapshot(sourceOrder) : null,
+        before: v.source?.mode === "edit" || isDraftEdit ? orderActivitySnapshot(sourceOrder!) : null,
         after: {
           ...orderActivitySnapshot(orderInsert),
           items: trustedItems.map((item) => ({
@@ -442,7 +472,7 @@ export async function createOrderForUser(
         },
         affectedRecords: [
           { type: "order", id: order.id, code: order.code },
-          ...(sourceOrder ? [{ type: "order", id: sourceOrder.id, code: sourceOrder.code }] : []),
+          ...(sourceOrder && !isDraftEdit ? [{ type: "order", id: sourceOrder.id, code: sourceOrder.code }] : []),
         ],
         metadata: { sourceMode: v.source?.mode ?? null, sourceOrderCode: sourceOrder?.code ?? null },
       });
@@ -471,7 +501,7 @@ export async function createOrderForUser(
       }
 
       // Báo giá / đơn chờ thanh toán: chưa ảnh hưởng tồn kho hoặc công nợ doanh thu.
-      if (isQuote || paymentPending) {
+      if (isQuote || paymentPending || isDraftEdit) {
         return { order, notification: null };
       }
 
@@ -525,7 +555,7 @@ export async function createOrderForUser(
         }).where(and(eq(customers.storeId, storeId), eq(customers.id, v.customerId)));
       }
 
-      const notification = v.source?.mode === "edit"
+      const notification = v.source?.mode === "edit" || isDraftEdit
         ? null
         : await createNotificationEventInTx(tx, {
             storeId,

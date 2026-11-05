@@ -7,6 +7,8 @@ describe("unpaid source invoice payment draft", () => {
       .toEqual({ payMethod: "credit", paidInput: 0 });
     expect(unpaidSourceInvoicePaymentDraft({ mode: "edit", kind: "invoice", amountPaid: 0 }))
       .toEqual({ payMethod: "cash", paidInput: 0 });
+    expect(unpaidSourceInvoicePaymentDraft({ mode: "draft_edit", kind: "invoice", amountPaid: 0, customerId: "customer-1" }))
+      .toEqual({ payMethod: "credit", paidInput: 0 });
   });
 
   test("does not change copy, return, quote, booking, or paid invoices", () => {
