@@ -83,6 +83,8 @@ export function ProductCatalogProvider({
         let fresh: ProductCatalogSnapshot | null = result?.mode === "full"
           ? result.snapshot
           : null;
+        // A failed delta must never leak its changed-ID list into a full recovery write.
+        let appliedIncrementalDelta = false;
 
         if (result?.mode === "unchanged") {
           const current = snapshotRef.current;
@@ -97,6 +99,7 @@ export function ProductCatalogProvider({
         } else if (result?.mode === "delta") {
           const current = snapshotRef.current;
           fresh = current ? mergeProductCatalogDelta(current, result.delta) : null;
+          appliedIncrementalDelta = fresh !== null;
         }
 
         // A stale/mismatched local snapshot or unavailable delta journal must
@@ -107,17 +110,14 @@ export function ProductCatalogProvider({
           }
           const recovered = await syncProductCatalog();
           fresh = recovered?.mode === "full" ? recovered.snapshot : null;
+          appliedIncrementalDelta = false;
         }
         if (!fresh || fresh.userId !== userId || fresh.scopeId !== scopeId) {
           setStatus((current) => current === "cached" ? current : "unavailable");
           return;
         }
         if (catalogRevisionChanged(fresh.revision, revisionRef.current)) return;
-        snapshotRef.current = fresh;
-        setSnapshot(fresh);
-        setStatus("synced");
-        revisionRef.current = fresh.revision;
-        const delta = result?.mode === "delta" ? result.delta : null;
+        const delta = appliedIncrementalDelta && result?.mode === "delta" ? result.delta : null;
         const changedProductIDs = new Set(delta?.upserts.map((product) => product.id) ?? []);
         const deletedProductIDs = delta?.deletedIds ?? [];
         if (delta?.metadata) {
@@ -139,14 +139,24 @@ export function ProductCatalogProvider({
           }
         }
         const persistStartedAt = performance.now();
-        await writeProductCatalogSnapshot(
+        const committed = await writeProductCatalogSnapshot(
           fresh,
           delta ? { changedProductIDs: [...changedProductIDs], deletedProductIDs } : undefined,
         );
+        if (!committed) {
+          // A newer tab may already have committed a later revision.
+          // Never broadcast or adopt an uncommitted snapshot.
+          return;
+        }
+        if (catalogRevisionChanged(fresh.revision, revisionRef.current)) return;
+        snapshotRef.current = fresh;
+        setSnapshot(fresh);
+        setStatus("synced");
+        revisionRef.current = fresh.revision;
         if (process.env.NODE_ENV !== "production") {
           const encoded = JSON.stringify(result);
           console.debug("[product-catalog] sync", {
-            mode: result?.mode ?? "unavailable",
+            mode: appliedIncrementalDelta ? "delta" : result?.mode === "delta" ? "full-recovery" : result?.mode ?? "unavailable",
             revisionBefore,
             revisionAfter: fresh.revision,
             changedEntities: delta ? changedProductIDs.size + deletedProductIDs.length : fresh.products.length,
