@@ -64,7 +64,6 @@ import { searchPosProducts } from "@/lib/actions/pos-search";
 import { createPosCustomer } from "@/lib/actions/pos-customers";
 import { enqueueOrder, getOutbox, removeOutbox, markFailed } from "@/lib/offline/pos-store";
 import { buildPrintDocumentBaseName } from "@/lib/print/share-document";
-import { applyPromo } from "@/lib/promo";
 import { Routes } from "@/lib/routes";
 import type { PosData, PosProduct, PosUnit } from "@/lib/data/pos";
 import { isProductStockManaged } from "@/lib/product-stock";
@@ -1542,14 +1541,14 @@ export function PosClient({
     return data.priceBooks.find((book) => book.id === (l.priceBook ?? priceBook))?.systemType === "list";
   }
 
-  /** Giá công ty và chiết khấu nhập tay không cộng dồn khuyến mại tự động. */
+  /** Giá công ty và chiết khấu nhập tay được áp dụng trực tiếp theo dòng. */
   function effPrice(l: CartLine): { price: number; pct: number } {
     if (l.manualPrice || (l.lineDiscount ?? 0) > 0 || (l.lineDiscountValue ?? 0) > 0 || usesCompanyPrice(l)) {
       const { sellPrice: price } = resolveLinePriceEditor(createLinePriceEditorState(l.unitPrice, l.lineDiscount ?? 0, l.lineDiscountMode, l.lineDiscountValue));
       const pct = l.lineDiscountMode === "pct" ? Math.min(100, l.lineDiscountValue ?? 0) : l.unitPrice > 0 ? Math.round((1 - price / l.unitPrice) * 100) : 0;
       return { price, pct };
     }
-    return applyPromo(l.unitPrice, data.promoByProduct[l.product.id], l.quantity * l.unitMultiplier);
+    return { price: l.unitPrice, pct: 0 };
   }
 
   /** Sửa giá/giảm giá 1 dòng (từ popup). */
@@ -2349,7 +2348,7 @@ export function PosClient({
         ? { ...invoice, cart: rehydrateCartProducts(invoice.cart, rows) }
         : invoice));
       void productCatalog.refresh();
-      // Fetch current price-book definitions and promotions without remounting the cart.
+      // Fetch current price-book definitions without remounting the cart.
       startPricingRefresh(() => router.refresh());
       setError(t("pos.pricingConflict.reselect"));
     } catch {

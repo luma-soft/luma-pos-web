@@ -41,8 +41,8 @@ export function assertCheckoutPricing(
     throw new Error(CHECKOUT_PRICING_CHANGED);
   }
 
-  // Approval was obtained for these server-resolved values. A price/promotion
-  // change must not increase the discount ratio after that authorization.
+  // Approval was obtained for these server-resolved values. A price change
+  // must not increase the discount ratio after that authorization.
   if (authorizedItems && (authorizedItems.length !== items.length || authorizedItems.some((line, index) => {
     const item = items[index];
     return line.productId !== item.productId || line.unitName !== item.unitName ||

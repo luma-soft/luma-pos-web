@@ -71,7 +71,6 @@ export default async function AppLayout({
           </div>
         </div>
         <AppNav
-          industry={store.industry}
           aiConfigured={store.prefs.ai.openaiApiKeySet}
           features={context.features}
           role={role}

@@ -1,8 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { products, productComboItems, productPrices, productUnits, promotions, priceBooks } from "@/db/schema";
+import { products, productComboItems, productPrices, productUnits, priceBooks } from "@/db/schema";
 import { canViewPurchasePrices, isInternalPriceBook, resolvePriceBookPrice, systemPriceBookType } from "@/lib/pricing/system-price-books";
-import { applyPromo, isPromoActive } from "@/lib/promo";
 import { resolveLinePriceEditor } from "@/lib/pos/line-price-editor";
 import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
 import type { CreateOrderOutput, UpdateOrderOutput } from "@/lib/schemas/order";
@@ -49,8 +48,8 @@ function listedUnitPrice(
  * Convert client order lines into trusted order item snapshots.
  *
  * The client may still request a manual price/discount so existing POS flows keep
- * working, but product names, units, multipliers, default prices, and promotions
- * are all resolved from the database here.
+ * working, but product names, units, multipliers, and default prices are all
+ * resolved from the database here.
  */
 export async function normalizeOrderItems(
   storeId: string,
@@ -105,16 +104,6 @@ export async function normalizeOrderItems(
       : Promise.resolve([]),
     database
       .select({
-        productId: promotions.productId,
-        tiers: promotions.tiers,
-        isActive: promotions.isActive,
-        startsAt: promotions.startsAt,
-        endsAt: promotions.endsAt,
-      })
-      .from(promotions)
-      .where(and(eq(promotions.isActive, true), inArray(promotions.productId, productIds))),
-    database
-      .select({
         comboProductId: productComboItems.comboProductId,
         componentProductId: productComboItems.componentProductId,
         quantity: productComboItems.quantity,
@@ -126,9 +115,9 @@ export async function normalizeOrderItems(
   ] as const;
   // Pool reads can run in parallel; a transaction has one physical connection.
   // Do not queue simultaneous pg queries on that connection (unsupported in pg9).
-  const [productRows, unitRows, priceRows, priceBookRows, promoRows, comboRows] = database === db
+  const [productRows, unitRows, priceRows, priceBookRows, comboRows] = database === db
     ? await Promise.all(reads)
-    : [await reads[0], await reads[1], await reads[2], await reads[3], await reads[4], await reads[5]];
+    : [await reads[0], await reads[1], await reads[2], await reads[3], await reads[4]];
 
   const productById = new Map(productRows.map((p) => [p.id, p]));
   const priceByBookProduct = new Map(priceRows.map((p) => [`${p.priceBookId}:${p.productId}`, p.price]));
@@ -140,10 +129,6 @@ export async function normalizeOrderItems(
     unitsByProduct.set(unit.productId, list);
   }
 
-  const promoByProduct = new Map<string, NonNullable<(typeof promoRows)[number]["tiers"]>>();
-  for (const promo of promoRows) {
-    if (isPromoActive(promo)) promoByProduct.set(promo.productId, promo.tiers ?? []);
-  }
   const comboItemsByProduct = new Map<string, typeof comboRows>();
   for (const comboItem of comboRows) {
     const list = comboItemsByProduct.get(comboItem.comboProductId) ?? [];
@@ -165,6 +150,7 @@ export async function normalizeOrderItems(
     }
 
     const multiplier = unit ? Number(unit.multiplier) : 1;
+    const baseQty = item.quantity * multiplier;
     const itemPriceBookId = item.priceBookId === undefined ? invoicePriceBookId ?? null : item.priceBookId;
     const itemPriceBook = itemPriceBookId ? priceBookById.get(itemPriceBookId) : undefined;
     if (itemPriceBookId && !itemPriceBook) throw new Error("PRICE_BOOK_NOT_FOUND");
@@ -178,13 +164,7 @@ export async function normalizeOrderItems(
     const listedPrice = listedUnitPrice(product, unit, base, source === "cost" || source === "purchase" || source === "list");
     const manualUnitPrice = item.manualUnitPrice;
     const discountValue = Math.max(0, item.lineDiscountValue ?? item.lineDiscount ?? 0);
-    const baseQty = item.quantity * multiplier;
-    // Explicit customer discount replaces automatic promotions. Company list
-    // prices never participate in automatic retail promotions.
-    const promoPrice = manualUnitPrice == null && discountValue === 0 && source !== "list"
-      ? applyPromo(listedPrice, promoByProduct.get(product.id), baseQty).price
-      : listedPrice;
-    const preDiscountUnitPrice = manualUnitPrice ?? promoPrice;
+    const preDiscountUnitPrice = manualUnitPrice ?? listedPrice;
     const { lineDiscount, lineDiscountMode, lineDiscountValue, sellPrice: unitPrice } = resolveLinePriceEditor({
       price: String(preDiscountUnitPrice),
       discount: String(discountValue),

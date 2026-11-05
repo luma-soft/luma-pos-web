@@ -8,7 +8,6 @@ import { parseProductListSort } from "@/lib/inventory/product-list-policy";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 import { parsePriceComparisonParams } from "@/lib/pricing/price-comparison";
 import { getPriceBooks } from "@/lib/data/price-books";
-import { getActivePromotions } from "@/lib/data/active-promotions";
 import {
   requireMobileStockAccess,
   requireMobileStockReadAccess,
@@ -42,7 +41,7 @@ export async function GET(request: Request) {
           : undefined,
       }
     : {};
-  const [products, options, promoByProduct] = await Promise.all([
+  const [products, options] = await Promise.all([
     getMobileProducts(gate.storeId, {
       q: searchParam(request, "q"),
       categoryId: searchParam(request, "categoryId"),
@@ -68,7 +67,6 @@ export async function GET(request: Request) {
       pageSize: numberParam(request, "pageSize", 50),
     }),
     includeCatalogMetadata ? getMobileProductOptions(gate.storeId) : Promise.resolve(undefined),
-    includeCatalogMetadata ? getActivePromotions(gate.storeId) : Promise.resolve(undefined),
   ]);
 
   const includeNetPurchase = includePurchasePrices;
@@ -81,7 +79,7 @@ export async function GET(request: Request) {
         ...member, lastPurchaseNetPrice: includeNetPurchase ? member.lastPurchaseNetPrice : null,
       })) } } : {}),
     })),
-  }, ...(includeCatalogMetadata ? { options, priceBooks, promoByProduct } : {}) });
+  }, ...(includeCatalogMetadata ? { options, priceBooks } : {}) });
 }
 
 export async function POST(request: Request) {

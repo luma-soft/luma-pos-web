@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   LayoutDashboard, ShoppingCart, Warehouse, Users, Wallet,
-  BarChart3, Settings, FileText, Utensils, Sparkles, ChefHat, Bell, Store,
+  BarChart3, Settings, FileText, Sparkles, Bell, Store,
   Calculator,
   Camera,
   Cpu,
@@ -16,7 +16,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { Routes } from "@/lib/routes";
-import { FNB_UI_ENABLED, ONLINE_SALES_ENABLED } from "@/lib/features";
+import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { cn } from "@/lib/utils";
 import { Text } from "@/components/ui/text";
 import type { StoreFeatureSet } from "@/lib/tenancy/store-features";
@@ -70,12 +70,10 @@ const GROUPS: Group[] = [
 
 /** Sidebar điều hướng có chữ — dùng cho cả desktop (cố định) và drawer mobile. */
 export function AppNav({
-  industry,
   aiConfigured = false,
   features,
   role,
 }: {
-  industry?: string;
   aiConfigured?: boolean;
   features: StoreFeatureSet;
   role: Role;
@@ -83,7 +81,6 @@ export function AppNav({
   const t = useTranslations();
   const pathname = usePathname();
   const [notificationCount, setNotificationCount] = useState(0);
-  const isFnb = FNB_UI_ENABLED && (industry === "restaurant" || industry === "cafe");
 
   useEffect(() => {
     let active = true;
@@ -138,15 +135,9 @@ export function AppNav({
       return item.href !== "/ai" || aiConfigured;
     }),
   }));
-  const groups = isFnb
-    ? groupsBase.map((g) => g.labelKey === "nav.groups.manage"
-        ? { ...g, items: [...g.items, { href: "/tables", icon: Utensils, key: "nav.tables" } as Item, { href: "/kds", icon: ChefHat, key: "nav.kds" } as Item] }
-        : g)
-    : groupsBase;
-
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-2 text-sm">
-      {groups.map((g) => (
+      {groupsBase.map((g) => (
         <div key={g.labelKey}>
           <Text
             as="div"

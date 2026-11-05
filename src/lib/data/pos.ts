@@ -2,7 +2,6 @@ import { and, asc, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { latestPurchaseNetPrices } from "@/lib/pricing/last-purchase-net-price";
 import { categories, customers, orderItems, orders, paymentBankAccounts, products, productComboItems, productPrices, productUnits, projects, stockLevels, warehouses } from "@/db/schema";
-import { getActivePromotions } from "@/lib/data/active-promotions";
 import { getPriceBooks } from "@/lib/data/price-books";
 import type { Role } from "@/lib/actions/common";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
@@ -304,8 +303,7 @@ export async function getPosData(storeId: string, options?: {
     includeManagerOnly: canViewPurchasePrices(options?.role),
   });
 
-  const [promoByProduct, projectRows, defaultBankAccount] = await Promise.all([
-    getActivePromotions(storeId),
+  const [projectRows, defaultBankAccount] = await Promise.all([
     db
       .select({ id: projects.id, name: projects.name, customerId: projects.customerId })
       .from(projects)
@@ -337,7 +335,6 @@ export async function getPosData(storeId: string, options?: {
     warehouse: defaultWh ?? null,
     products: productsForPos,
     customers: customerRows,
-    promoByProduct,
     projects: projectRows,
     priceBooks: priceBookRows,
     defaultBankAccount: defaultBankAccount[0] ?? null,

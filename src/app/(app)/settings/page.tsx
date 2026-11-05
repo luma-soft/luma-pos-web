@@ -1,5 +1,4 @@
 import { SettingsClient } from "./settings-client";
-import { PromotionsTab } from "../sales/tabs/promotions";
 import { getStoreSettings } from "@/lib/data/settings";
 import { getCameraQuoteFormOptions } from "@/lib/data/camera-quotes";
 import { requireUser, getRole } from "@/lib/actions/common";
@@ -30,7 +29,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       notificationChannels={resolveNotificationChannels()}
       cameraQuoteOptions={cameraQuoteOptions}
       initialTab={params.tab}
-      promotionsContent={<PromotionsTab />}
     />
   );
 }

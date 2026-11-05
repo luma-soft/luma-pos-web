@@ -237,7 +237,7 @@ function formatAiTestMessage(message: string, L: boolean) {
   return map[message] ? settingsTextByFlag(L, `ui.aiTest.${map[message]}`) : message;
 }
 
-type SectionId = "store" | "staff" | "pos" | "cameraQuote" | "hardware" | "payments" | "print" | "promotions" | "tax" | "notifications" | "zalo" | "shopee" | "ai";
+type SectionId = "store" | "staff" | "pos" | "cameraQuote" | "hardware" | "payments" | "print" | "tax" | "notifications" | "zalo" | "shopee" | "ai";
 
 const NAV: { groupKey: string; items: { id: SectionId; ico: string; labelKey: string; badge?: string }[] }[] = [
   { groupKey: "store", items: [
@@ -250,7 +250,6 @@ const NAV: { groupKey: string; items: { id: SectionId; ico: string; labelKey: st
     { id: "hardware", ico: "🖨️", labelKey: "hardware" },
     { id: "payments", ico: "💳", labelKey: "payments" },
     { id: "print", ico: "📄", labelKey: "print", badge: "15.1" },
-    { id: "promotions", ico: "%", labelKey: "promotions" },
   ] },
   { groupKey: "compliance", items: [
     { id: "tax", ico: "📋", labelKey: "tax" },
@@ -272,7 +271,6 @@ const SEC_META: Record<SectionId, { titleKey: string; subtitleKey: string }> = {
   hardware: { titleKey: "hardware", subtitleKey: "hardware" },
   payments: { titleKey: "payments", subtitleKey: "payments" },
   print: { titleKey: "print", subtitleKey: "print" },
-  promotions: { titleKey: "promotions", subtitleKey: "promotions" },
   tax: { titleKey: "tax", subtitleKey: "tax" },
   notifications: { titleKey: "notifications", subtitleKey: "notifications" },
   zalo: { titleKey: "zalo", subtitleKey: "zalo" },
@@ -331,7 +329,6 @@ export function SettingsClient({
   canEditAi,
   notificationChannels,
   initialTab,
-  promotionsContent,
   cameraQuoteOptions,
 }: {
   store: StoreSettings;
@@ -339,7 +336,6 @@ export function SettingsClient({
   canEditAi: boolean;
   notificationChannels: { id: string; configured: boolean }[];
   initialTab?: string;
-  promotionsContent: React.ReactNode;
   cameraQuoteOptions: CameraQuoteFormOptions;
 }) {
   const locale = useLocale();
@@ -434,7 +430,6 @@ export function SettingsClient({
         {active === "hardware" && <HardwareSection L={L} prefs={store.prefs.hardware} canManage={canManage} />}
         {active === "payments" && <PaymentsSection L={L} prefs={store.prefs.payments} canManage={canManage} bankAccounts={bankAccounts ?? []} accountsLoading={Boolean(lazyLoading.payments)} accountsError={lazyError.payments} />}
         {active === "print" && <PrintSection L={L} />}
-        {active === "promotions" && promotionsContent}
         {active === "tax" && <TaxSection L={L} prefs={store.prefs.tax} canManage={canManage} />}
         {active === "notifications" && <NotificationsSection L={L} prefs={store.prefs.notifications} canManage={canManage} availableChannels={notificationChannels} />}
         {active === "zalo" && <ZaloSection L={L} prefs={store.prefs.zalo} canEdit={canEditAi} />}

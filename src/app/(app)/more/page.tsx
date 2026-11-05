@@ -18,7 +18,6 @@ import {
   Camera,
   Cpu,
   Lightbulb,
-  Utensils,
   Printer,
   Images,
 } from "lucide-react";
@@ -33,7 +32,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { LogoutButton } from "@/components/logout-button";
 import { getMode, getTheme } from "@/lib/theme/cookie";
 import { requireStoreContext } from "@/lib/auth/store-context";
-import { FNB_UI_ENABLED, SHIFT_MANAGEMENT_UI_ENABLED } from "@/lib/features";
+import { SHIFT_MANAGEMENT_UI_ENABLED } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +49,6 @@ export default async function MorePage() {
   const manager = role === "owner" || role === "manager";
   const stock = manager || role === "warehouse";
   const sales = manager || role === "cashier";
-  const fnb = FNB_UI_ENABLED && (store.industry === "restaurant" || store.industry === "cafe");
 
   return (
     <div className="min-h-full bg-canvas lg:p-6">
@@ -93,7 +91,6 @@ export default async function MorePage() {
           {sales && context.features.camera_quote_builder && <MobileSettingsRow href={Routes.CameraQuote} icon={Camera} label={t("mobile.more.cameraQuote")} subtitle={t("mobile.more.cameraQuoteHint")} tone="blue" target="_blank" />}
           {sales && context.features.hunonic_price_list && <MobileSettingsRow href={Routes.HunonicPriceList} icon={Cpu} label={t("mobile.more.hunonicPriceList")} subtitle={t("mobile.more.hunonicPriceListHint")} tone="orange" target="_blank" />}
           {sales && context.features.rang_dong_price_list && <MobileSettingsRow href={Routes.RangDongSmartPriceList} icon={Lightbulb} label={t("mobile.more.rangDongPriceList")} subtitle={t("mobile.more.rangDongPriceListHint")} tone="red" target="_blank" />}
-          {sales && fnb && <MobileSettingsRow href={Routes.Tables} icon={Utensils} label={t("nav.tables")} subtitle={t("mobile.more.tablesHint")} tone="orange" />}
           {manager && <MobileSettingsRow href={Routes.Finance} icon={Wallet} label={t("nav.groups.finance")} subtitle={t("mobile.more.financeHint")} />}
           {sales && <MobileSettingsRow href={`${Routes.Sales}?tab=returns`} icon={RotateCcw} label={t("nav.returns")} subtitle={t("mobile.more.returnsHint")} tone="red" />}
           {sales && SHIFT_MANAGEMENT_UI_ENABLED && <MobileSettingsRow href={`${Routes.Finance}?tab=shifts`} icon={Clock3} label={t("nav.shifts")} subtitle={t("mobile.more.shiftHint")} tone="orange" />}
