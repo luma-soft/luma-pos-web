@@ -40,6 +40,11 @@ jobs:
       - name: Focused catalog regressions
         if: ${{ always() }}
         run: bun test src/lib/product-catalog.test.mjs src/lib/product-catalog-explorer.test.mjs src/lib/catalog-delta.test.mjs src/lib/catalog-delta-db.test.mjs src/lib/pos/product-catalog-adapter.test.mjs
-      - name: Production build
+      - name: Production build (compile-only)
         if: ${{ always() }}
+        # The app constructs a PG pool during route import. This dummy URL
+        # lets Next compile routes without connecting to a real database.
+        # Runtime/integration checks must use separately configured secrets.
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/lumapos_compile_only
         run: bun run build
