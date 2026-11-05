@@ -94,7 +94,13 @@ import { buildExpectedPosPricing, countPosPricingConflicts, requestPosOrder } fr
 import { defaultPosSellableUnitName, isPosUnitSellable, resolvePosCartUnit } from "@/lib/pos/cart-unit";
 import { upsertPosCartLine } from "@/lib/pos/cart-line-order";
 import { canAddCatalogProductsToPosDraft, canEditPriceBookForPosDraft } from "@/lib/pos/catalog-add-policy";
-import { expandPosSearchUnitResults, rankProductSearchUnitResults, type PosSearchUnitResult } from "@/lib/pos/search-unit-results";
+import {
+  expandPosSearchUnitResults,
+  rankProductSearchUnitResults,
+  type PosSearchRankFacts,
+  type PosSearchUnitResult,
+} from "@/lib/pos/search-unit-results";
+import { searchTokens } from "@/lib/normalize";
 import {
   createLinePriceEditorState,
   resolveLinePriceEditor,
@@ -106,7 +112,7 @@ import {
 } from "@/lib/pos/line-price-editor";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
-import type { ProductCatalogItem } from "@/lib/product-catalog";
+import { searchProductCatalog, type ProductCatalogItem } from "@/lib/product-catalog";
 import {
   PosAmountModeInput,
   PosStockQuantityTooltip,
@@ -1383,7 +1389,6 @@ export function PosClient({
     [data.priceBooks],
   );
   const catalogProducts = productCatalog.products;
-  const searchProductCatalogItems = productCatalog.search;
   const catalogChildrenByParentId = useMemo(() => {
     const childrenByParentId = new Map<string, ProductCatalogItem[]>();
     for (const product of catalogProducts) {
@@ -1394,16 +1399,55 @@ export function PosClient({
     }
     return childrenByParentId;
   }, [catalogProducts]);
-  const cachedPosSearchProducts = useCallback((query: string) => searchProductCatalogItems(
-    query,
-    { limit: catalogProducts.length },
-  ).map((product) => catalogItemToPosProduct(
-    product,
-    catalogProducts,
-    data.warehouse?.id ?? null,
+  const catalogSearchResultsRef = useRef<{
+    catalog: readonly ProductCatalogItem[];
+    tokens: readonly string[];
+    products: readonly ProductCatalogItem[];
+  } | null>(null);
+  useEffect(() => {
+    if (catalogSearchResultsRef.current?.catalog !== catalogProducts) {
+      catalogSearchResultsRef.current = null;
+    }
+  }, [catalogProducts]);
+  const catalogPosSearchCache = useMemo(() => ({
+    products: new WeakMap<ProductCatalogItem, PosProduct>(),
+    units: new WeakMap<PosProduct, readonly PosSearchUnitResult<PosProduct>[]>(),
+    rankFacts: new WeakMap<PosProduct, WeakMap<(product: PosProduct) => string, Map<boolean, PosSearchRankFacts>>>(),
+    catalog: catalogProducts,
+    childrenByParentId: catalogChildrenByParentId,
     costPriceBookIds,
-    catalogChildrenByParentId,
-  )), [catalogChildrenByParentId, catalogProducts, costPriceBookIds, data.warehouse?.id, searchProductCatalogItems]);
+    warehouseId: data.warehouse?.id ?? null,
+  }), [catalogChildrenByParentId, catalogProducts, costPriceBookIds, data.warehouse?.id]);
+  const cachedPosSearchProducts = useCallback((query: string) => {
+    const tokens = searchTokens(query);
+    const previous = catalogSearchResultsRef.current;
+    // A query that only extends existing tokens can match a subset of the previous results.
+    const canNarrowPreviousResults = Boolean(
+      previous
+      && previous.catalog === catalogProducts
+      && previous.tokens.length > 0
+      && tokens.length >= previous.tokens.length
+      && previous.tokens.every((token) => tokens.some((nextToken) => nextToken.startsWith(token))),
+    );
+    const candidates = previous && canNarrowPreviousResults ? previous.products : catalogProducts;
+    const matches = searchProductCatalog(candidates, query, { limit: candidates.length });
+    catalogSearchResultsRef.current = { catalog: catalogProducts, tokens, products: matches };
+
+    return matches.map((product) => {
+      const cached = catalogPosSearchCache.products.get(product);
+      if (cached) return cached;
+
+      const posProduct = catalogItemToPosProduct(
+        product,
+        catalogPosSearchCache.catalog,
+        catalogPosSearchCache.warehouseId,
+        catalogPosSearchCache.costPriceBookIds,
+        catalogPosSearchCache.childrenByParentId,
+      );
+      catalogPosSearchCache.products.set(product, posProduct);
+      return posProduct;
+    });
+  }, [catalogPosSearchCache, catalogProducts]);
   const loadPosSearchResults = useCallback((query: string): readonly PosSearchUnitResult<PosProduct>[] | Promise<readonly PosSearchUnitResult<PosProduct>[]> => {
     // The server search and catalog snapshot both preserve recent-sale order.
     // Sorting them again here adds a full O(n log n) pass to every keystroke.
@@ -1413,7 +1457,20 @@ export function PosClient({
       productDisplayName,
       { sellableOnly: true },
     );
-    const getCatalogResults = () => formatResults(cachedPosSearchProducts(query));
+    const getCatalogResults = () => {
+      const products = cachedPosSearchProducts(query);
+      const unitResults = products.flatMap((product) => {
+        const cached = catalogPosSearchCache.units.get(product);
+        if (cached) return cached;
+        const expanded = expandPosSearchUnitResults([product]);
+        catalogPosSearchCache.units.set(product, expanded);
+        return expanded;
+      });
+      return rankProductSearchUnitResults(unitResults, query, productDisplayName, {
+        sellableOnly: true,
+        factsCache: catalogPosSearchCache.rankFacts,
+      });
+    };
 
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       return hasPosPriceComparison ? [] : getCatalogResults();
@@ -1427,7 +1484,7 @@ export function PosClient({
       priceAgainst: hasPosPriceComparison ? posPriceAgainst : undefined,
       priceBookId: hasPosPriceComparison ? effectivePosPriceBookId : undefined,
     }).then(formatResults).catch(() => hasPosPriceComparison ? [] : getCatalogResults());
-  }, [cachedPosSearchProducts, catalogProducts, effectivePosPriceBookId, hasPosPriceComparison, posPriceAgainst, posPriceCondition]);
+  }, [cachedPosSearchProducts, catalogPosSearchCache, catalogProducts, effectivePosPriceBookId, hasPosPriceComparison, posPriceAgainst, posPriceCondition]);
 
   const syncingRef = useRef(false);
   async function flushOutbox() {

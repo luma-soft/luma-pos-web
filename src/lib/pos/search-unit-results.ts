@@ -22,6 +22,15 @@ export type PosSearchUnitResult<TProduct extends PosSearchProductLike> = {
   alternateUnit: TProduct["units"][number] | null;
 };
 
+export type PosSearchRankFacts = {
+  label: string;
+  productTokens: ReadonlySet<string>;
+  metadataTokens: ReadonlySet<string>;
+};
+
+export type PosSearchRankFactsCache<TProduct extends PosSearchProductLike> =
+  WeakMap<TProduct, WeakMap<(product: TProduct) => string, Map<boolean, PosSearchRankFacts>>>;
+
 function normalizedSearchKey(value: string): string {
   const normalized = normalizeSearch(value)
     .replace(/(^|\D)(\d{2})\s*[*x×]\s*(\d{2})(?=\D|$)/gu, "$1$2 $3")
@@ -46,30 +55,43 @@ export function rankProductSearchUnitResults<TProduct extends PosSearchProductLi
   results: readonly PosSearchUnitResult<TProduct>[],
   query: string,
   productLabel: (product: TProduct) => string,
-  { sellableOnly = false }: { sellableOnly?: boolean } = {},
+  {
+    sellableOnly = false,
+    factsCache,
+  }: {
+    sellableOnly?: boolean;
+    factsCache?: PosSearchRankFactsCache<TProduct>;
+  } = {},
 ): PosSearchUnitResult<TProduct>[] {
   const tokens = searchTokens(query);
   if (tokens.length === 0) return [...results];
 
   const queryKey = normalizedSearchKey(query);
-  const productFacts = new Map<TProduct, {
-    label: string;
-    productTokens: Set<string>;
-    metadataTokens: Set<string>;
-  }>();
+  const productFacts = new Map<TProduct, PosSearchRankFacts>();
   const ranked = results.map((result, index) => {
     let facts = productFacts.get(result.product);
     if (!facts) {
-      const label = productLabel(result.product);
-      const productTokens = new Set(searchTokens(label));
-      const units = result.product.units.filter((unit) => !sellableOnly || unit.directSale === true);
-      const includeBaseMetadata = !sellableOnly || (!result.product.isVariantParent && result.product.baseUnitDirectSale === true);
-      const metadataTokens = new Set(searchTokens([
-        result.product.sku,
-        ...(includeBaseMetadata ? [result.product.barcode, result.product.baseUnit] : []),
-        ...units.flatMap((unit) => [unit.unitName, unit.sku, unit.barcode]),
-      ].filter(Boolean).join(" ")));
-      facts = { label, productTokens, metadataTokens };
+      facts = factsCache?.get(result.product)?.get(productLabel)?.get(sellableOnly);
+      if (!facts) {
+        const label = productLabel(result.product);
+        const productTokens = new Set(searchTokens(label));
+        const units = result.product.units.filter((unit) => !sellableOnly || unit.directSale === true);
+        const includeBaseMetadata = !sellableOnly || (!result.product.isVariantParent && result.product.baseUnitDirectSale === true);
+        const metadataTokens = new Set(searchTokens([
+          result.product.sku,
+          ...(includeBaseMetadata ? [result.product.barcode, result.product.baseUnit] : []),
+          ...units.flatMap((unit) => [unit.unitName, unit.sku, unit.barcode]),
+        ].filter(Boolean).join(" ")));
+        facts = { label, productTokens, metadataTokens };
+
+        if (factsCache) {
+          const labelCache = factsCache.get(result.product) ?? new WeakMap<(product: TProduct) => string, Map<boolean, PosSearchRankFacts>>();
+          const modes = labelCache.get(productLabel) ?? new Map<boolean, PosSearchRankFacts>();
+          modes.set(sellableOnly, facts);
+          labelCache.set(productLabel, modes);
+          factsCache.set(result.product, labelCache);
+        }
+      }
       productFacts.set(result.product, facts);
     }
 
