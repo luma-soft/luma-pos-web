@@ -8,6 +8,7 @@ import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
 import { buildPrintPaymentQr, formatPrintPaymentReference, resolvePrintPaymentQrAccount } from "@/lib/print/payment-qr";
 import { buildBatchDebtSummaries } from "@/lib/print/batch-debt-summary";
 import { PrintDoc } from "@/components/print/print-doc";
+import { shouldShowPrintTax } from "@/lib/print/template-shared";
 import { BatchDebtSummary } from "@/components/print/batch-debt-summary";
 import { AutoPrint } from "@/components/print/auto-print";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -95,7 +96,7 @@ export default async function PrintBatchPage({ searchParams }: Props) {
           totals={[
             { label: t("pos.subtotal"), value: Number(order.subtotal), kind: "subtotal" },
             ...(template.options.showDiscount ? [{ label: t("pos.discount"), value: Number(order.discount), negative: true, kind: "discount" as const }] : []),
-            ...(template.options.showTax ? [{ label: t("pos.tax"), value: Number(order.tax), kind: "tax" as const }] : []),
+            ...(shouldShowPrintTax(template.options, Number(order.tax)) ? [{ label: t("pos.tax"), value: Number(order.tax), kind: "tax" as const }] : []),
             ...(Number(order.shippingFee) > 0 ? [{ label: t("pos.shipping"), value: Number(order.shippingFee), kind: "shipping" as const }] : []),
           ]}
           grandTotalLabel={t("print.grandTotal")}

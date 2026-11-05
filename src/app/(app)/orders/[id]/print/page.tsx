@@ -5,6 +5,7 @@ import { getOrder } from "@/lib/data/orders";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { getDefaultSepayBankAccount } from "@/lib/data/payment-bank-accounts";
 import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
+import { shouldShowPrintTax } from "@/lib/print/template-shared";
 import { buildPrintDocumentBaseName } from "@/lib/print/share-document";
 import { buildPrintPaymentQr, formatPrintPaymentReference, resolvePrintPaymentQrAccount } from "@/lib/print/payment-qr";
 import { PrintDoc } from "@/components/print/print-doc";
@@ -42,7 +43,7 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
   const totals = [
     { label: t("pos.subtotal"), value: Number(order.subtotal), kind: "subtotal" as const },
     ...(template.options.showDiscount ? [{ label: t("pos.discount"), value: Number(order.discount), negative: true, kind: "discount" as const }] : []),
-    ...(template.options.showTax ? [{ label: t("pos.tax"), value: Number(order.tax), kind: "tax" as const }] : []),
+    ...(shouldShowPrintTax(template.options, Number(order.tax)) ? [{ label: t("pos.tax"), value: Number(order.tax), kind: "tax" as const }] : []),
     ...(Number(order.shippingFee) > 0 ? [{ label: t("pos.shipping"), value: Number(order.shippingFee), kind: "shipping" as const }] : []),
   ];
   const afterTotals = isQuote || isBooking ? [] : [

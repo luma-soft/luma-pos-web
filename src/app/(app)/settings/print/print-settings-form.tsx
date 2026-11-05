@@ -41,7 +41,7 @@ const TYPOGRAPHY_KEYS = [
 
 const OPTION_GROUPS = [
   { key: "content", options: ["showSeller", "showProject", "showPartyPhone", "showDeliveryAddress", "showInWords", "showSignatures", "showSignatureLeft", "showSignatureMiddle", "showSignatureRight", "showSku"] },
-  { key: "pricing", options: ["showDebt", "showCustomerDebtBalance", "showDiscount", "showLineDiscount", "showLineDiscountPercent", "showLineDiscountAmount", "showTax", "showPaymentQr", "alwaysShowPaymentQr"] },
+  { key: "pricing", options: ["showDebt", "showCustomerDebtBalance", "showDiscount", "showLineDiscount", "showLineDiscountPercent", "showLineDiscountAmount", "showTax", "autoShowTaxWhenPresent", "showPaymentQr", "alwaysShowPaymentQr"] },
   { key: "batch", options: ["showBatchDebtSummary"] },
 ] as const;
 const SIGNATURE_LABELS = ["signatureLeftLabel", "signatureMiddleLabel", "signatureRightLabel"] as const;
@@ -486,7 +486,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                           </label>
                         ))}
                       </div>
-                      {group.key === "pricing" && selected.options.showTax && (
+                      {group.key === "pricing" && (selected.options.showTax || selected.options.autoShowTaxWhenPresent) && (
                         <Field label={t("printSettings.taxLabel")} className="mt-3 sm:max-w-md">
                           <input
                             value={selected.options.taxLabel}

@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { einvoices } from "@/db/schema";
 import { AutoPrint } from "@/components/print/auto-print";
 import { PrintDoc } from "@/components/print/print-doc";
+import { shouldShowPrintTax } from "@/lib/print/template-shared";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { getOrder } from "@/lib/data/orders";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
@@ -110,7 +111,7 @@ export default async function MergePrintPreviewPage({ searchParams }: Props) {
           totals={[
             { label: t("pos.subtotal"), value: subtotal, kind: "subtotal" },
             ...(template.options.showDiscount ? [{ label: t("pos.discount"), value: discount, negative: true, kind: "discount" as const }] : []),
-            ...(template.options.showTax ? [{ label: t("pos.tax"), value: tax, kind: "tax" as const }] : []),
+            ...(shouldShowPrintTax(template.options, tax) ? [{ label: t("pos.tax"), value: tax, kind: "tax" as const }] : []),
             ...(shippingFee > 0 ? [{ label: t("pos.shipping"), value: shippingFee, kind: "shipping" as const }] : []),
           ]}
           grandTotalLabel={t("print.grandTotal")}

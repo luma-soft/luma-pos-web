@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { getPurchase } from "@/lib/data/inventory";
 import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
+import { shouldShowPrintTax } from "@/lib/print/template-shared";
 import { PrintDoc } from "@/components/print/print-doc";
 import { AutoPrint } from "@/components/print/auto-print";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -59,7 +60,7 @@ export default async function PrintPurchasePage({ params, searchParams }: Props)
           totals={[
             { label: t("purchases.subtotal"), value: Number(po.subtotal), kind: "subtotal" },
             ...(Number(po.discount) > 0 ? [{ label: t("pos.discount"), value: Number(po.discount), negative: true, kind: "discount" as const }] : []),
-            ...(Number(po.tax) > 0 ? [{ label: t("pos.tax"), value: Number(po.tax), kind: "tax" as const }] : []),
+            ...(shouldShowPrintTax(template.options, Number(po.tax)) ? [{ label: t("pos.tax"), value: Number(po.tax), kind: "tax" as const }] : []),
             ...(Number(po.shippingFee) > 0 ? [{ label: "Phí vận chuyển", value: Number(po.shippingFee), kind: "shipping" as const }] : []),
           ]}
           grandTotalLabel={t("print.grandTotal")}

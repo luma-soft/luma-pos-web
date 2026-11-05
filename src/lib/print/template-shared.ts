@@ -17,6 +17,7 @@ export interface PrintTemplateOptions {
   showBatchDebtSummary: boolean;
   showDiscount: boolean;
   showTax: boolean;
+  autoShowTaxWhenPresent: boolean;
   showLineDiscount: boolean;
   showLineDiscountPercent: boolean;
   showLineDiscountAmount: boolean;
@@ -164,6 +165,7 @@ export const DEFAULT_OPTIONS: PrintTemplateOptions = {
   showBatchDebtSummary: true,
   showDiscount: true,
   showTax: true,
+  autoShowTaxWhenPresent: true,
   showLineDiscount: true,
   showLineDiscountPercent: true,
   showLineDiscountAmount: true,
@@ -204,6 +206,7 @@ const DOC_TYPE_OPTION_OVERRIDES: Record<PrintDocType, Partial<PrintTemplateOptio
     showDebt: false,
     showDiscount: false,
     showTax: false,
+    autoShowTaxWhenPresent: false,
     showLineDiscount: false,
     showPaymentQr: false,
     alwaysShowPaymentQr: false,
@@ -215,6 +218,7 @@ const DOC_TYPE_OPTION_OVERRIDES: Record<PrintDocType, Partial<PrintTemplateOptio
     showDebt: false,
     showDiscount: false,
     showTax: false,
+    autoShowTaxWhenPresent: false,
     showLineDiscount: false,
     showPaymentQr: false,
     alwaysShowPaymentQr: false,
@@ -233,8 +237,19 @@ export function printOptionApplies(docType: PrintDocType, option: keyof PrintTem
     return docType === "order";
   }
   if (["showProject", "showDeliveryAddress"].includes(option)) return docType === "order" || docType === "quote" || docType === "booking";
-  if (["showDebt", "showDiscount", "showTax", "showLineDiscount", "showSku"].includes(option)) return docType !== "receipt";
+  if (["showDebt", "showDiscount", "showTax", "autoShowTaxWhenPresent", "showLineDiscount", "showSku"].includes(option)) return docType !== "receipt";
   return true;
+}
+
+export function shouldShowPrintTax(
+  options: Pick<PrintTemplateOptions, "showTax" | "autoShowTaxWhenPresent">,
+  taxAmount: number,
+): boolean {
+  return options.showTax || (
+    options.autoShowTaxWhenPresent
+    && Number.isFinite(taxAmount)
+    && taxAmount !== 0
+  );
 }
 
 export const DEFAULT_FOOTER: Record<PrintDocType, string> = {

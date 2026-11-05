@@ -1,5 +1,5 @@
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
-import { moneyToWords, printOptionApplies, resolveLineDiscountColumns, resolveSignaturePositions, typographyForPaper, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
+import { moneyToWords, printOptionApplies, resolveLineDiscountColumns, resolveSignaturePositions, shouldShowPrintTax, typographyForPaper, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
 import { isPrintRichTextEmpty, sanitizePrintRichText } from "@/lib/print/rich-text";
 import { productLineDisplayName } from "@/lib/products/variant-presentation";
 
@@ -121,7 +121,7 @@ export function PrintDoc(p: PrintDocProps) {
   const isMoneyReceipt = t.docType === "receipt";
   const visibleTotals = p.totals.filter((row) => {
     if (row.kind === "discount") return t.options.showDiscount;
-    if (row.kind === "tax") return t.options.showTax;
+    if (row.kind === "tax") return shouldShowPrintTax(t.options, row.value);
     return true;
   });
   const qrTitle = t.options.paymentQrTitle?.trim() || (t.docType !== "order" ? p.paymentQr?.title : "");
@@ -272,7 +272,7 @@ function K80Doc(p: PrintDocProps) {
   const { showPercent: showLineDiscountPercent, showAmount: showLineDiscountAmount } = resolveLineDiscountColumns(t.options);
   const visibleTotals = p.totals.filter((row) => {
     if (row.kind === "discount") return t.options.showDiscount;
-    if (row.kind === "tax") return t.options.showTax;
+    if (row.kind === "tax") return shouldShowPrintTax(t.options, row.value);
     return true;
   });
   const qrTitle = t.options.paymentQrTitle?.trim() || (t.docType !== "order" ? p.paymentQr?.title : "");

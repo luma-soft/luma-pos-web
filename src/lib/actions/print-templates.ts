@@ -54,6 +54,7 @@ const saveSchema = z.object({
     showBatchDebtSummary: z.boolean().default(true),
     showDiscount: z.boolean(),
     showTax: z.boolean(),
+    autoShowTaxWhenPresent: z.boolean().optional(),
     showLineDiscount: z.boolean(),
     showLineDiscountPercent: z.boolean().default(true),
     showLineDiscountAmount: z.boolean().default(true),
@@ -98,6 +99,8 @@ export async function savePrintTemplate(input: SavePrintTemplateInput): Promise<
     options: normalizeSignatureOptions(normalizeLineDiscountOptions({
       ...defaultOptionsForDocType(parsed.data.docType),
       ...parsed.data.options,
+      autoShowTaxWhenPresent: parsed.data.options.autoShowTaxWhenPresent
+        ?? defaultOptionsForDocType(parsed.data.docType).autoShowTaxWhenPresent,
       typography: typographyForPaper(parsed.data.paperDefault, parsed.data.options.typography),
     } as PrintTemplateOptions)),
   };

@@ -55,7 +55,7 @@ import { PRODUCT_SEARCH_DEBOUNCE_MS } from "@/components/product-search/product-
 import { LumaWebPicker } from "@/app/(app)/sales/tabs/filter-drawer-shared";
 import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
 import { ProductCreateMenu, type ProductKind } from "@/app/(app)/inventory/tabs/product-create-menu";
-import type { PaperSize, PrintTemplate } from "@/lib/print/template-shared";
+import { shouldShowPrintTax, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
 import type { StorePrefs } from "@/lib/schemas/settings";
 import type { AiActionPreview } from "@/lib/ai/actions";
 import { createOrder } from "@/lib/actions/orders";
@@ -1671,11 +1671,8 @@ export function PosClient({
 
   function buildPrintJob(input: { template: PrintTemplate; title: string; code: string; paymentQr?: PrintPaymentQr | null; isTemporarySlip?: boolean }): PosPrintJob {
     const printLines = isReturnDraft ? cart.filter((line) => line.quantity > 0) : cart;
-    const printTemplate = taxAmount > 0 && !input.template.options.showTax
-      ? { ...input.template, options: { ...input.template.options, showTax: true } }
-      : input.template;
     return {
-      template: printTemplate,
+      template: input.template,
       title: input.title,
       code: input.code,
       date: new Date().toISOString(),
@@ -3650,7 +3647,7 @@ export function PosClient({
             totals={[
               { label: t("pos.subtotal"), value: printJob.totals.subtotal, kind: "subtotal" },
               ...(printJob.totals.discount > 0 ? [{ label: t("pos.discount"), value: printJob.totals.discount, negative: true, kind: "discount" as const }] : []),
-              ...(printJob.totals.tax > 0 ? [{ label: t("pos.tax"), value: printJob.totals.tax, ratePercent: printJob.totals.taxRate, kind: "tax" as const }] : []),
+              ...(shouldShowPrintTax(printJob.template.options, printJob.totals.tax) ? [{ label: t("pos.tax"), value: printJob.totals.tax, ratePercent: printJob.totals.taxRate, kind: "tax" as const }] : []),
               ...(printJob.totals.shipping > 0 ? [{ label: t("pos.shipping"), value: printJob.totals.shipping, kind: "shipping" as const }] : []),
             ]}
             grandTotalLabel={t(printJob.template.docType === "return" ? "returns.totalRefund" : "print.grandTotal")}
