@@ -2,6 +2,7 @@
 
 import { productDisplayName } from "@/lib/products/variant-presentation";
 
+import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -704,7 +705,16 @@ export function PurchaseForm({
                   {lines.map((l) => (
                     <MobileFormLineCard
                       key={l.productId}
-                      title={l.name}
+                      title={(
+                        <Link
+                          href={Routes.product(l.productId)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-h-11 min-w-11 max-w-full items-center font-semibold text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:min-h-0 lg:min-w-0"
+                        >
+                          {l.name}
+                        </Link>
+                      )}
                       subtitle={l.sku}
                       amount={(
                         <MoneyInput
@@ -799,7 +809,10 @@ export function PurchaseForm({
                   {lines.map((l) => (
                     <tr key={l.productId}>
                       <td className="px-3 py-2">
-                        <div className="font-medium">{l.name}</div><div className="text-xs text-slate-400">{l.sku}</div>
+                        <Link href={Routes.product(l.productId)} target="_blank" rel="noopener noreferrer" className="font-medium text-primary-600 hover:underline">
+                          {l.name}
+                        </Link>
+                        <div className="text-xs text-slate-400">{l.sku}</div>
                       </td>
                       <td className="px-2 py-2">
                         <Select
