@@ -9,6 +9,8 @@ on:
       - "src/lib/product-catalog-explorer*"
       - "src/lib/offline/product-*"
       - "src/lib/actions/product-*"
+      - "src/lib/media/client.test.ts"
+      - "src/lib/pos/price-book-switch.test.ts"
       - "src/components/product-catalog-provider.tsx"
       - "src/app/(app)/inventory/tabs/products-table.tsx"
   workflow_dispatch:
