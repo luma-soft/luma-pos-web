@@ -1333,6 +1333,8 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
   const t = useTranslations();
   const { snapshot } = useProductCatalog();
   const [page, setPage] = useState(1);
+  const [refreshSequence, setRefreshSequence] = useState(0);
+  const appliedRefreshSequence = useRef(0);
   const [history, setHistory] = useState<{
     scopeId: string;
     productId: string;
@@ -1350,6 +1352,8 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
   useEffect(() => {
     if (!tracked) return;
     let cancelled = false;
+    const forceReload = appliedRefreshSequence.current !== refreshSequence;
+    appliedRefreshSequence.current = refreshSequence;
 
     void (async () => {
       // Defer UI state updates until after the effect has subscribed.
@@ -1373,7 +1377,7 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
         return;
       }
       try {
-        if (cached) {
+        if (cached && !forceReload) {
           const currentVersion = await checkStockHistoryVersionOnce(scopeId, product.id);
           if (cancelled || cached.version === currentVersion) return;
         }
@@ -1390,7 +1394,13 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [scopeId, revision, product.id, page, tracked]);
+  }, [scopeId, revision, product.id, page, refreshSequence, tracked]);
+
+  useEffect(() => {
+    const refreshAfterReconnect = () => setRefreshSequence((current) => current + 1);
+    window.addEventListener("online", refreshAfterReconnect);
+    return () => window.removeEventListener("online", refreshAfterReconnect);
+  }, []);
 
   if (!tracked)
     return <EmptyPanel message={t("products.stock.notTracked")} />;
@@ -1401,10 +1411,20 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
     && history.productId === product.id && history.page === page ? history : null;
   if (!visibleHistory) {
     if (loadState === "offline") {
-      return <EmptyPanel message="Lịch sử Thẻ kho chưa được tải trên thiết bị này. Hãy kết nối mạng và mở lại Thẻ kho." />;
+      return (
+        <div>
+          <EmptyPanel message="Lịch sử Thẻ kho chưa được tải trên thiết bị này. Hãy kết nối mạng rồi thử lại." />
+          <button type="button" className="mt-3 rounded-md border border-border-soft px-3 py-2 text-sm" onClick={() => setRefreshSequence((current) => current + 1)}>Thử lại</button>
+        </div>
+      );
     }
     if (loadState === "error") {
-      return <EmptyPanel message="Không tải được lịch sử Thẻ kho. Kiểm tra kết nối hoặc quyền truy cập rồi mở lại." />;
+      return (
+        <div>
+          <EmptyPanel message="Không tải được lịch sử Thẻ kho. Kiểm tra kết nối hoặc quyền truy cập." />
+          <button type="button" className="mt-3 rounded-md border border-border-soft px-3 py-2 text-sm" onClick={() => setRefreshSequence((current) => current + 1)}>Thử lại</button>
+        </div>
+      );
     }
     return <div role="status" className="p-4 text-sm text-muted-foreground">Đang tải lịch sử Thẻ kho…</div>;
   }
@@ -1502,6 +1522,7 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
       </table>
     </div>
     <div className="mt-4 flex items-center justify-end gap-3 text-sm">
+      <button type="button" className="mr-auto rounded-md border border-border-soft px-3 py-2" onClick={() => setRefreshSequence((current) => current + 1)}>Làm mới Thẻ kho</button>
       <button
         type="button"
         className="rounded-md border border-border-soft px-3 py-2 disabled:opacity-40"
