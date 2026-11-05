@@ -145,7 +145,7 @@ export function ProductCatalogProvider({
         try {
           committed = await writeProductCatalogSnapshot(
             fresh,
-            delta ? { changedProductIDs: [...changedProductIDs], deletedProductIDs } : undefined,
+            delta ? { baseRevision: delta.baseRevision, changedProductIDs: [...changedProductIDs], deletedProductIDs } : undefined,
           );
         } catch {
           // IndexedDB can be disabled or temporarily fail. Keep online browsing
