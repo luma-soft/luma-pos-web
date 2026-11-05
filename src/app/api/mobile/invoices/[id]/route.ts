@@ -41,6 +41,12 @@ export async function GET(
     getEnabledPaymentBankAccounts(gate.storeId),
   ]);
   const eInvoice = eInvoiceRows[0];
+  const isEditableDraft =
+    order.status === "draft" &&
+    order.documentType === "sale" &&
+    !order.isPosCartDraft &&
+    Number(order.amountPaid) === 0 &&
+    order.payments.length === 0;
   return mobileOk({
     ...order,
     items: order.items.map((item) => ({ ...item, productName: productLineDisplayName(item) })),
@@ -50,9 +56,13 @@ export async function GET(
       hasReturns: order.returns.length > 0,
       hasEInvoice: eInvoice?.status === "issued",
       canEdit:
-        (order.status === "completed" || order.status === "quote" || order.status === "confirmed") &&
+        (order.status === "completed" || order.status === "quote" || order.status === "confirmed" || isEditableDraft) &&
         order.returns.length === 0 &&
         eInvoice?.status !== "issued",
+      canFinalizeDraft:
+        isEditableDraft &&
+        Boolean(order.warehouseId) &&
+        order.items.length > 0,
       canCancel: order.status !== "cancelled" && order.status !== "merged" && eInvoice?.status !== "issued",
       canAddPayment:
         (order.status === "completed" || order.status === "returned" || order.status === "confirmed") &&

@@ -216,6 +216,10 @@ export async function createOrderForUser(
         : [];
       if (v.source && !sourceOrder) throw new Error("SOURCE_NOT_FOUND");
       const sourceIsSale = sourceOrder?.status === "completed";
+      const sourceIsDraftSale = sourceOrder?.status === "draft"
+        && sourceOrder.documentType === "sale"
+        && sourceOrder.posDraftPayload == null
+        && Number(sourceOrder.amountPaid) === 0;
       const sourceIsQuote = sourceOrder?.status === "quote";
       const sourceIsBooking = sourceOrder?.status === "confirmed";
 
@@ -224,8 +228,15 @@ export async function createOrderForUser(
       }
 
       if (v.source?.mode === "edit") {
-        const sourceMatchesMode = (isQuote && sourceIsQuote) || (isBooking && sourceIsBooking) || (!isQuote && !isBooking && sourceIsSale);
+        const sourceMatchesMode = (isQuote && sourceIsQuote)
+          || (isBooking && sourceIsBooking)
+          || (!isQuote && !isBooking && (sourceIsSale || sourceIsDraftSale));
         if (!sourceMatchesMode) throw new Error("SOURCE_NOT_EDITABLE");
+        const [draftPayment] = sourceIsDraftSale
+          ? await tx.select({ id: payments.id }).from(payments)
+            .where(and(eq(payments.storeId, storeId), eq(payments.orderId, sourceOrder.id))).limit(1)
+          : [];
+        if (draftPayment) throw new Error("SOURCE_NOT_EDITABLE");
         if (sourceOrder.replacedByOrderId) throw new Error("SOURCE_ALREADY_REPLACED");
         const [hasReturn] = await tx.select({ id: returns.id }).from(returns)
           .where(and(eq(returns.storeId, storeId), eq(returns.orderId, sourceOrder.id), eq(returns.status, "completed"))).limit(1);

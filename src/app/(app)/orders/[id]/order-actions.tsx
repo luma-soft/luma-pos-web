@@ -3,14 +3,47 @@
 import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { CreditCard, Loader2, MessageCircle, X, XCircle } from "lucide-react";
-import { addPayment, cancelOrder } from "@/lib/actions/orders";
+import { CreditCard, FilePlus2, Loader2, MessageCircle, X, XCircle } from "lucide-react";
+import { addPayment, cancelOrder, createInvoiceFromDraft } from "@/lib/actions/orders";
 import { sendOrderInvoiceZalo } from "@/lib/actions/zalo";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { MoneyInput } from "@/components/ui/money-input";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Routes } from "@/lib/routes";
 import { buttonVariants, modalActionSizeClassName } from "@/components/ui/button-variants";
+
+export function CreateInvoiceFromDraftButton({ orderId }: { orderId: string }) {
+  const t = useTranslations();
+  const router = useRouter();
+  const dialog = useConfirmDialog();
+  const [busy, setBusy] = useState(false);
+
+  async function finalize() {
+    if (busy) return;
+    const confirmed = await dialog.confirm({
+      description: t("orders.createInvoiceFromDraftConfirm"),
+      confirmLabel: t("orders.createInvoiceFromDraft"),
+    });
+    if (!confirmed) return;
+    setBusy(true);
+    const result = await createInvoiceFromDraft(orderId);
+    setBusy(false);
+    if (result.ok) router.push(Routes.salesOrder(orderId, "completed"));
+    else await dialog.alert({ description: t(result.error as never), variant: "destructive" });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={finalize}
+      disabled={busy}
+      className={cn("inline-flex min-w-11 items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 lg:min-w-0", modalActionSizeClassName)}
+    >
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePlus2 className="h-4 w-4" />}
+      {t("orders.createInvoiceFromDraft")}
+    </button>
+  );
+}
 
 export function OrderActions({ orderId }: { orderId: string }) {
   const t = useTranslations();

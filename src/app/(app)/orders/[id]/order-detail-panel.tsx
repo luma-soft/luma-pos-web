@@ -10,7 +10,7 @@ import { getStoreSettings } from "@/lib/data/settings";
 import { getPrintTemplate, getPrintTemplatesForDoc } from "@/lib/print/template";
 import type { ShareablePrintDocType } from "@/lib/print/share-document";
 import { OrderStatusBadge, PaymentStatusBadge } from "../status-badges";
-import { OrderActions, PaymentForm, SendOrderZaloButton } from "./order-actions";
+import { CreateInvoiceFromDraftButton, OrderActions, PaymentForm, SendOrderZaloButton } from "./order-actions";
 import { SharePrintDocButton } from "./share-print-doc-button";
 import { buttonVariants, modalActionSizeClassName } from "@/components/ui/button-variants";
 import { OrderDetailActionGroup } from "@/components/order-detail-action-group";
@@ -40,6 +40,12 @@ export async function OrderDetailPanel({
   const isQuote = order.status === "quote";
   const isBooking = order.status === "confirmed";
   const cancelled = order.status === "cancelled" || order.status === "merged";
+  const editableDraft = order.status === "draft"
+    && order.documentType === "sale"
+    && !order.isPosCartDraft
+    && Number(order.amountPaid) === 0
+    && order.payments.length === 0;
+  const canCreateInvoiceFromDraft = editableDraft && Boolean(order.warehouseId) && order.items.length > 0;
   const sourceKind = isQuote ? "quote" : isBooking ? "booking" : "invoice";
   const shareDocType: ShareablePrintDocType | null = cancelled
     ? null
@@ -330,6 +336,7 @@ export async function OrderDetailPanel({
           {!isQuote && canSendZalo && <SendOrderZaloButton orderId={order.id} />}
         </OrderDetailActionGroup>
         <OrderDetailActionGroup label={t("common.actions")} alignEnd>
+          {canCreateInvoiceFromDraft && <CreateInvoiceFromDraftButton orderId={order.id} />}
           {!isQuote && !cancelled && remaining > 0 && <PaymentForm key={`${order.id}:${remaining}`} orderId={order.id} remaining={remaining} />}
           {isQuote && !order.hasCreatedOrder && (
             <Link href={posSourceHref("copy", "invoice")} className={cn(buttonVariants({ variant: "default", size: "sm" }), modalActionSizeClassName)}>
@@ -344,7 +351,7 @@ export async function OrderDetailPanel({
             label={t("print.printBtn")}
             className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}
           />
-          {(order.status === "completed" || order.status === "quote" || order.status === "confirmed") && order.returns.length === 0 && (
+          {(order.status === "completed" || order.status === "quote" || order.status === "confirmed" || editableDraft) && order.returns.length === 0 && (
             <Link href={posSourceHref("edit")} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName, "bg-white dark:bg-surface")}>
               {isQuote ? t("quotes.edit") : isBooking ? t("bookings.edit") : t("orderEdit.action")}
             </Link>

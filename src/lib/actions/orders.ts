@@ -13,7 +13,7 @@ import {
 import { Routes } from "@/lib/routes";
 import { createOrderForUser } from "@/lib/orders/create";
 import { addPaymentForUser } from "@/lib/orders/payment";
-import { convertQuoteToOrderForUser } from "@/lib/orders/convert";
+import { convertQuoteToOrderForUser, finalizeDraftOrderForUser } from "@/lib/orders/convert";
 import { cancelOrderForUser, cancelQuoteForUser } from "@/lib/orders/cancel";
 import { normalizeOrderItems } from "@/lib/orders/normalize";
 import {
@@ -99,6 +99,13 @@ export async function convertQuoteToOrder(quoteId: string): Promise<ActionResult
     revalidatePath(Routes.order(quoteId));
   }
   return result;
+}
+
+/** Chốt đơn nháp thành hóa đơn bán hàng: trừ kho và ghi công nợ nếu còn nợ. */
+export async function createInvoiceFromDraft(orderId: string): Promise<ActionResult<{ code: string }>> {
+  const gate = await requireSalesAccess();
+  if (!gate.ok) return gate;
+  return finalizeDraftOrderForUser(gate.userId, gate.storeId, orderId);
 }
 
 /** Hủy báo giá (không ảnh hưởng kho/nợ). */

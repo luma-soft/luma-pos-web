@@ -3252,7 +3252,9 @@
       "to": "Đến ngày",
       "clear": "Xóa lọc"
     },
-    "unitLabel": "đơn hàng"
+    "unitLabel": "đơn hàng",
+    "createInvoiceFromDraft": "Tạo hóa đơn",
+    "createInvoiceFromDraftConfirm": "Chốt đơn nháp này thành hóa đơn bán hàng? Hàng sẽ được trừ khỏi kho và phần còn nợ được ghi nhận cho khách hàng."
   },
   "customerProfit": {
     "show": "Hiện lợi nhuận gộp",

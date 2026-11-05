@@ -3252,7 +3252,9 @@
       "to": "To",
       "clear": "Clear"
     },
-    "unitLabel": "orders"
+    "unitLabel": "orders",
+    "createInvoiceFromDraft": "Create invoice",
+    "createInvoiceFromDraftConfirm": "Finalize this draft as a sales invoice? Stock will be deducted and any remaining balance recorded as customer debt."
   },
   "customerProfit": {
     "show": "Show gross profit",

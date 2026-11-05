@@ -351,6 +351,7 @@ export async function getOrder(storeId: string, id: string) {
       shippingFee: orders.shippingFee,
       total: orders.total,
       amountPaid: orders.amountPaid,
+      isPosCartDraft: sql<boolean>`${orders.posDraftPayload} is not null`,
       sourceOrderId: orders.sourceOrderId,
       sourceMode: orders.sourceMode,
       sourceSaleTime: orders.sourceSaleTime,

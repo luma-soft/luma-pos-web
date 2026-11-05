@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { db } from "@/db";
-import { orders, orderItems, customers, products, productUnits, stockLevels, stockMovements } from "@/db/schema";
+import { orders, orderItems, payments, customers, products, productUnits, stockLevels, stockMovements } from "@/db/schema";
 import { type ActionResult, getProfileId, generateCode, toQty } from "@/lib/actions/common";
 import { Routes } from "@/lib/routes";
 import { createNotificationEventInTx } from "@/lib/notifications/events-core";
@@ -18,16 +18,47 @@ export async function convertQuoteToOrderForUser(
   storeId: string,
   quoteId: string
 ): Promise<ActionResult<{ code: string }>> {
+  return convertSourceOrderToInvoiceForUser(userId, storeId, quoteId, false);
+}
+
+/** Chốt đơn nháp thành hóa đơn bán hàng, ghi kho và công nợ một lần. */
+export async function finalizeDraftOrderForUser(
+  userId: string,
+  storeId: string,
+  orderId: string
+): Promise<ActionResult<{ code: string }>> {
+  return convertSourceOrderToInvoiceForUser(userId, storeId, orderId, true);
+}
+
+async function convertSourceOrderToInvoiceForUser(
+  userId: string,
+  storeId: string,
+  sourceOrderId: string,
+  allowDraft: boolean,
+): Promise<ActionResult<{ code: string }>> {
   try {
-      const profileId = await getProfileId(userId);
+    const profileId = await getProfileId(userId);
 
     const result = await db.transaction(async (tx) => {
-      const [order] = await tx.select().from(orders).where(and(eq(orders.id, quoteId), eq(orders.storeId, storeId))).limit(1).for("update");
+      const [order] = await tx.select().from(orders).where(and(eq(orders.id, sourceOrderId), eq(orders.storeId, storeId))).limit(1).for("update");
       if (!order) throw new Error("ORDER_NOT_FOUND");
-      if (order.status !== "quote" && order.status !== "confirmed") throw new Error("NOT_CONVERTIBLE");
+      const isDraft = order.status === "draft";
+      if (allowDraft && order.status === "completed" && order.documentType === "sale") {
+        return { code: order.code, notification: null };
+      }
+      const [draftPayment] = allowDraft && isDraft
+        ? await tx.select({ id: payments.id }).from(payments)
+          .where(and(eq(payments.storeId, storeId), eq(payments.orderId, sourceOrderId))).limit(1)
+        : [];
+      if (allowDraft
+        ? !isDraft || order.documentType !== "sale" || order.posDraftPayload != null || Number(order.amountPaid) !== 0 || Boolean(draftPayment)
+        : order.status !== "quote" && order.status !== "confirmed") {
+        throw new Error("NOT_CONVERTIBLE");
+      }
       if (!order.warehouseId) throw new Error("NO_WAREHOUSE");
 
-      const items = await tx.select().from(orderItems).where(and(eq(orderItems.orderId, quoteId), eq(orderItems.storeId, storeId)));
+      const items = await tx.select().from(orderItems).where(and(eq(orderItems.orderId, sourceOrderId), eq(orderItems.storeId, storeId)));
+      if (!items.length) throw new Error("NOT_CONVERTIBLE");
       const productIds = [...new Set(items.map((item) => item.productId))];
       const productRows = productIds.length
         ? await tx.select({ id: products.id, baseUnit: products.baseUnit, baseUnitDirectSale: products.baseUnitDirectSale })
@@ -47,15 +78,17 @@ export async function convertQuoteToOrderForUser(
       }
       const sourceWasBooking = order.status === "confirmed";
 
-      const newCode = generateCode("DH");
-      const sourceLabel = order.status === "quote" ? "báo giá" : "đặt hàng";
+      const newCode = isDraft ? order.code : generateCode("DH");
+      const sourceLabel = isDraft ? "đơn nháp" : order.status === "quote" ? "báo giá" : "đặt hàng";
       await tx.update(orders).set({
         code: newCode,
         documentType: "sale",
         status: "completed",
-        note: order.note ? `${order.note} · từ ${sourceLabel} ${order.code}` : `Từ ${sourceLabel} ${order.code}`,
+        ...(!isDraft ? {
+          note: order.note ? `${order.note} · từ ${sourceLabel} ${order.code}` : `Từ ${sourceLabel} ${order.code}`,
+        } : {}),
         updatedAt: sql`now()`,
-      }).where(and(eq(orders.id, quoteId), eq(orders.storeId, storeId)));
+      }).where(and(eq(orders.id, sourceOrderId), eq(orders.storeId, storeId)));
 
       for (const i of items) {
         const baseQty = Number(i.quantity) * Number(i.unitMultiplier);
@@ -76,11 +109,11 @@ export async function convertQuoteToOrderForUser(
           storeId,
           productId: i.productId,
           warehouseId: order.warehouseId,
-              type: "sale",
+          type: "sale",
           quantity: toQty(-baseQty),
           refType: "order",
           refId: order.id,
-          note: `${newCode} (chốt từ ${sourceLabel} ${order.code})`,
+          note: isDraft ? `${newCode} (chốt từ đơn nháp)` : `${newCode} (chốt từ ${sourceLabel} ${order.code})`,
           createdBy: profileId,
         });
       }
@@ -107,7 +140,7 @@ export async function convertQuoteToOrderForUser(
         excludeActor: true,
         metadata: {
           debtDelta: remaining.toFixed(2),
-          source: order.status === "quote" ? "quote_conversion" : "booking_conversion",
+          source: isDraft ? "draft_finalization" : order.status === "quote" ? "quote_conversion" : "booking_conversion",
         },
       });
 
@@ -115,7 +148,7 @@ export async function convertQuoteToOrderForUser(
         storeId, actorId: profileId, action: `${orderActivityType(order)}.converted`, entityType: "order", entityId: order.id,
         before: orderActivitySnapshot(order),
         after: orderActivitySnapshot({ ...order, code: newCode, documentType: "sale", status: "completed" }),
-        metadata: { sourceOrderCode: order.code },
+        metadata: { sourceOrderCode: order.code, source: isDraft ? "draft_finalization" : undefined },
       });
       return { code: newCode, notification };
     });
@@ -126,7 +159,7 @@ export async function convertQuoteToOrderForUser(
     revalidatePath(Routes.POS);
     revalidatePath(Routes.Sales);
     revalidatePath(Routes.Orders);
-    revalidatePath(Routes.order(quoteId));
+    revalidatePath(Routes.order(sourceOrderId));
     return { ok: true, data: { code: result.code } };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
