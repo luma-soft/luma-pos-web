@@ -34,6 +34,7 @@ export async function createOrder(
   let orderInput = parsed.data;
   let trustedItems;
   let taxPrefs: StorePrefs["tax"] | undefined;
+  let preservedInvoicePrice = false;
   try {
     trustedItems = await normalizeOrderItems(
       gate.storeId,
@@ -50,6 +51,7 @@ export async function createOrder(
           missingInvoicePrice = true;
           return item;
         }
+        preservedInvoicePrice = true;
         return { ...item, manualUnitPrice: item.invoiceUnitPrice };
       });
       if (missingInvoicePrice) {
@@ -77,7 +79,7 @@ export async function createOrder(
       maxDiscountPercent: prefs.security.maxDiscountPercent,
     });
     if (!roleCanApproveOrderRequirement(gate.role, requirement)) {
-      return { ok: false, error: "errors.forbidden" };
+      return { ok: false, error: preservedInvoicePrice ? CHECKOUT_PRICING_CHANGED : "errors.forbidden" };
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
