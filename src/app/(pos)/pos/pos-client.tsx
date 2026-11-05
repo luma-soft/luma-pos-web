@@ -1763,7 +1763,7 @@ export function PosClient({
         (line) => ({ ...line, quantity: line.quantity + 1 }),
       );
     });
-  }, [canAddCatalogProducts, data.priceBooks, priceBook, setCart, t]);
+  }, [canAddCatalogProducts, data.priceBooks, priceBook, setCart, setVariantParent, t]);
 
   const addQuantityToCart = useCallback((p: PosProduct, quantity: number) => {
     if (!canAddCatalogProducts) return;
@@ -1828,7 +1828,7 @@ export function PosClient({
     setBrowsing(false);
     setSearch("");
     return true;
-  }, [addQuantityToCart, patchActive, searchableProducts, setAiHighlightedProductIds, setAiUnresolvedItems]);
+  }, [addQuantityToCart, patchActive, searchableProducts, setAiHighlightedProductIds, setAiUnresolvedItems, setMobileView, setBrowsing]);
 
   function applyAiCartPreview(preview: AiActionPreview) {
     if (preview.intent !== "pos_voice_cart_draft" && preview.intent !== "pos_image_cart_draft") return;
@@ -2082,6 +2082,56 @@ export function PosClient({
     setTimeout(() => setOfflineSaved(false), 3500);
   }
 
+  async function startSepayCheckout() {
+    if (submitting || sepayCheckout || sepayCheckoutLoading) return;
+    if (cart.some((line) => line.isQuickLine)) {
+      setError(t("pos.quickLine.cannotSubmit"));
+      return;
+    }
+    const attempt = ++sepaySetupAttemptRef.current;
+    const amount = Math.min(Math.max(0, paidInput ?? total), total);
+    setSepayCheckout(null);
+    setSepayCheckoutAmount(amount);
+    setSepayCheckoutLoading(true);
+    setError("");
+    try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setError(t("pos.sepay.onlineRequired"));
+        return;
+      }
+      const response = await fetch("/api/payments/sepay", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          amount,
+          clientRequestId: `web-pos:${activeId}:${attempt}`,
+          note: `POS ${activeId}`,
+        }),
+      });
+      const result = await response.json() as {
+        ok: boolean;
+        data?: Omit<SepayCheckout, "orderId" | "orderCode">;
+        error?: string;
+      };
+      if (sepaySetupAttemptRef.current !== attempt) return;
+      if (!response.ok || !result.ok || !result.data) {
+        setError(result.error ? t(result.error) : t("pos.sepay.createFailed"));
+        return;
+      }
+      setSepayCheckout({
+        ...result.data,
+        orderId: null,
+        orderCode: `#${activeId}`,
+      });
+    } catch {
+      if (sepaySetupAttemptRef.current === attempt) setError(t("pos.sepay.createFailed"));
+    } finally {
+      if (sepaySetupAttemptRef.current === attempt) {
+        setSepayCheckoutLoading(false);
+      }
+    }
+  }
+
   async function submitOrder(
     mode: "sale" | "quote" | "booking",
     selectedPayMethod = payMethod,
@@ -2270,56 +2320,6 @@ export function PosClient({
   useEffect(() => {
     submitOrderRef.current = submitOrder;
   });
-
-  async function startSepayCheckout() {
-    if (submitting || sepayCheckout || sepayCheckoutLoading) return;
-    if (cart.some((line) => line.isQuickLine)) {
-      setError(t("pos.quickLine.cannotSubmit"));
-      return;
-    }
-    const attempt = ++sepaySetupAttemptRef.current;
-    const amount = Math.min(Math.max(0, paidInput ?? total), total);
-    setSepayCheckout(null);
-    setSepayCheckoutAmount(amount);
-    setSepayCheckoutLoading(true);
-    setError("");
-    try {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        setError(t("pos.sepay.onlineRequired"));
-        return;
-      }
-      const response = await fetch("/api/payments/sepay", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          amount,
-          clientRequestId: `web-pos:${activeId}:${attempt}`,
-          note: `POS ${activeId}`,
-        }),
-      });
-      const result = await response.json() as {
-        ok: boolean;
-        data?: Omit<SepayCheckout, "orderId" | "orderCode">;
-        error?: string;
-      };
-      if (sepaySetupAttemptRef.current !== attempt) return;
-      if (!response.ok || !result.ok || !result.data) {
-        setError(result.error ? t(result.error) : t("pos.sepay.createFailed"));
-        return;
-      }
-      setSepayCheckout({
-        ...result.data,
-        orderId: null,
-        orderCode: `#${activeId}`,
-      });
-    } catch {
-      if (sepaySetupAttemptRef.current === attempt) setError(t("pos.sepay.createFailed"));
-    } finally {
-      if (sepaySetupAttemptRef.current === attempt) {
-        setSepayCheckoutLoading(false);
-      }
-    }
-  }
 
   async function selectPayMethod(method: PayMethod) {
     if (submitting || sepayCheckout || sepayCheckoutLoading) return;
