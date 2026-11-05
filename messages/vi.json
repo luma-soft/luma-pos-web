@@ -195,6 +195,7 @@
     "ai": "AI",
     "notifications": "Thông báo",
     "onlineSales": "Bán online",
+    "supabaseUsage": "Egress Supabase",
     "shopee": "Shopee",
     "notificationsBadge": "{count} thông báo cần chú ý",
     "activity": "Thông báo",

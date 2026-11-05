@@ -195,6 +195,7 @@
     "ai": "AI",
     "notifications": "Notifications",
     "onlineSales": "Online Sales",
+    "supabaseUsage": "Supabase Egress",
     "shopee": "Shopee",
     "notificationsBadge": "{count} notifications need attention",
     "activity": "Notifications",

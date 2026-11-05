@@ -14,6 +14,7 @@ import {
   Images,
   Wrench,
   BookOpen,
+  Database,
 } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
@@ -28,6 +29,8 @@ import {
 
 type Item = { href: string; icon: React.ComponentType<{ className?: string }>; key: string; badge?: "notifications"; newTab?: boolean };
 type Group = { labelKey: string; items: Item[] };
+
+const SUPABASE_USAGE_URL = "https://supabase.com/dashboard/org/_/usage";
 
 const GROUPS: Group[] = [
   {
@@ -63,6 +66,7 @@ const GROUPS: Group[] = [
     items: [
       { href: Routes.Tools, icon: Calculator, key: "nav.tools" },
       { href: "/ai", icon: Sparkles, key: "nav.ai" },
+      { href: SUPABASE_USAGE_URL, icon: Database, key: "nav.supabaseUsage", newTab: true },
       { href: Routes.Settings, icon: Settings, key: "nav.settings" },
     ],
   },
