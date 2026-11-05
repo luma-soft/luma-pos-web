@@ -4181,8 +4181,7 @@
       "notifications": "Notifications",
       "zalo": "Zalo OA",
       "shopee": "Marketplace Apps",
-      "ai": "AI",
-      "databaseBackups": "Database Backups"
+      "ai": "AI"
     },
     "payments": {
       "sepay": {
@@ -4717,8 +4716,7 @@
           "notifications": "Notifications",
           "zalo": "Zalo OA",
           "shopee": "Marketplace Apps",
-          "ai": "AI",
-          "databaseBackups": "Database Backups"
+          "ai": "AI"
         }
       },
       "sections": {
@@ -4773,10 +4771,6 @@
         "ai": {
           "title": "AI Settings",
           "subtitle": "Provider key, vision model, and attachment bucket"
-        },
-        "databaseBackups": {
-          "title": "Database Backups",
-          "subtitle": "Automatic schedule, manual backups, and run history"
         }
       },
       "industries": {
