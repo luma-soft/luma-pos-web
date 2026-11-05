@@ -7,6 +7,44 @@ import { requireStockAccess } from "@/lib/actions/common";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 
 const PAGE_SIZE = 40;
+const PRODUCT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function stockHistoryVersion(storeId: string, productId: string): Promise<string> {
+  // Two narrowly scoped indexed reads, independent of unrelated products'
+  // global catalog revisions. The movement journal is append-only in normal
+  // inventory operations; count detects removals and latest identifies inserts.
+  const [[latest], [aggregate]] = await Promise.all([
+    db.select({ id: stockMovements.id, createdAt: stockMovements.createdAt })
+      .from(stockMovements)
+      .where(and(eq(stockMovements.storeId, storeId), eq(stockMovements.productId, productId)))
+      .orderBy(desc(stockMovements.createdAt), desc(stockMovements.id))
+      .limit(1),
+    db.select({
+      count: sql<string>`count(*)::text`,
+      quantity: sql<string>`coalesce(sum(${stockMovements.quantity}), 0)::text`,
+    }).from(stockMovements).where(and(
+      eq(stockMovements.storeId, storeId), eq(stockMovements.productId, productId),
+    )),
+  ]);
+  return [latest?.id ?? "-", latest?.createdAt?.toISOString() ?? "-",
+    aggregate?.count ?? "0", aggregate?.quantity ?? "0"].join(":");
+}
+
+export async function checkProductStockHistoryVersion(productId: string) {
+  const gate = await requireStockAccess();
+  if (!gate.ok) return { ok: false as const, error: gate.error };
+  if (!PRODUCT_ID.test(productId)) return { ok: false as const, error: "errors.invalidData" };
+  const [authorized] = await db.select({ id: products.id }).from(products)
+    .where(and(eq(products.storeId, gate.storeId), eq(products.id, productId))).limit(1);
+  if (!authorized) return { ok: false as const, error: "errors.forbidden" };
+  return {
+    ok: true as const,
+    data: {
+      scopeId: `${gate.storeId}:${gate.userId}:${gate.role}`,
+      version: await stockHistoryVersion(gate.storeId, productId),
+    },
+  };
+}
 
 /**
  * Fetch history only for the requested, authorized product. Do not project
@@ -15,7 +53,7 @@ const PAGE_SIZE = 40;
 export async function loadProductStockHistory(productId: string, requestedPage = 1) {
   const gate = await requireStockAccess();
   if (!gate.ok) return { ok: false as const, error: gate.error };
-  if (!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(productId)) {
+  if (!PRODUCT_ID.test(productId)) {
     return { ok: false as const, error: "errors.invalidData" };
   }
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0
@@ -106,5 +144,9 @@ export async function loadProductStockHistory(productId: string, requestedPage =
       transactionPrice: canSeeCosts || movement.refType !== "purchase" ? movement.transactionPrice : null,
     };
   });
-  return { ok: true as const, data: { rows, page, hasMore } };
+  return { ok: true as const, data: {
+    rows, page, hasMore,
+    scopeId: `${gate.storeId}:${gate.userId}:${gate.role}`,
+    version: await stockHistoryVersion(storeId, productId),
+  } };
 }
