@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { exploreProductCatalog } from "./product-catalog-explorer";
+import { exploreProductCatalog, getInventorySearchableProducts } from "./product-catalog-explorer";
 
 function product(overrides = {}) {
   return {
@@ -100,4 +100,18 @@ test("applies lifecycle and price comparisons locally", () => {
   const inactive = exploreProductCatalog(rows, [], { status: "inactive", view: "flat" });
   expect(active.rows.map((row) => row.id)).toEqual(["active"]);
   expect(inactive.rows.map((row) => row.id)).toEqual(["inactive"]);
+});
+
+
+test("reuses the Inventory searchable view while excluding variant parent placeholders", () => {
+  const parent = product({ id: "parent", sku: "PARENT", isVariantParent: true });
+  const sku = product({ id: "sku", sku: "SKU" });
+  const catalog = [parent, sku];
+  const first = getInventorySearchableProducts(catalog);
+  expect(first).toEqual([sku]);
+  expect(getInventorySearchableProducts(catalog)).toBe(first);
+  expect(getInventorySearchableProducts([...catalog])).not.toBe(first);
+
+  const noParents = [sku];
+  expect(getInventorySearchableProducts(noParents)).toBe(noParents);
 });
