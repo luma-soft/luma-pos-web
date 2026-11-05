@@ -296,11 +296,12 @@ async function main() {
       note: str(h["Ghi chú"]) || null,
       createdAt: toDate(h["Thời gian"]),
     });
+    let lineOrder = 0;
     for (const r of rows) {
       const p = prodBySku.get(str(r["Mã hàng"]));
       if (!p) continue;
       poItemIns.push({
-        purchaseOrderId: id, productId: p.id,
+        purchaseOrderId: id, productId: p.id, lineOrder: lineOrder++,
         quantity: qtyS(num(r["Số lượng"])),
         unitCost: money(num(r["Giá nhập"])),
         total: money(num(r["Thành tiền"])),

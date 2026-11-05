@@ -265,7 +265,7 @@ async function main() {
         })
         .returning({ id: purchaseOrders.id });
 
-      for (const item of receipt.items) {
+      for (const [lineOrder, item] of receipt.items.entries()) {
         const productId = productBySku.get(item.sku)!;
         const quantity = item.quantity.toFixed(4);
         const unitCost = item.unitCost.toFixed(2);
@@ -273,6 +273,7 @@ async function main() {
 
         await tx.insert(purchaseOrderItems).values({
           purchaseOrderId: purchase.id,
+          lineOrder,
           productId,
           quantity,
           unitCost,

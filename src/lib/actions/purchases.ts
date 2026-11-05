@@ -86,7 +86,7 @@ export async function savePurchaseDraft(
       if (existing) await tx.delete(purchaseOrderItems)
         .where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
       await tx.insert(purchaseOrderItems).values(v.items.map((item, index) => ({
-        storeId: gate.storeId, purchaseOrderId: po.id, productId: item.productId,
+        storeId: gate.storeId, purchaseOrderId: po.id, lineOrder: index, productId: item.productId,
         quantity: toQty(item.quantity), unitCost: toMoney(item.unitCost), discount: toMoney(item.discount),
         discountMode: item.discountMode,
         discountInput: item.discountMode === "pct" ? toMoney(item.discountInput!) : null,
@@ -173,6 +173,7 @@ export async function createPurchase(
         const [receiptItem] = await tx.insert(purchaseOrderItems).values({
           storeId: gate.storeId,
           purchaseOrderId: po.id,
+          lineOrder: index,
           productId: i.productId,
           quantity: toQty(i.quantity),
           unitCost: toMoney(i.unitCost),
@@ -417,6 +418,7 @@ export async function updatePurchase(
           const [receiptItem] = await tx.insert(purchaseOrderItems).values({
             storeId: gate.storeId,
             purchaseOrderId: po.id,
+            lineOrder: index,
             productId: i.productId,
             quantity: toQty(i.quantity),
             unitCost: toMoney(i.unitCost),

@@ -1437,6 +1437,7 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
   purchaseOrderId: uuid("purchase_order_id").notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
+  lineOrder: integer("line_order").notNull().default(0),
   productId: uuid("product_id").notNull().references(() => products.id),
   productName: text("product_name"),
   sku: varchar("sku", { length: 50 }),

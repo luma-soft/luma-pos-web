@@ -153,9 +153,10 @@ export async function createDraftPurchaseForUser(
         .returning({ id: purchaseOrders.id, code: purchaseOrders.code });
 
       await tx.insert(purchaseOrderItems).values(
-        lines.map((item) => ({
+        lines.map((item, index) => ({
           storeId,
           purchaseOrderId: po.id,
+          lineOrder: index,
           productId: item.productId,
           quantity: toQty(item.quantity),
           unitCost: toMoney(item.unitCost),

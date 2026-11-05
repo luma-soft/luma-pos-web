@@ -274,7 +274,7 @@ export async function getPurchases(storeId: string, filters: { q?: string; statu
           eq(purchaseOrderItems.storeId, storeId),
           inArray(purchaseOrderItems.purchaseOrderId, ids),
         ))
-        .orderBy(asc(products.name))
+        .orderBy(asc(purchaseOrderItems.lineOrder), asc(purchaseOrderItems.id))
     : [];
   const itemsByPurchase = new Map<string, typeof itemRows>();
   for (const item of itemRows) {
@@ -349,7 +349,8 @@ export async function getPurchase(storeId: string, id: string) {
     .where(and(
       eq(purchaseOrderItems.purchaseOrderId, id),
       eq(purchaseOrderItems.storeId, storeId),
-    ));
+    ))
+    .orderBy(asc(purchaseOrderItems.lineOrder), asc(purchaseOrderItems.id));
 
   return { ...po, items };
 }
