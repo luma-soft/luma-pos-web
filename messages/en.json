@@ -2461,6 +2461,8 @@
     "invalidData": "Invalid data.",
     "versionConflict": "This record was updated on the server.",
     "serverError": "Something went wrong, please retry.",
+    "serverErrorWithReference": "Could not save the invoice. Reference: {reference}. Share this code with an administrator to find the cause.",
+    "schemaOutOfDate": "The database schema is out of date. Ask an administrator to update it. Reference: {reference}.",
     "notFound": "Data not found.",
     "forbidden": "You don't have permission for this action."
   },

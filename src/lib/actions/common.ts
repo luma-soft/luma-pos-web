@@ -21,7 +21,7 @@ export type { Role } from "@/lib/auth/roles";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data: T }
-  | { ok: false; error: string };
+  | { ok: false; error: string; referenceCode?: string };
 
 export { UnauthorizedError } from "@/lib/auth/store-context";
 

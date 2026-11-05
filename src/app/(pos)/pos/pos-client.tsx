@@ -2235,7 +2235,9 @@ export function PosClient({
       }
     } else if (res.kind === "rejected") {
       setSubmittingMode(null);
-      setError(t(res.error));
+      setError(res.referenceCode
+        ? t(res.error, { reference: res.referenceCode })
+        : t(res.error));
       if (res.error === "pos.errors.pricingChanged") setPricingConflictId(activeId);
     } else {
       if (selectedPayMethod === "bank_transfer") {

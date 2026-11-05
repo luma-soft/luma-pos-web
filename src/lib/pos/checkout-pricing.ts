@@ -20,10 +20,10 @@ export function buildExpectedPosPricing<T extends CheckoutPriceLine>(
   };
 }
 
-type OrderResult<T> = { ok: true; data: T } | { ok: false; error: string };
+type OrderResult<T> = { ok: true; data: T } | { ok: false; error: string; referenceCode?: string };
 type PosOrderRequestResult<T> =
   | { kind: "created"; data: T }
-  | { kind: "rejected"; error: string }
+  | { kind: "rejected"; error: string; referenceCode?: string }
   | { kind: "connection-failed" };
 
 /** Business rejections must never enter the offline-success path or be retried. */
@@ -35,7 +35,11 @@ export async function requestPosOrder<TInput, TData>(
     const result = await create(payload);
     return result.ok
       ? { kind: "created", data: result.data }
-      : { kind: "rejected", error: result.error };
+      : {
+          kind: "rejected",
+          error: result.error,
+          ...(result.referenceCode ? { referenceCode: result.referenceCode } : {}),
+        };
   } catch {
     return { kind: "connection-failed" };
   }

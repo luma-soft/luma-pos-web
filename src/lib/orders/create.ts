@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -617,7 +618,12 @@ export async function createOrderForUser(
     }
     if (msg === "INVALID_ITEMS") return { ok: false, error: "errors.invalidData" };
     if (known[msg]) return { ok: false, error: known[msg] };
-    console.error("createOrder failed:", e);
-    return { ok: false, error: "errors.serverError" };
+    const referenceCode = `POS-${randomUUID().slice(0, 8).toUpperCase()}`;
+    const databaseCode = pgErrorCode(e);
+    console.error("createOrder failed:", { referenceCode, databaseCode, error: e });
+    if (databaseCode === "42703") {
+      return { ok: false, error: "errors.schemaOutOfDate", referenceCode };
+    }
+    return { ok: false, error: "errors.serverErrorWithReference", referenceCode };
   }
 }
