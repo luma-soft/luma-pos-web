@@ -8,11 +8,18 @@ export type PosSearchUnitLike = {
 };
 
 export type PosSearchProductLike = {
+  name?: string;
   baseUnit: string;
   baseUnitDirectSale?: boolean;
   isVariantParent: boolean;
   sku?: string | null;
   barcode?: string | null;
+  enName?: string | null;
+  variantName?: string | null;
+  model?: string | null;
+  brandName?: string | null;
+  categoryName?: string | null;
+  specs?: unknown;
   units: readonly PosSearchUnitLike[];
 };
 
@@ -25,8 +32,15 @@ export type PosSearchUnitResult<TProduct extends PosSearchProductLike> = {
 export type PosSearchRankFacts = {
   label: string;
   labelKey: string;
+  searchName: string;
+  normalizedName: string;
+  compactName: string;
+  skuCodes: readonly string[];
+  barcodeCodes: readonly string[];
   productTokens: ReadonlySet<string>;
+  codeTokens: ReadonlySet<string>;
   metadataTokens: ReadonlySet<string>;
+  searchableText: string;
   unitFactsByName: Map<string, PosSearchUnitRankFacts>;
 };
 
@@ -58,6 +72,10 @@ function countMatches(tokens: readonly string[], candidates: ReadonlySet<string>
   return count;
 }
 
+function normalizeCode(value: string | null | undefined): string {
+  return normalizeSearch(value ?? "").replace(/[^a-z0-9]/g, "");
+}
+
 /** Rank expanded product/unit rows the same way across product pickers. */
 export function rankProductSearchUnitResults<TProduct extends PosSearchProductLike>(
   results: readonly PosSearchUnitResult<TProduct>[],
@@ -75,6 +93,7 @@ export function rankProductSearchUnitResults<TProduct extends PosSearchProductLi
   if (tokens.length === 0) return [...results];
 
   const queryKey = normalizedSearchKey(query);
+  const queryCode = normalizeCode(query);
   const productFacts = new Map<TProduct, PosSearchRankFacts>();
   const ranked = results.map((result, index) => {
     let facts = productFacts.get(result.product);
@@ -82,19 +101,59 @@ export function rankProductSearchUnitResults<TProduct extends PosSearchProductLi
       facts = factsCache?.get(result.product)?.get(productLabel)?.get(sellableOnly);
       if (!facts) {
         const label = productLabel(result.product);
-        const productTokens = new Set(searchTokens(label));
+        const searchName = result.product.name ?? label;
+        const productTokens = new Set(searchTokens(searchName));
         const units = result.product.units.filter((unit) => !sellableOnly || unit.directSale === true);
         const includeBaseMetadata = !sellableOnly || (!result.product.isVariantParent && result.product.baseUnitDirectSale === true);
+        const unitCodes = units.flatMap((unit) => [unit.sku, unit.barcode]).filter((value): value is string => Boolean(value));
+        const codeValues = [result.product.sku, result.product.barcode, ...unitCodes]
+          .filter((value): value is string => Boolean(value));
+        const additionalSearchText = [
+          result.product.enName,
+          result.product.variantName,
+          result.product.model,
+          result.product.brandName,
+          result.product.categoryName,
+          JSON.stringify(result.product.specs ?? {}),
+        ].filter((value): value is string => Boolean(value));
         const metadataTokens = new Set(searchTokens([
           result.product.sku,
           ...(includeBaseMetadata ? [result.product.barcode, result.product.baseUnit] : []),
           ...units.flatMap((unit) => [unit.unitName, unit.sku, unit.barcode]),
         ].filter(Boolean).join(" ")));
+        const codeTokens = new Set(searchTokens(codeValues.join(" ")));
+        const normalizedName = normalizeSearch(searchName);
+        const compactName = normalizeCode(searchName);
+        const skuCodes = [result.product.sku, ...units.map((unit) => unit.sku)]
+          .map(normalizeCode).filter(Boolean);
+        const barcodeCodes = [
+          ...(includeBaseMetadata ? [result.product.barcode] : []),
+          ...units.map((unit) => unit.barcode),
+        ].map(normalizeCode).filter(Boolean);
+        const searchableText = normalizeSearch([
+          searchName,
+          label,
+          result.product.sku,
+          includeBaseMetadata ? result.product.barcode : "",
+          includeBaseMetadata ? result.product.baseUnit : "",
+          ...units.flatMap((unit) => [unit.unitName, unit.sku, unit.barcode]),
+          ...additionalSearchText,
+        ].filter(Boolean).join(" ")) + " " + [
+          searchName, label, result.product.sku, result.product.barcode,
+          result.product.baseUnit, ...unitCodes, ...additionalSearchText,
+        ].map(normalizeCode).filter(Boolean).join(" ");
         facts = {
           label,
           labelKey: normalizedSearchKey(label),
+          searchName,
+          normalizedName,
+          compactName,
+          skuCodes,
+          barcodeCodes,
           productTokens,
+          codeTokens,
           metadataTokens,
+          searchableText,
           unitFactsByName: new Map(),
         };
 
@@ -124,33 +183,52 @@ export function rankProductSearchUnitResults<TProduct extends PosSearchProductLi
     return {
       result,
       index,
+      exactSKU: Number(Boolean(queryCode) && facts.skuCodes.includes(queryCode)),
+      exactBarcode: Number(Boolean(queryCode) && facts.barcodeCodes.includes(queryCode)),
+      exactName: Number(facts.normalizedName === queryKey || (Boolean(queryCode) && facts.compactName === queryCode)),
+      prefixCode: Number(Boolean(queryCode) && [...facts.skuCodes, ...facts.barcodeCodes].some((value) => value.startsWith(queryCode))),
+      prefixName: Number(facts.normalizedName.startsWith(queryKey) || (Boolean(queryCode) && facts.compactName.startsWith(queryCode))),
       labelExact: Number(facts.labelKey === queryKey),
       rowExact: Number(unitFacts.rowLabelKey === queryKey),
       visibleMatches: countMatches(tokens, unitFacts.visibleTokens),
       productMatches: countMatches(tokens, facts.productTokens),
+      codeMatches: countMatches(tokens, facts.codeTokens),
       unitMatches: countMatches(tokens, unitFacts.tokens),
       metadataMatches: countMatches(tokens, facts.metadataTokens),
+      otherMatches: tokens.filter((token) => facts.searchableText.includes(token)).length,
     };
   });
 
   ranked.sort((left, right) => {
-    return right.labelExact - left.labelExact
+    return right.exactSKU - left.exactSKU
+      || right.exactBarcode - left.exactBarcode
+      || right.exactName - left.exactName
       || right.rowExact - left.rowExact
+      || right.prefixCode - left.prefixCode
+      || right.prefixName - left.prefixName
       || right.visibleMatches - left.visibleMatches
       || right.productMatches - left.productMatches
+      || right.codeMatches - left.codeMatches
       || right.unitMatches - left.unitMatches
       || right.metadataMatches - left.metadataMatches
+      || right.otherMatches - left.otherMatches
       || left.index - right.index;
   });
   return ranked
-    .filter(({ labelExact, rowExact, visibleMatches, productMatches, unitMatches, metadataMatches }) => (
+    .filter(({ exactSKU, exactBarcode, exactName, rowExact, prefixCode, prefixName, visibleMatches, productMatches, codeMatches, unitMatches, metadataMatches, otherMatches }) => (
       !sellableOnly
-      || labelExact > 0
+      || exactSKU > 0
+      || exactBarcode > 0
+      || exactName > 0
       || rowExact > 0
+      || prefixCode > 0
+      || prefixName > 0
       || visibleMatches > 0
       || productMatches > 0
+      || codeMatches > 0
       || unitMatches > 0
       || metadataMatches > 0
+      || otherMatches > 0
     ))
     .map(({ result }) => result);
 }

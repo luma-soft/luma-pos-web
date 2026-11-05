@@ -1,4 +1,5 @@
 import { getProductCatalogDelta, getProductCatalogRevision, getProductCatalogSnapshot } from "@/lib/data/product-catalog";
+import { LEGACY_PRODUCT_CATALOG_SCHEMA_VERSION } from "@/lib/product-catalog";
 import { requireMobileStockReadAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
       gate.storeId,
       gate.userId,
       gate.role,
-      { includeInactive: true },
+      { includeInactive: true, schemaVersion: LEGACY_PRODUCT_CATALOG_SCHEMA_VERSION },
     );
     const response = mobileOk({
       mode: "full" as const,

@@ -28,7 +28,8 @@ import {
 } from "@/lib/pricing/pricing-policy";
 import { pricingStockCondition } from "@/lib/data/pricing-stock";
 import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
-import { priceComparisonCondition, type PriceComparison } from "@/lib/pricing/price-comparison";
+import type { PriceComparison } from "@/lib/pricing/price-comparison";
+import { priceComparisonCondition } from "@/lib/pricing/price-comparison-sql";
 import { recentProductSaleOrder } from "@/lib/data/recent-product-sales";
 import {
   productCompatibilityImageUrls,

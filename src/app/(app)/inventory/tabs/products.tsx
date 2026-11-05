@@ -1,46 +1,27 @@
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { PackageOpen } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
-import { getProduct, getProductCount, getProducts, getProductFormOptions } from "@/lib/data/products";
+import { getProduct, getProductFormOptions } from "@/lib/data/products";
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
-import { ProductsTable } from "./products-table";
 import { NewProductForm } from "../../products/new/product-form";
 import { latestVariantMemberId, productToFormInitialValues, resolveProductFormSeed } from "../../products/product-form-values";
 import { ShopeeListingModal } from "./shopee-listing-modal";
 import { CAMERA_QUOTE_DETAIL_MATERIAL_SKUS, CAMERA_QUOTE_MATERIAL_SKUS } from "@/lib/data/camera-quote-constants";
-import { CameraMaterialSearch } from "./camera-material-search";
-import { InstantProductSearch } from "./instant-product-search";
-import { InventoryFilterDrawer } from "./inventory-filter-drawer";
-import { ProductCreateMenu } from "./product-create-menu";
-import {
-  ProductBulkActions,
-  ProductSelectionProvider,
-} from "./product-selection";
 import { getCategoriesWithCounts } from "@/lib/data/categories";
 import { CategoriesManager } from "../../products/categories/categories-manager";
 import { ProductCatalogSwitcher } from "./product-catalog-switcher";
-import { ListSearchFilterBar } from "@/components/list-search-filter";
+import { ProductCatalogProductsContent } from "./product-catalog-products-content";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
-import { parsePriceComparisonParams } from "@/lib/pricing/price-comparison";
 import { getPublicMediaConfig } from "@/lib/media/config";
 import { ProductModalFrame } from "@/components/product-modal-frame";
 import { KeepPreviousContent } from "@/components/keep-previous-content";
-import {
-  DEFAULT_PRODUCT_LIST_SORT,
-  parseProductListSort,
-} from "@/lib/inventory/product-list-policy";
 
 type SP = Record<string, string | undefined>;
-const STATUSES = ["active", "inactive", "all"] as const;
-type Status = (typeof STATUSES)[number];
-const VIEWS = ["grouped", "flat"] as const;
-type View = (typeof VIEWS)[number];
 const PRODUCT_MODAL_KEYS = ["productModal", "productId", "copyFrom", "copyGroup", "sameTypeAs", "productKind", "returnTo", "onlineListing", "onlineProductId", "shopeeProductId"] as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -75,30 +56,26 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
   if (!cameraMaterials && catalogView === "categories") {
     const page = Number(params.page) || 1;
     const pageSize = parsePageSize(params.size);
-    const [categoryData, productCount] = await Promise.all([
-      getCategoriesWithCounts(context.storeId, { page, pageSize }),
-      getProductCount(context.storeId, { status: "active", view: "grouped" }),
-    ]);
+    const categoryData = await getCategoriesWithCounts(context.storeId, { page, pageSize });
     return (
       <>
-        <ProductCatalogSwitcher activeView="categories" productCount={productCount} categoryCount={categoryData.total} />
+        <ProductCatalogSwitcher activeView="categories" categoryCount={categoryData.total} />
         <CategoriesManager categories={categoryData.rows} parentOptions={categoryData.roots} total={categoryData.total} />
         <Pagination page={page} pageCount={categoryData.pageCount} total={categoryData.total} pageSize={pageSize} unitLabel={t("categories.unitLabel")} />
       </>
     );
   }
 
-  const options = await getProductFormOptions(context.storeId);
-  const { categories } = options;
-
   return (
     <>
       {cameraMaterials && <div className="mb-4"><h2 className="text-lg font-bold">Vật tư lắp camera</h2><p className="text-sm text-slate-500">Thêm, sửa, xóa các vật tư dùng trong báo giá lắp đặt camera.</p></div>}
 
-      {cameraMaterials && <CameraMaterialSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
-
       <KeepPreviousContent fallback={<TableSkeleton cols={8} rows={10} />}>
-        <ProductsContent searchParams={searchParams} cameraMaterials={cameraMaterials} categories={categories} brands={options.brands} suppliers={options.suppliers} />
+        <ProductCatalogProductsContent
+          showPriceComparison={canViewPurchasePrices(context.role)}
+          cameraMaterials={cameraMaterials}
+          cameraSkus={[...CAMERA_QUOTE_MATERIAL_SKUS, ...CAMERA_QUOTE_DETAIL_MATERIAL_SKUS]}
+        />
       </KeepPreviousContent>
 
       <ProductEditorModal searchParams={params} />
@@ -116,57 +93,6 @@ async function ShopeeListingModalShell({ searchParams }: { searchParams: SP }) {
   const product = await getProduct(context.storeId, productId);
   if (!product) notFound();
   return <ShopeeListingModal key={product.id} product={product} closeHref={productModalHref(searchParams, {})} />;
-}
-
-async function ProductsToolbar({
-  params,
-  categories,
-  brands,
-  suppliers,
-  resultCount,
-  showPriceComparison,
-}: {
-  params: SP;
-  categories: Awaited<ReturnType<typeof getProductFormOptions>>["categories"];
-  brands: Awaited<ReturnType<typeof getProductFormOptions>>["brands"];
-  suppliers: Awaited<ReturnType<typeof getProductFormOptions>>["suppliers"];
-  resultCount: number;
-  showPriceComparison: boolean;
-}) {
-  const t = await getTranslations();
-  return (
-    <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
-      <ListSearchFilterBar
-        search={<InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
-        filter={<InventoryFilterDrawer title="Bộ lọc sản phẩm" values={params} resultCount={resultCount} defaultSort={DEFAULT_PRODUCT_LIST_SORT} showPriceComparison={showPriceComparison} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort", "view", "price"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
-      />
-      <ProductCreateMenu
-        label={t("products.createNew")}
-        showLabel
-        items={[
-          {
-            kind: "product",
-            label: t("products.kind.labels.product"),
-            hint: t("products.kind.hints.product"),
-            href: productModalHref(params, { productModal: "create", productKind: "product" }),
-          },
-          {
-            kind: "service",
-            label: t("products.kind.labels.service"),
-            hint: t("products.kind.hints.service"),
-            href: productModalHref(params, { productModal: "create", productKind: "service" }),
-          },
-          {
-            kind: "combo",
-            label: t("products.kind.labels.combo"),
-            hint: t("products.kind.hints.combo"),
-            href: productModalHref(params, { productModal: "create", productKind: "combo" }),
-          },
-        ]}
-      />
-      <ProductBulkActions />
-    </div>
-  );
 }
 
 export async function ProductEditorModal({
@@ -273,80 +199,4 @@ function productModalHref(params: SP, patch: Record<string, string>) {
   sp.set("tab", "products");
   for (const [key, value] of Object.entries(patch)) sp.set(key, value);
   return `${Routes.Inventory}?${sp.toString()}`;
-}
-
-async function ProductsContent({ searchParams, cameraMaterials = false, categories = [], brands = [], suppliers = [] }: { searchParams: SP; cameraMaterials?: boolean; categories?: Awaited<ReturnType<typeof getProductFormOptions>>["categories"]; brands?: Awaited<ReturnType<typeof getProductFormOptions>>["brands"]; suppliers?: Awaited<ReturnType<typeof getProductFormOptions>>["suppliers"] }) {
-  const context = await requireStoreContext();
-  const t = await getTranslations();
-  const params = searchParams;
-  const page = Number(params.page) || 1;
-  const pageSize = parsePageSize(params.size);
-  const status: Status = STATUSES.includes(params.status as Status) ? (params.status as Status) : "active";
-  const view: View = VIEWS.includes(params.view as View) ? (params.view as View) : "grouped";
-  const showPriceComparison = canViewPurchasePrices(context.role);
-
-  const { rows, total, pageCount } = await getProducts(context.storeId, {
-    q: params.q,
-    categoryId: params.category,
-    brandId: params.brandId,
-    supplierId: params.supplierId,
-    productKind: params.productKind as "product" | "service" | "combo" | undefined,
-    stock: params.stock as "instock" | "low" | "out" | undefined,
-    sort: parseProductListSort(params.sort),
-    status,
-    view,
-    page,
-    pageSize,
-    includeThumbnailUrl: true,
-    includeLastPurchaseNetPrice: showPriceComparison,
-    productSkus: cameraMaterials ? [...CAMERA_QUOTE_MATERIAL_SKUS, ...CAMERA_QUOTE_DETAIL_MATERIAL_SKUS] : undefined,
-    cameraMaterial: cameraMaterials,
-    ...(showPriceComparison ? parsePriceComparisonParams(params) : {}),
-  }, {
-    includeDetails: false,
-    includeImageUrls: false,
-    includeComboItems: false,
-  });
-
-  return (
-    <ProductSelectionProvider visibleIds={[...new Set(rows.flatMap((row) => view === "grouped" && row.variantGroup ? row.variantGroup.members.filter((member) => !member.isVariantParent).map((member) => member.id) : row.isVariantParent ? [] : [row.id]))]}>
-      {!cameraMaterials && <ProductCatalogSwitcher activeView="products" productCount={total} categoryCount={categories.length} />}
-      {!cameraMaterials && (
-        <div className="mb-3 lg:hidden">
-          <h2 className="text-xl font-bold tracking-tight text-slate-950 dark:text-white">{t("products.title")}</h2>
-          <p className="mt-0.5 text-xs font-medium text-slate-500">{total.toLocaleString("vi-VN")} SKU</p>
-        </div>
-      )}
-      {!cameraMaterials && <ProductsToolbar params={params} categories={categories} brands={brands} suppliers={suppliers} resultCount={total} showPriceComparison={showPriceComparison} />}
-      <ProductsTable
-        rows={rows}
-        grouped={view === "grouped" && !cameraMaterials}
-        resetScrollKey={[
-          params.q,
-          params.category,
-          params.brandId,
-          params.supplierId,
-          params.productKind,
-          params.stock,
-          params.sort,
-          status,
-          view,
-          page,
-          pageSize,
-        ].join("\u0000")}
-        selectionEnabled={!cameraMaterials}
-        empty={(
-          <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
-            <PackageOpen className="w-10 h-10 mx-auto mb-3 opacity-60" />
-            <p className="font-medium">{t("products.list.empty")}</p>
-            <p className="text-sm mt-1">{t("products.list.emptyHint")}</p>
-          </div>
-        )}
-      />
-
-      <div className="shrink-0 pt-3">
-        <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
-      </div>
-    </ProductSelectionProvider>
-  );
 }

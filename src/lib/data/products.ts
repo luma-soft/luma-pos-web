@@ -25,10 +25,8 @@ import {
 } from "@/db/schema";
 import { inventoryProductSearchCondition } from "@/lib/search";
 import { latestPurchaseNetPrices } from "@/lib/pricing/last-purchase-net-price";
-import {
-  priceComparisonCondition,
-  type PriceComparison,
-} from "@/lib/pricing/price-comparison";
+import type { PriceComparison } from "@/lib/pricing/price-comparison";
+import { priceComparisonCondition } from "@/lib/pricing/price-comparison-sql";
 import { coercePageSize, DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import {
   hasProductComplianceColumns,

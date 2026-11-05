@@ -22,16 +22,18 @@ import { canViewPurchasePrices, resolvePriceBookPrice, systemPriceBookType } fro
 import { UNMANAGED_STOCK_CATEGORY_NAME } from "@/lib/product-stock";
 import {
   PRODUCT_CATALOG_SCHEMA_VERSION,
+  LEGACY_PRODUCT_CATALOG_SCHEMA_VERSION,
   sortByRecentProductSale,
   type ProductCatalogDelta,
   type CatalogUnit,
   type CatalogWarehouseStock,
   type ProductCatalogSnapshot,
+  type ProductCatalogMetadataDelta,
 } from "@/lib/product-catalog";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 import { latestPurchaseNetPrices } from "@/lib/pricing/last-purchase-net-price";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
-import { changedCatalogProductIds } from "@/lib/catalog-delta";
+import { changedCatalogProductIds, replayCatalogDeltaBatch } from "@/lib/catalog-delta";
 
 export async function getProductCatalogRevision(storeId: string): Promise<string> {
   const [state] = await db
@@ -80,6 +82,8 @@ export async function getProductCatalogDelta(
   const partial = await getProductCatalogSnapshot(storeId, userId, role, {
     includeInactive: true,
     productIds: changedIds,
+    includeMetadata: false,
+    schemaVersion: LEGACY_PRODUCT_CATALOG_SCHEMA_VERSION,
   });
   // Snapshot builders retry when a revision changes during hydration. A
   // changed revision here means our journal window is already stale.
@@ -97,12 +101,108 @@ export async function getProductCatalogDelta(
   };
 }
 
+const CATALOG_DELTA_PAGE_SIZE = 200;
+
+/**
+ * Build one bounded V2 delta page. Product rows are hydrated only for the
+ * affected IDs; metadata renames travel independently from product rows.
+ */
+export async function getProductCatalogDeltaV2(
+  storeId: string,
+  userId: string,
+  role: string,
+  sinceRevision: string,
+  expectedRevision: string,
+): Promise<ProductCatalogDelta | null> {
+  const since = Number(sinceRevision);
+  const target = Number(expectedRevision);
+  if (!Number.isSafeInteger(since) || !Number.isSafeInteger(target) || since < 0 || since >= target) return null;
+
+  const [floor] = await db.select({ revision: catalogDeltaFloors.floorRevision })
+    .from(catalogDeltaFloors)
+    .where(eq(catalogDeltaFloors.storeId, storeId))
+    .limit(1);
+  if (!floor || since < floor.revision) return null;
+
+  const events = await db.select({
+    revision: catalogDeltaEvents.revision,
+    changeKind: catalogDeltaEvents.changeKind,
+    entityType: catalogDeltaEvents.entityType,
+    entityId: catalogDeltaEvents.entityId,
+    affectedProductIds: catalogDeltaEvents.affectedProductIds,
+    requiresFullV2: catalogDeltaEvents.requiresFullV2,
+  }).from(catalogDeltaEvents).where(and(
+    eq(catalogDeltaEvents.storeId, storeId),
+    gt(catalogDeltaEvents.revision, since),
+    lte(catalogDeltaEvents.revision, target),
+  )).orderBy(asc(catalogDeltaEvents.revision)).limit(CATALOG_DELTA_PAGE_SIZE + 1);
+
+  const batch = replayCatalogDeltaBatch(since, target, events, CATALOG_DELTA_PAGE_SIZE);
+  if (!batch) return null;
+
+  const partial = await getProductCatalogSnapshot(storeId, userId, role, {
+    includeInactive: true,
+    productIds: batch.productIds,
+    includeMetadata: false,
+  });
+  if (partial.revision !== expectedRevision) return null;
+
+  const metadata = await getCatalogMetadataDelta(storeId, batch.metadataIds);
+  const liveIds = new Set(partial.products.map((product) => product.id));
+  return {
+    baseRevision: batch.fromRevision,
+    revision: batch.toRevision,
+    schemaVersion: partial.schemaVersion,
+    userId: partial.userId,
+    scopeId: partial.scopeId,
+    upserts: partial.products,
+    deletedIds: batch.productIds.filter((id) => !liveIds.has(id)),
+    metadata,
+    hasMore: batch.hasMore,
+  };
+}
+
+async function getCatalogMetadataDelta(
+  storeId: string,
+  ids: Partial<Record<"categories" | "brands" | "suppliers" | "warehouses", string[]>>,
+): Promise<ProductCatalogMetadataDelta> {
+  const [categoryRows, brandRows, supplierRows, warehouseRows] = await Promise.all([
+    ids.categories?.length
+      ? db.select({ id: categories.id, name: categories.name }).from(categories)
+        .where(and(eq(categories.storeId, storeId), inArray(categories.id, ids.categories)))
+      : Promise.resolve([]),
+    ids.brands?.length
+      ? db.select({ id: brands.id, name: brands.name }).from(brands)
+        .where(and(eq(brands.storeId, storeId), inArray(brands.id, ids.brands)))
+      : Promise.resolve([]),
+    ids.suppliers?.length
+      ? db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers)
+        .where(and(eq(suppliers.storeId, storeId), inArray(suppliers.id, ids.suppliers)))
+      : Promise.resolve([]),
+    ids.warehouses?.length
+      ? db.select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
+        .from(warehouses).where(and(eq(warehouses.storeId, storeId), inArray(warehouses.id, ids.warehouses)))
+      : Promise.resolve([]),
+  ]);
+  return {
+    ...(ids.categories ? { categories: { upserts: categoryRows, deletedIds: ids.categories.filter((id) => !categoryRows.some((row) => row.id === id)) } } : {}),
+    ...(ids.brands ? { brands: { upserts: brandRows, deletedIds: ids.brands.filter((id) => !brandRows.some((row) => row.id === id)) } } : {}),
+    ...(ids.suppliers ? { suppliers: { upserts: supplierRows, deletedIds: ids.suppliers.filter((id) => !supplierRows.some((row) => row.id === id)) } } : {}),
+    ...(ids.warehouses ? { warehouses: { upserts: warehouseRows, deletedIds: ids.warehouses.filter((id) => !warehouseRows.some((row) => row.id === id)) } } : {}),
+  };
+}
+
 /** Projection đầy đủ để mọi màn hình dùng chung khi online và offline. */
 export async function getProductCatalogSnapshot(
   storeId: string,
   userId: string,
   role: string,
-  options: { includeInactive?: boolean; productIds?: readonly string[] } = {},
+  options: {
+    includeInactive?: boolean;
+    productIds?: readonly string[];
+    includeMetadata?: boolean;
+    schemaVersion?: number;
+  } = {},
 ): Promise<ProductCatalogSnapshot> {
   return buildProductCatalogSnapshot(storeId, userId, role, 0, options);
 }
@@ -112,17 +212,28 @@ async function buildProductCatalogSnapshot(
   userId: string,
   role: string,
   attempt: number,
-  options: { includeInactive?: boolean; productIds?: readonly string[] },
+  options: {
+    includeInactive?: boolean;
+    productIds?: readonly string[];
+    includeMetadata?: boolean;
+    schemaVersion?: number;
+  },
 ): Promise<ProductCatalogSnapshot> {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const revisionBefore = await getProductCatalogRevision(storeId);
-  const [productRows, recentSaleRows, warehouseRows, books] = await Promise.all([
+  const includeMetadata = options.includeMetadata ?? !options.productIds;
+  const [productRows, recentSaleRows, warehouseRows, books, categoryRows, brandRows, supplierRows] = await Promise.all([
     db
       .select({
         id: products.id,
         sku: products.sku,
         barcode: products.barcode,
         name: products.name,
+        description: products.description,
+        location: products.location,
+        weight: products.weight,
+        dimensions: products.dimensions,
+        createdAt: products.createdAt,
         productKind: products.productKind,
         isActive: products.isActive,
         lifecycleStatus: products.lifecycleStatus,
@@ -156,6 +267,10 @@ async function buildProductCatalogSnapshot(
         specs: products.specs,
         parentProductId: products.parentProductId,
         relatedProductId: products.relatedProductId,
+        variantGroupId: sql<string | null>`(select product_variant_members.group_id from product_variant_members where product_variant_members.store_id = ${storeId}::uuid and product_variant_members.product_id = ${products.id} limit 1)`,
+        variantGroupKind: sql<string | null>`(select product_variant_groups.kind from product_variant_groups where product_variant_groups.store_id = ${storeId}::uuid and product_variant_groups.id = (select product_variant_members.group_id from product_variant_members where product_variant_members.store_id = ${storeId}::uuid and product_variant_members.product_id = ${products.id} limit 1) limit 1)`,
+        combinationKey: sql<string | null>`(select product_variant_members.combination_key from product_variant_members where product_variant_members.store_id = ${storeId}::uuid and product_variant_members.product_id = ${products.id} limit 1)`,
+        optionValueIds: sql<string[]>`coalesce((select product_variant_members.option_value_ids from product_variant_members where product_variant_members.store_id = ${storeId}::uuid and product_variant_members.product_id = ${products.id} limit 1), '[]'::jsonb)`,
         variantName: products.variantName,
         isVariantParent: products.isVariantParent,
         m2PerUnit: products.m2PerUnit,
@@ -233,7 +348,7 @@ async function buildProductCatalogSnapshot(
         options.productIds ? inArray(orderItems.productId, [...options.productIds]) : undefined,
       ))
       .groupBy(orderItems.productId, products.parentProductId),
-    db
+    includeMetadata ? db
       .select({
         id: warehouses.id,
         name: warehouses.name,
@@ -241,8 +356,17 @@ async function buildProductCatalogSnapshot(
       })
       .from(warehouses)
       .where(eq(warehouses.storeId, storeId))
-      .orderBy(desc(warehouses.isDefault), asc(warehouses.name)),
+      .orderBy(desc(warehouses.isDefault), asc(warehouses.name)) : Promise.resolve([]),
     getPriceBooks(storeId, { includeManagerOnly: canViewPurchasePrices(role) }),
+    includeMetadata
+      ? db.select({ id: categories.id, name: categories.name }).from(categories).where(eq(categories.storeId, storeId)).orderBy(asc(categories.sortOrder), asc(categories.name))
+      : Promise.resolve([]),
+    includeMetadata
+      ? db.select({ id: brands.id, name: brands.name }).from(brands).where(eq(brands.storeId, storeId)).orderBy(asc(brands.name))
+      : Promise.resolve([]),
+    includeMetadata
+      ? db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers).where(eq(suppliers.storeId, storeId)).orderBy(asc(suppliers.name))
+      : Promise.resolve([]),
   ]);
   const purchaseNetPriceByProductId = canViewPurchasePrices(role)
     ? await latestPurchaseNetPrices(storeId, productRows.map((product) => product.id))
@@ -272,7 +396,7 @@ async function buildProductCatalogSnapshot(
   })));
 
   return {
-    schemaVersion: PRODUCT_CATALOG_SCHEMA_VERSION,
+    schemaVersion: options.schemaVersion ?? PRODUCT_CATALOG_SCHEMA_VERSION,
     userId,
     scopeId: `${storeId}:${userId}:${role}`,
     revision: revisionAfter,
@@ -302,11 +426,13 @@ async function buildProductCatalogSnapshot(
         minLevel: String(stock.minLevel ?? 0),
       })),
       updatedAt: product.updatedAt.toISOString(),
+      createdAt: product.createdAt.toISOString(),
       lastSoldAt: lastSoldAtByProduct.get(product.id)
         ? new Date(lastSoldAtByProduct.get(product.id)!).toISOString()
         : null,
       imageUpdatedAt: product.imageUpdatedAt.toISOString(),
     })),
     warehouses: warehouseRows,
+    ...(includeMetadata ? { metadata: { categories: categoryRows, brands: brandRows, suppliers: supplierRows } } : {}),
   };
 }

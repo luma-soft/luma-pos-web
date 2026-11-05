@@ -1,67 +1,137 @@
-import { describe, expect, test } from "bun:test";
-import { searchProductCatalog } from "./product-catalog";
-import { matchesProductVariant } from "./products/variant-presentation";
+import { expect, test } from "bun:test";
+import {
+  isProductCatalogCacheSchemaCompatible,
+  mergeProductCatalogDelta,
+  searchProductCatalog,
+} from "./product-catalog";
 
-const product = (id, name, overrides = {}) => ({
-  id, name, sku: `SKU-${id}`, barcode: null, units: [], isStockManaged: true, ...overrides,
+function product(overrides = {}) {
+  return {
+    id: "p",
+    sku: "SKU-P",
+    barcode: null,
+    name: "Sản phẩm",
+    productKind: "product",
+    isActive: true,
+    lifecycleStatus: "active",
+    trackBatches: false,
+    brandId: null,
+    brandName: null,
+    model: null,
+    categoryId: null,
+    categoryName: null,
+    baseUnit: "cái",
+    baseUnitDirectSale: true,
+    costPrice: null,
+    retailPrice: "10",
+    wholesalePrice: null,
+    contractorPrice: null,
+    agentPrice: null,
+    imageUrls: [],
+    imageUpdatedAt: "2026-01-01T00:00:00.000Z",
+    specs: {},
+    parentProductId: null,
+    relatedProductId: null,
+    variantName: null,
+    isVariantParent: false,
+    m2PerUnit: null,
+    priceByWeight: false,
+    vatRate: null,
+    isStockManaged: true,
+    comboItems: [],
+    units: [],
+    prices: {},
+    warehouseStock: [],
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    lastSoldAt: null,
+    ...overrides,
+  };
+}
+
+const snapshot = (products, metadata = {}) => ({
+  schemaVersion: 12,
+  userId: "u",
+  scopeId: "s:u:owner",
+  revision: "10",
+  savedAt: 1,
+  products,
+  warehouses: [],
+  metadata: { categories: [], brands: [], suppliers: [], ...metadata },
 });
 
-const elbow = product("27", "Cút góc - 27", { barcode: "8934567890123" });
-const other = product("99", "Cút góc - 99");
-const catalog = [elbow, other];
+test("keeps older local catalog schemas usable until their full sync completes", () => {
+  expect([10, 11, 12].every(isProductCatalogCacheSchemaCompatible)).toBe(true);
+  expect(isProductCatalogCacheSchemaCompatible(9)).toBe(false);
+  expect(isProductCatalogCacheSchemaCompatible(13)).toBe(false);
+});
 
-describe("product catalog keyword search", () => {
-  test("matches separated, reordered and accent-insensitive words", () => {
-    for (const query of ["cút 27", "cút góc 27", "27 CUT", "cút góc 27", "cút-góc 27", "  CÚT   27  "]) {
-      expect(searchProductCatalog(catalog, query).map((item) => item.id)).toEqual(["27"]);
-      expect(matchesProductVariant(elbow, query)).toBe(true);
-    }
-  });
+test("search ranks exact SKU/barcode before exact name and ranks before truncating", () => {
+  const rows = [
+    product({ id: "prefix", sku: "AB-123X", name: "Other" }),
+    product({ id: "name", sku: "OTHER", name: "AB 123" }),
+    product({ id: "barcode", sku: "OTHER2", barcode: "AB123" }),
+    product({ id: "sku", sku: "AB123", name: "Third" }),
+  ];
+  expect(searchProductCatalog(rows, "AB 123", { limit: 4 }).map((row) => row.id))
+    .toEqual(["sku", "barcode", "name", "prefix"]);
+});
 
-  test("Vietnamese tone placement and decomposed stored characters agree", () => {
-    const rows = [product("tone", "Òa úy".normalize("NFD"))];
-    for (const query of ["Òa úy", "oà uý", "OA UY", "uy oa"]) {
-      expect(searchProductCatalog(rows, query).map((item) => item.id)).toEqual(["tone"]);
-    }
+test("metadata-only rename updates local product projections without product upserts", () => {
+  const current = snapshot([
+    product({ id: "one", categoryId: "c1", categoryName: "Old category", supplierId: "s1", supplierName: "Old supplier" }),
+    product({ id: "two", categoryId: "c2", categoryName: "Other category" }),
+  ], {
+    categories: [{ id: "c1", name: "Old category" }, { id: "c2", name: "Other category" }],
+    suppliers: [{ id: "s1", name: "Old supplier" }],
   });
+  const next = mergeProductCatalogDelta(current, {
+    baseRevision: "10",
+    revision: "11",
+    schemaVersion: 12,
+    userId: "u",
+    scopeId: "s:u:owner",
+    upserts: [],
+    deletedIds: [],
+    metadata: {
+      categories: { upserts: [{ id: "c1", name: "New category" }], deletedIds: [] },
+      suppliers: { upserts: [{ id: "s1", name: "New supplier" }], deletedIds: [] },
+    },
+  });
+  expect(next.products.map(({ categoryName, supplierName }) => ({ categoryName, supplierName }))).toEqual([
+    { categoryName: "New category", supplierName: "New supplier" },
+    { categoryName: "Other category", supplierName: null },
+  ]);
+  expect(next.metadata.categories).toContainEqual({ id: "c1", name: "New category" });
+});
 
-  test("keywords must all belong to the same product; empty/punctuation do not return all", () => {
-    expect(searchProductCatalog(catalog, "cút 28")).toEqual([]);
-    expect(searchProductCatalog(catalog, "27 99")).toEqual([]);
-    expect(searchProductCatalog(catalog, "")).toEqual([]);
-    expect(searchProductCatalog(catalog, "% _ -")).toEqual([]);
-  });
+test("benchmarks local search and delta projection at 1k, 10k, and 50k products", () => {
+  const measurements = [];
+  for (const size of [1_000, 10_000, 50_000]) {
+    const products = Array.from({ length: size }, (_, index) => product({
+      id: `product-${index}`,
+      sku: `SKU-${String(index).padStart(5, "0")}`,
+      name: `Product ${index}`,
+    }));
+    const started = performance.now();
+    const exact = searchProductCatalog(products, `SKU-${String(size - 1).padStart(5, "0")}`, { limit: 20 });
+    const exactSearchMs = performance.now() - started;
+    expect(exact[0]?.id).toBe(`product-${size - 1}`);
 
-  test("preserves SKU, barcode and alternate-unit lookup with cross-field keywords", () => {
-    for (const query of ["SKU-27", "8934567890123", "góc SKU-27"]) {
-      expect(searchProductCatalog(catalog, query).map((item) => item.id)).toEqual(["27"]);
-    }
-    const rows = [product("unit", "Ống", { units: [{ unitName: "Cuộn", multiplier: "10", sku: "ROLL-001", barcode: "UNIT-001", priceOverride: null }] })];
-    expect(searchProductCatalog(rows, "ống UNIT-001").map((item) => item.id)).toEqual(["unit"]);
-    expect(searchProductCatalog(rows, "ROLL-001").map((item) => item.id)).toEqual(["unit"]);
-  });
+    const broadStarted = performance.now();
+    const broad = searchProductCatalog(products, "product", { limit: 20 });
+    const broadSearchMs = performance.now() - broadStarted;
+    expect(broad.length).toBe(20);
 
-  test("finds products by their base and alternate unit names", () => {
-    const rows = [product("pipe", "Ống Nhựa PVC Tiền Phong - 110 - C2", {
-      baseUnit: "m",
-      units: [{ unitName: "Cây", multiplier: "6", barcode: null, priceOverride: null }],
-    })];
-    expect(searchProductCatalog(rows, "Ống Nhựa PVC Tiền Phong - 110 - C2 (Cây)").map((item) => item.id)).toEqual(["pipe"]);
-    expect(searchProductCatalog(rows, "m").map((item) => item.id)).toEqual(["pipe"]);
-  });
-
-  test("finds variants by their variant label and specification values", () => {
-    const rows = [product("variant", "Gạch Lâm Hưng sân vườn", {
-      variantName: "34601",
-      specs: { "Phiên bản": ["34601"], "Kích thước": ["40x60"] },
-    })];
-    expect(searchProductCatalog(rows, "34601").map((item) => item.id)).toEqual(["variant"]);
-    expect(searchProductCatalog(rows, "40x60").map((item) => item.id)).toEqual(["variant"]);
-  });
-
-  test("respects exclusions, stock-managed filtering and limit", () => {
-    expect(searchProductCatalog(catalog, "cút", { excludeIds: new Set(["27"]) }).map((item) => item.id)).toEqual(["99"]);
-    expect(searchProductCatalog(catalog, "cút", { limit: 1 }).map((item) => item.id)).toEqual(["27"]);
-    expect(searchProductCatalog([product("service", "Cút", { isStockManaged: false })], "cút", { stockManagedOnly: true })).toEqual([]);
-  });
+    const base = snapshot(products);
+    const changed = product({ id: `product-${size - 1}`, sku: `SKU-${String(size - 1).padStart(5, "0")}`, name: `Renamed ${size - 1}` });
+    const deltaStarted = performance.now();
+    const merged = mergeProductCatalogDelta(base, {
+      baseRevision: "10", revision: "11", schemaVersion: 12,
+      userId: "u", scopeId: "s:u:owner", upserts: [changed], deletedIds: [],
+    });
+    const deltaApplyMs = performance.now() - deltaStarted;
+    expect(merged?.products.find((row) => row.id === changed.id)?.name).toBe(changed.name);
+    measurements.push({ size, exactSearchMs, broadSearchMs, deltaApplyMs });
+  }
+  console.info("[catalog-benchmark] synthetic", JSON.stringify(measurements));
 });

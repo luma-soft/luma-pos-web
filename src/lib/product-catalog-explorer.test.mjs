@@ -1,0 +1,103 @@
+import { expect, test } from "bun:test";
+import { exploreProductCatalog } from "./product-catalog-explorer";
+
+function product(overrides = {}) {
+  return {
+    id: "p-1",
+    sku: "SKU-1",
+    barcode: null,
+    name: "Sản phẩm mẫu",
+    productKind: "product",
+    isActive: true,
+    lifecycleStatus: "active",
+    trackBatches: false,
+    supplierId: null,
+    supplierIDs: [],
+    minStock: "2",
+    totalStock: "5",
+    brandId: null,
+    brandName: null,
+    model: null,
+    categoryId: null,
+    categoryName: null,
+    baseUnit: "cái",
+    baseUnitDirectSale: true,
+    costPrice: "10",
+    lastPurchasePrice: "11",
+    lastPurchaseNetPrice: "8",
+    retailPrice: "20",
+    wholesalePrice: null,
+    contractorPrice: null,
+    agentPrice: null,
+    imageUrls: [],
+    imageUpdatedAt: "2026-01-01T00:00:00.000Z",
+    specs: {},
+    parentProductId: null,
+    relatedProductId: null,
+    variantGroupId: null,
+    variantGroupKind: null,
+    combinationKey: null,
+    optionValueIds: [],
+    variantName: null,
+    isVariantParent: false,
+    m2PerUnit: null,
+    priceByWeight: false,
+    vatRate: null,
+    isStockManaged: true,
+    comboItems: [],
+    units: [],
+    priceBookTypes: {},
+    prices: {},
+    warehouseStock: [{ warehouseId: "w1", quantity: "5", reserved: "1", minLevel: "2" }],
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    lastSoldAt: null,
+    ...overrides,
+  };
+}
+
+test("groups legacy related products locally and filters on matching members", () => {
+  const root = product({ id: "root", sku: "ROOT", name: "Ống PVC", relatedProductId: null });
+  const member = product({
+    id: "member", sku: "PVC-110", name: "Ống PVC 110",
+    categoryId: "pipes", categoryName: "Ống nước", relatedProductId: "root",
+    variantGroupId: "root", variantGroupKind: "related", variantName: "110",
+  });
+
+  const result = exploreProductCatalog([root, member], [], {
+    query: "PVC 110",
+    categoryId: "pipes",
+    view: "grouped",
+    status: "active",
+    page: 1,
+    pageSize: 20,
+  });
+
+  expect(result.total).toBe(1);
+  expect(result.rows[0].id).toBe("root");
+  expect(result.rows[0].variantGroup?.kind).toBe("related");
+  expect(result.rows[0].variantGroup?.members.map((row) => row.id)).toEqual(["member", "root"]);
+});
+
+test("ranks the complete local candidate set before pagination", () => {
+  const rows = [
+    product({ id: "prefix", sku: "AB123X", name: "Other" }),
+    product({ id: "name", sku: "OTHER", name: "AB 123" }),
+    product({ id: "exact", sku: "AB123", name: "Third" }),
+  ];
+  const result = exploreProductCatalog(rows, [], { query: "AB123", view: "flat", page: 1, pageSize: 1 });
+  expect(result.rows.map((row) => row.id)).toEqual(["exact"]);
+  expect(result.total).toBe(3);
+});
+
+test("applies lifecycle and price comparisons locally", () => {
+  const rows = [
+    product({ id: "active", sku: "A", priceBookTypes: { costBook: "cost" } }),
+    product({ id: "inactive", sku: "B", isActive: false, lifecycleStatus: "archived", priceBookTypes: { costBook: "cost" } }),
+  ];
+  const active = exploreProductCatalog(rows, [], {
+    status: "active", view: "flat", priceCondition: "eq", priceAgainst: "cost", priceBookId: "costBook",
+  });
+  const inactive = exploreProductCatalog(rows, [], { status: "inactive", view: "flat" });
+  expect(active.rows.map((row) => row.id)).toEqual(["active"]);
+  expect(inactive.rows.map((row) => row.id)).toEqual(["inactive"]);
+});

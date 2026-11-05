@@ -1,7 +1,7 @@
 "use server";
 
 import {
-  getProductCatalogDelta,
+  getProductCatalogDeltaV2,
   getProductCatalogRevision,
   getProductCatalogSnapshot,
 } from "@/lib/data/product-catalog";
@@ -29,16 +29,28 @@ export async function syncProductCatalog(
         };
       }
       try {
-        const delta = await getProductCatalogDelta(
-          context.storeId,
-          context.userId,
-          context.role,
-          sinceRevision,
-          revision,
-        );
-        if (delta) return { mode: "delta", delta };
+        let cursor = sinceRevision;
+        const pages: ProductCatalogDelta[] = [];
+        for (let page = 0; page < 20; page += 1) {
+          const delta = await getProductCatalogDeltaV2(
+            context.storeId,
+            context.userId,
+            context.role,
+            cursor,
+            revision,
+          );
+          if (!delta) break;
+          pages.push(delta);
+          cursor = delta.revision;
+          if (!delta.hasMore) {
+            return {
+              mode: "delta",
+              delta: combineProductCatalogDeltas(pages, sinceRevision, revision),
+            };
+          }
+        }
       } catch {
-        // A missing journal or an interrupted replay safely falls back to full.
+        // A missing V2 journal or an interrupted replay safely falls back to full.
       }
     }
     return {
@@ -47,6 +59,80 @@ export async function syncProductCatalog(
     };
   } catch {
     return null;
+  }
+}
+
+function combineProductCatalogDeltas(
+  pages: readonly ProductCatalogDelta[],
+  baseRevision: string,
+  revision: string,
+): ProductCatalogDelta {
+  const first = pages[0];
+  if (!first) throw new Error("PRODUCT_CATALOG_DELTA_PAGE_MISSING");
+  const products = new Map<string, ProductCatalogDelta["upserts"][number]>();
+  const deleted = new Set<string>();
+  const metadata = {
+    categories: new Map<string, { id: string; name: string }>(),
+    brands: new Map<string, { id: string; name: string }>(),
+    suppliers: new Map<string, { id: string; name: string }>(),
+    warehouses: new Map<string, { id: string; name: string; isDefault: boolean }>(),
+  };
+  const metadataDeleted = {
+    categories: new Set<string>(),
+    brands: new Set<string>(),
+    suppliers: new Set<string>(),
+    warehouses: new Set<string>(),
+  };
+
+  for (const page of pages) {
+    for (const id of page.deletedIds) {
+      products.delete(id);
+      deleted.add(id);
+    }
+    for (const product of page.upserts) {
+      deleted.delete(product.id);
+      products.set(product.id, product);
+    }
+    applyMetadataChange(metadata.categories, metadataDeleted.categories, page.metadata?.categories);
+    applyMetadataChange(metadata.brands, metadataDeleted.brands, page.metadata?.brands);
+    applyMetadataChange(metadata.suppliers, metadataDeleted.suppliers, page.metadata?.suppliers);
+    applyMetadataChange(metadata.warehouses, metadataDeleted.warehouses, page.metadata?.warehouses);
+  }
+
+  const metadataChanges = Object.fromEntries(
+    (["categories", "brands", "suppliers", "warehouses"] as const)
+      .filter((key) => pages.some((page) => page.metadata?.[key]))
+      .map((key) => [key, {
+        upserts: [...metadata[key].values()],
+        deletedIds: [...metadataDeleted[key]],
+      }]),
+  ) as NonNullable<ProductCatalogDelta["metadata"]>;
+  return {
+    baseRevision,
+    revision,
+    schemaVersion: first.schemaVersion,
+    userId: first.userId,
+    scopeId: first.scopeId,
+    upserts: [...products.values()],
+    deletedIds: [...deleted],
+    metadata: metadataChanges,
+    hasMore: false,
+  };
+}
+
+function applyMetadataChange<T extends { id: string }>(
+  current: Map<string, T>,
+  deleted: Set<string>,
+  change: { upserts: T[]; deletedIds: string[] } | undefined,
+) {
+  if (!change) return;
+  for (const id of change.deletedIds) {
+    current.delete(id);
+    deleted.add(id);
+  }
+  for (const item of change.upserts) {
+    deleted.delete(item.id);
+    current.set(item.id, item);
   }
 }
 

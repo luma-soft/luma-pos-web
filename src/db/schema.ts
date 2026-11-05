@@ -854,6 +854,12 @@ export const catalogDeltaEvents = pgTable("catalog_delta_events", {
   revision: bigint("revision", { mode: "number" }).notNull(),
   productId: uuid("product_id"),
   requiresFull: boolean("requires_full").notNull().default(false),
+  changeKind: text("change_kind"),
+  entityType: text("entity_type"),
+  entityId: uuid("entity_id"),
+  affectedProductIds: uuid("affected_product_ids").array(),
+  requiresFullV2: boolean("requires_full_v2").notNull().default(false),
+  metadataPayload: jsonb("metadata_payload").$type<Record<string, unknown> | null>(),
   changedAt: timestamp("changed_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   primaryKey({ columns: [t.storeId, t.revision] }),
