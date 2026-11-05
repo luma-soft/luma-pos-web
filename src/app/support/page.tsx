@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -9,9 +10,9 @@ export default function SupportPage() {
   return (
     <main className="min-h-screen bg-canvas px-5 py-12 text-foreground sm:px-8 sm:py-16">
       <article className="mx-auto max-w-3xl rounded-3xl border border-border bg-surface p-6 shadow-e1 sm:p-10">
-        <a className="text-sm font-semibold text-primary-700 hover:underline" href="/">
+        <Link className="text-sm font-semibold text-primary-700 hover:underline" href="/">
           Hải Đăng POS · LumaPOS
-        </a>
+        </Link>
         <h1 className="mt-6 text-3xl font-black tracking-tight sm:text-4xl">Hỗ trợ ứng dụng</h1>
         <p className="mt-4 leading-7 text-slate-700 dark:text-slate-300">
           Hải Đăng POS dành cho nhân viên và chủ cửa hàng đã được cấp tài khoản LumaPOS. Nếu bạn chưa có tài khoản hoặc không thể đăng nhập, hãy liên hệ quản trị viên của cửa hàng trước.
@@ -43,7 +44,7 @@ export default function SupportPage() {
         </section>
 
         <footer className="mt-10 border-t border-border pt-6 text-sm text-slate-500">
-          <a className="font-semibold text-primary-700 hover:underline" href="/privacy">Chính sách quyền riêng tư</a>
+          <Link className="font-semibold text-primary-700 hover:underline" href="/privacy">Chính sách quyền riêng tư</Link>
         </footer>
       </article>
     </main>
