@@ -13,18 +13,33 @@ const moneyEquals = (a: number, b: number) =>
 const factorEquals = (a: number, b: number) =>
   Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) < 0.000000001;
 
+/** Return changed price line indexes only when product and unit identity still match. */
+export function checkoutPriceMismatchIndexes(
+  input: CreateOrderOutput,
+  items: NormalizedOrderItem[],
+): number[] | null {
+  const expected = input.expectedPricing?.lines;
+  if (!expected || expected.length !== items.length) return null;
+  const changed: number[] = [];
+  for (const [index, line] of expected.entries()) {
+    const item = items[index];
+    if (line.productId !== item.productId || line.unitName !== item.unitName ||
+      !factorEquals(line.unitMultiplier, item.unitMultiplier)) return null;
+    if (!moneyEquals(line.unitPrice, item.unitPrice)) changed.push(index);
+  }
+  return changed;
+}
+
 /** The snapshot is an expectation, never an authority to set the price. */
 export function assertCheckoutPricing(
   input: CreateOrderOutput,
   items: NormalizedOrderItem[],
   authorizedItems?: NormalizedOrderItem[],
 ) {
-  const expected = input.expectedPricing?.lines;
-  if (expected && (expected.length !== items.length || expected.some((line, index) => {
-    const item = items[index];
-    return line.productId !== item.productId || line.unitName !== item.unitName ||
-      !factorEquals(line.unitMultiplier, item.unitMultiplier) || !moneyEquals(line.unitPrice, item.unitPrice);
-  }))) throw new Error(CHECKOUT_PRICING_CHANGED);
+  const priceMismatches = checkoutPriceMismatchIndexes(input, items);
+  if (input.expectedPricing && (priceMismatches == null || priceMismatches.length > 0)) {
+    throw new Error(CHECKOUT_PRICING_CHANGED);
+  }
 
   // Approval was obtained for these server-resolved values. A price/promotion
   // change must not increase the discount ratio after that authorization.
@@ -62,7 +77,8 @@ export async function prepareCheckoutPricing(
     .from(catalogSyncState).where(condition);
   if (!before) throw new Error(CHECKOUT_PRICING_CHANGED);
 
-  const items = await normalizeOrderItems(storeId, input.items, input.priceBookId, role, tx);
+  let pricingInput = input;
+  let items = await normalizeOrderItems(storeId, pricingInput.items, pricingInput.priceBookId, role, tx);
   const taxes = await tx.select({ id: products.id, vatRate: products.vatRate }).from(products)
     .where(and(eq(products.storeId, storeId), inArray(products.id, [...new Set(items.map((item) => item.productId))])));
 
@@ -73,7 +89,23 @@ export async function prepareCheckoutPricing(
   // retried by the order writer; the next attempt re-resolves prices and still
   // rejects if the cashier's snapshot is actually stale.
   if (before.revision !== locked.revision) throw new Error(CHECKOUT_CATALOG_RACE);
-  assertCheckoutPricing(input, items, authorizedItems);
+
+  const priceMismatches = checkoutPriceMismatchIndexes(pricingInput, items);
+  if (priceMismatches?.length) {
+    // Only managers and owners may approve a stale sale price as an explicit
+    // override. Cashier submissions keep failing closed if the catalog changes
+    // between the action's preflight and this transaction.
+    if (role !== "owner" && role !== "manager") throw new Error(CHECKOUT_PRICING_CHANGED);
+    const lockedItems = pricingInput.items.map((item, index) => {
+      if (!priceMismatches.includes(index) || item.manualUnitPrice != null) return item;
+      if (item.invoiceUnitPrice == null) throw new Error(CHECKOUT_PRICING_CHANGED);
+      return { ...item, manualUnitPrice: item.invoiceUnitPrice };
+    });
+    pricingInput = { ...pricingInput, items: lockedItems };
+    items = await normalizeOrderItems(storeId, pricingInput.items, pricingInput.priceBookId, role, tx);
+  }
+
+  assertCheckoutPricing(pricingInput, items, authorizedItems);
   return {
     items,
     vatRateByProduct: new Map(taxes.map((product) => [product.id, product.vatRate == null ? null : Number(product.vatRate)])),

@@ -22,6 +22,9 @@ export const orderItemSchema = z.object({
   quantity: z.number().positive(),
   unitPrice: z.number().min(0).optional(),
   manualUnitPrice: z.number().min(0).optional(),
+  // Price shown on the invoice before line discounts. The server may use it
+  // only to preserve a stale invoice price through the normal override policy.
+  invoiceUnitPrice: z.number().min(0).optional(),
   lineDiscount: z.number().min(0).optional(),
   lineDiscountMode: z.enum(["pct", "vnd"]).optional(),
   lineDiscountValue: z.number().min(0).optional(),

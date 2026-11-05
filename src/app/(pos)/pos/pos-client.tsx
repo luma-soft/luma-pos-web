@@ -2068,7 +2068,12 @@ export function PosClient({
       taxRate,
       shippingFee,
       priceBookId: priceBook || null,
-      items: cart.map(buildPosOrderItemPayload),
+      items: cart.map((line) => ({
+        ...buildPosOrderItemPayload(line),
+        invoiceUnitPrice: line.manualPrice || (line.lineDiscount ?? 0) > 0 || (line.lineDiscountValue ?? 0) > 0 || usesCompanyPrice(line)
+          ? line.unitPrice
+          : effPrice(line).price,
+      })),
       expectedPricing: buildExpectedPosPricing(cart, (line) => effPrice(line).price),
       paymentPending: isCheckoutMode && selectedPayMethod === "bank_transfer" && !paymentSessionId,
       paymentSessionId,

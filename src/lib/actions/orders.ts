@@ -16,6 +16,7 @@ import { addPaymentForUser } from "@/lib/orders/payment";
 import { convertQuoteToOrderForUser, finalizeDraftOrderForUser } from "@/lib/orders/convert";
 import { cancelOrderForUser, cancelQuoteForUser } from "@/lib/orders/cancel";
 import { normalizeOrderItems } from "@/lib/orders/normalize";
+import { CHECKOUT_PRICING_CHANGED, checkoutPriceMismatchIndexes } from "@/lib/orders/checkout-pricing";
 import {
   evaluateOrderApprovalRequirement,
   roleCanApproveOrderRequirement,
@@ -30,22 +31,49 @@ export async function createOrder(
   if (!gate.ok) return gate;
   const parsed = createOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  let orderInput = parsed.data;
   let trustedItems;
   let taxPrefs: StorePrefs["tax"] | undefined;
   try {
     trustedItems = await normalizeOrderItems(
       gate.storeId,
-      parsed.data.items,
-      parsed.data.priceBookId,
+      orderInput.items,
+      orderInput.priceBookId,
       gate.role,
     );
+    const priceMismatchIndexes = checkoutPriceMismatchIndexes(orderInput, trustedItems);
+    if (priceMismatchIndexes?.length) {
+      let missingInvoicePrice = false;
+      const adjustedItems = orderInput.items.map((item, index) => {
+        if (!priceMismatchIndexes.includes(index) || item.manualUnitPrice != null) return item;
+        if (item.invoiceUnitPrice == null) {
+          missingInvoicePrice = true;
+          return item;
+        }
+        return { ...item, manualUnitPrice: item.invoiceUnitPrice };
+      });
+      if (missingInvoicePrice) {
+        return { ok: false, error: CHECKOUT_PRICING_CHANGED };
+      }
+      orderInput = { ...orderInput, items: adjustedItems };
+      trustedItems = await normalizeOrderItems(
+        gate.storeId,
+        orderInput.items,
+        orderInput.priceBookId,
+        gate.role,
+      );
+      const remainingPriceMismatches = checkoutPriceMismatchIndexes(orderInput, trustedItems);
+      if (remainingPriceMismatches == null || remainingPriceMismatches.length > 0) {
+        return { ok: false, error: CHECKOUT_PRICING_CHANGED };
+      }
+    }
     const prefs = await getRawStorePrefs(gate.storeId);
     taxPrefs = prefs.tax;
     const requirement = evaluateOrderApprovalRequirement({
       clientId: parsed.data.clientId,
-      rawItems: parsed.data.items,
+      rawItems: orderInput.items,
       trustedItems,
-      orderDiscount: parsed.data.discount,
+      orderDiscount: orderInput.discount,
       maxDiscountPercent: prefs.security.maxDiscountPercent,
     });
     if (!roleCanApproveOrderRequirement(gate.role, requirement)) {
@@ -54,8 +82,8 @@ export async function createOrder(
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === "UNIT_NOT_SELLABLE") return { ok: false, error: "pos.errors.unitUnavailable" };
-    if (parsed.data.expectedPricing && ["PRICE_BOOK_PRICE_UNAVAILABLE", "PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "PRICE_BOOK_NOT_FOUND"].includes(message)) {
-      return { ok: false, error: "pos.errors.pricingChanged" };
+    if (orderInput.expectedPricing && ["PRICE_BOOK_PRICE_UNAVAILABLE", "PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "PRICE_BOOK_NOT_FOUND"].includes(message)) {
+      return { ok: false, error: CHECKOUT_PRICING_CHANGED };
     }
     if (message === "PRICE_BOOK_PRICE_UNAVAILABLE") return { ok: false, error: "pricing.errors.priceUnavailable" };
     if (message === "PRICE_BOOK_FORBIDDEN") return { ok: false, error: "errors.forbidden" };
@@ -73,7 +101,7 @@ export async function createOrder(
     throw error;
   }
   // Lõi tách riêng. Xem src/lib/orders/create.ts.
-  return createOrderForUser(gate.userId, parsed.data, {
+  return createOrderForUser(gate.userId, orderInput, {
     items: trustedItems,
     taxPrefs,
   });
