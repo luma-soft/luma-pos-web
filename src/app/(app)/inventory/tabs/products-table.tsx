@@ -1343,6 +1343,9 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
     let cancelled = false;
 
     void (async () => {
+      // Defer UI state updates until after the effect has subscribed.
+      await Promise.resolve();
+      if (cancelled) return;
       if (!scopeId || !revision) {
         if (!cancelled) setLoadState("offline");
         return;
