@@ -3230,10 +3230,10 @@
       "notConvertible": "Phiếu này không thể tạo đơn hàng."
     },
     "printSelected": "In đã chọn",
-    "cancelSelected": "Hủy đã chọn",
+    "cancelSelected": "Hủy đơn đã chọn",
     "bulkCancel": {
-      "title": "Hủy nhiều đơn hàng",
-      "description": "Hủy {count} đơn đã chọn? Kho sẽ được hoàn lại và công nợ được điều chỉnh cho từng đơn.",
+      "title": "Xác nhận hủy đơn đã chọn",
+      "description": "Bạn có chắc muốn hủy {count} đơn đã chọn? Kho sẽ được hoàn lại và công nợ được điều chỉnh cho từng đơn. Thao tác này không thể hoàn tác.",
       "resultTitle": "Kết quả hủy đơn",
       "success": "Đã hủy thành công {count} đơn.",
       "partial": "Đã hủy {cancelled} đơn. Có {failed} đơn không thể hủy và vẫn được giữ trong danh sách chọn.",
