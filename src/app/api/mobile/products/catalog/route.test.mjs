@@ -81,7 +81,7 @@ test("new revision returns full, authorized and inactive-aware snapshot", async 
   expect(body.data.catalog.products[0].relatedProductId).toBeNull();
   expect(body.data.catalog.schemaVersion).toBe(10);
   expect(requestedOptions).toEqual([
-    "store-a", "cashier-a", "cashier", { includeInactive: true },
+    "store-a", "cashier-a", "cashier", { includeInactive: true, schemaVersion: 10 },
   ]);
   expect(snapshotRequests).toBe(1);
 });
