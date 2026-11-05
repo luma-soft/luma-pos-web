@@ -111,14 +111,14 @@ refresh from the shared coordinator when the catalog is missing or stale.
 | Surface | Screen open, search, filter, sort, pagination | Shared synchronization | Requests that remain |
 | --- | --- | --- | --- |
 | Web POS, Inventory management, and product pickers | 0 product-list requests; local ProductExplorer over the scoped catalog | One provider uses the V2 server action for revision/delta/full recovery | Checkout, document mutations, and selected-product/detail operations still use their authoritative APIs |
-| iOS POS, Inventory, and product pickers | 0 screen-owned product-list requests; local provider projections | One actor-scoped coordinator uses `/api/mobile/products/catalog/v2` when enabled | POS metadata/checkout APIs remain; Release builds without `LUMA_UNIFIED_CATALOG_ENABLED=YES` use the coordinator's paginated V1-compatible sync path |
+| iOS POS, Inventory, and product pickers | 0 screen-owned product-list requests; local provider projections | One actor-scoped coordinator uses `/api/mobile/products/catalog/v2` by default in Release builds | POS metadata/checkout APIs remain; the coordinator retains its paginated V1-compatible sync path for rollback |
 | Older mobile clients | Existing behavior | Existing `/api/mobile/products/catalog` route remains available | Compatibility contract is unchanged |
 
-The iOS V2 gate is enabled in Debug builds and can be enabled in Release with
-`LUMA_UNIFIED_CATALOG_ENABLED=YES` or the in-app setting. Release currently
-defaults to the legacy sync implementation when that flag is absent. Both
-paths are owned by the shared coordinator; turning V2 off does not restore
-per-screen product browsing.
+The iOS V2 gate is enabled by default in Debug and Release builds. Release
+builds can still use the per-device override or `luma.catalog.forceLegacySync`
+to roll back to the legacy sync path. Both paths are owned by the shared
+coordinator; turning V2 off does not restore per-screen product browsing. The
+source default affects newly built apps and does not update installed clients.
 
 The implementation removes per-screen product-list reads. It does not claim a
 measured reduction in database CPU, response bytes, or Supabase billing; those

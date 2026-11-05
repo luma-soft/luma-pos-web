@@ -64,8 +64,8 @@ from those commits.
   projections. It also keeps legacy browse and POS caches for compatibility.
 - `NativeProductCatalogSyncCoordinator` in
   `Features/Inventory/NativeProductCatalogSync.swift` still has a separate
-  paginated full-catalog sync path. The unified `/catalog` endpoint is opt-in
-  for release builds; release currently defaults to the legacy path.
+  paginated full-catalog sync path for compatibility and rollback. The unified
+  `/catalog` endpoint is now enabled by default for newly built Release apps.
 - Inventory first renders its local grouped projection when available, but
   `NativeInventoryProductBrowseModel` still calls the paginated browse API for
   unsupported filters, missing projections, and some online reconciliation
@@ -131,8 +131,8 @@ the web Inventory management list now reads the local catalog; product screens
 use local provider/model search and pagination; and V2 deltas update only
 changed web IndexedDB and iOS SQLite product rows. Web and native unit search
 ranking now share equivalent rules and mirrored parity fixtures. The iOS
-Release V2 feature gate remains opt-in; its legacy paginated sync is still
-coordinated centrally for compatibility.
+Release V2 feature gate now defaults on; its legacy paginated sync remains
+coordinated centrally for compatibility and rollback.
 
 The compatibility V1 catalog route and native legacy sync implementation
 remain during rollout. Product detail, POS metadata, checkout, document

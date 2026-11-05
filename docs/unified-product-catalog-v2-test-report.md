@@ -2,9 +2,10 @@
 
 ## Status
 
-This report records local verification of the current web and iOS worktrees on
-2026-11-06. V1 compatibility remains in place, and the iOS Release flag remains
-off by default. These checks do not certify a production rollout.
+This report records verification of the current web and iOS worktrees on
+2026-11-06. V1 compatibility and iOS rollback controls remain in place. The
+iOS Release flag now defaults to V2 for newly built releases; this does not
+change apps already installed or certify a production rollout.
 
 The earlier migration runner record is documented in
 [the migration and rollout document](./unified-product-catalog-v2-migration.md).
@@ -32,18 +33,18 @@ certify a production rollout.
 ## iOS verification
 
 - The app target's Release configuration defaults
-  `LUMA_UNIFIED_CATALOG_ENABLED` to **NO**. `luma.catalog.forceLegacySync`
-  remains the device rollback switch.
+  `LUMA_UNIFIED_CATALOG_ENABLED` to **YES** (mobile commit
+  `b3020247991cb69a6a918e4b38e52024314f89d1`). The per-device override and
+  `luma.catalog.forceLegacySync` emergency switch remain available for rollback.
 - The local iOS gate on Xcode 27.2 built the whole app and passed **59/59**
   tests on the booted iPhone 17 Simulator (58 catalog-model tests plus the
-  product-picker rendering test). The updated app was installed and launched
-  on that simulator.
-- [GitHub Actions run #24](https://github.com/luma-soft/luma-pos-mobile/actions/runs/42110386019)
-  passed both jobs on the Xcode 27.0 preview image: 59 tests passed, and the
-  Release Simulator build with V2 opt-in verified
-  `LUMA_UNIFIED_CATALOG_ENABLED=YES` in the compiled Info.plist. The workflow
-  also verifies that Release defaults to **NO**. This is an ad hoc Simulator
-  build, not a signed TestFlight archive or upload.
+  product-picker rendering test). The Debug app and a local Release build were
+  installed and launched on that simulator. The Release build used no flag
+  override, and its compiled Info.plist contains **YES**.
+- [GitHub Actions run](https://github.com/luma-soft/luma-pos-mobile/actions/runs/42129477446)
+  verifies the Release default without a command-line override and runs the
+  same catalog/delta test gate. This is an ad hoc Simulator build, not a signed
+  TestFlight archive or upload.
 - The model tests cover offline cache use, full/delta synchronization,
   tombstones, cross-screen cache sharing, POS prices and units, release
   fallback, SQLite rollback, retry after a failed sync, relevance ordering,

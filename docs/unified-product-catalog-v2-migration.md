@@ -26,18 +26,19 @@ were preserved. Migration `0142_catalog_delta_journal.sql` was not modified.
 
 1. Keep the V1 route available while older mobile clients remain supported.
 2. Deploy the V2 API and web client from `main`.
-3. Ship the iOS client through TestFlight. Debug builds enable V2; Release
-   builds require `LUMA_UNIFIED_CATALOG_ENABLED=YES` (or the in-app override)
-   to opt into V2. Without it, the shared coordinator uses the paginated
-   legacy sync contract.
-4. Enable V2 for a controlled cohort after sync, tenant-scope, offline, and
-   performance diagnostics are reviewed.
-5. Expand rollout and later remove the legacy paginated browse sync after the
-   supported old-client window.
+3. The iOS Release build setting now defaults to V2 on `main`. Newly built
+   releases use the unified catalog; already installed apps are unchanged.
+   The per-device override and `luma.catalog.forceLegacySync` emergency switch
+   remain available for rollback.
+4. Build and validate a signed TestFlight release without a flag override.
+   No TestFlight archive or upload has been made yet.
+5. Review sync, tenant-scope, offline, performance, and production metrics
+   before expanding distribution. Keep the V1 route and legacy sync available
+   through the supported old-client window.
 
-The database migration is complete for the configured database. App deployment
-and feature-flag rollout remain separate steps; do not enable the iOS release
-flag broadly until diagnostics are reviewed.
+The database migration is complete for the configured database. The iOS source
+flag is enabled for future Release builds, but app distribution, signed-client
+validation, and production measurement remain separate outstanding steps.
 
 ## Existing cache migration
 

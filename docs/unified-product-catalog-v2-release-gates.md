@@ -34,18 +34,20 @@ Do not assume a successful queue insertion proves that an offsite backup exists.
 
 - Preserve the checked-in Keychain signing validation. Production/test builds
   need valid entitlements and signing; no anonymous unsigned installation.
-- Test Release with `LUMA_UNIFIED_CATALOG_ENABLED=YES` on a **signed** TestFlight
-  build, and verify the compiled Info.plist contains YES.
-- Release default is NO while rollout is gated; `luma.catalog.forceLegacySync`
-  remains the device rollback switch.
+- Build a **signed** TestFlight Release without a flag override and verify the
+  compiled Info.plist contains YES. No signed TestFlight archive or upload has
+  been made yet.
+- Release builds now default to V2. This source setting applies to newly built
+  apps; it does not change installed clients. The per-device override and
+  `luma.catalog.forceLegacySync` emergency switch remain available for rollback.
 - On iPhone/iPad, verify first-install full snapshot, unchanged revision, multi-
   page delta, tombstones, schema and actor mismatch, offline relaunch, low disk
   space, and app foreground restoration.
 - Preserve invoices, POS drafts, outbox entries, payment workflows, and
   existing SQLite data through migration and rollback.
-- macOS GitHub Actions compiles the Release target with V2 explicitly enabled
-  and runs selected catalog, delta, offline, SQLite rollback, and picker tests
-  on a simulator. Passing these checks does **not** establish signed-device,
+- macOS GitHub Actions compiles the Release target with the V2 default and runs
+  selected catalog, delta, offline, SQLite rollback, and picker tests on a
+  simulator. Passing these checks does **not** establish signed-device,
   Keychain, or TestFlight correctness.
 
 ## Stock Card and offline cache
