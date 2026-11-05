@@ -55,7 +55,11 @@ export async function syncProductCatalog(
     }
     return {
       mode: "full",
-      snapshot: await getProductCatalogSnapshot(context.storeId, context.userId, context.role),
+      // Inventory needs every lifecycle state; POS still applies its own
+      // authorized sellability filter when selecting products.
+      snapshot: await getProductCatalogSnapshot(context.storeId, context.userId, context.role, {
+        includeInactive: true,
+      }),
     };
   } catch {
     return null;
