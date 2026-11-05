@@ -444,6 +444,7 @@ export async function getOrder(storeId: string, id: string) {
         grossProfit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
       })
       .from(orderItems)
+      .innerJoin(orders, and(eq(orders.id, orderItems.orderId), eq(orders.storeId, storeId)))
       .innerJoin(products, and(eq(products.id, orderItems.productId), eq(products.storeId, storeId)))
       .where(and(eq(orderItems.orderId, id), eq(orderItems.storeId, storeId))),
     db
