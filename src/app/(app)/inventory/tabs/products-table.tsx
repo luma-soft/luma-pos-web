@@ -75,6 +75,7 @@ import {
 import { useProductSelection } from "./product-selection";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import {
+  checkStockHistoryVersionOnce,
   fetchStockHistoryOnce,
   readCachedStockHistory,
 } from "@/lib/offline/product-stock-history-store";
@@ -1342,6 +1343,8 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
   const [loadState, setLoadState] = useState<"loading" | "ready" | "offline" | "error">("loading");
   const tracked = isProductStockManaged(product.categoryName);
   const scopeId = snapshot?.scopeId;
+  // A catalog revision prompts a cheap stock-history check, not a reload of
+  // the entire history. The cached history itself has its own product version.
   const revision = snapshot?.revision;
 
   useEffect(() => {
@@ -1369,10 +1372,12 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
         if (!cached) setLoadState("offline");
         return;
       }
-      if (cached?.revision === revision) return;
-
       try {
-        const result = await fetchStockHistoryOnce(scopeId, product.id, page, revision);
+        if (cached) {
+          const currentVersion = await checkStockHistoryVersionOnce(scopeId, product.id);
+          if (cancelled || cached.version === currentVersion) return;
+        }
+        const result = await fetchStockHistoryOnce(scopeId, product.id, page);
         if (cancelled) return;
         if (result.ok) {
           setHistory({ scopeId, productId: product.id, page, rows: result.data.rows, hasMore: result.data.hasMore });
