@@ -1,4 +1,5 @@
-import { expect, test } from "bun:test";
+import { test } from "node:test";
+import assert from "node:assert/strict";
 
 import { uploadManagedMedia } from "./client";
 
@@ -70,12 +71,12 @@ test("retries a transient signed PUT before completing product media", async () 
     () => new Date(NOW.getTime()),
   );
 
-  expect(signedPutAttempts).toBe(2);
-  expect(calls).toEqual([
+  assert.equal(signedPutAttempts, 2);
+  assert.deepEqual(calls, [
     "/api/mobile/media/uploads",
     SIGNED_URL,
     SIGNED_URL,
     `/api/mobile/media/uploads/${MEDIA_ID}/complete`,
   ]);
-  expect(result.id).toBe(MEDIA_ID);
+  assert.equal(result.id, MEDIA_ID);
 });
