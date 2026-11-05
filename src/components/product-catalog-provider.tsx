@@ -133,17 +133,23 @@ export function ProductCatalogProvider({
     }
 
     await locks.request(`luma-product-catalog:${scopeId}`, async () => {
-      if (expectedRevision != null) {
-        const shared = await readProductCatalogSnapshot(scopeId);
-        if (
-          shared?.userId === userId && shared.scopeId === scopeId &&
-          !catalogRevisionChanged(shared.revision, expectedRevision)
-        ) {
+      // Recheck after acquiring the cross-tab lock. A tab may have completed
+      // the full cold-start sync while this tab was waiting; reuse its snapshot
+      // and ask the server for unchanged/delta instead of downloading it again.
+      const shared = await readProductCatalogSnapshot(scopeId);
+      if (shared?.userId === userId && shared.scopeId === scopeId) {
+        const current = snapshotRef.current;
+        const sharedIsNotOlder = !current || current.scopeId !== scopeId ||
+          !catalogRevisionChanged(shared.revision, current.revision);
+        if (sharedIsNotOlder) {
           snapshotRef.current = shared;
           setSnapshot(shared);
           setStatus("cached");
           revisionRef.current = shared.revision;
-          return;
+          if (
+            expectedRevision != null &&
+            !catalogRevisionChanged(shared.revision, expectedRevision)
+          ) return;
         }
       }
       await queue.refresh();

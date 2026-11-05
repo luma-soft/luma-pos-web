@@ -401,3 +401,152 @@ cached scope does not match. The delta retains inactive products to match the
 existing full-snapshot contract. This should reduce repeated catalog payloads;
 the production egress change is not yet measurable and needs comparison over a
 representative window.
+
+## Egress reduction follow-up — 2026-11-04
+
+### Baseline and what the metric counts
+
+The latest recorded production snapshot is **3.138 GB uncached egress** for
+the 2026-10-04–2026-11-04 cycle, with **0 GB cached egress** and **0 GB
+Supabase Storage egress**. It is a completed-cycle baseline, not a current
+reading for the new cycle. The October 28 service breakdown attributed 98.3%
+of that day's egress to Shared Pooler; the November 4 total does not identify
+the same per-service split, so Shared Pooler remains the leading hypothesis to
+re-check in the new cycle.
+
+Supabase counts query results returned through Supavisor as Shared Pooler
+Egress. Cached egress applies to CDN hits, typically Storage; it does not make
+a repeated Postgres query free. CDN-compressing an API response after the
+backend has fetched rows would reduce API-to-browser traffic, but not the
+already incurred Supabase-to-backend pooler egress. Supabase recommends
+returning fewer fields/rows, reducing repeated calls with caching, and avoiding
+full-row returns from writes when the caller does not need them.
+[Egress documentation](https://supabase.com/docs/guides/platform/manage-your-usage/egress)
+
+### First measurement: daily logical backups
+
+The scheduled backup is a new candidate not measured in the prior product-query
+review. [The workflow](../../.github/workflows/database-backup.yml) connects
+through the Supabase session pooler and requests a full roles dump, schema
+dump, and application data dump every day. [The worker](../../scripts/database-backup-worker.sh)
+then builds a local `tar.gz` and uploads it to R2. The dump files are downloaded
+from Supabase before compression, so compressing the final archive reduces R2
+storage and upload traffic but does not reduce the preceding Supabase-to-runner
+transfer. This is an inference from the worker order and Supabase's pooler
+egress definition.
+
+The worker records each uncompressed dump file's `sizeBytes` in the backup
+run's `manifest`, as well as the compressed `archive_size_bytes`. Sum
+`manifest.files[*].sizeBytes` across successful runs in the billing cycle and
+compare that estimate with daily Shared Pooler Egress. The uncompressed source
+size is a better estimate of dump transfer than the archive size; protocol
+overhead means it is not an exact byte-for-byte billing measurement.
+
+If full backups are a substantial share, do not reduce their cadence without
+accepting a larger recovery point objective. Evaluate excluding only data that
+is safely reproducible, choosing an offsite-copy frequency consistent with
+the restore target, or using a managed backup option while retaining a less
+frequent independent R2 copy. Supabase also recommends reducing the scope or
+frequency of manual backups run through Supavisor.
+[Egress optimization guidance](https://supabase.com/docs/guides/platform/manage-your-usage/egress)
+
+### Next candidates in application traffic
+
+1. **Inventory product reads.** The November 4 Query Performance snapshot
+   identified the product-list query as the leading query by total time: 1,005
+   calls and 97,404 rows processed. The inventory and mobile list paths already
+   use count-only mode, a 20-row web page, compact projections, and omit
+   stock-location/history and full media data. The generic list query still
+   returns fields such as description/specs and unit definitions, and variant
+   grouping can hydrate member rows. Profile result size for the actual list
+   response before removing fields; if they are not displayed in the current
+   list, return a thin row and load details when the user opens a product.
+   [Product reads](../../src/lib/data/products.ts)
+2. **POS draft polling.** While the web POS is visible, it requests
+   `/api/pos/order-drafts` every 10 seconds. Each GET lists the user's drafts,
+   including their payloads, and the current implementation also reads legacy
+   shared-draft rows for compatibility. Repeated full snapshots can add up for
+   stores with several active POS devices or large parked drafts. Measure row
+   count and serialized payload bytes per poll. If material, add a per-owner
+   revision/cursor so unchanged polls return a small `unchanged` response and
+   changed polls return only upserts/deletions; retire legacy reads after the
+   compatibility data has been reconciled.
+   [POS client](<../../src/app/(pos)/pos/pos-client.tsx>),
+   [draft listing](../../src/lib/orders/pos-drafts.ts)
+3. **Catalog full/delta ratio.** Web and mobile already use revision checks and
+   retained product deltas, while native clients keep local catalogs. Track
+   counts and byte estimates for `full`, `delta`, and `unchanged` responses.
+   Repeated full snapshots would point to stale/mismatched revision scope,
+   missing journal coverage, or oversized deltas forcing fallback. Fixing that
+   cause is more useful than adding another cache in front of the endpoint.
+4. **Realtime only if its service share rises.** The last recorded service
+   breakdown attributed 0.4% of egress to Realtime. If a fresh breakdown shows
+   meaningful growth, filter subscriptions by store and select only fields the
+   client consumes; do not add realtime subscriptions as an assumed egress
+   reduction. [Realtime protocol](https://supabase.com/docs/guides/realtime/protocol)
+
+### Measurement and rollout order
+
+1. In the new billing cycle, record daily total and per-service egress from
+   Supabase Usage. Compare it with daily active POS devices, backup runs, and
+   catalog sync mode counts so a billing change is not confused with lower
+   traffic.
+2. Extract dump source bytes from backup manifests and calculate their share
+   of Shared Pooler egress. This is the cheapest next check because the size
+   fields are already stored.
+3. For the top application query shapes, record query fingerprint, call
+   count, row count, and estimated result bytes at the backend `pg` boundary.
+   Supabase Query Performance exposes calls and rows but not bytes, and its API
+   gateway logs do not currently expose response-byte data; use its counters
+   to rank work, not as egress attribution by themselves.
+4. Change one source at a time and compare at least one representative week
+   against a similar workload. Keep the backup RPO and POS cross-device draft
+   behavior as explicit acceptance criteria.
+
+## Production egress check — 2026-11-05
+
+The Supabase Usage dashboard for organization `Luma` / project `LumaPos` showed
+**1.796 GB uncached egress out of 5 GB (36%)**, **0 GB cached egress**, and
+**0 GB overage** for the 2026-11-04–2026-12-04 cycle. Storage size was 0 GB and
+database size was 88.06 MB. The chart updates hourly and its daily service
+breakdown includes cached traffic, even though the separate cached quota was
+still 0 GB.
+
+The daily tooltip attributes:
+
+| Date | Shared Pooler | Auth | Realtime |
+| --- | ---: | ---: | ---: |
+| 2026-11-04 | 947.961 MB (98.5%) | 12.375 MB (1.3%) | 1.630 MB (0.2%) |
+| 2026-11-05 | 740.430 MB (98.6%) | 9.563 MB (1.3%) | 804.876 KB (0.1%) |
+
+This confirms the current spike is primarily database result traffic returned
+through Supavisor, not Storage or Realtime. The Usage page aggregates egress by
+service; it does not attribute those bytes to a particular SQL query.
+
+### Highest-volume query candidate
+
+The production Query Performance page currently shows a full product-catalog
+projection at **534 calls and 1,583,900 rows processed** (about 2,966 rows per
+call). Its SQL shape matches the uncapped full snapshot in
+[`product-catalog.ts`](../../src/lib/data/product-catalog.ts): it returns
+active product rows with supplier, pricing, unit, image, and warehouse-stock
+data. Query Performance does not show response bytes or a date range for these
+counters, so this is a strong candidate for the Shared Pooler spike, not a
+byte-for-byte attribution. The 534 calls may include activity before this
+billing cycle.
+
+The web provider already uses a retained delta when possible and shares its
+snapshot through IndexedDB. One avoidable case remained: a second tab that was
+waiting on the cross-tab Web Lock did not re-read the shared snapshot when its
+own first read had found no cache. It could therefore issue another full
+snapshot after the first tab completed its cold start. The provider now
+rechecks IndexedDB after acquiring the lock and, when a valid snapshot exists,
+uses its revision for the unchanged/delta request instead of repeating the
+full download.
+
+**Current priority:** compare full/delta/unchanged response modes and estimated
+bytes over the same billing window; continue tracing the uncapped catalog
+snapshot calls, including native clients; then measure backup dump bytes from
+their stored manifests. Keep the R2 media migration and existing bounded
+product list queries in place. The current service breakdown makes Storage
+optimizations unlikely to reduce this particular spike.
