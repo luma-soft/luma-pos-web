@@ -11,6 +11,7 @@ import { getPrintTemplatesForDoc } from "@/lib/print/template";
 import { Routes } from "@/lib/routes";
 import { formatDate } from "@/lib/utils";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { productCatalogScopeId } from "@/lib/product-catalog";
 import { PosClient, type PosSourceInvoice } from "./pos-client";
 import type { PosInitialContext } from "./pos-client";
 import { ProductEditorModal } from "@/app/(app)/inventory/tabs/products";
@@ -195,7 +196,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
       </header>
       <div className="flex-1 min-h-0">
         <PosClient
-          storageScope={`${context.storeId}:${context.userId}:${context.role}`}
+          storageScope={productCatalogScopeId(context.storeId, context.userId, context.role)}
           data={data}
           orderPrintTemplates={orderPrintTemplates}
           quotePrintTemplates={quotePrintTemplates}

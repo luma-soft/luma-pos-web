@@ -23,6 +23,7 @@ import { UNMANAGED_STOCK_CATEGORY_NAME } from "@/lib/product-stock";
 import {
   PRODUCT_CATALOG_SCHEMA_VERSION,
   LEGACY_PRODUCT_CATALOG_SCHEMA_VERSION,
+  productCatalogScopeId,
   sortByRecentProductSale,
   type ProductCatalogDelta,
   type CatalogUnit,
@@ -398,7 +399,7 @@ async function buildProductCatalogSnapshot(
   return {
     schemaVersion: options.schemaVersion ?? PRODUCT_CATALOG_SCHEMA_VERSION,
     userId,
-    scopeId: `${storeId}:${userId}:${role}`,
+    scopeId: productCatalogScopeId(storeId, userId, role),
     revision: revisionAfter,
     savedAt: Date.now(),
     products: orderedProductRows.map((product) => ({

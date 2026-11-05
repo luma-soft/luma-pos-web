@@ -5,7 +5,7 @@ import {
   getProductCatalogRevision,
   getProductCatalogSnapshot,
 } from "@/lib/data/product-catalog";
-import type { ProductCatalogDelta, ProductCatalogSnapshot } from "@/lib/product-catalog";
+import { productCatalogScopeId, type ProductCatalogDelta, type ProductCatalogSnapshot } from "@/lib/product-catalog";
 import { requireStoreContext } from "@/lib/auth/store-context";
 
 export type ProductCatalogSyncResult =
@@ -25,7 +25,7 @@ export async function syncProductCatalog(
           mode: "unchanged",
           revision,
           userId: context.userId,
-          scopeId: `${context.storeId}:${context.userId}:${context.role}`,
+          scopeId: productCatalogScopeId(context.storeId, context.userId, context.role),
         };
       }
       try {

@@ -4,6 +4,11 @@ export const PRODUCT_CATALOG_SCHEMA_VERSION = 12;
 export const LEGACY_PRODUCT_CATALOG_SCHEMA_VERSION = 10;
 export const PREVIOUS_PRODUCT_CATALOG_SCHEMA_VERSION = 11;
 
+/** One tenant and permission scope for every web catalog cache and consumer. */
+export function productCatalogScopeId(storeId: string, userId: string, role: string): string {
+  return `${storeId}:${userId}:${role}`;
+}
+
 export function isProductCatalogCacheSchemaCompatible(schemaVersion: number) {
   return schemaVersion === PRODUCT_CATALOG_SCHEMA_VERSION
     || schemaVersion === PREVIOUS_PRODUCT_CATALOG_SCHEMA_VERSION

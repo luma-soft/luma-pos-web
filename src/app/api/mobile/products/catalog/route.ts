@@ -1,5 +1,5 @@
 import { getProductCatalogDelta, getProductCatalogRevision, getProductCatalogSnapshot } from "@/lib/data/product-catalog";
-import { LEGACY_PRODUCT_CATALOG_SCHEMA_VERSION } from "@/lib/product-catalog";
+import { LEGACY_PRODUCT_CATALOG_SCHEMA_VERSION, productCatalogScopeId } from "@/lib/product-catalog";
 import { requireMobileStockReadAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const sinceRevision = params.get("sinceRevision")?.trim() ?? null;
   const sinceScope = params.get("sinceScope")?.trim() ?? null;
-  const currentScope = `${gate.storeId}:${gate.userId}:${gate.role}`;
+  const currentScope = productCatalogScopeId(gate.storeId, gate.userId, gate.role);
   // Revision is store-wide, whereas the snapshot's prices and purchase-cost
   // fields depend on the effective actor and role. Never replay/unchanged
   // across a role, user or store switch.

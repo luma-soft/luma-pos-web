@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { getRole, requireUser } from "@/lib/actions/common";
+import { requireUser } from "@/lib/actions/common";
 import { LogoutButton } from "@/components/logout-button";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeSwitcher } from "@/components/theme-switcher";
@@ -18,6 +18,7 @@ import { ProductCatalogProvider } from "@/components/product-catalog-provider";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { getProductCatalogRevision } from "@/lib/data/product-catalog";
 import { AppDataSyncProvider } from "@/components/app-data-sync-provider";
+import { productCatalogScopeId } from "@/lib/product-catalog";
 import { randomUUID } from "node:crypto";
 
 export const dynamic = "force-dynamic";
@@ -49,8 +50,8 @@ export default async function AppLayout({
   const t = await getTranslations();
   const theme = await getTheme();
   const mode = await getMode();
-  const role = await getRole(user.id);
-  const catalogScopeId = `${context.storeId}:${user.id}:${role}`;
+  const role = context.role;
+  const catalogScopeId = productCatalogScopeId(context.storeId, user.id, role);
   const catalogRevision = await getProductCatalogRevision(context.storeId);
 
   return (

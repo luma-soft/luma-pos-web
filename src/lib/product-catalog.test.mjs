@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import {
   isProductCatalogCacheSchemaCompatible,
   mergeProductCatalogDelta,
+  productCatalogScopeId,
   searchProductCatalog,
 } from "./product-catalog";
 
@@ -63,6 +64,14 @@ test("keeps older local catalog schemas usable until their full sync completes",
   expect([10, 11, 12].every(isProductCatalogCacheSchemaCompatible)).toBe(true);
   expect(isProductCatalogCacheSchemaCompatible(9)).toBe(false);
   expect(isProductCatalogCacheSchemaCompatible(13)).toBe(false);
+});
+
+test("catalog cache scope includes and isolates store, user, and role", () => {
+  const scope = productCatalogScopeId("store-1", "user-1", "manager");
+  expect(scope).toBe("store-1:user-1:manager");
+  expect(productCatalogScopeId("store-2", "user-1", "manager")).not.toBe(scope);
+  expect(productCatalogScopeId("store-1", "user-2", "manager")).not.toBe(scope);
+  expect(productCatalogScopeId("store-1", "user-1", "cashier")).not.toBe(scope);
 });
 
 test("search ranks exact SKU/barcode before exact name and ranks before truncating", () => {

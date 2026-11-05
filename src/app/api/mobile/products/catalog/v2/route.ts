@@ -3,6 +3,7 @@ import {
   getProductCatalogRevision,
   getProductCatalogSnapshot,
 } from "@/lib/data/product-catalog";
+import { productCatalogScopeId } from "@/lib/product-catalog";
 import { requireMobileStockReadAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const sinceRevision = params.get("sinceRevision")?.trim() ?? null;
   const sinceScope = params.get("sinceScope")?.trim() ?? null;
-  const currentScope = `${gate.storeId}:${gate.userId}:${gate.role}`;
+  const currentScope = productCatalogScopeId(gate.storeId, gate.userId, gate.role);
   const sameScope = sinceScope === currentScope;
   if (sinceRevision && !/^\d+$/.test(sinceRevision)) {
     return mobileError("errors.invalidData", 400);
