@@ -16,6 +16,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { db } from "@/db";
+import { orderItemGrossProfitSql } from "@/lib/data/order-profit";
 import {
   customers,
   einvoices,
@@ -440,7 +441,7 @@ export async function getOrder(storeId: string, id: string) {
       .orderBy(desc(returns.createdAt)),
     db
       .select({
-        grossProfit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+        grossProfit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
       })
       .from(orderItems)
       .innerJoin(products, and(eq(products.id, orderItems.productId), eq(products.storeId, storeId)))

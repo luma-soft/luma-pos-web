@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { orderItemGrossProfitSql } from "@/lib/data/order-profit";
 import {
   categories,
   customers,
@@ -92,7 +93,7 @@ export async function getDashboard(
 
     // lãi gộp = Σ(thành tiền − SL quy đổi × giá vốn hiện tại)
     db.select({
-      profit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
     })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
@@ -247,7 +248,7 @@ export async function getDashboard(
     db.select({
       key: orderBucketKey,
       label: orderBucketLabel,
-      grossProfit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      grossProfit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
     })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))

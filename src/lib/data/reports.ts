@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, ilike, inArray, lt, or, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { db } from "@/db";
+import { orderItemGrossProfitSql, orderItemNetRevenueSql } from "@/lib/data/order-profit";
 import {
   categories,
   customers,
@@ -130,7 +131,7 @@ export async function getReportInvoices(
       amountPaid: orders.amountPaid,
       productCount: sql<number>`count(distinct ${orderItems.productId})::int`,
       cost: sql<string>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}), 0)`,
-      profit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
     })
       .from(orders)
       .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
@@ -236,9 +237,9 @@ export async function getReportProducts(
       qtySold: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier})`,
       baseUnit: sql<string>`max(${products.baseUnit})`,
       imageUrls: productCompatibilityImageUrls(storeId),
-      revenue: sql<string>`sum(${orderItems.total})`,
+      revenue: sql<string>`sum(${orderItemNetRevenueSql()})`,
       cost: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})`,
-      profit: sql<string>`sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}))`,
+      profit: sql<string>`sum(${orderItemGrossProfitSql(products.costPrice)})`,
     })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
@@ -246,7 +247,7 @@ export async function getReportProducts(
       .leftJoin(customers, eq(orders.customerId, customers.id))
       .where(where)
       .groupBy(orderItems.productId, products.id, products.imageUrls)
-      .orderBy(desc(sql`sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}))`))
+      .orderBy(desc(sql`sum(${orderItemGrossProfitSql(products.costPrice)})`))
       .limit(safePageSize)
       .offset((safePage - 1) * safePageSize),
     db.select({ total: sql<number>`count(distinct ${orderItems.productId})::int` })
@@ -319,7 +320,7 @@ export async function getReportCustomers(
   const [profitRows, refundRows, returnedProfitRows] = await Promise.all([
     db.select({
       customerId: orders.customerId,
-      profit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
     })
       .from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id))
       .leftJoin(customers, eq(orders.customerId, customers.id)).where(and(where, customerSubset)).groupBy(orders.customerId),
@@ -376,7 +377,7 @@ async function getCoreReportsForDatabase(
       customerCount: sql<number>`count(distinct ${orders.customerId})::int`,
     }).from(orders).leftJoin(customers, eq(orders.customerId, customers.id)).where(where),
     database.select({
-      grossProfit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      grossProfit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
       costOfGoods: sql<string>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}), 0)`,
       quantitySold: sql<string>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitMultiplier}), 0)`,
       productCount: sql<number>`count(distinct ${orderItems.productId})::int`,
@@ -400,7 +401,7 @@ async function getCoreReportsForDatabase(
       .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`),
     database.select({
       day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
-      profit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
       cost: sql<string>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}), 0)`,
     }).from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id))
       .leftJoin(customers, eq(orders.customerId, customers.id)).where(where)
@@ -424,9 +425,9 @@ async function getCoreReportsForDatabase(
       qtySold: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier})`,
       baseUnit: sql<string>`max(${products.baseUnit})`,
       imageUrls: productCompatibilityImageUrls(storeId, publicMedia),
-      revenue: sql<string>`sum(${orderItems.total})`,
+      revenue: sql<string>`sum(${orderItemNetRevenueSql()})`,
       cost: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})`,
-      profit: sql<string>`sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}))`,
+      profit: sql<string>`sum(${orderItemGrossProfitSql(products.costPrice)})`,
     }).from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id))
       .leftJoin(customers, eq(orders.customerId, customers.id)).where(where).groupBy(orderItems.productId, products.id, products.imageUrls),
     database.select({
@@ -450,7 +451,7 @@ async function getCoreReportsForDatabase(
     }).from(orders).leftJoin(customers, eq(orders.customerId, customers.id)).where(where).groupBy(orders.customerId),
     database.select({
       customerId: orders.customerId,
-      profit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
     }).from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id))
       .leftJoin(customers, eq(orders.customerId, customers.id)).where(where).groupBy(orders.customerId),
     database.select({ customerId: returns.customerId, refund: sql<string>`coalesce(sum(${returns.totalRefund}), 0)` })
@@ -462,10 +463,10 @@ async function getCoreReportsForDatabase(
       .leftJoin(customers, eq(returns.customerId, customers.id)).where(returnWhere).groupBy(returns.customerId),
     database.select({
       categoryName: sql<string>`coalesce(${categories.name}, 'Khác')`,
-      revenue: sql<string>`sum(${orderItems.total})`,
+      revenue: sql<string>`sum(${orderItemNetRevenueSql()})`,
     }).from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id))
       .leftJoin(categories, eq(products.categoryId, categories.id)).leftJoin(customers, eq(orders.customerId, customers.id)).where(where)
-      .groupBy(categories.name).orderBy(desc(sql`sum(${orderItems.total})`)),
+      .groupBy(categories.name).orderBy(desc(sql`sum(${orderItemNetRevenueSql()})`)),
     database.select({ status: orders.status, count: sql<number>`count(*)::int` })
       .from(orders).leftJoin(customers, eq(orders.customerId, customers.id)).where(operationalWhere).groupBy(orders.status),
   ]);

@@ -1,5 +1,6 @@
 import { and, count, desc, eq, getTableColumns, gte, inArray, isNull, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
+import { orderItemGrossProfitSql } from "@/lib/data/order-profit";
 import {
   customerConsents,
   customerReceivableAllocations,
@@ -678,7 +679,7 @@ export async function getCustomerGrossProfit(
   const [[profitRow], [returnedProfitRow]] = await Promise.all([
     db
       .select({
-        grossProfit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+        grossProfit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
       })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
@@ -726,7 +727,7 @@ export async function getWalkInGrossProfit(
   const [[profitRow], [returnedProfitRow]] = await Promise.all([
     db
       .select({
-        grossProfit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+        grossProfit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
       })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
