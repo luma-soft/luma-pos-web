@@ -4,7 +4,7 @@ import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-d
 import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { paymentBankAccounts, storeSettings } from "@/db/schema";
-import { getPaymentBankAccounts, getStaff } from "@/lib/data/settings";
+import { getPaymentBankAccounts } from "@/lib/data/settings";
 import { getCameraQuoteFormOptions } from "@/lib/data/camera-quotes";
 import {
   CAMERA_IP_QUOTE_CAMERA_TYPES,
@@ -27,7 +27,6 @@ import {
   type PaymentBankAccountInput,
   type ShopeeSettingsInput,
   type StoreSettingsInput,
-  type StaffRole,
   type MobileNotificationSettingsPatch,
   type StorePrefsPatch,
   type StorePrefs,
@@ -42,8 +41,6 @@ import { buildAiProviderConfig, completeAiText, completeAiVision } from "@/lib/a
 import { type ActionResult, requireManager, requireOwner, requireUser } from "./common";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 import { Routes } from "@/lib/routes";
-import { applyStaffSettingsMutation } from "@/lib/settings/staff-settings-service";
-import { parseStaffSettingsMutation } from "@/lib/settings/staff-settings-mutation";
 import { formatStoreAddress, parseLegacyStoreAddress } from "@/lib/addresses/vietnam";
 
 type AiProviderTestKind = "text" | "vision";
@@ -65,17 +62,6 @@ type AiProviderTestResult = {
     totalTokens: number;
   };
 };
-
-export async function loadSettingsStaff(): Promise<ActionResult<Awaited<ReturnType<typeof getStaff>>>> {
-  const gate = await requireManager();
-  if (!gate.ok) return gate;
-  try {
-    return { ok: true, data: await getStaff(gate.storeId) };
-  } catch (e) {
-    console.error("loadSettingsStaff failed:", e);
-    return { ok: false, error: "errors.serverError" };
-  }
-}
 
 export async function loadSettingsPaymentBankAccounts(): Promise<ActionResult<Awaited<ReturnType<typeof getPaymentBankAccounts>>>> {
   let context;
@@ -624,40 +610,6 @@ export async function testAiProvider(input: AiSettingsInput, kind: AiProviderTes
       },
     };
   }
-}
-
-export async function updateStaffRole(id: string, role: StaffRole): Promise<ActionResult> {
-  const gate = await requireManager();
-  if (!gate.ok) return gate;
-  const mutation = parseStaffSettingsMutation({ id, role });
-  if (!mutation) return { ok: false, error: "errors.invalidData" };
-  const result = await applyStaffSettingsMutation({
-    actorId: gate.userId,
-    storeId: gate.storeId,
-    actorRole: gate.role,
-    mutation,
-    source: "manual",
-  });
-  if (!result.ok) return result;
-  revalidatePath(Routes.Settings);
-  return { ok: true, data: undefined };
-}
-
-export async function setStaffActive(id: string, active: boolean): Promise<ActionResult> {
-  const gate = await requireManager();
-  if (!gate.ok) return gate;
-  const mutation = parseStaffSettingsMutation({ id, active });
-  if (!mutation) return { ok: false, error: "errors.invalidData" };
-  const result = await applyStaffSettingsMutation({
-    actorId: gate.userId,
-    storeId: gate.storeId,
-    actorRole: gate.role,
-    mutation,
-    source: "manual",
-  });
-  if (!result.ok) return result;
-  revalidatePath(Routes.Settings);
-  return { ok: true, data: undefined };
 }
 
 function bankAccountActivitySummary(account: typeof paymentBankAccounts.$inferSelect) {

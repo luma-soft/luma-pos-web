@@ -1,48 +1,15 @@
-import { authorizeMobileSensitiveAction } from "@/lib/auth/mobile-approval";
-import { getStaff } from "@/lib/data/settings";
 import { requireMobileManager } from "@/lib/mobile/auth";
-import {
-  mobileAction,
-  mobileError,
-  mobileGate,
-  mobileOk,
-  readJson,
-} from "@/lib/mobile/response";
-import { applyStaffSettingsMutation } from "@/lib/settings/staff-settings-service";
-import { parseStaffSettingsMutation } from "@/lib/settings/staff-settings-mutation";
+import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 
+// Retired interface: preserve an empty read shape for older mobile builds.
 export async function GET() {
   const gate = await requireMobileManager();
   if (!gate.ok) return mobileGate(gate);
-
-  return mobileOk(await getStaff(gate.storeId));
+  return mobileOk([]);
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH() {
   const gate = await requireMobileManager();
-  if (!gate.ok) return mobileGate(gate)!;
-
-  const body = await readJson(request);
-  const mutation = parseStaffSettingsMutation(body);
-  if (!mutation) {
-    return mobileAction({ ok: false, error: "errors.invalidData" });
-  }
-
-  const authorization = await authorizeMobileSensitiveAction({
-    request,
-    storeId: gate.storeId,
-    requesterId: gate.userId,
-    requesterRole: gate.role,
-    permission: "settings.sensitive",
-    scope: mutation.scope,
-  });
-  if (!authorization.ok) return mobileError(authorization.error, 403);
-
-  return mobileAction(await applyStaffSettingsMutation({
-    actorId: gate.userId,
-    storeId: gate.storeId,
-    actorRole: gate.role,
-    mutation,
-    source: "mobile",
-  }));
+  if (!gate.ok) return mobileGate(gate);
+  return mobileError("errors.notFound", 404);
 }

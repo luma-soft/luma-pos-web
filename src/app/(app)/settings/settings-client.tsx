@@ -28,7 +28,6 @@ import {
   deletePaymentBankAccount,
   loadSettingsAiUsage,
   loadSettingsPaymentBankAccounts,
-  loadSettingsStaff,
   savePaymentBankAccount,
   setDefaultPaymentBankAccount,
   setPaymentBankAccountEnabled,
@@ -38,12 +37,10 @@ import {
   updateZaloSettings,
   updateStoreSettings,
   updateSepayPaymentNotificationsEnabled,
-  updateStaffRole,
-  setStaffActive,
   updateStorePrefs,
   updateCameraQuoteSettings,
 } from "@/lib/actions/settings";
-import type { PaymentBankAccountRow, StoreSettings, StaffRow } from "@/lib/data/settings";
+import type { PaymentBankAccountRow, StoreSettings } from "@/lib/data/settings";
 import type { CameraQuoteFormOptions } from "@/lib/data/camera-quotes";
 import {
   cameraQuoteMemoryCapacity,
@@ -81,21 +78,6 @@ import {
 } from "@/lib/notifications/contracts";
 import { applyDirectTaxPreset, DIRECT_TAX_PRESETS, DIRECT_TAX_REDUCTION_PERCENT } from "@/lib/tax/direct-tax";
 
-/* ── sample data (design preview — chưa nối backend) ── */
-const ROLE_LABELS: Record<string, string> = {
-  owner: "owner", manager: "manager", cashier: "cashier", stock: "stock", accountant: "accountant",
-};
-const PERMS: { key: string; roles: Record<string, boolean> }[] = [
-  { key: "processSales", roles: { owner: true, manager: true, cashier: true, stock: false, accountant: false } },
-  { key: "applyDiscount", roles: { owner: true, manager: true, cashier: true, stock: false, accountant: false } },
-  { key: "priceOverride", roles: { owner: true, manager: true, cashier: false, stock: false, accountant: false } },
-  { key: "processRefund", roles: { owner: true, manager: true, cashier: false, stock: false, accountant: false } },
-  { key: "voidDeleteInvoice", roles: { owner: true, manager: true, cashier: false, stock: false, accountant: false } },
-  { key: "editProducts", roles: { owner: true, manager: true, cashier: false, stock: true, accountant: false } },
-  { key: "stockInbound", roles: { owner: true, manager: true, cashier: false, stock: true, accountant: false } },
-  { key: "viewReports", roles: { owner: true, manager: true, cashier: false, stock: false, accountant: true } },
-  { key: "settingsAccess", roles: { owner: true, manager: false, cashier: false, stock: false, accountant: false } },
-];
 const DEVICES = [
   { ico: "🖨️", name: "XPrinter XP-N260L", labelKey: "thermalPrinter", status: "connected", detail: "USB · COM3" },
   { ico: "📷", name: "Honeywell Voyager 1250g", labelKey: "barcodeScanner", status: "connected", detail: "USB HID · Wedge" },
@@ -237,12 +219,11 @@ function formatAiTestMessage(message: string, L: boolean) {
   return map[message] ? settingsTextByFlag(L, `ui.aiTest.${map[message]}`) : message;
 }
 
-type SectionId = "store" | "staff" | "pos" | "cameraQuote" | "hardware" | "payments" | "print" | "tax" | "notifications" | "zalo" | "shopee" | "ai";
+type SectionId = "store" | "pos" | "cameraQuote" | "hardware" | "payments" | "print" | "tax" | "notifications" | "zalo" | "shopee" | "ai";
 
 const NAV: { groupKey: string; items: { id: SectionId; ico: string; labelKey: string; badge?: string }[] }[] = [
   { groupKey: "store", items: [
     { id: "store", ico: "🏪", labelKey: "store" },
-    { id: "staff", ico: "👤", labelKey: "staff" },
   ] },
   { groupKey: "operations", items: [
     { id: "pos", ico: "🛒", labelKey: "pos" },
@@ -265,7 +246,6 @@ const NAV: { groupKey: string; items: { id: SectionId; ico: string; labelKey: st
 ];
 const SEC_META: Record<SectionId, { titleKey: string; subtitleKey: string }> = {
   store: { titleKey: "store", subtitleKey: "store" },
-  staff: { titleKey: "staff", subtitleKey: "staff" },
   pos: { titleKey: "pos", subtitleKey: "pos" },
   cameraQuote: { titleKey: "cameraQuote", subtitleKey: "cameraQuote" },
   hardware: { titleKey: "hardware", subtitleKey: "hardware" },
@@ -304,12 +284,6 @@ const ROW = "flex min-h-11 items-center justify-between gap-3 px-3.5 py-2.5 bg-c
 const btnS = "inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-border-soft px-3 text-xs font-semibold transition hover:bg-surface-2";
 const btnF = "inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white transition hover:brightness-110";
 const searchableTouch = "[&>button]:h-11 lg:[&>button]:h-10";
-
-async function readSettingsStaff() {
-  const result = await loadSettingsStaff();
-  if (!result.ok) throw new Error(result.error);
-  return result.data;
-}
 
 async function readSettingsBankAccounts() {
   const result = await loadSettingsPaymentBankAccounts();
@@ -350,14 +324,12 @@ export function SettingsClient({
   const visibleNav = useMemo(() => NAV
     .map((group) => ({ ...group, items: group.items.filter((item) => isVisibleSection(item.id)) }))
     .filter((group) => group.items.length > 0), []);
-  const { state: staffQuery } = useAppDataQuery(active === "staff" ? "staff" : null, readSettingsStaff);
   const { state: bankQuery } = useAppDataQuery(active === "payments" ? "payments" : null, readSettingsBankAccounts);
   const { state: usageQuery } = useAppDataQuery(active === "ai" ? "ai" : null, readSettingsAiUsage);
-  const staff = staffQuery?.data;
   const bankAccounts = bankQuery?.data;
   const aiUsage = usageQuery?.data;
-  const lazyLoading = { staff: staffQuery?.loading, payments: bankQuery?.loading, ai: usageQuery?.loading };
-  const lazyError = { staff: staffQuery?.error, payments: bankQuery?.error, ai: usageQuery?.error };
+  const lazyLoading = { payments: bankQuery?.loading, ai: usageQuery?.loading };
+  const lazyError = { payments: bankQuery?.error, ai: usageQuery?.error };
   useEffect(() => {
     if (normalizedInitialTab) return;
     const saved = localStorage.getItem("lp-settings-active") as SectionId | null;
@@ -424,7 +396,6 @@ export function SettingsClient({
         </div>
 
         {active === "store" && <StoreSection L={L} store={store} canManage={canManage} />}
-        {active === "staff" && (staff ? <StaffSection L={L} staff={staff} canManage={canManage} /> : <LazySectionState L={L} loading={Boolean(lazyLoading.staff)} error={lazyError.staff} />)}
         {active === "pos" && <PosSettingsSection L={L} prefs={store.prefs.pos} canManage={canManage} />}
         {active === "cameraQuote" && <CameraQuoteSettingsSection prefs={store.prefs.cameraQuote} options={cameraQuoteOptions} canManage={canManage} />}
         {active === "hardware" && <HardwareSection L={L} prefs={store.prefs.hardware} canManage={canManage} />}
@@ -453,15 +424,6 @@ function LazySectionState({ L, loading, error }: { L: boolean; loading: boolean;
 }
 
 const INDUSTRY_OPTS = ["grocery", "cafe", "restaurant", "fashion", "electronics", "cosmetics", "books", "services", "petshop", "mobile", "construction"] as const;
-const ROLE_TEXT: Record<string, string> = {
-  owner: "owner", manager: "manager", cashier: "cashier", warehouse: "warehouse", technician: "technician",
-};
-const ROLE_PILL: Record<string, string> = {
-  owner: "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300",
-  manager: "bg-in-soft text-in", cashier: "bg-ok-soft text-ok", warehouse: "bg-warn-soft text-warn",
-};
-const AVATAR_COLORS = ["#0C7B6B", "#1D4ED8", "#B45309", "#6B6F76", "#9CA0A8"];
-
 function StoreSection({ L, store, canManage }: { L: boolean; store: StoreSettings; canManage: boolean }) {
   const [form, setForm] = useState(store);
   const [addressError, setAddressError] = useState("");
@@ -527,57 +489,6 @@ function StoreSection({ L, store, canManage }: { L: boolean; store: StoreSetting
         {!canManage && <p className="text-[11px] text-slate-400 italic">{settingsTextByFlag(L, "legacy.f2daa8f757fc")}</p>}
       </div>
     </Card>
-  );
-}
-
-function StaffRowItem({ s, i, L, canManage }: { s: StaffRow; i: number; L: boolean; canManage: boolean }) {
-  const t = useTranslations();
-  const role = s.role;
-  const active = s.isActive;
-  const [error, setError] = useState("");
-  const [pending, start] = useTransition();
-  function save(action: () => ReturnType<typeof updateStaffRole>) {
-    setError("");
-    start(async () => {
-      try {
-        const result = await action();
-        if (!result.ok) setError(t(result.error as never));
-      } catch {
-        setError(t("errors.serverError"));
-      }
-    });
-  }
-  const initial = ((s.fullName.trim().split(" ").pop() ?? "?")[0] ?? "?").toUpperCase();
-  return (
-    <tr className="grid grid-cols-2 gap-3 border-b border-border-soft p-3 last:border-0 hover:bg-surface-2 md:table-row md:p-0">
-      <td className="col-span-2 block p-0 md:table-cell md:px-3 md:py-2.5"><div className="flex items-center gap-2">
-        <span className="w-7 h-7 rounded-full grid place-items-center text-[11px] font-extrabold text-white shrink-0" style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}>{initial}</span>
-        <span className="font-bold text-xs">{s.fullName}</span>
-      </div>{error && <p role="alert" className="mt-1 text-xs text-er">{error}</p>}</td>
-      <td className="block p-0 md:table-cell md:px-3 md:py-2.5">
-        <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{settingsTextByFlag(L, "legacy.500066278f54")}</div>
-        {canManage ? (
-          <Select
-            value={role}
-            onChange={(e) => { const r = e.target.value as StaffRole; save(() => updateStaffRole(s.id, r)); }}
-            disabled={pending}
-            size="sm"
-            options={STAFF_ROLES.map((r) => ({ value: r, label: settingsTextByFlag(L, `ui.roles.${ROLE_TEXT[r] ?? r}`) }))}
-            className="min-h-11 text-xs lg:min-h-0"
-          />
-        ) : <span className={cn("inline-block px-2 py-0.5 rounded-full text-[9px] font-bold", ROLE_PILL[role] ?? "bg-surface-2 text-slate-500")}>{settingsTextByFlag(L, `ui.roles.${ROLE_TEXT[role] ?? role}`)}</span>}
-      </td>
-      <td className="block p-0 font-mono text-[11px] text-slate-500 md:table-cell md:px-3 md:py-2.5">
-        <div className="mb-1 font-sans text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{settingsTextByFlag(L, "legacy.5745605d2af1")}</div>
-        {s.phone ?? "—"}
-      </td>
-      <td className="col-span-2 flex min-h-11 items-center justify-between p-0 md:table-cell md:px-3 md:py-2.5">
-        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{settingsTextByFlag(L, "legacy.81a5b063f527")}</div>
-        {canManage
-          ? <TouchTargetToggle checked={active} disabled={pending} onChange={(v) => save(() => setStaffActive(s.id, v))} aria-label="active" />
-          : <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", active ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-400")}>{active ? (settingsTextByFlag(L, "legacy.91c275269ca2")) : (settingsTextByFlag(L, "legacy.c6878ed4526d"))}</span>}
-      </td>
-    </tr>
   );
 }
 
@@ -1688,82 +1599,6 @@ function CameraQuoteSettingsSection({
           />
         </div>
       </Card>
-    </>
-  );
-}
-
-function StaffSection({ L, staff, canManage }: { L: boolean; staff: StaffRow[]; canManage: boolean }) {
-  const [tab, setTab] = useState<"list" | "perms">("list");
-  const roles = ["owner", "manager", "cashier", "stock", "accountant"];
-  return (
-    <>
-      <SegmentedTabs
-        className="mb-3.5"
-        items={[
-          { id: "list", label: settingsTextByFlag(L, "legacy.fbeb731bf942") },
-          { id: "perms", label: settingsTextByFlag(L, "legacy.39f66c66bb76") },
-        ]}
-        value={tab}
-        onChange={setTab}
-      />
-      {tab === "list" && (
-        <Card title={settingsTextByFlag(L, "legacy.495fdd9788f8")} vi={settingsTextByFlag(L, "legacy.deca5f03b901")}>
-          {staff.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-slate-400">{settingsTextByFlag(L, "legacy.3d5570d660db")}</p>
-          ) : (
-            <div className="overflow-visible md:overflow-x-auto" data-mobile-audit="settings-staff">
-              <table className="block w-full text-sm md:table">
-                <thead className="hidden md:table-header-group"><tr className="bg-canvas text-left text-[9px] uppercase tracking-wide text-slate-400 border-b border-border">
-                  <th className="px-3 py-2 font-bold">{settingsTextByFlag(L, "legacy.28433b857242")}</th>
-                  <th className="px-3 py-2 font-bold">{settingsTextByFlag(L, "legacy.500066278f54")}</th>
-                  <th className="px-3 py-2 font-bold">{settingsTextByFlag(L, "legacy.5745605d2af1")}</th>
-                  <th className="px-3 py-2 font-bold">{settingsTextByFlag(L, "legacy.81a5b063f527")}</th>
-                </tr></thead>
-                <tbody className="block md:table-row-group">{staff.map((s, i) => <StaffRowItem key={s.id} s={s} i={i} L={L} canManage={canManage} />)}</tbody>
-              </table>
-            </div>
-          )}
-          {canManage && <div className="px-4 py-2.5 border-t border-border text-[10px] text-slate-400 italic">{settingsTextByFlag(L, "legacy.a29acbc36055")}</div>}
-        </Card>
-      )}
-      {tab === "perms" && (
-        <Card title={settingsTextByFlag(L, "legacy.0c3cf56f43fe")} vi={settingsTextByFlag(L, "legacy.d3462055821b")}>
-          <div className="divide-y divide-border-soft md:hidden" data-mobile-audit="settings-permissions">
-            {PERMS.map((p, i) => (
-              <article key={i} className="p-3">
-                <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">{settingsTextByFlag(L, `ui.permissions.${p.key}`)}</h4>
-                <dl className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
-                  {roles.map((r) => (
-                    <div key={r} className="flex items-center justify-between gap-2 rounded-lg bg-canvas px-2 py-2">
-                      <dt className="text-slate-500">{settingsTextByFlag(L, `ui.roles.${ROLE_LABELS[r] ?? r}`)}</dt>
-                      <dd aria-label={p.roles[r] ? (settingsTextByFlag(L, "legacy.11225dbe9c65")) : (settingsTextByFlag(L, "legacy.487230a9c0fa"))}>
-                        {p.roles[r] ? <Check className="h-4 w-4 text-ok" /> : <span className="text-slate-300 dark:text-slate-700">✕</span>}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </article>
-            ))}
-          </div>
-          <div className="hidden overflow-x-auto md:block">
-            <table className="w-full text-[11px]">
-              <thead><tr className="bg-canvas border-b border-border text-[9px] uppercase tracking-wide text-slate-400">
-                <th className="px-2 py-2 text-left font-bold min-w-45">{settingsTextByFlag(L, "legacy.51927998f6ae")}</th>
-                {roles.map((r) => <th key={r} className="px-2 py-2 font-bold text-center">{settingsTextByFlag(L, `ui.roles.${ROLE_LABELS[r] ?? r}`)}</th>)}
-              </tr></thead>
-              <tbody>{PERMS.map((p, i) => (
-                <tr key={i} className="border-b border-border-soft last:border-0">
-                  <td className="px-2 py-2 font-semibold text-slate-900 dark:text-slate-100">{settingsTextByFlag(L, `ui.permissions.${p.key}`)}</td>
-                  {roles.map((r) => <td key={r} className="px-2 py-2 text-center">{p.roles[r] ? <Check className="w-3.5 h-3.5 text-ok inline" /> : <span className="text-slate-300 dark:text-slate-700">✕</span>}</td>)}
-                </tr>
-              ))}</tbody>
-            </table>
-          </div>
-          <div className="px-3.5 py-2.5 bg-in-soft border-t border-in/20 text-[10px] text-in">
-            {settingsTextByFlag(L, "legacy.cdfc710b5ed9")}
-          </div>
-        </Card>
-      )}
     </>
   );
 }
