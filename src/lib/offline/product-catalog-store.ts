@@ -112,15 +112,18 @@ export async function readProductCatalogSnapshot(
 export async function writeProductCatalogSnapshot(
   snapshot: ProductCatalogSnapshot,
   changes?: ProductCatalogWriteChanges,
-): Promise<void> {
+): Promise<boolean> {
   const database = await openDatabase();
-  if (!database) return;
+  if (!database) return false;
 
-  await new Promise<void>((resolve) => {
+  // One readwrite transaction owns both rows and revision metadata.
+  // The caller must not announce a new revision before oncomplete fires.
+  return new Promise<boolean>((resolve, reject) => {
     const transaction = database.transaction([META_STORE, PRODUCTS_STORE], "readwrite");
     const metaStore = transaction.objectStore(META_STORE);
     const productsStore = transaction.objectStore(PRODUCTS_STORE);
     const currentRequest = metaStore.get(snapshot.scopeId);
+    let committed = false;
     currentRequest.onsuccess = () => {
       const current = currentRequest.result as ProductCatalogSnapshot | undefined;
       if (
@@ -129,6 +132,7 @@ export async function writeProductCatalogSnapshot(
       ) return;
 
       const saveRows = () => {
+        committed = true;
         if (!changes) {
           for (const product of snapshot.products) {
             productsStore.put(product, productKey(snapshot.scopeId, product.id));
@@ -163,11 +167,12 @@ export async function writeProductCatalogSnapshot(
     };
     transaction.oncomplete = () => {
       database.close();
-      resolve();
+      // false means a newer scoped revision already won the race.
+      resolve(committed);
     };
-    transaction.onabort = transaction.onerror = () => {
+    transaction.onabort = () => {
       database.close();
-      resolve();
+      reject(new Error("PRODUCT_CATALOG_INDEXEDDB_COMMIT_FAILED"));
     };
   });
 }
