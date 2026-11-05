@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { MobileFormLineCard } from "@/components/mobile-ui";
@@ -43,6 +43,7 @@ import { ProductSearchThumbnail } from "@/components/product-search/product-sear
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 import { expandProductSearchUnitResults, rankProductSearchUnitResults } from "@/lib/pos/search-unit-results";
 import { ProductCreateMenu, type ProductKind } from "@/app/(app)/inventory/tabs/product-create-menu";
+import { SupplierCreateDialog } from "@/components/partners/supplier-create-dialog";
 
 type PUnit = { unitName: string; multiplier: number };
 type Line = {
@@ -248,6 +249,8 @@ export function PurchaseForm({
   const router = useRouter();
 
   const [supplierId, setSupplierId] = useState(initialValues?.supplierId ?? "");
+  const [createdSuppliers, setCreatedSuppliers] = useState<PurchaseFormOptions["suppliers"]>([]);
+  const [supplierCreateOpen, setSupplierCreateOpen] = useState(false);
   const [warehouseId, setWarehouseId] = useState(initialValues?.warehouseId ?? options.warehouses[0]?.id ?? "");
   const [lines, setLines] = useState<Line[]>(() => {
     if (!initialValues) return initialProducts.map((p) => productToLine(p));
@@ -274,7 +277,11 @@ export function PurchaseForm({
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
   const aiPreviewHydratedRef = useRef(false);
   const createdProductRefreshRef = useRef<string | null>(null);
-  const selectedSupplier = options.suppliers.find((supplier) => supplier.id === supplierId);
+  const supplierOptions = useMemo(() => {
+    const existingIds = new Set(options.suppliers.map((supplier) => supplier.id));
+    return [...options.suppliers, ...createdSuppliers.filter((supplier) => !existingIds.has(supplier.id))];
+  }, [createdSuppliers, options.suppliers]);
+  const selectedSupplier = supplierOptions.find((supplier) => supplier.id === supplierId);
 
   useEffect(() => {
     if (mode !== "create" || !createdProductId) return;
@@ -877,8 +884,11 @@ export function PurchaseForm({
           <div>
             <Text as="div" variant="muted" size="xs" weight="medium" className="mb-1" text={`${t("purchases.cols.supplier")} *`} />
             <Combobox value={supplierId} onChange={(value) => { clearError(); setSupplierId(value); }} allowClear={false}
-              placeholder={t(options.suppliers.length ? "products.fields.supplierPlaceholder" : "purchases.noSuppliers")}
-              options={options.suppliers.map((s) => ({ value: s.id, label: s.name }))} />
+              placeholder={t(supplierOptions.length ? "products.fields.supplierPlaceholder" : "purchases.noSuppliers")}
+              options={supplierOptions.map((supplier) => ({ value: supplier.id, label: supplier.name }))}
+              actionLabel={t("suppliers.createNew")}
+              actionIcon={<Plus className="h-4 w-4" />}
+              onAction={() => { clearError(); setSupplierCreateOpen(true); }} />
             {selectedSupplier && (
               <div className="mt-1.5 flex items-center justify-between gap-3 text-xs">
                 <span className="text-slate-500">{t("purchases.currentSupplierDebt")}</span>
@@ -958,6 +968,18 @@ export function PurchaseForm({
           </div>
         </div>
       </div>
+
+      <SupplierCreateDialog
+        open={supplierCreateOpen}
+        onOpenChange={setSupplierCreateOpen}
+        onCreated={(supplier) => {
+          setCreatedSuppliers((current) => current.some((existing) => existing.id === supplier.id)
+            ? current
+            : [...current, { id: supplier.id, name: supplier.name, currentDebt: "0" }]);
+          setSupplierId(supplier.id);
+          setSupplierCreateOpen(false);
+        }}
+      />
 
       {mode === "create" && (
         <AiQuickActionModal
