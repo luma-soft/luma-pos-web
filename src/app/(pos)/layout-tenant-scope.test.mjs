@@ -7,7 +7,9 @@ mock.module("next/navigation", () => ({
 }));
 mock.module("@/lib/actions/common", () => ({
   requireUser: async () => ({ id: "user-1" }),
-  getRole: async () => "cashier",
+}));
+mock.module("@/lib/auth/store-context", () => ({
+  resolveStoreContextForUser: async () => ({ storeId: "store-1", role: "cashier" }),
 }));
 mock.module("@/components/product-catalog-provider", () => ({
   ProductCatalogProvider: ({ children }) => children,
