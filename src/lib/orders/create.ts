@@ -39,6 +39,21 @@ function revalidateOrderPaths(sourceOrderId?: string) {
   }
 }
 
+function undefinedColumnName(error: unknown): string | null {
+  const value = error as {
+    cause?: { column?: unknown; message?: unknown };
+    message?: unknown;
+  };
+  const candidate = value?.cause?.column;
+  if (typeof candidate === "string" && /^[a-z_][a-z0-9_$]*$/i.test(candidate)) return candidate;
+
+  const message = typeof value?.cause?.message === "string"
+    ? value.cause.message
+    : typeof value?.message === "string" ? value.message : "";
+  const match = message.match(/column\s+(?:[a-z_][a-z0-9_$]*\.)?["']?([a-z_][a-z0-9_$]*)["']?(?:\s+of\s+relation\s+["']?[a-z_][a-z0-9_$]*["']?)?\s+does not exist/i);
+  return match?.[1] ?? null;
+}
+
 async function retryCheckoutTransaction<T>(runTransaction: () => Promise<T>): Promise<T> {
   const maxAttempts = 3;
   for (let attempt = 0; ; attempt += 1) {
@@ -622,7 +637,13 @@ export async function createOrderForUser(
     const databaseCode = pgErrorCode(e);
     console.error("createOrder failed:", { referenceCode, databaseCode, error: e });
     if (databaseCode === "42703") {
-      return { ok: false, error: "errors.schemaOutOfDate", referenceCode };
+      const column = undefinedColumnName(e);
+      return {
+        ok: false,
+        error: column ? "errors.missingDatabaseColumn" : "errors.schemaOutOfDate",
+        referenceCode,
+        ...(column ? { errorDetails: { kind: "missingColumn" as const, column } } : {}),
+      };
     }
     return { ok: false, error: "errors.serverErrorWithReference", referenceCode };
   }

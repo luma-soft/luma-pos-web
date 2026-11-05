@@ -2238,9 +2238,17 @@ export function PosClient({
       }
     } else if (res.kind === "rejected") {
       setSubmittingMode(null);
-      setError(res.referenceCode
-        ? t(res.error, { reference: res.referenceCode })
-        : t(res.error));
+      if (res.referenceCode && t.has(res.error)) {
+        setError(t(res.error, {
+          reference: res.referenceCode,
+          ...(res.errorDetails?.kind === "missingColumn" ? { column: res.errorDetails.column } : {}),
+        }));
+      } else if (res.referenceCode) {
+        const columnDetail = res.errorDetails?.kind === "missingColumn" ? ` (${res.errorDetails.column})` : "";
+        setError(`${t("errors.serverError")}${columnDetail} · ${res.referenceCode}`);
+      } else {
+        setError(t(res.error));
+      }
       if (res.error === "pos.errors.pricingChanged") setPricingConflictId(activeId);
     } else {
       if (selectedPayMethod === "bank_transfer") {

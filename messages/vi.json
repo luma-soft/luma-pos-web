@@ -2462,6 +2462,7 @@
     "versionConflict": "Bản ghi này đã được cập nhật trên máy chủ.",
     "serverError": "Có lỗi xảy ra, thử lại sau.",
     "serverErrorWithReference": "Không lưu được hóa đơn. Mã tra cứu: {reference}. Gửi mã này cho quản trị viên để tìm nguyên nhân.",
+    "missingDatabaseColumn": "Cơ sở dữ liệu thiếu cột {column} mà ứng dụng cần. Mã tra cứu: {reference}.",
     "schemaOutOfDate": "Cơ sở dữ liệu chưa được cập nhật đúng phiên bản. Báo quản trị viên. Mã tra cứu: {reference}.",
     "notFound": "Không tìm thấy dữ liệu.",
     "forbidden": "Bạn không có quyền thực hiện thao tác này."

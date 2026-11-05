@@ -19,9 +19,12 @@ import {
 
 export type { Role } from "@/lib/auth/roles";
 
+export type ActionErrorDetails =
+  | { kind: "missingColumn"; column: string };
+
 export type ActionResult<T = undefined> =
   | { ok: true; data: T }
-  | { ok: false; error: string; referenceCode?: string };
+  | { ok: false; error: string; referenceCode?: string; errorDetails?: ActionErrorDetails };
 
 export { UnauthorizedError } from "@/lib/auth/store-context";
 
