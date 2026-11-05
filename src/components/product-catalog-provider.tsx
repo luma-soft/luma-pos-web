@@ -394,7 +394,7 @@ export function ProductCatalogProvider({
       stopCanonical();
       stopInventory();
     };
-  }, [snapshot?.products]);
+  }, [snapshot]);
 
   const search = useCallback((
     query: string,
