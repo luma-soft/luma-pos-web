@@ -166,11 +166,12 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
         : await tx.insert(purchaseReturns).values(values).returning({ id: purchaseReturns.id, code: purchaseReturns.code });
       if (previous) await tx.delete(purchaseReturnItems).where(and(eq(purchaseReturnItems.storeId, gate.storeId), eq(purchaseReturnItems.purchaseReturnId, previous.id)));
 
-      await tx.insert(purchaseReturnItems).values(v.items.map((item) => {
+      await tx.insert(purchaseReturnItems).values(v.items.map((item, lineOrder) => {
         const product = productsById.get(item.productId)!;
         return {
           storeId: gate.storeId,
           purchaseReturnId: ret.id,
+          lineOrder,
           purchaseOrderItemId: item.purchaseOrderItemId ?? null,
           productId: item.productId,
           productName: product.name,

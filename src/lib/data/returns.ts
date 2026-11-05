@@ -1,4 +1,4 @@
-import { and, count, desc, eq, exists, getTableColumns, gte, lte, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, exists, getTableColumns, gte, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { customers, orderItems, orders, profiles, products, returnItems, returns, warehouses } from "@/db/schema";
@@ -244,6 +244,7 @@ export async function getReturn(storeId: string, id: string) {
   }).from(returnItems)
     .leftJoin(orderItems, and(eq(orderItems.id, returnItems.orderItemId), eq(orderItems.storeId, storeId)))
     .leftJoin(products, and(eq(products.id, returnItems.productId), eq(products.storeId, storeId)))
-    .where(and(eq(returnItems.returnId, id), eq(returnItems.storeId, storeId)));
+    .where(and(eq(returnItems.returnId, id), eq(returnItems.storeId, storeId)))
+    .orderBy(asc(returnItems.lineOrder), asc(returnItems.id));
   return { ...ret, items };
 }

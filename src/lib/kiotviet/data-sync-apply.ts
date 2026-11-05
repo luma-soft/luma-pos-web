@@ -196,7 +196,7 @@ type OrderLine = {
 
 async function writeOrderLine(input: ApplyInput & {
   parentId: string; entityType: "booking_line" | "sale_line"; externalId: string; localId?: string;
-  line: OrderLine; parentWasCreated: boolean; method?: KiotVietMappingAdoptionMethod;
+  line: OrderLine; lineOrder: number; parentWasCreated: boolean; method?: KiotVietMappingAdoptionMethod;
 }) {
   assertUuid(input.line.productId, "product reference");
   if (!input.line.sourceSku.trim() || !input.line.unitName.trim() || input.line.unitMultiplier <= 0) {
@@ -206,7 +206,7 @@ async function writeOrderLine(input: ApplyInput & {
   const method: KiotVietMappingAdoptionMethod = input.method ?? (localId ? "mapped" : "created");
   localId ??= randomUUID();
   const values = {
-    productId: input.line.productId, sourceSku: input.line.sourceSku, productName: input.line.productName,
+    lineOrder: input.lineOrder, productId: input.line.productId, sourceSku: input.line.sourceSku, productName: input.line.productName,
     unitName: input.line.unitName, unitMultiplier: String(input.line.unitMultiplier),
     quantity: String(input.line.quantity), unitPrice: String(input.line.unitPrice), discount: String(input.line.discount),
     total: String(input.line.total), note: input.line.note,
@@ -250,9 +250,9 @@ async function applyBookings(input: ApplyInput & { plan: Extract<KiotVietTypedPh
       eq(orders.storeId, input.storeId), eq(orders.id, localId), eq(orders.documentType, "booking"),
     )).returning({ id: orders.id }), `Booking ${localId}`);
     await mapSource({ ...input, entityType: "booking", externalId: write.externalId, localId, method: adoptionMethod(write.action, write.localId) });
-    for (const child of write.booking.lines) await writeOrderLine({
+    for (const [lineOrder, child] of write.booking.lines.entries()) await writeOrderLine({
       ...input, parentId: localId, entityType: "booking_line", externalId: child.externalId,
-      localId: child.localId, line: child.line, parentWasCreated, method: child.adoptionMethod,
+      localId: child.localId, line: child.line, lineOrder, parentWasCreated, method: child.adoptionMethod,
     });
     for (const child of write.booking.payments) await writeOrderPayment({
       ...input, parentId: localId, entityType: "booking_payment", externalId: child.externalId,
@@ -279,7 +279,7 @@ async function applySales(input: ApplyInput & { plan: Extract<KiotVietTypedPhase
       eq(orders.storeId, input.storeId), eq(orders.id, localId), eq(orders.documentType, "sale"),
     )).returning({ id: orders.id }), `Sale ${localId}`);
     await mapSource({ ...input, entityType: "sale", externalId: write.externalId, localId, method: adoptionMethod(write.action, write.localId) });
-    for (const child of write.sale.lines) await writeOrderLine({ ...input, parentId: localId, entityType: "sale_line", externalId: child.externalId, localId: child.localId, line: child.line, parentWasCreated, method: child.adoptionMethod });
+    for (const [lineOrder, child] of write.sale.lines.entries()) await writeOrderLine({ ...input, parentId: localId, entityType: "sale_line", externalId: child.externalId, localId: child.localId, line: child.line, lineOrder, parentWasCreated, method: child.adoptionMethod });
     for (const child of write.sale.payments) await writeOrderPayment({ ...input, parentId: localId, entityType: "sale_payment", externalId: child.externalId, localId: child.localId, payment: child.payment, parentWasCreated, method: child.adoptionMethod });
   }
   await refreshEntityMappings({ ...input, entityType: "sale", entityPlan: input.plan.typedPlan.entityPlan });
@@ -338,13 +338,13 @@ async function applyReturns(input: ApplyInput & { plan: Extract<KiotVietTypedPha
       eq(returns.storeId, input.storeId), eq(returns.id, localId),
     )).returning({ id: returns.id }), `Return ${localId}`);
     await mapSource({ ...input, entityType: "customer_return", externalId: write.externalId, localId, method: adoptionMethod(write.action, write.localId) });
-    for (const child of value.lines) {
+    for (const [lineOrder, child] of value.lines.entries()) {
       const childId = child.localId ?? randomUUID();
       const line = child.line;
       assertUuid(line.productId, "product reference");
       assertOptionalUuid(line.orderItemId, "sale line reference");
       if (!line.sourceSku.trim() || !line.unitName.trim() || line.unitMultiplier <= 0) throw new Error("KiotViet return line source SKU/unit/multiplier must be valid");
-      const values = { orderItemId: line.orderItemId, productId: line.productId, sourceSku: line.sourceSku,
+      const values = { lineOrder, orderItemId: line.orderItemId, productId: line.productId, sourceSku: line.sourceSku,
         productName: line.productName, unitName: line.unitName, unitMultiplier: String(line.unitMultiplier),
         quantity: String(line.quantity), unitPrice: String(line.unitPrice), total: String(line.total), restock: false };
       if (!child.localId) await input.transaction.insert(returnItems).values({ id: childId, storeId: input.storeId, returnId: localId, ...values });
@@ -381,12 +381,12 @@ async function applyPurchaseReturns(input: ApplyInput & { plan: Extract<KiotViet
       eq(purchaseReturns.storeId, input.storeId), eq(purchaseReturns.id, localId),
     )).returning({ id: purchaseReturns.id }), `Supplier return ${localId}`);
     await mapSource({ ...input, entityType: "supplier_return", externalId: write.externalId, localId, method: adoptionMethod(write.action, write.localId) });
-    for (const child of value.lines) {
+    for (const [lineOrder, child] of value.lines.entries()) {
       const childId = child.localId ?? randomUUID();
       const line = child.line;
       assertUuid(line.productId, "product reference");
       if (!line.sourceSku.trim() || !line.unitName.trim() || line.unitMultiplier <= 0) throw new Error("KiotViet supplier return line source SKU/unit/multiplier must be valid");
-      const values = { purchaseOrderItemId: null, productId: line.productId, productName: line.productName,
+      const values = { lineOrder, purchaseOrderItemId: null, productId: line.productId, productName: line.productName,
         sku: line.sourceSku, unitName: line.unitName, unitMultiplier: String(line.unitMultiplier),
         quantity: String(line.quantity), unitCost: String(line.unitCost), returnUnitCost: String(line.returnUnitCost), total: String(line.total) };
       if (!child.localId) await input.transaction.insert(purchaseReturnItems).values({ id: childId, storeId: input.storeId, purchaseReturnId: localId, ...values });

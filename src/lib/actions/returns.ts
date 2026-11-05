@@ -354,9 +354,10 @@ export async function createExchangeForUser(
         note: `Đổi hàng từ ${order.code}${v.note ? ` · ${v.note}` : ""}`,
         createdBy: profileId,
       }).returning({ id: orders.id, code: orders.code });
-      await tx.insert(orderItems).values(replacementItems.map((item) => ({
+      await tx.insert(orderItems).values(replacementItems.map((item, lineOrder) => ({
         storeId,
         orderId: exchangeOrder.id,
+        lineOrder,
         productId: item.productId,
         productName: item.productName,
         unitName: item.unitName,
@@ -382,10 +383,11 @@ export async function createExchangeForUser(
         note: v.note || null,
         createdBy: profileId,
       }).returning({ id: returns.id, code: returns.code });
-      await tx.insert(returnItems).values(returnedRows.map((row) => ({
+      await tx.insert(returnItems).values(returnedRows.map((row, lineOrder) => ({
         ...row,
         storeId,
         returnId: returned.id,
+        lineOrder,
       })));
       const [gatewayRefund] = gatewayPayment && gatewayReference
         ? await tx.insert(paymentRefunds).values({
@@ -780,7 +782,7 @@ export async function createReturnForUser(
         createdBy: profileId,
       }).returning({ id: returns.id, code: returns.code });
 
-      await tx.insert(returnItems).values(rows.map((r) => ({ ...r, storeId, returnId: ret.id })));
+      await tx.insert(returnItems).values(rows.map((r, lineOrder) => ({ ...r, storeId, returnId: ret.id, lineOrder })));
       const [gatewayRefund] = gatewayPayment && gatewayReference && v.clientId
         ? await tx.insert(paymentRefunds).values({
             storeId,
@@ -1255,7 +1257,7 @@ export async function createPosReturn(
         createdBy: profileId,
       }).returning({ id: returns.id, code: returns.code });
 
-      await tx.insert(returnItems).values(rows.map((r) => ({ ...r, storeId: gate.storeId, returnId: ret.id })));
+      await tx.insert(returnItems).values(rows.map((r, lineOrder) => ({ ...r, storeId: gate.storeId, returnId: ret.id, lineOrder })));
 
       for (const r of rows.filter((row) => row.restock)) {
         const targets = await stockTargetsForReturnedItem(

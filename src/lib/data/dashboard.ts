@@ -188,7 +188,7 @@ export async function getDashboard(
           and ${orderItems.storeId} = ${storeId}
       )`,
       productNames: sql<string>`coalesce((
-        select string_agg(${orderItems.productName}, ', ' order by ${orderItems.id})
+        select string_agg(${orderItems.productName}, ', ' order by ${orderItems.lineOrder}, ${orderItems.id})
         from ${orderItems}
         where ${orderItems.orderId} = ${orders.id}
           and ${orderItems.storeId} = ${storeId}

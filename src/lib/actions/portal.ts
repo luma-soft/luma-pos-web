@@ -72,9 +72,10 @@ export async function createPortalOrder(input: PortalOrderInput): Promise<Action
         note: `Đặt qua portal${v.note ? ` · ${v.note}` : ""}`,
       }).returning({ code: orders.code, id: orders.id });
 
-      await tx.insert(orderItems).values(lines.map((l) => ({
+      await tx.insert(orderItems).values(lines.map((l, lineOrder) => ({
         storeId: customer.storeId,
         orderId: order.id,
+        lineOrder,
         productId: l.p.id,
         productName: l.p.name,
         unitName: l.p.baseUnit,

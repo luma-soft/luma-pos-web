@@ -1,5 +1,6 @@
 import {
   and,
+  asc,
   count,
   desc,
   eq,
@@ -280,7 +281,7 @@ export async function getOrders(storeId: string, filters: OrderListFilters = {})
           and ${orderItems.storeId} = ${storeId}
       )`,
       productNames: sql<string>`coalesce((
-        select string_agg(${orderItems.productName}, ', ' order by ${orderItems.id})
+        select string_agg(${orderItems.productName}, ', ' order by ${orderItems.lineOrder}, ${orderItems.id})
         from ${orderItems}
         where ${orderItems.orderId} = ${orders.id}
           and ${orderItems.storeId} = ${storeId}
@@ -428,7 +429,8 @@ export async function getOrder(storeId: string, id: string) {
       .where(and(
         eq(orderItems.orderId, id),
         eq(orderItems.storeId, storeId),
-      )),
+      ))
+      .orderBy(asc(orderItems.lineOrder), asc(orderItems.id)),
     db
       .select()
       .from(payments)

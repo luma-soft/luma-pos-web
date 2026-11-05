@@ -318,9 +318,10 @@ export async function savePOSOrderDraft(
     }
 
     if (lines.length) {
-      await tx.insert(orderItems).values(lines.map((line) => ({
+      await tx.insert(orderItems).values(lines.map((line, lineOrder) => ({
         storeId,
         orderId,
+        lineOrder,
         productId: line.productId,
         productName: line.productName,
         unitName: line.unitName,

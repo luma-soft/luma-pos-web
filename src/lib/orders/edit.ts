@@ -62,9 +62,10 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
       const total = Math.max(0, subtotal - v.discount + v.shippingFee);
 
       await tx.insert(orderItems).values(
-        trustedItems.map((i) => ({
+        trustedItems.map((i, lineOrder) => ({
           storeId,
           orderId: v.orderId,
+          lineOrder,
           productId: i.productId,
           productName: i.productName,
           unitName: i.unitName,

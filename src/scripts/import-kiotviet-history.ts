@@ -234,13 +234,14 @@ async function main() {
     orderIdByCode.set(code, id);
 
     const oi: { id: string; productId: string }[] = [];
+    let lineOrder = 0;
     for (const r of rows) {
       const p = prodBySku.get(str(r["Mã hàng"]));
       if (!p) continue;
       const u = resolveUnit(p.id, str(r["ĐVT"]), p.baseUnit);
       const iid = randomUUID();
       itemIns.push({
-        id: iid, orderId: id, productId: p.id,
+        id: iid, orderId: id, lineOrder: lineOrder++, productId: p.id,
         productName: str(r["Tên hàng"]) || p.sku,
         unitName: u.name.slice(0, 30), unitMultiplier: qtyS(u.mult),
         quantity: qtyS(num(r["Số lượng"])),
@@ -348,6 +349,7 @@ async function main() {
       note: str(h["Ghi chú"]) || "Import trả hàng nhập KiotViet",
       createdAt: toDate(h["Thời gian"]),
     });
+    let lineOrder = 0;
     for (const r of rows) {
       const p = prodBySku.get(str(r["Mã hàng"]));
       if (!p) continue;
@@ -355,6 +357,7 @@ async function main() {
       const returnUnitCost = num(r["Giá trả lại"]);
       thnItemIns.push({
         purchaseReturnId: id,
+        lineOrder: lineOrder++,
         purchaseOrderItemId: null,
         productId: p.id,
         productName: str(r["Tên hàng"]) || p.sku,
@@ -411,6 +414,7 @@ async function main() {
     });
     if (orderId) returnedOrderIds.push(orderId);
 
+    let lineOrder = 0;
     for (const r of rows) {
       const p = prodBySku.get(str(r["Mã hàng"]));
       if (!p) continue;
@@ -419,6 +423,7 @@ async function main() {
       const price = num(r["Giá bán"]);
       retItemIns.push({
         returnId: id,
+        lineOrder: lineOrder++,
         orderItemId: orderItems.find((i) => i.productId === p.id)?.id ?? null,
         productId: p.id,
         productName: str(r["Tên hàng"]) || p.sku,

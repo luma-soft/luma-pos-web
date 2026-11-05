@@ -159,8 +159,8 @@ async function seedDemo() {
     }).returning();
 
     await db.insert(orderItems).values([
-      { orderId: ord.id, productId: prodId["HT-PCB40"], productName: "Xi măng Hà Tiên PCB40 50kg", unitName: "bao", unitMultiplier: qty(1), quantity: qty(xmQty), unitPrice: money(92000), total: money(xmTotal) },
-      { orderId: ord.id, productId: prodId["DT6060"], productName: "Gạch lát 60×60 Đồng Tâm DT6060", unitName: "viên", unitMultiplier: qty(1), quantity: qty(gachQty), unitPrice: money(72000), total: money(gachTotal) },
+      { orderId: ord.id, lineOrder: 0, productId: prodId["HT-PCB40"], productName: "Xi măng Hà Tiên PCB40 50kg", unitName: "bao", unitMultiplier: qty(1), quantity: qty(xmQty), unitPrice: money(92000), total: money(xmTotal) },
+      { orderId: ord.id, lineOrder: 1, productId: prodId["DT6060"], productName: "Gạch lát 60×60 Đồng Tâm DT6060", unitName: "viên", unitMultiplier: qty(1), quantity: qty(gachQty), unitPrice: money(72000), total: money(gachTotal) },
     ]);
 
     if (o.paid > 0) {

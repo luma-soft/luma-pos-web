@@ -631,9 +631,10 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
         note: `Shopee order ${v.orderSn}`,
         createdBy: gate.userId,
       }).returning({ id: orders.id, code: orders.code });
-      await tx.insert(orderItems).values(v.items.map((item) => ({
+      await tx.insert(orderItems).values(v.items.map((item, lineOrder) => ({
         storeId: gate.storeId,
         orderId: order.id,
+        lineOrder,
         productId: item.productId,
         productName: item.name,
         unitName: "cái",

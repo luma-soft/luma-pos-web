@@ -97,7 +97,7 @@ export async function getPurchaseReturns(storeId: string, filters: { q?: string;
           eq(purchaseReturnItems.storeId, storeId),
           inArray(purchaseReturnItems.purchaseReturnId, ids),
         ))
-        .orderBy(asc(purchaseReturnItems.productName))
+        .orderBy(asc(purchaseReturnItems.lineOrder), asc(purchaseReturnItems.id))
     : [];
   const itemsByReturn = new Map<string, typeof itemRows>();
   for (const item of itemRows) {
@@ -178,7 +178,7 @@ export async function getPurchaseReturn(storeId: string, id: string) {
       eq(purchaseReturnItems.purchaseReturnId, id),
       eq(purchaseReturnItems.storeId, storeId),
     ))
-    .orderBy(asc(purchaseReturnItems.productName));
+    .orderBy(asc(purchaseReturnItems.lineOrder), asc(purchaseReturnItems.id));
   return { ...ret, items };
 }
 

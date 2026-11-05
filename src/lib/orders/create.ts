@@ -388,9 +388,10 @@ export async function createOrderForUser(
       }
 
       await tx.insert(orderItems).values(
-        trustedItems.map((i) => ({
+        trustedItems.map((i, lineOrder) => ({
           storeId,
           orderId: order.id,
+          lineOrder,
           productId: i.productId,
           productName: i.productName,
           unitName: i.unitName,

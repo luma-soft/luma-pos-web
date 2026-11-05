@@ -1222,6 +1222,7 @@ export const orderItems = pgTable("order_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
   orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  lineOrder: integer("line_order").notNull().default(0),
   productId: uuid("product_id").notNull().references(() => products.id),
   productName: text("product_name").notNull(), // snapshot
   unitName: varchar("unit_name", { length: 30 }).notNull(), // unit dùng khi bán
@@ -1588,6 +1589,7 @@ export const purchaseReturnItems = pgTable("purchase_return_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
   purchaseReturnId: uuid("purchase_return_id").notNull().references(() => purchaseReturns.id, { onDelete: "cascade" }),
+  lineOrder: integer("line_order").notNull().default(0),
   purchaseOrderItemId: uuid("purchase_order_item_id").references(() => purchaseOrderItems.id),
   productId: uuid("product_id").notNull().references(() => products.id),
   productName: text("product_name").notNull(),
@@ -1652,6 +1654,7 @@ export const returnItems = pgTable("return_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
   returnId: uuid("return_id").notNull().references(() => returns.id, { onDelete: "cascade" }),
+  lineOrder: integer("line_order").notNull().default(0),
   orderItemId: uuid("order_item_id").references(() => orderItems.id), // null = trả nhanh
   productId: uuid("product_id").notNull().references(() => products.id),
   productName: text("product_name").notNull(),
