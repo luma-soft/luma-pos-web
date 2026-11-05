@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { PackageOpen } from "lucide-react";
@@ -31,6 +30,7 @@ import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 import { parsePriceComparisonParams } from "@/lib/pricing/price-comparison";
 import { getPublicMediaConfig } from "@/lib/media/config";
 import { ProductModalFrame } from "@/components/product-modal-frame";
+import { KeepPreviousContent } from "@/components/keep-previous-content";
 import {
   DEFAULT_PRODUCT_LIST_SORT,
   parseProductListSort,
@@ -97,9 +97,9 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
 
       {cameraMaterials && <CameraMaterialSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
 
-      <Suspense fallback={<TableSkeleton cols={8} rows={10} />}>
+      <KeepPreviousContent fallback={<TableSkeleton cols={8} rows={10} />}>
         <ProductsContent searchParams={searchParams} cameraMaterials={cameraMaterials} categories={categories} brands={options.brands} suppliers={options.suppliers} />
-      </Suspense>
+      </KeepPreviousContent>
 
       <ProductEditorModal searchParams={params} />
       {ONLINE_SALES_ENABLED && <ShopeeListingModalShell searchParams={params} />}

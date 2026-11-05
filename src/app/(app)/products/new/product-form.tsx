@@ -514,6 +514,7 @@ export function NewProductForm({
   }
 
   const close = () => {
+    if (isModal) dismissProductModalAfterSave?.();
     if (cancelNavigation === "back") router.back();
     else if (cancelNavigation === "replace") router.replace(doneHref);
     else navigateAfterModal(doneHref);

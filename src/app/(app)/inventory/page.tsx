@@ -11,6 +11,7 @@ import { PurchaseReturnsTab } from "./tabs/purchase-returns";
 import { InternalUseTab } from "./tabs/internal-use";
 import { InventoryNavigation } from "./inventory-navigation";
 import { InventoryTabErrorBoundary } from "./inventory-tab-error-boundary";
+import { KeepPreviousContent } from "@/components/keep-previous-content";
 
 export const dynamic = "force-dynamic";
 
@@ -61,8 +62,14 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       </div>
 
       <InventoryTabErrorBoundary tabTitle={tabTitle}>
-        {showProductListLoadingBoundary ? (
-          <Suspense fallback={<ProductsTabLoading />}>{tabContent}</Suspense>
+        {tab === "products" && effectiveParams.catalog !== "categories" ? (
+          <Suspense fallback={<ProductsTabLoading />}>
+            <KeepPreviousContent
+              fallback={showProductListLoadingBoundary ? <ProductsTabLoading /> : null}
+            >
+              {tabContent}
+            </KeepPreviousContent>
+          </Suspense>
         ) : tabContent}
       </InventoryTabErrorBoundary>
     </div>

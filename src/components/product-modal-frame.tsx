@@ -59,10 +59,11 @@ export function ProductModalFrame({
   const [dismissed, setDismissed] = useState(false);
   const dismiss = useCallback(() => setDismissed(true), []);
   const close = useCallback(() => {
+    dismiss();
     if (closeNavigation === "back") router.back();
     else if (closeHref && closeNavigation === "push") router.push(closeHref);
     else if (closeHref) router.replace(closeHref);
-  }, [closeHref, closeNavigation, router]);
+  }, [closeHref, closeNavigation, dismiss, router]);
 
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement
