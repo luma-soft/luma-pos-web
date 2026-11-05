@@ -4,6 +4,12 @@ import {
   type ProductCatalogItem,
 } from "@/lib/product-catalog";
 
+/** Shared catalog contains inactive/draft/archived Inventory rows. */
+export function isCatalogProductSellable(product: ProductCatalogItem): boolean {
+  return product.isActive !== false
+    && (product.lifecycleStatus == null || product.lifecycleStatus === "active");
+}
+
 export function catalogItemToPosProduct(
   product: ProductCatalogItem,
   catalog: readonly ProductCatalogItem[],
@@ -12,7 +18,8 @@ export function catalogItemToPosProduct(
   childrenByParentId?: ReadonlyMap<string, readonly ProductCatalogItem[]>,
 ): PosProduct {
   const children = product.isVariantParent
-    ? childrenByParentId?.get(product.id) ?? catalog.filter((candidate) => candidate.parentProductId === product.id)
+    ? (childrenByParentId?.get(product.id) ?? catalog.filter((candidate) => candidate.parentProductId === product.id))
+        .filter(isCatalogProductSellable)
     : [];
   const childPrices = children.map((child) => Number(child.retailPrice));
   const stock = product.isVariantParent
