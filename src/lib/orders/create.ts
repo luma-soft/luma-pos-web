@@ -218,7 +218,6 @@ export async function createOrderForUser(
       const sourceIsSale = sourceOrder?.status === "completed";
       const sourceIsDraftSale = sourceOrder?.status === "draft"
         && sourceOrder.documentType === "sale"
-        && sourceOrder.posDraftPayload == null
         && Number(sourceOrder.amountPaid) === 0;
       const sourceIsQuote = sourceOrder?.status === "quote";
       const sourceIsBooking = sourceOrder?.status === "confirmed";

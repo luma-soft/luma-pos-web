@@ -44,7 +44,6 @@ export async function GET(
   const isEditableDraft =
     order.status === "draft" &&
     order.documentType === "sale" &&
-    !order.isPosCartDraft &&
     Number(order.amountPaid) === 0 &&
     order.payments.length === 0;
   return mobileOk({
