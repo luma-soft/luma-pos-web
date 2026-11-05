@@ -1417,8 +1417,8 @@ export function PosClient({
     if (catalogSearchResultsRef.current?.catalog !== catalogProducts) {
       catalogSearchResultsRef.current = null;
     }
-    if (catalogProducts.length > 0) return prepareProductCatalogSearchIndex(catalogProducts);
-  }, [catalogProducts]);
+    if (sellableCatalogProducts.length > 0) return prepareProductCatalogSearchIndex(sellableCatalogProducts);
+  }, [catalogProducts, sellableCatalogProducts]);
   const catalogPosSearchCache = useMemo(() => ({
     products: new WeakMap<ProductCatalogItem, PosProduct>(),
     units: new WeakMap<PosProduct, readonly PosSearchUnitResult<PosProduct>[]>(),
