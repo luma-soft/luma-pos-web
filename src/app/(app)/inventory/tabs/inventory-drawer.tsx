@@ -48,7 +48,9 @@ export function InventoryDrawer({
       }
     }, prefersReducedMotion ? 0 : 300);
   }, [closeHref, onClose, router]);
-  closeRef.current = close;
+  useEffect(() => {
+    closeRef.current = close;
+  }, [close]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
