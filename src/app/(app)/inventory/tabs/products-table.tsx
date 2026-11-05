@@ -909,7 +909,7 @@ export function ProductDetailView({
         {tab === "description" && (
           <ProductDescriptionPanel product={product} orderNote={orderNote} />
         )}
-        {tab === "stockCard" && !needsVariant && <ProductStockCardPanel product={product} />}
+        {tab === "stockCard" && !needsVariant && <ProductStockCardPanel key={product.id} product={product} />}
         {tab === "stock" && !needsVariant && (
           <ProductStockPanel
             product={product}
@@ -1338,13 +1338,9 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
   const scopeId = snapshot?.scopeId;
   const revision = snapshot?.revision;
 
-  useEffect(() => { setPage(1); }, [product.id]);
-
   useEffect(() => {
     if (!tracked) return;
     let cancelled = false;
-    setHistory(null);
-    setLoadState("loading");
 
     void (async () => {
       if (!scopeId || !revision) {
@@ -1353,7 +1349,10 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
       }
       const cached = await readCachedStockHistory(scopeId, product.id, page);
       if (cancelled) return;
-      if (cached) {
+      if (!cached) {
+        setHistory(null);
+        setLoadState("loading");
+      } else {
         setHistory({ rows: cached.rows, hasMore: cached.hasMore });
         setLoadState("ready");
       }
