@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { approvePriceBookSwitch, prepareInvoicePriceBookSwitch, prepareLinePriceBookSwitch, selectedPosUnitPrice } from "./price-book-switch";
+import { approvePriceBookSwitch, prepareInvoicePriceBookSwitch, prepareLinePriceBookSwitch, selectedPosUnitPrice, type PriceBookSwitchLine } from "./price-book-switch";
 import { createLinePriceEditorState } from "./line-price-editor";
 
 const books = [
@@ -16,7 +16,7 @@ const product = {
     { unitName: "đoạn", multiplier: "1", priceOverride: "15000" },
   ],
 };
-const line = { key: "one", product, unitName: "m", unitPrice: 10000.25, quantity: 3, note: "Keep note" };
+const line: PriceBookSwitchLine & { key: string; product: typeof product; quantity: number; note: string } = { key: "one", product, unitName: "m", unitPrice: 10000.25, quantity: 3, note: "Keep note" };
 
 describe("POS price-book switching", () => {
   it("invoice switching preserves base decimals and ignores a redundant base override", () => {
