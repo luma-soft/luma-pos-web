@@ -280,7 +280,11 @@ export function exploreProductCatalog(
   const warehouseById = getWarehouseView(warehouseRows);
   const q = filters.query?.trim() ?? "";
   const searchable = getInventorySearchableProducts(products);
-  const searchRows = q ? searchProductCatalog(searchable, q, { limit: searchable.length }) : searchable;
+  // Rank against the canonical array so Inventory shares the provider's
+  // catalog-revision index. Variant parents remain excluded from matches.
+  const searchRows = q
+    ? searchProductCatalog(products, q, { limit: products.length }).filter((product) => !product.isVariantParent)
+    : searchable;
   const searchRank = q
     ? new Map(searchRows.map((product, index) => [product.id, index]))
     : new Map<string, number>();

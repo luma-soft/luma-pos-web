@@ -1,6 +1,7 @@
 import {
   isProductCatalogCacheSchemaCompatible,
   catalogRevisionChanged,
+  type ProductCatalogDelta,
   type ProductCatalogItem,
   type ProductCatalogSnapshot,
 } from "@/lib/product-catalog";
@@ -16,6 +17,20 @@ export type ProductCatalogWriteChanges = {
   changedProductIDs: readonly string[];
   deletedProductIDs: readonly string[];
 };
+
+/** Full and recovered snapshots must always replace the complete scope. */
+export function productCatalogWriteChangesForSync(
+  delta: ProductCatalogDelta | null | undefined,
+  appliedIncrementally: boolean,
+  changedProductIDs: readonly string[],
+): ProductCatalogWriteChanges | undefined {
+  if (!delta || !appliedIncrementally) return undefined;
+  return {
+    baseRevision: delta.baseRevision,
+    changedProductIDs,
+    deletedProductIDs: delta.deletedIds,
+  };
+}
 
 function productKey(scopeId: string, productId: string) {
   return `${scopeId}::${productId}`;

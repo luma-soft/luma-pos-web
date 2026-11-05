@@ -2,9 +2,11 @@ import { expect, mock, test } from "bun:test";
 
 let authorized = true;
 let revision = "91";
+let revisionReplies = [];
 let snapshotRequests = 0;
 let deltaResult = null;
 let deltaThrows = false;
+let deltaResponses = [];
 const deltaRequests = [];
 
 mock.module("@/lib/mobile/auth", () => ({
@@ -14,7 +16,7 @@ mock.module("@/lib/mobile/auth", () => ({
 }));
 
 mock.module("@/lib/data/product-catalog", () => ({
-  getProductCatalogRevision: async () => revision,
+  getProductCatalogRevision: async () => revisionReplies.length ? revisionReplies.shift() : revision,
   getProductCatalogSnapshot: async (...args) => {
     snapshotRequests += 1;
     return {
@@ -30,6 +32,7 @@ mock.module("@/lib/data/product-catalog", () => ({
   getProductCatalogDeltaV2: async (...args) => {
     deltaRequests.push(args);
     if (deltaThrows) throw new Error("journal temporarily unavailable");
+    if (deltaResponses.length) return deltaResponses.shift();
     return deltaResult;
   },
 }));
@@ -126,4 +129,35 @@ test("expired or failed journal replay recovers with a complete snapshot", async
   expect(snapshotRequests).toBe(1);
   deltaThrows = false;
   deltaResult = null;
+});
+
+test("retries the delta against a newer bounded target when revision moves during hydration", async () => {
+  revisionReplies = ["91", "92"];
+  deltaRequests.length = 0;
+  snapshotRequests = 0;
+  deltaResult = null;
+  deltaResponses = [null, {
+    baseRevision: "90",
+    revision: "92",
+    schemaVersion: 12,
+    userId: "owner-a",
+    scopeId: "store-a:owner-a:manager",
+    upserts: [{ id: "product-a", retailPrice: "21000" }],
+    deletedIds: [],
+    hasMore: false,
+  }];
+
+  const response = await GET(new Request(
+    "http://localhost/api/mobile/products/catalog/v2?sinceRevision=90&sinceScope=store-a%3Aowner-a%3Amanager",
+  ));
+  const body = await response.json();
+  expect(response.status).toBe(200);
+  expect(body.data.mode).toBe("delta");
+  expect(body.data.delta.revision).toBe("92");
+  expect(deltaRequests.map(([, , , since, target]) => [since, target]))
+    .toEqual([["90", "91"], ["90", "92"]]);
+  expect(snapshotRequests).toBe(0);
+
+  revisionReplies = [];
+  deltaResponses = [];
 });

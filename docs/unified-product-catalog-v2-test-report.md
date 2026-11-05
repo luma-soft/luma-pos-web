@@ -2,81 +2,72 @@
 
 ## Status
 
-The web and iOS implementation PRs are merged into `main`. Pending database
-migrations were applied through the migration runner to the database configured
-by `DATABASE_URL`; the runner recorded them in `_migrations`. The iOS Release
-client still requires the V2 feature flag or in-app override, so this report
-does not claim broad end-user rollout or production performance savings.
+This report records local verification of the current web and iOS worktrees on
+2026-11-06. V1 compatibility remains in place, and the iOS Release flag remains
+off by default. These checks do not certify a production rollout.
 
-## Verification
+The earlier migration runner record is documented in
+[the migration and rollout document](./unified-product-catalog-v2-migration.md).
+This run did not re-query the live Supabase project or collect production
+traffic measurements.
 
-- Focused web catalog, delta, explorer, route, and migration suite: **24/24
-  passed**. Bun is unavailable in this environment, so the Bun-compatible tests
-  ran through a temporary Node.js shim.
-- PostgreSQL migration simulation with PGlite: **3/3 passed**.
-- V2 API route, bulk statement-journal, and line-order preservation regressions:
-  **10/10 passed** in the focused Node/PGlite run.
-- The configured database has all V2 journal columns and **24 statement-level
-  triggers** across the eight high-volume tables (insert, update, and delete
-  triggers per table). The migration tracker contains `0144`, `0147`, `0148`,
-  `0149`, and `0150`.
-- ESLint on changed web files: passed.
-- TypeScript check over application source (excluding tests): passed. The
-  repository-wide check still reports unrelated existing test errors in
-  `src/lib/media/client.test.ts` (`bun:test` types are unavailable) and
-  `src/lib/pos/price-book-switch.test.ts` (stale fixture properties).
-- Next.js production build with Webpack: passed and generated 150 static pages.
-  The build printed non-fatal warnings for missing `metadataBase`, three
-  existing `fit-content` width declarations, and the `libheif-js` dynamic
-  dependency.
-- Native iOS focused XCTest selection: the earlier catalog suite passed
-  **7/7**, and the latest persistence plus synthetic-size selection passed
-  **2/2**. The full test target still has stale compile errors in unrelated
-  existing tests; `NativeCustomerOfflineParityTests.swift`,
-  `NativeSyncProgressTests.swift`, and `LumaPOSNativeTests.swift` were excluded
-  for the latest focused run.
-- Native iOS Debug build: passed. The updated app was installed and launched on
-  the already-booted iPhone 17 Simulator.
-- Development diagnostics now record web sync mode/revisions, changed entities,
-  serialized response bytes, hydration/search/IndexedDB duration, and duplicate
-  revision-check coalescing. Native OSLog records sync request count,
-  mode/revisions, estimated response bytes, changed/deleted product counts,
-  fallback reason, hydration/search duration, duplicate refresh coalescing, and
-  actual SQLite row writes/deletes. No production sample has been collected.
-- `git diff --check`: passed in both repositories.
+## Web verification
 
-## Synthetic search benchmark
+- TypeScript check: passed.
+- Focused catalog lint and full repository ESLint: passed with 0 errors and 8
+  existing warnings.
+- Focused tests: core catalog/cache/history **27 passed**, V2 API **6 passed**,
+  V1 API **6 passed**, and PGlite migration simulation **4 passed**.
+- Next.js production build: passed and generated 150 pages. It used a local
+  compile-only `DATABASE_URL`; it did not connect to production. Existing
+  non-fatal warnings mention missing `metadataBase` and three `fit-content`
+  image widths.
+- Stock Card state/cache checks cover cached offline history, uncached offline
+  history, and scope mismatch. History remains per product and page; it is not
+  part of the shared catalog.
+- `git diff --check`: passed.
 
-These are single-run Node.js microbenchmarks over the same generated product
-catalog. Exact search is measured separately from a broad query returning the
-first 20 ranked matches. They are not browser screen-open timings.
+## iOS verification
 
-| Products | Previous exact | Previous broad, limit 20 | V2 exact | V2 broad, limit 20 |
-| ---: | ---: | ---: | ---: | ---: |
-| 1,000 | 1.93 ms | 0.03 ms | 3.75 ms | 3.28 ms |
-| 10,000 | 13.44 ms | 0.02 ms | 40.26 ms | 29.70 ms |
-| 50,000 | 51.95 ms | 0.02 ms | 201.69 ms | 151.06 ms |
+- The app target's Release configuration defaults
+  `LUMA_UNIFIED_CATALOG_ENABLED` to **NO**. `luma.catalog.forceLegacySync`
+  remains the device rollback switch.
+- A Release Simulator build with the flag explicitly set to **YES** passed on
+  Xcode 27.2; the built app's Info.plist contained `YES`.
+- The full `NativeInventoryProductBrowseModelTests` suite passed **58/58** on
+  an iPhone Simulator. It covers offline cache use, full/delta synchronization,
+  tombstones, cross-screen cache sharing, POS prices and units, release
+  fallback, SQLite rollback, retry after a failed sync, relevance ordering,
+  and catalog paging. The product-picker rendering test passed separately.
+- The local Release Simulator build with V2 explicitly enabled produced an app
+  bundle whose Info.plist contains `YES`.
+- The native synthetic relevance benchmark reported **84 ms**, **830 ms**, and
+  **4,210 ms** for 1k, 10k, and 50k candidates on the final Simulator run. These are
+  local microbenchmark timings, not device or production screen-open latency.
+- The selected picker test attached a Simulator screenshot to the `.xcresult`.
+  Simulator emitted keyboard and coordinate-space diagnostics; the test passed.
 
-The previous broad-search implementation stopped after finding 20 rows. V2
-scores the complete matching set before applying the limit so exact codes and
-names rank ahead of weaker matches regardless of row order. The benchmark
-therefore shows the cost of the correctness change as well as the larger search
-set; it is not an apples-to-apples proof of a speedup.
+## Web catalog search benchmark
 
-The latest automated V2 delta-apply benchmark measured **0.62 ms**, **3.61 ms**,
-and **21.01 ms** at 1,000, 10,000, and 50,000 products, respectively.
+Synthetic local benchmark, Bun 1.4.4, seven-sample medians. Timings compare the
+previous scan with the V2 index; broad search returns the first 20 ranked
+matches. Index construction and delta-apply work are shown separately.
 
-The native synthetic benchmark before the final product-name normalization
-optimization measured **75 ms**, **730 ms**, and **3,637 ms** at those same
-sizes. The focused suite passed after the optimization, but its timing could not
-be extracted from the Xcode result bundle in this environment; no post-change
-native timing is claimed.
+| Products | Build index | SKU scan → index | Barcode scan → index | Name scan → index | Broad scan → index | Delta apply | Index patch |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,000 | 16.49 ms | 0.107 → 0.008 ms | 0.058 → 0.006 ms | 0.066 → 0.004 ms | 2.16 → 1.82 ms | 1.31 ms | 0.121 ms |
+| 10,000 | 115.65 ms | 1.204 → 0.007 ms | 0.762 → 0.004 ms | 1.301 → 0.013 ms | 19.47 → 20.29 ms | 3.41 ms | 0.101 ms |
+| 50,000 | 680.43 ms | 13.711 → 0.017 ms | 9.217 → 0.003 ms | 14.564 → 0.013 ms | 122.63 → 110.08 ms | 22.87 ms | 0.119 ms |
 
-## Not measured
+The index sharply reduces exact SKU, barcode, and name lookup time. Broad search
+at 10k was about 4% slower in this synthetic run; results vary by query shape.
+The benchmark is not a browser screen-open test.
 
-No production traffic was used for performance measurement. Production API
-request/response volume, Realtime volume, warm screen-open latency, memory use,
-Supabase query/CPU/billing changes, and any numeric savings estimate remain
-unmeasured.
-The PGlite migration simulation is local; the separate database migration run
-is recorded in [the migration and rollout document](./unified-product-catalog-v2-migration.md).
+## Production measurements still outstanding
+
+No production Supabase query count, CPU, Egress, Realtime volume, or billing
+sample was available in this run, so there is no production savings estimate.
+The local PGlite migration simulation is not a substitute for those metrics.
+Representative-store browser/iPhone measurements, signed TestFlight Release
+verification, and the remaining gates are listed in
+[the release and operations checklist](./unified-product-catalog-v2-release-gates.md).

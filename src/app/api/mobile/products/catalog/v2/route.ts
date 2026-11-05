@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const revision = await getProductCatalogRevision(gate.storeId);
+    let revision = await getProductCatalogRevision(gate.storeId);
     if (sameScope && sinceRevision === revision) {
       const response = mobileOk({
         protocolVersion: 2 as const,
@@ -34,29 +34,35 @@ export async function GET(request: Request) {
     }
 
     if (sameScope && sinceRevision && sinceRevision !== revision) {
-      let delta: Awaited<ReturnType<typeof getProductCatalogDeltaV2>> = null;
-      try {
-        delta = await getProductCatalogDeltaV2(
-          gate.storeId,
-          gate.userId,
-          gate.role,
-          sinceRevision,
-          revision,
-        );
-      } catch {
-        // Journal expiration/query failure must recover with a complete
-        // snapshot. If that also fails, the outer handler returns 503.
-      }
-      if (delta) {
-        const response = mobileOk({
-          protocolVersion: 2 as const,
-          mode: "delta" as const,
-          revision: delta.revision,
-          deltaSupported: true,
-          delta,
-        });
-        response.headers.set("Cache-Control", "private, no-store, max-age=0");
-        return response;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        let delta: Awaited<ReturnType<typeof getProductCatalogDeltaV2>> = null;
+        try {
+          delta = await getProductCatalogDeltaV2(
+            gate.storeId,
+            gate.userId,
+            gate.role,
+            sinceRevision,
+            revision,
+          );
+        } catch {
+          // The retry below distinguishes a moving revision from an expired
+          // journal; either way, full recovery remains the safe fallback.
+        }
+        if (delta) {
+          const response = mobileOk({
+            protocolVersion: 2 as const,
+            mode: "delta" as const,
+            revision: delta.revision,
+            deltaSupported: true,
+            delta,
+          });
+          response.headers.set("Cache-Control", "private, no-store, max-age=0");
+          return response;
+        }
+
+        const latestRevision = await getProductCatalogRevision(gate.storeId);
+        if (latestRevision === revision) break;
+        revision = latestRevision;
       }
     }
 

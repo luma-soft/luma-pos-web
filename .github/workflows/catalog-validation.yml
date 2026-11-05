@@ -8,6 +8,7 @@ on:
       - "src/lib/product-catalog*"
       - "src/lib/product-catalog-explorer*"
       - "src/lib/offline/product-*"
+      - "src/lib/product-stock-history-state*"
       - "src/lib/actions/product-*"
       - "src/lib/media/client.test.ts"
       - "src/lib/pos/price-book-switch.test.ts"
@@ -43,11 +44,11 @@ jobs:
       - name: TypeScript check
         run: bunx tsc --noEmit
       - name: Focused catalog lint
-        run: bunx eslint src/lib/product-catalog.ts src/lib/product-catalog-explorer.ts src/lib/actions/product-catalog.ts src/lib/actions/product-stock-history.ts src/lib/offline/product-catalog-store.ts src/lib/offline/product-stock-history-store.ts src/lib/pos/product-catalog-adapter.ts src/components/product-catalog-provider.tsx 'src/app/(app)/inventory/tabs/products-table.tsx'
+        run: bunx eslint src/lib/product-catalog.ts src/lib/product-catalog-explorer.ts src/lib/actions/product-catalog.ts src/lib/actions/product-stock-history.ts src/lib/offline/product-catalog-store.ts src/lib/offline/product-stock-history-store.ts src/lib/product-stock-history-state.ts src/lib/pos/product-catalog-adapter.ts src/components/product-catalog-provider.tsx 'src/app/(app)/inventory/tabs/products-table.tsx'
       - name: ESLint full repository
         run: bun run lint
       - name: Focused catalog regressions
-        run: bun test src/lib/product-catalog.test.mjs src/lib/product-catalog-explorer.test.mjs src/lib/catalog-delta.test.mjs src/lib/catalog-delta-db.test.mjs src/lib/pos/product-catalog-adapter.test.mjs
+        run: bun test src/lib/product-catalog.test.mjs src/lib/product-catalog-explorer.test.mjs src/lib/catalog-delta.test.mjs src/lib/catalog-delta-db.test.mjs src/lib/pos/product-catalog-adapter.test.mjs src/lib/offline/product-catalog-store.test.mjs src/lib/product-stock-history-state.test.mjs src/lib/actions/product-catalog.test.mjs
       - name: V2 API and migration regressions
         run: |
           bun test 'src/app/api/mobile/products/catalog/v2/route.test.mjs'

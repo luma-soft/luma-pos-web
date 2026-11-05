@@ -149,6 +149,9 @@ export async function getProductCatalogDeltaV2(
   if (partial.revision !== expectedRevision) return null;
 
   const metadata = await getCatalogMetadataDelta(storeId, batch.metadataIds);
+  // Metadata is hydrated after product rows. Refuse a mixed-revision delta if
+  // a concurrent write landed while those queries were in flight.
+  if (await getProductCatalogRevision(storeId) !== expectedRevision) return null;
   const liveIds = new Set(partial.products.map((product) => product.id));
   return {
     baseRevision: batch.fromRevision,

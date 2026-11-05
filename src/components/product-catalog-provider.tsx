@@ -14,6 +14,7 @@ import {
   syncProductCatalog,
 } from "@/lib/actions/product-catalog";
 import {
+  productCatalogWriteChangesForSync,
   readProductCatalogSnapshot,
   writeProductCatalogSnapshot,
 } from "@/lib/offline/product-catalog-store";
@@ -143,9 +144,14 @@ export function ProductCatalogProvider({
         const persistStartedAt = performance.now();
         let committed = false;
         try {
+          const writeChanges = productCatalogWriteChangesForSync(
+            result?.mode === "delta" ? result.delta : null,
+            appliedIncrementalDelta,
+            [...changedProductIDs],
+          );
           committed = await writeProductCatalogSnapshot(
             fresh,
-            delta ? { baseRevision: delta.baseRevision, changedProductIDs: [...changedProductIDs], deletedProductIDs } : undefined,
+            writeChanges,
           );
         } catch {
           // IndexedDB can be disabled or temporarily fail. Keep online browsing

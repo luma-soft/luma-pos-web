@@ -19,7 +19,7 @@ export async function syncProductCatalog(
   try {
     const context = await requireStoreContext();
     if (sinceRevision && /^\d+$/.test(sinceRevision)) {
-      const revision = await getProductCatalogRevision(context.storeId);
+      let revision = await getProductCatalogRevision(context.storeId);
       if (revision === sinceRevision) {
         return {
           mode: "unchanged",
@@ -28,29 +28,50 @@ export async function syncProductCatalog(
           scopeId: productCatalogScopeId(context.storeId, context.userId, context.role),
         };
       }
-      try {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
         let cursor = sinceRevision;
         const pages: ProductCatalogDelta[] = [];
-        for (let page = 0; page < 20; page += 1) {
-          const delta = await getProductCatalogDeltaV2(
-            context.storeId,
-            context.userId,
-            context.role,
-            cursor,
-            revision,
-          );
-          if (!delta) break;
-          pages.push(delta);
-          cursor = delta.revision;
-          if (!delta.hasMore) {
-            return {
-              mode: "delta",
-              delta: combineProductCatalogDeltas(pages, sinceRevision, revision),
-            };
+        let complete = false;
+        try {
+          for (let page = 0; page < 20; page += 1) {
+            const delta = await getProductCatalogDeltaV2(
+              context.storeId,
+              context.userId,
+              context.role,
+              cursor,
+              revision,
+            );
+            if (!delta) break;
+            pages.push(delta);
+            cursor = delta.revision;
+            if (!delta.hasMore) {
+              complete = true;
+              break;
+            }
           }
+        } catch {
+          break;
         }
-      } catch {
-        // A missing V2 journal or an interrupted replay safely falls back to full.
+        if (complete) {
+          return {
+            mode: "delta",
+            delta: combineProductCatalogDeltas(pages, sinceRevision, revision),
+          };
+        }
+
+        // A revision that changed during hydration can be replayed safely from
+        // the original committed cursor. Retry against the new bounded target
+        // before falling back to a full snapshot for an expired/invalid journal.
+        try {
+          const latestRevision = await getProductCatalogRevision(context.storeId);
+          if (latestRevision !== revision) {
+            revision = latestRevision;
+            continue;
+          }
+        } catch {
+          // The complete snapshot path below remains the safe recovery.
+        }
+        break;
       }
     }
     return {

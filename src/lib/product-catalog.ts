@@ -138,6 +138,16 @@ export type ProductCatalogDelta = {
   hasMore?: boolean;
 };
 
+type ProductCatalogSearchIndexChange = {
+  previousProducts: readonly ProductCatalogItem[];
+  changedProductsById: ReadonlyMap<string, ProductCatalogItem | null>;
+};
+
+const searchIndexChangesByProducts = new WeakMap<
+  readonly ProductCatalogItem[],
+  ProductCatalogSearchIndexChange
+>();
+
 export function sortByRecentProductSale<T extends Pick<ProductCatalogItem, "id" | "name" | "lastSoldAt">>(
   rows: readonly T[],
 ): T[] {
@@ -168,12 +178,28 @@ export function mergeProductCatalogDelta(
   const categoryNameById = new Map(metadata.categories.map((item) => [item.id, item.name]));
   const brandNameById = new Map(metadata.brands.map((item) => [item.id, item.name]));
   const supplierNameById = new Map(metadata.suppliers.map((item) => [item.id, item.name]));
-  const products = sortByRecentProductSale([...productsById.values()].map((product) => ({
-    ...product,
-    categoryName: product.categoryId ? categoryNameById.get(product.categoryId) ?? null : null,
-    brandName: product.brandId ? brandNameById.get(product.brandId) ?? null : null,
-    supplierName: product.supplierId ? supplierNameById.get(product.supplierId) ?? null : null,
-  })));
+  const changedProductIDs = new Set([...delta.upserts.map((product) => product.id), ...delta.deletedIds]);
+  const projectedProducts: ProductCatalogItem[] = [];
+  for (const product of productsById.values()) {
+    const categoryName = product.categoryId ? categoryNameById.get(product.categoryId) ?? null : null;
+    const brandName = product.brandId ? brandNameById.get(product.brandId) ?? null : null;
+    const supplierName = product.supplierId ? supplierNameById.get(product.supplierId) ?? null : null;
+    const projected = product.categoryName === categoryName
+      && product.brandName === brandName
+      && product.supplierName === supplierName
+      ? product
+      : { ...product, categoryName, brandName, supplierName };
+    if (projected !== product) changedProductIDs.add(product.id);
+    productsById.set(product.id, projected);
+    projectedProducts.push(projected);
+  }
+  const products = sortByRecentProductSale(projectedProducts);
+  const changedProductsById = new Map<string, ProductCatalogItem | null>();
+  for (const id of changedProductIDs) changedProductsById.set(id, productsById.get(id) ?? null);
+  searchIndexChangesByProducts.set(products, {
+    previousProducts: snapshot.products,
+    changedProductsById,
+  });
   const warehouseChanges = delta.metadata?.warehouses;
   let warehouses = snapshot.warehouses;
   if (warehouseChanges) {
@@ -227,8 +253,27 @@ export type ProductCatalogSearchOptions = {
 };
 
 const searchableTextByProduct = new WeakMap<ProductCatalogItem, string>();
+type ProductCatalogSearchIndexBase = {
+  productIdsByTrigram: ReadonlyMap<string, ReadonlySet<string>>;
+  trigramsByProductId: ReadonlyMap<string, readonly string[]>;
+  productsById: ReadonlyMap<string, ProductCatalogItem>;
+};
 type ProductCatalogSearchIndex = {
-  productIndexesByTrigram: ReadonlyMap<string, Uint32Array>;
+  base: ProductCatalogSearchIndexBase;
+  parent: ProductCatalogSearchIndex | null;
+  addedByTrigram?: ReadonlyMap<string, ReadonlySet<string>>;
+  removedByTrigram?: ReadonlyMap<string, ReadonlySet<string>>;
+  changedTrigramsByProductId?: ReadonlyMap<string, readonly string[] | null>;
+  changedProductsById?: ReadonlyMap<string, ProductCatalogItem | null>;
+  depth: number;
+  productCount: number;
+  resolvedPostings: Map<string, ProductCatalogSearchPostingView>;
+};
+type ProductCatalogSearchPostingView = {
+  base: ReadonlySet<string> | undefined;
+  changes: ReadonlyMap<string, boolean>;
+  size: number;
+  [Symbol.iterator](): Iterator<string>;
 };
 type ProductCatalogIdleDeadline = {
   didTimeout: boolean;
@@ -243,6 +288,9 @@ type ProductCatalogIdleWindow = Window & {
 
 const searchIndexesByProducts = new WeakMap<readonly ProductCatalogItem[], ProductCatalogSearchIndex>();
 const buildingSearchIndexes = new WeakMap<readonly ProductCatalogItem[], object>();
+const buildingSearchIndexPromises = new WeakMap<readonly ProductCatalogItem[], Promise<void>>();
+const MAX_INCREMENTAL_INDEX_DEPTH = 12;
+const MAX_INCREMENTAL_INDEX_PRODUCT_CHANGES = 1_000;
 
 function productSearchText(product: ProductCatalogItem): string {
   const cached = searchableTextByProduct.get(product);
@@ -270,7 +318,134 @@ function productSearchText(product: ProductCatalogItem): string {
   return searchable;
 }
 
-/** Build the substring index in short idle-time slices so POS stays responsive. */
+function productTrigrams(searchable: string): string[] {
+  const characters = Array.from(searchable);
+  const trigrams = new Set<string>();
+  for (let offset = 0; offset <= characters.length - 3; offset += 1) {
+    trigrams.add(characters[offset] + characters[offset + 1] + characters[offset + 2]);
+  }
+  return [...trigrams];
+}
+
+function indexedProduct(
+  index: ProductCatalogSearchIndex,
+  productId: string,
+): ProductCatalogItem | undefined {
+  let current: ProductCatalogSearchIndex | null = index;
+  while (current) {
+    if (current.changedProductsById?.has(productId)) {
+      return current.changedProductsById.get(productId) ?? undefined;
+    }
+    current = current.parent;
+  }
+  return index.base.productsById.get(productId);
+}
+
+function indexedProductTrigrams(
+  index: ProductCatalogSearchIndex,
+  productId: string,
+): readonly string[] {
+  let current: ProductCatalogSearchIndex | null = index;
+  while (current) {
+    if (current.changedTrigramsByProductId?.has(productId)) {
+      return current.changedTrigramsByProductId.get(productId) ?? [];
+    }
+    current = current.parent;
+  }
+  return index.base.trigramsByProductId.get(productId) ?? [];
+}
+
+function updatedSearchIndex(
+  previous: ProductCatalogSearchIndex,
+  changes: ProductCatalogSearchIndexChange,
+): ProductCatalogSearchIndex {
+  const changedTrigramsByProductId = new Map<string, readonly string[] | null>();
+  const changedProductsById = new Map<string, ProductCatalogItem | null>();
+  const addedByTrigram = new Map<string, Set<string>>();
+  const removedByTrigram = new Map<string, Set<string>>();
+  let productCount = previous.productCount;
+
+  const add = (postings: Map<string, Set<string>>, trigram: string, id: string) => {
+    const ids = postings.get(trigram) ?? new Set<string>();
+    ids.add(id);
+    postings.set(trigram, ids);
+  };
+
+  for (const [id, product] of changes.changedProductsById) {
+    const previousProduct = indexedProduct(previous, id);
+    const previousTrigrams = indexedProductTrigrams(previous, id);
+    const nextTrigrams = product ? productTrigrams(productSearchText(product)) : [];
+    const previousSet = new Set(previousTrigrams);
+    const nextSet = new Set(nextTrigrams);
+
+    if (!previousProduct && product) productCount += 1;
+    if (previousProduct && !product) productCount -= 1;
+    changedProductsById.set(id, product);
+    changedTrigramsByProductId.set(id, product ? nextTrigrams : null);
+
+    for (const trigram of previousSet) {
+      if (!nextSet.has(trigram)) add(removedByTrigram, trigram, id);
+    }
+    for (const trigram of nextSet) {
+      if (!previousSet.has(trigram)) add(addedByTrigram, trigram, id);
+    }
+  }
+
+  return {
+    base: previous.base,
+    parent: previous,
+    addedByTrigram,
+    removedByTrigram,
+    changedTrigramsByProductId,
+    changedProductsById,
+    depth: previous.depth + 1,
+    productCount,
+    resolvedPostings: new Map(),
+  };
+}
+
+function postingView(
+  index: ProductCatalogSearchIndex,
+  trigram: string,
+): ProductCatalogSearchPostingView {
+  const cached = index.resolvedPostings.get(trigram);
+  if (cached) return cached;
+
+  const changes = new Map<string, boolean>();
+  let current: ProductCatalogSearchIndex | null = index;
+  while (current) {
+    for (const id of current.addedByTrigram?.get(trigram) ?? []) {
+      if (!changes.has(id)) changes.set(id, true);
+    }
+    for (const id of current.removedByTrigram?.get(trigram) ?? []) {
+      if (!changes.has(id)) changes.set(id, false);
+    }
+    current = current.parent;
+  }
+
+  const base = index.base.productIdsByTrigram.get(trigram);
+  let size = base?.size ?? 0;
+  for (const [id, present] of changes) {
+    size += Number(present) - Number(base?.has(id) ?? false);
+  }
+  const view: ProductCatalogSearchPostingView = {
+    base,
+    changes,
+    size,
+    *[Symbol.iterator]() {
+      for (const id of base ?? []) {
+        if (changes.get(id) !== false) yield id;
+      }
+      for (const [id, present] of changes) {
+        if (present && !base?.has(id)) yield id;
+      }
+    },
+  };
+  index.resolvedPostings.set(trigram, view);
+  return view;
+}
+
+/** Build a full index in idle slices, then patch only delta-affected products. */
 export function prepareProductCatalogSearchIndex(products: readonly ProductCatalogItem[]): () => void {
   if (
     products.length === 0
@@ -279,10 +454,25 @@ export function prepareProductCatalogSearchIndex(products: readonly ProductCatal
     || typeof window === "undefined"
   ) return () => undefined;
 
+  const change = searchIndexChangesByProducts.get(products);
+  const previousIndex = change ? searchIndexesByProducts.get(change.previousProducts) : undefined;
+  if (
+    change && previousIndex
+    && previousIndex.depth < MAX_INCREMENTAL_INDEX_DEPTH
+    && change.changedProductsById.size <= MAX_INCREMENTAL_INDEX_PRODUCT_CHANGES
+  ) {
+    searchIndexesByProducts.set(products, updatedSearchIndex(previousIndex, change));
+    return () => undefined;
+  }
+
   const buildToken = {};
   buildingSearchIndexes.set(products, buildToken);
-  const productIndexesByTrigram = new Map<string, number[]>();
-  const lastProductIndexByTrigram = new Map<string, number>();
+  let resolveBuild!: () => void;
+  const buildPromise = new Promise<void>((resolve) => { resolveBuild = resolve; });
+  buildingSearchIndexPromises.set(products, buildPromise);
+  const productIdsByTrigram = new Map<string, Set<string>>();
+  const trigramsByProductId = new Map<string, readonly string[]>();
+  const productsById = new Map<string, ProductCatalogItem>();
   let nextProductIndex = 0;
   let cancelled = false;
 
@@ -298,6 +488,7 @@ export function prepareProductCatalogSearchIndex(products: readonly ProductCatal
   const processSlice = (deadline?: ProductCatalogIdleDeadline) => {
     if (cancelled) {
       if (buildingSearchIndexes.get(products) === buildToken) buildingSearchIndexes.delete(products);
+      resolveBuild();
       return;
     }
 
@@ -308,14 +499,14 @@ export function prepareProductCatalogSearchIndex(products: readonly ProductCatal
       && (!deadline || deadline.timeRemaining() > 1 || deadline.didTimeout)
     ) {
       const currentIndex = nextProductIndex;
-      const characters = Array.from(productSearchText(products[currentIndex]));
-      for (let offset = 0; offset <= characters.length - 3; offset += 1) {
-        const trigram = characters[offset] + characters[offset + 1] + characters[offset + 2];
-        if (lastProductIndexByTrigram.get(trigram) === currentIndex) continue;
-        lastProductIndexByTrigram.set(trigram, currentIndex);
-        const indexes = productIndexesByTrigram.get(trigram) ?? [];
-        indexes.push(currentIndex);
-        productIndexesByTrigram.set(trigram, indexes);
+      const product = products[currentIndex];
+      const trigrams = productTrigrams(productSearchText(product));
+      productsById.set(product.id, product);
+      trigramsByProductId.set(product.id, trigrams);
+      for (const trigram of trigrams) {
+        const ids = productIdsByTrigram.get(trigram) ?? new Set<string>();
+        ids.add(product.id);
+        productIdsByTrigram.set(trigram, ids);
       }
       nextProductIndex += 1;
     }
@@ -325,44 +516,58 @@ export function prepareProductCatalogSearchIndex(products: readonly ProductCatal
       return;
     }
 
-    const compactIndex = new Map<string, Uint32Array>();
-    for (const [trigram, indexes] of productIndexesByTrigram) {
-      compactIndex.set(trigram, Uint32Array.from(indexes));
-    }
-    searchIndexesByProducts.set(products, { productIndexesByTrigram: compactIndex });
+    const base: ProductCatalogSearchIndexBase = {
+      productIdsByTrigram,
+      trigramsByProductId,
+      productsById,
+    };
+    searchIndexesByProducts.set(products, {
+      base,
+      parent: null,
+      depth: 0,
+      productCount: productsById.size,
+      resolvedPostings: new Map(),
+    });
     if (buildingSearchIndexes.get(products) === buildToken) buildingSearchIndexes.delete(products);
-    productIndexesByTrigram.clear();
-    lastProductIndexByTrigram.clear();
+    resolveBuild();
   };
 
   scheduleNextSlice();
   return () => {
     cancelled = true;
     if (buildingSearchIndexes.get(products) === buildToken) buildingSearchIndexes.delete(products);
-    productIndexesByTrigram.clear();
-    lastProductIndexByTrigram.clear();
+    resolveBuild();
   };
 }
 
-function indexedProductCandidates(
-  products: readonly ProductCatalogItem[],
-  tokens: readonly string[],
-): Uint32Array | null {
-  const index = searchIndexesByProducts.get(products);
-  if (!index) return null;
+/** Wait for the idle-built index; also used by deterministic browser benchmarks. */
+export function waitForProductCatalogSearchIndex(products: readonly ProductCatalogItem[]): Promise<void> {
+  return buildingSearchIndexPromises.get(products) ?? Promise.resolve();
+}
 
-  let smallestPosting: Uint32Array | null = null;
+/** Minimal diagnostics make index reuse and delta maintenance measurable. */
+export function getProductCatalogSearchIndexStats(products: readonly ProductCatalogItem[]) {
+  const index = searchIndexesByProducts.get(products);
+  return index ? { depth: index.depth, productCount: index.productCount } : null;
+}
+
+function indexedProductCandidates(
+  index: ProductCatalogSearchIndex,
+  tokens: readonly string[],
+): ProductCatalogSearchPostingView | null {
+
+  let smallestPosting: ProductCatalogSearchPostingView | null = null;
   for (const token of tokens) {
     const characters = Array.from(token);
     if (characters.length < 3) continue;
 
     for (let offset = 0; offset <= characters.length - 3; offset += 1) {
       const trigram = characters[offset] + characters[offset + 1] + characters[offset + 2];
-      const posting = index.productIndexesByTrigram.get(trigram);
-      if (!posting) return new Uint32Array();
-      if (!smallestPosting || posting.length < smallestPosting.length) {
+      const posting = postingView(index, trigram);
+      if (posting.size === 0) return posting;
+      if (!smallestPosting || posting.size < smallestPosting.size) {
         smallestPosting = posting;
-        if (smallestPosting.length === 0) return smallestPosting;
+        if (smallestPosting.size === 0) return smallestPosting;
       }
     }
   }
@@ -380,9 +585,10 @@ export function searchProductCatalog(
   const tokens = searchTokens(normalizedQuery);
   if (tokens.length === 0) return [];
 
-  const candidateIndexes = indexedProductCandidates(products, tokens);
-  const result: Array<{ product: ProductCatalogItem; index: number; score: number[] }> = [];
-  const considerProduct = (product: ProductCatalogItem, index: number) => {
+  const index = searchIndexesByProducts.get(products);
+  const candidates = index ? indexedProductCandidates(index, tokens) : null;
+  const result: Array<{ product: ProductCatalogItem; score: number[] }> = [];
+  const considerProduct = (product: ProductCatalogItem) => {
     if (options.stockManagedOnly && !product.isStockManaged) return;
     if (options.excludeIds?.has(product.id)) return;
 
@@ -411,22 +617,29 @@ export function searchProductCatalog(
     const nameMatches = tokens.filter((token) => nameTokens.some((candidate) => candidate.startsWith(token) || candidate.includes(token))).length;
     const codeMatches = tokens.filter((token) => codeTokens.some((candidate) => candidate.startsWith(token) || candidate.includes(token))).length;
     const otherMatches = tokens.filter((token) => searchable.includes(token)).length;
-    result.push({ product, index, score: [exactSKU, exactBarcode, exactName, prefixCode, prefixName, nameMatches, codeMatches, otherMatches] });
+    result.push({ product, score: [exactSKU, exactBarcode, exactName, prefixCode, prefixName, nameMatches, codeMatches, otherMatches] });
   };
 
-  if (candidateIndexes) {
-    for (const productIndex of candidateIndexes) {
-      const product = products[productIndex];
-      if (product) considerProduct(product, productIndex);
+  // When a query matches most of the catalog, a contiguous array scan avoids
+  // the set iteration overhead while preserving the indexed path for selective
+  // SKU, barcode, name, and metadata searches.
+  if (candidates && index && candidates.size < index.productCount / 2) {
+    for (const productId of candidates) {
+      const product = indexedProduct(index, productId);
+      if (product) considerProduct(product);
     }
   } else {
-    products.forEach(considerProduct);
+    products.forEach((product) => considerProduct(product));
   }
   result.sort((left, right) => {
     for (let index = 0; index < left.score.length; index += 1) {
       if (left.score[index] !== right.score[index]) return right.score[index] - left.score[index];
     }
-    return left.index - right.index;
+    const leftDate = left.product.lastSoldAt ? new Date(left.product.lastSoldAt).getTime() : 0;
+    const rightDate = right.product.lastSoldAt ? new Date(right.product.lastSoldAt).getTime() : 0;
+    return rightDate - leftDate
+      || left.product.name.localeCompare(right.product.name, "vi")
+      || left.product.id.localeCompare(right.product.id);
   });
   return result.slice(0, options.limit ?? 20).map(({ product }) => product);
 }

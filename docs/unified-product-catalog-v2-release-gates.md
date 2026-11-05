@@ -43,9 +43,10 @@ Do not assume a successful queue insertion proves that an offsite backup exists.
   space, and app foreground restoration.
 - Preserve invoices, POS drafts, outbox entries, payment workflows, and
   existing SQLite data through migration and rollback.
-- The macOS GitHub Actions simulator build is only a compile smoke test. A
-  passing result does **not** establish signed-device/Keychain/TestFlight
-  correctness.
+- macOS GitHub Actions compiles the Release target with V2 explicitly enabled
+  and runs selected catalog, delta, offline, SQLite rollback, and picker tests
+  on a simulator. Passing these checks does **not** establish signed-device,
+  Keychain, or TestFlight correctness.
 
 ## Stock Card and offline cache
 

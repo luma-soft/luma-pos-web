@@ -79,6 +79,7 @@ import {
   fetchStockHistoryOnce,
   readCachedStockHistory,
 } from "@/lib/offline/product-stock-history-store";
+import { resolveProductStockHistoryPanelState } from "@/lib/product-stock-history-state";
 
 type ProductRow = ProductListResult["rows"][number];
 type StockMovementRow = ProductRow["stockMovements"][number];
@@ -1409,28 +1410,33 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
   // actor or product while asynchronous IndexedDB hydration is in progress.
   const visibleHistory = history !== null && history.scopeId === scopeId
     && history.productId === product.id && history.page === page ? history : null;
-  if (!visibleHistory) {
-    if (loadState === "offline") {
-      return (
-        <div>
-          <EmptyPanel message="Lịch sử Thẻ kho chưa được tải trên thiết bị này. Hãy kết nối mạng rồi thử lại." />
-          <button type="button" className="mt-3 rounded-md border border-border-soft px-3 py-2 text-sm" onClick={() => setRefreshSequence((current) => current + 1)}>Thử lại</button>
-        </div>
-      );
-    }
-    if (loadState === "error") {
-      return (
-        <div>
-          <EmptyPanel message="Không tải được lịch sử Thẻ kho. Kiểm tra kết nối hoặc quyền truy cập." />
-          <button type="button" className="mt-3 rounded-md border border-border-soft px-3 py-2 text-sm" onClick={() => setRefreshSequence((current) => current + 1)}>Thử lại</button>
-        </div>
-      );
-    }
+  const panelState = resolveProductStockHistoryPanelState(
+    visibleHistory,
+    { scopeId, productId: product.id, page },
+    loadState,
+  );
+  if (panelState === "offline-unavailable") {
+    return (
+      <div>
+        <EmptyPanel message="Lịch sử Thẻ kho chưa được tải trên thiết bị này. Hãy kết nối mạng rồi thử lại." />
+        <button type="button" className="mt-3 rounded-md border border-border-soft px-3 py-2 text-sm" onClick={() => setRefreshSequence((current) => current + 1)}>Thử lại</button>
+      </div>
+    );
+  }
+  if (panelState === "error") {
+    return (
+      <div>
+        <EmptyPanel message="Không tải được lịch sử Thẻ kho. Kiểm tra kết nối hoặc quyền truy cập." />
+        <button type="button" className="mt-3 rounded-md border border-border-soft px-3 py-2 text-sm" onClick={() => setRefreshSequence((current) => current + 1)}>Thử lại</button>
+      </div>
+    );
+  }
+  if (panelState === "loading" || !visibleHistory) {
     return <div role="status" className="p-4 text-sm text-muted-foreground">Đang tải lịch sử Thẻ kho…</div>;
   }
 
   const movements = visibleHistory.rows;
-  if (movements.length === 0)
+  if (panelState === "empty")
     return <EmptyPanel message={t("products.expand.stockCardEmpty")} />;
 
   return (
