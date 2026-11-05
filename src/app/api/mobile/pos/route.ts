@@ -7,12 +7,14 @@ export async function GET(request: Request) {
   if (gate.ok === false) return mobileGate(gate);
 
   try {
+    const includeProducts = searchParam(request, "includeProducts") !== "false";
     const includeProductIds = (searchParam(request, "includeProductIds") ?? "")
       .split(",")
       .map((id) => id.trim())
       .filter(Boolean)
       .slice(0, 100);
     return mobileOk(await getMobilePosData(gate.storeId, gate.role, {
+      includeProducts,
       includeProductIds,
     }));
   } catch {
