@@ -219,7 +219,7 @@ export function ProductSearchPicker<T>({
         onChange={(event) => {
           setActiveIndex(-1);
           setFailed(false);
-          setSearching(Boolean(event.target.value.trim()));
+          if (!event.target.value.trim()) setSearching(false);
           setOpen(true);
           onQueryChange(event.target.value);
         }}

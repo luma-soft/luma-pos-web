@@ -2986,7 +2986,7 @@ export function PosClient({
               loadingMessage={t("common.loading")}
               unavailableMessage={t("common.error")}
               closeLabel={t("common.close")}
-              debounceMs={hasPosPriceComparison ? PRODUCT_SEARCH_DEBOUNCE_MS : 50}
+              debounceMs={PRODUCT_SEARCH_DEBOUNCE_MS}
               className="flex-1"
               renderItem={(result) => {
                 const p = result.product;
