@@ -24,8 +24,16 @@ export type PosSearchUnitResult<TProduct extends PosSearchProductLike> = {
 
 export type PosSearchRankFacts = {
   label: string;
+  labelKey: string;
   productTokens: ReadonlySet<string>;
   metadataTokens: ReadonlySet<string>;
+  unitFactsByName: Map<string, PosSearchUnitRankFacts>;
+};
+
+type PosSearchUnitRankFacts = {
+  rowLabelKey: string;
+  tokens: ReadonlySet<string>;
+  visibleTokens: ReadonlySet<string>;
 };
 
 export type PosSearchRankFactsCache<TProduct extends PosSearchProductLike> =
@@ -82,7 +90,13 @@ export function rankProductSearchUnitResults<TProduct extends PosSearchProductLi
           ...(includeBaseMetadata ? [result.product.barcode, result.product.baseUnit] : []),
           ...units.flatMap((unit) => [unit.unitName, unit.sku, unit.barcode]),
         ].filter(Boolean).join(" ")));
-        facts = { label, productTokens, metadataTokens };
+        facts = {
+          label,
+          labelKey: normalizedSearchKey(label),
+          productTokens,
+          metadataTokens,
+          unitFactsByName: new Map(),
+        };
 
         if (factsCache) {
           const labelCache = factsCache.get(result.product) ?? new WeakMap<(product: TProduct) => string, Map<boolean, PosSearchRankFacts>>();
@@ -95,34 +109,49 @@ export function rankProductSearchUnitResults<TProduct extends PosSearchProductLi
       productFacts.set(result.product, facts);
     }
 
-    const unitTokens = new Set(searchTokens(result.unitName ?? ""));
-    const visibleTokens = new Set([...facts.productTokens, ...unitTokens]);
-    const productLabelKey = normalizedSearchKey(facts.label);
-    const rowLabel = normalizedSearchKey(`${facts.label} ${result.unitName ?? ""}`);
+    const unitName = result.unitName ?? "";
+    let unitFacts = facts.unitFactsByName.get(unitName);
+    if (!unitFacts) {
+      const unitTokens = new Set(searchTokens(unitName));
+      unitFacts = {
+        rowLabelKey: normalizedSearchKey(unitName ? `${facts.label} ${unitName}` : facts.label),
+        tokens: unitTokens,
+        visibleTokens: new Set([...facts.productTokens, ...unitTokens]),
+      };
+      facts.unitFactsByName.set(unitName, unitFacts);
+    }
 
     return {
       result,
       index,
-      rank: [
-        Number(productLabelKey === queryKey),
-        Number(rowLabel === queryKey),
-        countMatches(tokens, visibleTokens),
-        countMatches(tokens, facts.productTokens),
-        countMatches(tokens, unitTokens),
-        countMatches(tokens, facts.metadataTokens),
-      ],
+      labelExact: Number(facts.labelKey === queryKey),
+      rowExact: Number(unitFacts.rowLabelKey === queryKey),
+      visibleMatches: countMatches(tokens, unitFacts.visibleTokens),
+      productMatches: countMatches(tokens, facts.productTokens),
+      unitMatches: countMatches(tokens, unitFacts.tokens),
+      metadataMatches: countMatches(tokens, facts.metadataTokens),
     };
   });
 
   ranked.sort((left, right) => {
-    for (let index = 0; index < left.rank.length; index += 1) {
-      const difference = right.rank[index] - left.rank[index];
-      if (difference !== 0) return difference;
-    }
-    return left.index - right.index;
+    return right.labelExact - left.labelExact
+      || right.rowExact - left.rowExact
+      || right.visibleMatches - left.visibleMatches
+      || right.productMatches - left.productMatches
+      || right.unitMatches - left.unitMatches
+      || right.metadataMatches - left.metadataMatches
+      || left.index - right.index;
   });
   return ranked
-    .filter(({ rank }) => !sellableOnly || rank.some((value) => value > 0))
+    .filter(({ labelExact, rowExact, visibleMatches, productMatches, unitMatches, metadataMatches }) => (
+      !sellableOnly
+      || labelExact > 0
+      || rowExact > 0
+      || visibleMatches > 0
+      || productMatches > 0
+      || unitMatches > 0
+      || metadataMatches > 0
+    ))
     .map(({ result }) => result);
 }
 

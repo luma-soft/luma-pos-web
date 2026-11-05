@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { expandPosSearchUnitResults } from "./search-unit-results";
+import { expandPosSearchUnitResults, rankProductSearchUnitResults } from "./search-unit-results";
 
 describe("POS search selling units", () => {
   test("shows one result for the base unit and each distinct converted unit", () => {
@@ -33,5 +33,50 @@ describe("POS search selling units", () => {
 
     expect(row.unitName).toBeNull();
     expect(row.alternateUnit).toBeNull();
+  });
+
+  test("cached ranking facts match uncached results when the query changes", () => {
+    const products = [
+      {
+        id: "elbow-110",
+        name: "Cút góc PVC 110",
+        sku: "CUT-110",
+        barcode: "893110",
+        baseUnit: "cái",
+        baseUnitDirectSale: true,
+        isVariantParent: false,
+        units: [{ unitName: "cây", sku: "CUT-110-CAY", directSale: true }],
+      },
+      {
+        id: "pipe-110",
+        name: "Ống PVC 110",
+        sku: "ONG-110",
+        barcode: null,
+        baseUnit: "cây",
+        baseUnitDirectSale: true,
+        isVariantParent: false,
+        units: [{ unitName: "bó", sku: null, directSale: true }],
+      },
+    ];
+    const rows = expandPosSearchUnitResults(products);
+    const label = (product) => product.name;
+    const factsCache = new WeakMap();
+
+    for (const query of ["cút 110", "cây", "PVC 110", "110 cút", "ống bó"]) {
+      expect(rankProductSearchUnitResults(rows, query, label, {
+        sellableOnly: true,
+        factsCache,
+      })).toEqual(rankProductSearchUnitResults(rows, query, label, { sellableOnly: true }));
+    }
+
+    expect(rankProductSearchUnitResults(rows, "cút 110", label, {
+      sellableOnly: true,
+      factsCache,
+    }).map(({ product, unitName }) => [product.id, unitName])).toEqual([
+      ["elbow-110", "cái"],
+      ["elbow-110", "cây"],
+      ["pipe-110", "cây"],
+      ["pipe-110", "bó"],
+    ]);
   });
 });
