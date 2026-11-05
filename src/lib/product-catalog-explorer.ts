@@ -227,6 +227,23 @@ function compareNumbers(left: string, right: string, descending: boolean) {
   return (descending ? b - a : a - b);
 }
 
+// ProductExplorer receives an immutable catalog array for each revision.
+// Cache its variant-filtered search view by that identity so the trigram
+// index can be reused across keystrokes, filters, sorting and pagination.
+const inventorySearchViews = new WeakMap<readonly ProductCatalogItem[], readonly ProductCatalogItem[]>();
+
+export function getInventorySearchableProducts(
+  products: readonly ProductCatalogItem[],
+): readonly ProductCatalogItem[] {
+  const existing = inventorySearchViews.get(products);
+  if (existing) return existing;
+  const view = products.some((product) => product.isVariantParent)
+    ? products.filter((product) => !product.isVariantParent)
+    : products;
+  inventorySearchViews.set(products, view);
+  return view;
+}
+
 export function exploreProductCatalog(
   products: readonly ProductCatalogItem[],
   warehouseRows: readonly ProductCatalogWarehouse[],
@@ -239,7 +256,7 @@ export function exploreProductCatalog(
   const warehouseById = new Map(warehouseRows.map((warehouse) => [warehouse.id, warehouse]));
   const groups = buildGroups(products);
   const q = filters.query?.trim() ?? "";
-  const searchable = products.filter((product) => !product.isVariantParent);
+  const searchable = getInventorySearchableProducts(products);
   const searchRows = q ? searchProductCatalog(searchable, q, { limit: searchable.length }) : searchable;
   const searchRank = new Map(searchRows.map((product, index) => [product.id, index]));
   const matched = new Set(searchRows.filter((product) => matchesProduct(product, filters)).map((product) => product.id));
