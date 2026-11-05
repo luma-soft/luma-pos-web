@@ -1,26 +1,43 @@
 # Unified Product Catalog V2 migration and rollout
 
-## Database deployment
+## Database deployment status
 
-The production database may already have migration 0142 applied. Do not edit
-0142. Apply the new forward-only migration in this order:
+The migration runner applied the pending migrations to the
+database configured by `DATABASE_URL`, using its session endpoint and the
+runner's reserved connection, PID checks, and advisory lock. The applied files
+were:
 
-1. `0149_catalog_delta_v2.sql` (additive protocol fields/functions/triggers and
-   revision floor initialization).
-2. Deploy the V2 API and keep the existing V1 route available.
-3. Deploy the web client.
-4. Ship the iOS client through TestFlight. Debug builds enable V2; Release
+1. `0144_database_backup_runs.sql`
+2. `0147_purchase_order_item_line_order.sql` (fills only missing positions and
+   preserves existing document line order)
+3. `0148_document_line_order.sql` (fills only missing positions and preserves
+   existing document line order)
+4. `0149_catalog_delta_v2.sql` (additive protocol fields/functions/triggers
+   and revision floor initialization)
+5. `0150_catalog_statement_journal.sql` (statement-level, per-store journal
+   events for bulk product and document-line changes)
+
+The runner recorded all five files in `_migrations`. A post-run query confirmed
+all six V2 journal columns and 24 statement-level triggers (insert, update, and
+delete across eight high-volume tables). Existing document line-order values
+were preserved. Migration `0142_catalog_delta_journal.sql` was not modified.
+
+## Deployment and rollout order
+
+1. Keep the V1 route available while older mobile clients remain supported.
+2. Deploy the V2 API and web client from `main`.
+3. Ship the iOS client through TestFlight. Debug builds enable V2; Release
    builds require `LUMA_UNIFIED_CATALOG_ENABLED=YES` (or the in-app override)
    to opt into V2. Without it, the shared coordinator uses the paginated
    legacy sync contract.
-5. Enable V2 for a controlled cohort after sync, tenant-scope, offline, and
+4. Enable V2 for a controlled cohort after sync, tenant-scope, offline, and
    performance diagnostics are reviewed.
-6. Expand rollout and later remove the legacy paginated browse sync after the
+5. Expand rollout and later remove the legacy paginated browse sync after the
    supported old-client window.
 
-This task creates migration files only. Production migration execution is a
-separate deployment operation and is not performed by this implementation.
-The migration to apply manually is `drizzle/0149_catalog_delta_v2.sql`.
+The database migration is complete for the configured database. App deployment
+and feature-flag rollout remain separate steps; do not enable the iOS release
+flag broadly until diagnostics are reviewed.
 
 ## Existing cache migration
 

@@ -29,6 +29,10 @@
   derived fields.
 - Persist only changed IndexedDB/SQLite rows and the revision marker for a
   delta.
+- Use statement-level transition triggers for bulk product, stock, price, unit,
+  supplier-assignment, combo, and document-line changes. They emit one journal
+  event per affected store and SQL statement with a deduplicated product-ID
+  array. Lower-volume metadata and relationship triggers remain row-level.
 - Keep one actor-scoped sync coordinator and one Realtime invalidation source;
   screens do not subscribe or poll independently.
 - Keep image bytes outside the catalog. Send only stable media references and
@@ -52,7 +56,9 @@ Web list browsing and the iOS product browse model now use local catalog
 projections; product list calls are owned by the shared sync coordinator. The
 web provider persists only changed product rows for deltas. Native SQLite
 applies changed catalog rows and tombstones in the same transaction as the
-revision marker.
+revision marker. Migration `0150_catalog_statement_journal.sql` collapses
+high-volume row-trigger fanout to one revision and journal row per affected
+store and statement while retaining targeted V2 product IDs.
 
 Synthetic local search and delta timings are recorded in
 `unified-product-catalog-v2-test-report.md`. Warm screen-open time, memory,

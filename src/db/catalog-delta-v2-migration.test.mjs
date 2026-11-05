@@ -40,13 +40,13 @@ beforeAll(async () => {
 
   await pg.exec(await readFile("drizzle/0149_catalog_delta_v2.sql", "utf8"));
   for (const table of [
-    "products", "product_units", "product_prices", "stock_levels", "product_combo_items",
-    "product_suppliers", "product_media", "media_objects", "categories", "brands", "suppliers",
-    "warehouses", "product_variant_groups", "product_variant_members", "order_items",
-    "purchase_order_items", "price_books", "promotions",
+    "product_media", "media_objects", "categories", "brands", "suppliers", "warehouses",
+    "product_variant_groups", "product_variant_members", "purchase_orders", "price_books",
+    "promotions",
   ]) {
     await pg.exec(`create trigger ${table}_catalog_revision_test after insert or update or delete on public.${table} for each row execute function public.bump_product_catalog_revision()`);
   }
+  await pg.exec(await readFile("drizzle/0150_catalog_statement_journal.sql", "utf8"));
 });
 
 afterAll(async () => pg.close());
@@ -113,4 +113,35 @@ test("journal writes roll back with the business transaction and stay tenant-loc
   await pg.query("insert into public.products(id,store_id,name) values($1,$2,'Other tenant')", ["90000000-0000-4000-8000-000000000001", otherStoreId]);
   expect(Number((await pg.query("select revision from public.catalog_sync_state where store_id=$1", [otherStoreId])).rows[0].revision)).toBe(26);
   expect(Number((await pg.query("select revision from public.catalog_sync_state where store_id=$1", [storeId])).rows[0].revision)).toBe(before);
+});
+
+test("bulk product writes create one revision per store and retain all V2 product IDs", async () => {
+  const before = new Map((await pg.query(
+    "select store_id, revision from public.catalog_sync_state",
+  )).rows.map((row) => [row.store_id, Number(row.revision)]));
+  const ids = [
+    "a0000000-0000-4000-8000-000000000001",
+    "a0000000-0000-4000-8000-000000000002",
+    "a0000000-0000-4000-8000-000000000003",
+  ];
+  await pg.query(
+    "insert into public.products(id,store_id,name) values($1,$3,'Bulk A'),($2,$3,'Bulk B'),($4,$5,'Bulk Other')",
+    [ids[0], ids[1], storeId, ids[2], otherStoreId],
+  );
+
+  const events = (await pg.query(
+    "select store_id, revision, product_id, requires_full, affected_product_ids, requires_full_v2 from public.catalog_delta_events where (store_id=$1 and revision > $2) or (store_id=$3 and revision > $4) order by store_id,revision",
+    [storeId, before.get(storeId), otherStoreId, before.get(otherStoreId)],
+  )).rows;
+  const storeEvents = events.filter((event) => event.store_id === storeId);
+  const otherEvents = events.filter((event) => event.store_id === otherStoreId);
+
+  expect(storeEvents.length).toBe(1);
+  expect(Number(storeEvents[0].revision)).toBe((before.get(storeId) ?? 0) + 1);
+  expect(storeEvents[0].product_id).toBeNull();
+  expect(storeEvents[0].requires_full).toBe(true);
+  expect(storeEvents[0].affected_product_ids.slice().sort()).toEqual(ids.slice(0, 2).sort());
+  expect(storeEvents[0].requires_full_v2).toBe(false);
+  expect(otherEvents.length).toBe(1);
+  expect(otherEvents[0].affected_product_ids).toEqual([ids[2]]);
 });

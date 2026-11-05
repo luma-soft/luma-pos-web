@@ -41,6 +41,10 @@ unit rows where the workflow needs them.
   malformed delta, revision gap, expired journal, unsupported schema, invalid
   permission scope, or corrupt cache leaves the old committed catalog visible
   and starts a full recovery.
+- High-volume product and document-line tables use statement-level transition
+  triggers. Each SQL statement writes one revision/event per affected store and
+  carries the deduplicated product IDs; V1 receives a full marker for a
+  multi-product statement while V2 can replay the targeted ID set.
 
 ## ProductExplorer
 

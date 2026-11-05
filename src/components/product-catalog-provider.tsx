@@ -216,7 +216,12 @@ export function ProductCatalogProvider({
   }, [refresh, serverRevision]);
 
   const checkForUpdates = useCallback(async () => {
-    if (checkingRef.current) return checkingRef.current;
+    if (checkingRef.current) {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[product-catalog] duplicate revision check coalesced");
+      }
+      return checkingRef.current;
+    }
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
 
     const check = checkProductCatalogRevision()

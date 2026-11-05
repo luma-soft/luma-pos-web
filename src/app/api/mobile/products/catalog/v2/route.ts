@@ -33,13 +33,19 @@ export async function GET(request: Request) {
     }
 
     if (sameScope && sinceRevision && sinceRevision !== revision) {
-      const delta = await getProductCatalogDeltaV2(
-        gate.storeId,
-        gate.userId,
-        gate.role,
-        sinceRevision,
-        revision,
-      );
+      let delta: Awaited<ReturnType<typeof getProductCatalogDeltaV2>> = null;
+      try {
+        delta = await getProductCatalogDeltaV2(
+          gate.storeId,
+          gate.userId,
+          gate.role,
+          sinceRevision,
+          revision,
+        );
+      } catch {
+        // Journal expiration/query failure must recover with a complete
+        // snapshot. If that also fails, the outer handler returns 503.
+      }
       if (delta) {
         const response = mobileOk({
           protocolVersion: 2 as const,

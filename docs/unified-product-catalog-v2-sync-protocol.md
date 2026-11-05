@@ -79,7 +79,12 @@ revision remains usable and the client requests a full snapshot.
 
 - Business writes and journal events share one Postgres transaction.
 - Rolled-back business writes cannot publish a catalog change.
-- A row-level product/stock/price/unit change identifies affected product IDs.
+- High-volume product, stock, price, unit, supplier-assignment, combo, and
+  document-line writes use statement-level transition tables. They emit one
+  revision/event per affected store and SQL statement with deduplicated product
+  IDs. Metadata and less common relationship triggers remain row-level.
+- For compatibility, a multi-product statement may mark V1 as requiring a
+  full snapshot; V2 retains the targeted product IDs and remains incremental.
 - Order and purchase-document changes identify their affected line products;
   unrelated catalog products are not invalidated.
 - Metadata-only changes update metadata/projections instead of forcing a full
