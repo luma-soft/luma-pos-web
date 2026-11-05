@@ -3,7 +3,8 @@
 import { and, desc, eq, gt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { products, stockLevels, stockMovements } from "@/db/schema";
-import { requireStockAccess } from "@/lib/actions/common";
+import { requireRole } from "@/lib/actions/common";
+import { STOCK_READ_ROLES } from "@/lib/auth/roles";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 
 const PAGE_SIZE = 40;
@@ -31,7 +32,7 @@ async function stockHistoryVersion(storeId: string, productId: string): Promise<
 }
 
 export async function checkProductStockHistoryVersion(productId: string) {
-  const gate = await requireStockAccess();
+  const gate = await requireRole([...STOCK_READ_ROLES]);
   if (!gate.ok) return { ok: false as const, error: gate.error };
   if (!PRODUCT_ID.test(productId)) return { ok: false as const, error: "errors.invalidData" };
   const [authorized] = await db.select({ id: products.id }).from(products)
@@ -51,7 +52,7 @@ export async function checkProductStockHistoryVersion(productId: string) {
  * transaction history into the shared offline product catalog.
  */
 export async function loadProductStockHistory(productId: string, requestedPage = 1) {
-  const gate = await requireStockAccess();
+  const gate = await requireRole([...STOCK_READ_ROLES]);
   if (!gate.ok) return { ok: false as const, error: gate.error };
   if (!PRODUCT_ID.test(productId)) {
     return { ok: false as const, error: "errors.invalidData" };
