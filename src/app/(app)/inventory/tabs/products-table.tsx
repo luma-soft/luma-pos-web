@@ -73,6 +73,11 @@ import {
   productStockDisplay,
 } from "@/lib/product-stock";
 import { useProductSelection } from "./product-selection";
+import { useProductCatalog } from "@/components/product-catalog-provider";
+import {
+  fetchStockHistoryOnce,
+  readCachedStockHistory,
+} from "@/lib/offline/product-stock-history-store";
 
 type ProductRow = ProductListResult["rows"][number];
 type StockMovementRow = ProductRow["stockMovements"][number];
@@ -1325,11 +1330,69 @@ function TextPanel({
 
 function ProductStockCardPanel({ product }: { product: ProductRow }) {
   const t = useTranslations();
-  const movements = product.stockMovements;
+  const { snapshot } = useProductCatalog();
+  const [page, setPage] = useState(1);
+  const [history, setHistory] = useState<{ rows: StockMovementRow[]; hasMore: boolean } | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "offline" | "error">("loading");
+  const tracked = isProductStockManaged(product.categoryName);
+  const scopeId = snapshot?.scopeId;
+  const revision = snapshot?.revision;
 
-  if (!isProductStockManaged(product.categoryName))
+  useEffect(() => { setPage(1); }, [product.id]);
+
+  useEffect(() => {
+    if (!tracked) return;
+    let cancelled = false;
+    setHistory(null);
+    setLoadState("loading");
+
+    void (async () => {
+      if (!scopeId || !revision) {
+        if (!cancelled) setLoadState("offline");
+        return;
+      }
+      const cached = await readCachedStockHistory(scopeId, product.id, page);
+      if (cancelled) return;
+      if (cached) {
+        setHistory({ rows: cached.rows, hasMore: cached.hasMore });
+        setLoadState("ready");
+      }
+      if (!navigator.onLine) {
+        if (!cached) setLoadState("offline");
+        return;
+      }
+      if (cached?.revision === revision) return;
+
+      try {
+        const result = await fetchStockHistoryOnce(scopeId, product.id, page, revision);
+        if (cancelled) return;
+        if (result.ok) {
+          setHistory({ rows: result.data.rows, hasMore: result.data.hasMore });
+          setLoadState("ready");
+        } else if (!cached) {
+          setLoadState("error");
+        }
+      } catch {
+        if (!cancelled && !cached) setLoadState("error");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [scopeId, revision, product.id, page, tracked]);
+
+  if (!tracked)
     return <EmptyPanel message={t("products.stock.notTracked")} />;
 
+  if (!history) {
+    if (loadState === "offline") {
+      return <EmptyPanel message="Lịch sử Thẻ kho chưa được tải trên thiết bị này. Hãy kết nối mạng và mở lại Thẻ kho." />;
+    }
+    if (loadState === "error") {
+      return <EmptyPanel message="Không tải được lịch sử Thẻ kho. Kiểm tra kết nối hoặc quyền truy cập rồi mở lại." />;
+    }
+    return <div role="status" className="p-4 text-sm text-muted-foreground">Đang tải lịch sử Thẻ kho…</div>;
+  }
+
+  const movements = history.rows;
   if (movements.length === 0)
     return <EmptyPanel message={t("products.expand.stockCardEmpty")} />;
 
@@ -1420,6 +1483,25 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
           ))}
         </tbody>
       </table>
+    </div>
+    <div className="mt-4 flex items-center justify-end gap-3 text-sm">
+      <button
+        type="button"
+        className="rounded-md border border-border-soft px-3 py-2 disabled:opacity-40"
+        disabled={page <= 1}
+        onClick={() => setPage((current) => Math.max(1, current - 1))}
+      >
+        Trang trước
+      </button>
+      <span className="tabular-nums">Trang {page}</span>
+      <button
+        type="button"
+        className="rounded-md border border-border-soft px-3 py-2 disabled:opacity-40"
+        disabled={!history.hasMore}
+        onClick={() => setPage((current) => current + 1)}
+      >
+        Trang sau
+      </button>
     </div>
     </>
   );
