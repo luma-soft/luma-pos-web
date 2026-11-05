@@ -12,6 +12,7 @@ const META_STORE = "product-catalog-meta";
 const PRODUCTS_STORE = "product-catalog-products";
 
 export type ProductCatalogWriteChanges = {
+  baseRevision?: string;
   changedProductIDs: readonly string[];
   deletedProductIDs: readonly string[];
 };
@@ -126,14 +127,18 @@ export async function writeProductCatalogSnapshot(
     let committed = false;
     currentRequest.onsuccess = () => {
       const current = currentRequest.result as ProductCatalogSnapshot | undefined;
-      if (
-        current?.schemaVersion === snapshot.schemaVersion &&
-        catalogRevisionChanged(snapshot.revision, current.revision)
-      ) return;
+      if (current && catalogRevisionChanged(snapshot.revision, current.revision)) return;
+
+      // A delta can only patch a complete cache at exactly the revision it
+      // was based on. Missing/migrated/stale metadata requires full replacement.
+      const replaceRows = !changes
+        || current?.schemaVersion !== snapshot.schemaVersion
+        || !changes.baseRevision
+        || current?.revision !== changes.baseRevision;
 
       const saveRows = () => {
         committed = true;
-        if (!changes) {
+        if (replaceRows) {
           for (const product of snapshot.products) {
             productsStore.put(product, productKey(snapshot.scopeId, product.id));
           }
@@ -150,7 +155,7 @@ export async function writeProductCatalogSnapshot(
         metaStore.put(headerOnly(snapshot), snapshot.scopeId);
       };
 
-      if (!changes) {
+      if (replaceRows) {
         const cursorRequest = productsStore.openCursor(productRange(snapshot.scopeId));
         cursorRequest.onsuccess = () => {
           const cursor = cursorRequest.result;
