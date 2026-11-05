@@ -110,7 +110,7 @@ import {
   type LineDiscountMode,
 } from "@/lib/pos/line-price-editor";
 import { useProductCatalog } from "@/components/product-catalog-provider";
-import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
+import { catalogItemToPosProduct, isCatalogProductSellable } from "@/lib/pos/product-catalog-adapter";
 import {
   prepareProductCatalogSearchIndex,
   searchProductCatalog,
@@ -1392,16 +1392,22 @@ export function PosClient({
     [data.priceBooks],
   );
   const catalogProducts = productCatalog.products;
+  // Inventory sync includes inactive/draft/archived products. POS must not
+  // surface them as sale choices, even when their SKU or barcode matches.
+  const sellableCatalogProducts = useMemo(
+    () => catalogProducts.filter(isCatalogProductSellable),
+    [catalogProducts],
+  );
   const catalogChildrenByParentId = useMemo(() => {
     const childrenByParentId = new Map<string, ProductCatalogItem[]>();
-    for (const product of catalogProducts) {
+    for (const product of sellableCatalogProducts) {
       if (!product.parentProductId) continue;
       const siblings = childrenByParentId.get(product.parentProductId) ?? [];
       siblings.push(product);
       childrenByParentId.set(product.parentProductId, siblings);
     }
     return childrenByParentId;
-  }, [catalogProducts]);
+  }, [sellableCatalogProducts]);
   const catalogSearchResultsRef = useRef<{
     catalog: readonly ProductCatalogItem[];
     tokens: readonly string[];
@@ -1417,11 +1423,11 @@ export function PosClient({
     products: new WeakMap<ProductCatalogItem, PosProduct>(),
     units: new WeakMap<PosProduct, readonly PosSearchUnitResult<PosProduct>[]>(),
     rankFacts: new WeakMap<PosProduct, WeakMap<(product: PosProduct) => string, Map<boolean, PosSearchRankFacts>>>(),
-    catalog: catalogProducts,
+    catalog: sellableCatalogProducts,
     childrenByParentId: catalogChildrenByParentId,
     costPriceBookIds,
     warehouseId: data.warehouse?.id ?? null,
-  }), [catalogChildrenByParentId, catalogProducts, costPriceBookIds, data.warehouse?.id]);
+  }), [catalogChildrenByParentId, sellableCatalogProducts, costPriceBookIds, data.warehouse?.id]);
   const cachedPosSearchProducts = useCallback((query: string) => {
     const tokens = searchTokens(query);
     const previous = catalogSearchResultsRef.current;
@@ -1433,7 +1439,7 @@ export function PosClient({
       && tokens.length >= previous.tokens.length
       && previous.tokens.every((token) => tokens.some((nextToken) => nextToken.startsWith(token))),
     );
-    const candidates = previous && canNarrowPreviousResults ? previous.products : catalogProducts;
+    const candidates = previous && canNarrowPreviousResults ? previous.products : sellableCatalogProducts;
     const matches = searchProductCatalog(candidates, query, { limit: candidates.length });
     catalogSearchResultsRef.current = { catalog: catalogProducts, tokens, products: matches };
 
@@ -1451,7 +1457,7 @@ export function PosClient({
       catalogPosSearchCache.products.set(product, posProduct);
       return posProduct;
     });
-  }, [catalogPosSearchCache, catalogProducts]);
+  }, [catalogPosSearchCache, catalogProducts, sellableCatalogProducts]);
   const loadPosSearchResults = useCallback((query: string): readonly PosSearchUnitResult<PosProduct>[] | Promise<readonly PosSearchUnitResult<PosProduct>[]> => {
     // The server search and catalog snapshot both preserve recent-sale order.
     // Sorting them again here adds a full O(n log n) pass to every keystroke.
