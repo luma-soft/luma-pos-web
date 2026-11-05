@@ -8,8 +8,10 @@ off by default. These checks do not certify a production rollout.
 
 The earlier migration runner record is documented in
 [the migration and rollout document](./unified-product-catalog-v2-migration.md).
-This run did not re-query the live Supabase project or collect production
-traffic measurements.
+A read-only snapshot was collected from the Supabase project configured for
+this workspace on 2026-11-06 (ICT). No metrics export was available. The
+snapshot did not apply migrations or write application data, and it does not
+certify a production rollout.
 
 ## Web verification
 
@@ -63,10 +65,37 @@ The index sharply reduces exact SKU, barcode, and name lookup time. Broad search
 at 10k was about 4% slower in this synthetic run; results vary by query shape.
 The benchmark is not a browser screen-open test.
 
-## Production measurements still outstanding
+## Supabase snapshot and measurement limits
 
-No production Supabase query count, CPU, Egress, Realtime volume, or billing
-sample was available in this run, so there is no production savings estimate.
+- The configured database connection used session-mode port **5432** and
+  reported PostgreSQL **17.11**. Database size was **85,989,043 bytes**
+  (about **82.0 MiB**). The configured connection's project reference matched
+  the workspace's `NEXT_PUBLIC_SUPABASE_URL` project reference.
+- All **162** local Drizzle migrations were present in the database migration
+  ledger; none were pending. Migrations `0149_catalog_delta_v2.sql` and
+  `0150_catalog_statement_journal.sql` were recorded as applied. The database
+  had **38** catalog revision triggers: 24 statement-level and 14 row-level.
+- PostgreSQL relation estimates were 3,470 products (13,459,456 bytes), 7,362
+  `catalog_delta_events` rows (1,466,368 bytes), 3 sync-state rows (401,408
+  bytes), and 0 delta-floor rows (24,576 bytes). These are catalog statistics
+  estimates, not exact live row counts.
+- All **3** stores remained exactly at their V2 cutover floors: no revision gap,
+  no events after a floor, and no structured events after a floor. The largest
+  store had **3,463** products at revision **61,940**. Therefore there is no
+  post-cutover V2 delta traffic from which to measure real delta savings.
+- The app's full-snapshot helper returned a **6,784,045-byte** JSON payload for
+  the largest store in one read (about **6.47 MiB**); that single call took
+  **2.46 seconds** end to end. This is a one-off payload observation, not a
+  latency benchmark.
+- Since the PostgreSQL statistics reset on 2026-10-02, normalized SQL matching
+  the delta-event and sync-state tables accumulated **6,141 calls**, **2,066 ms**
+  total execution time, **14,746 rows**, and **10** blocks read. This is a
+  cumulative mixed-query total, not a clean V1/V2 comparison. The available
+  `pg_stat_statements` data is not an export of Supabase Egress, Realtime, CPU,
+  or billing usage.
+
+No production savings estimate can be made until representative V2 events are
+written after cutover and before/after Supabase usage metrics are available.
 The local PGlite migration simulation is not a substitute for those metrics.
 Representative-store browser/iPhone measurements, signed TestFlight Release
 verification, and the remaining gates are listed in
