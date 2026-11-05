@@ -1665,8 +1665,11 @@ export function PosClient({
 
   function buildPrintJob(input: { template: PrintTemplate; title: string; code: string; paymentQr?: PrintPaymentQr | null; isTemporarySlip?: boolean }): PosPrintJob {
     const printLines = isReturnDraft ? cart.filter((line) => line.quantity > 0) : cart;
+    const printTemplate = taxAmount > 0 && !input.template.options.showTax
+      ? { ...input.template, options: { ...input.template.options, showTax: true } }
+      : input.template;
     return {
-      template: input.template,
+      template: printTemplate,
       title: input.title,
       code: input.code,
       date: new Date().toISOString(),
