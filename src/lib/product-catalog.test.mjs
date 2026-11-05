@@ -135,3 +135,44 @@ test("benchmarks local search and delta projection at 1k, 10k, and 50k products"
   }
   console.info("[catalog-benchmark] synthetic", JSON.stringify(measurements));
 });
+
+test("full lifecycle catalog retains inactive rows through deltas and deletion tombstones", () => {
+  const full = snapshot([
+    product({ id: "active", sku: "SKU-A", lifecycleStatus: "active", isActive: true }),
+    product({ id: "inactive", sku: "SKU-I", lifecycleStatus: "inactive", isActive: false }),
+    product({ id: "draft", sku: "SKU-D", lifecycleStatus: "draft", isActive: false }),
+    product({ id: "archived", sku: "SKU-R", lifecycleStatus: "archived", isActive: false }),
+  ]);
+  const afterStatusChange = mergeProductCatalogDelta(full, {
+    baseRevision: "10", revision: "11", schemaVersion: 12,
+    userId: "u", scopeId: "s:u:owner",
+    upserts: [product({ id: "active", sku: "SKU-A", lifecycleStatus: "inactive", isActive: false })],
+    deletedIds: [],
+  });
+  expect(afterStatusChange?.products).toHaveLength(4);
+  expect(afterStatusChange?.products.find((row) => row.id === "active")?.lifecycleStatus)
+    .toBe("inactive");
+  expect(afterStatusChange?.products.find((row) => row.id === "draft")?.isActive).toBe(false);
+
+  const afterDeletion = mergeProductCatalogDelta(afterStatusChange, {
+    baseRevision: "11", revision: "12", schemaVersion: 12,
+    userId: "u", scopeId: "s:u:owner",
+    upserts: [], deletedIds: ["archived"],
+  });
+  expect(afterDeletion?.products.map(({ id }) => id).sort())
+    .toEqual(["active", "draft", "inactive"]);
+  expect(afterDeletion?.revision).toBe("12");
+});
+
+test("rejects a delta from another actor or the wrong base revision", () => {
+  const current = snapshot([product()]);
+  const delta = {
+    baseRevision: "10", revision: "11", schemaVersion: 12,
+    userId: "other-user", scopeId: "s:other-user:owner",
+    upserts: [product({ id: "new" })], deletedIds: [],
+  };
+  expect(mergeProductCatalogDelta(current, delta)).toBeNull();
+  expect(mergeProductCatalogDelta(current, {
+    ...delta, userId: "u", scopeId: "s:u:owner", baseRevision: "9",
+  })).toBeNull();
+});
