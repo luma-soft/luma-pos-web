@@ -1,0 +1,37 @@
+name: Catalog verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/catalog-validation.yml"
+      - "src/lib/product-catalog*"
+      - "src/lib/product-catalog-explorer*"
+      - "src/lib/offline/product-*"
+      - "src/lib/actions/product-*"
+      - "src/components/product-catalog-provider.tsx"
+      - "src/app/(app)/inventory/tabs/products-table.tsx"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: TypeScript check
+        run: bunx tsc --noEmit
+      - name: ESLint
+        run: bun run lint
+      - name: Focused catalog regressions
+        run: bun test src/lib/product-catalog.test.mjs src/lib/product-catalog-explorer.test.mjs src/lib/catalog-delta.test.mjs src/lib/catalog-delta-db.test.mjs
+      - name: Production build
+        run: bun run build
