@@ -41,7 +41,7 @@ export function VietnamAddressFields({
 
   useEffect(() => {
     let cancelled = false;
-    setLoadingProvinces(true);
+    queueMicrotask(() => { if (!cancelled) setLoadingProvinces(true); });
     fetch("/api/public/address-catalog", { cache: "force-cache" })
       .then(async (response) => {
         if (!response.ok) throw new Error("address_catalog_unavailable");
@@ -62,11 +62,15 @@ export function VietnamAddressFields({
   useEffect(() => {
     let cancelled = false;
     if (!value.addressProvinceCode) {
-      setWards([]);
-      setLoadingWards(false);
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setWards([]);
+          setLoadingWards(false);
+        }
+      });
       return () => { cancelled = true; };
     }
-    setLoadingWards(true);
+    queueMicrotask(() => { if (!cancelled) setLoadingWards(true); });
     fetch(`/api/public/address-catalog?provinceCode=${encodeURIComponent(value.addressProvinceCode)}`, { cache: "force-cache" })
       .then(async (response) => {
         if (!response.ok) throw new Error("address_catalog_unavailable");
