@@ -141,13 +141,27 @@ export function ProductCatalogProvider({
           }
         }
         const persistStartedAt = performance.now();
-        const committed = await writeProductCatalogSnapshot(
-          fresh,
-          delta ? { changedProductIDs: [...changedProductIDs], deletedProductIDs } : undefined,
-        );
+        let committed = false;
+        try {
+          committed = await writeProductCatalogSnapshot(
+            fresh,
+            delta ? { changedProductIDs: [...changedProductIDs], deletedProductIDs } : undefined,
+          );
+        } catch {
+          // IndexedDB can be disabled or temporarily fail. Keep online browsing
+          // functional without announcing a revision that was never persisted.
+        }
         if (!committed) {
-          // A newer tab may already have committed a later revision.
-          // Never broadcast or adopt an uncommitted snapshot.
+          const shared = await readProductCatalogSnapshot(scopeId);
+          const usable = shared?.userId === userId && shared.scopeId === scopeId
+            && catalogRevisionChanged(fresh.revision, shared.revision)
+            ? shared : fresh;
+          if (!catalogRevisionChanged(usable.revision, revisionRef.current)) {
+            snapshotRef.current = usable;
+            setSnapshot(usable);
+            setStatus("synced");
+            revisionRef.current = usable.revision;
+          }
           return;
         }
         if (catalogRevisionChanged(fresh.revision, revisionRef.current)) return;
