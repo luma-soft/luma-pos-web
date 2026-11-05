@@ -1392,7 +1392,7 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
 
   // A scope/product/page switch must not display rows cached for the previous
   // actor or product while asynchronous IndexedDB hydration is in progress.
-  const visibleHistory = history?.scopeId === scopeId
+  const visibleHistory = history !== null && history.scopeId === scopeId
     && history.productId === product.id && history.page === page ? history : null;
   if (!visibleHistory) {
     if (loadState === "offline") {
