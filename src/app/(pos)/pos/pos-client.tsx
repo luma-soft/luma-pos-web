@@ -112,7 +112,11 @@ import {
 } from "@/lib/pos/line-price-editor";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
-import { searchProductCatalog, type ProductCatalogItem } from "@/lib/product-catalog";
+import {
+  prepareProductCatalogSearchIndex,
+  searchProductCatalog,
+  type ProductCatalogItem,
+} from "@/lib/product-catalog";
 import {
   PosAmountModeInput,
   PosStockQuantityTooltip,
@@ -1408,6 +1412,7 @@ export function PosClient({
     if (catalogSearchResultsRef.current?.catalog !== catalogProducts) {
       catalogSearchResultsRef.current = null;
     }
+    if (catalogProducts.length > 0) return prepareProductCatalogSearchIndex(catalogProducts);
   }, [catalogProducts]);
   const catalogPosSearchCache = useMemo(() => ({
     products: new WeakMap<ProductCatalogItem, PosProduct>(),

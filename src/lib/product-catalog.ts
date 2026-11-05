@@ -150,6 +150,22 @@ export type ProductCatalogSearchOptions = {
 };
 
 const searchableTextByProduct = new WeakMap<ProductCatalogItem, string>();
+type ProductCatalogSearchIndex = {
+  productIndexesByTrigram: ReadonlyMap<string, Uint32Array>;
+};
+type ProductCatalogIdleDeadline = {
+  didTimeout: boolean;
+  timeRemaining: () => number;
+};
+type ProductCatalogIdleWindow = Window & {
+  requestIdleCallback?: (
+    callback: (deadline: ProductCatalogIdleDeadline) => void,
+    options?: { timeout: number },
+  ) => number;
+};
+
+const searchIndexesByProducts = new WeakMap<readonly ProductCatalogItem[], ProductCatalogSearchIndex>();
+const buildingSearchIndexes = new WeakMap<readonly ProductCatalogItem[], object>();
 
 function productSearchText(product: ProductCatalogItem): string {
   const cached = searchableTextByProduct.get(product);
@@ -171,6 +187,106 @@ function productSearchText(product: ProductCatalogItem): string {
   return searchable;
 }
 
+/** Build the substring index in short idle-time slices so POS stays responsive. */
+export function prepareProductCatalogSearchIndex(products: readonly ProductCatalogItem[]): () => void {
+  if (
+    products.length === 0
+    || searchIndexesByProducts.has(products)
+    || buildingSearchIndexes.has(products)
+    || typeof window === "undefined"
+  ) return () => undefined;
+
+  const buildToken = {};
+  buildingSearchIndexes.set(products, buildToken);
+  const productIndexesByTrigram = new Map<string, number[]>();
+  const lastProductIndexByTrigram = new Map<string, number>();
+  let nextProductIndex = 0;
+  let cancelled = false;
+
+  const scheduleNextSlice = () => {
+    const idleWindow = window as ProductCatalogIdleWindow;
+    if (idleWindow.requestIdleCallback) {
+      idleWindow.requestIdleCallback(processSlice, { timeout: 1_000 });
+      return;
+    }
+    window.setTimeout(() => processSlice(), 0);
+  };
+
+  const processSlice = (deadline?: ProductCatalogIdleDeadline) => {
+    if (cancelled) {
+      if (buildingSearchIndexes.get(products) === buildToken) buildingSearchIndexes.delete(products);
+      return;
+    }
+
+    const sliceStartedAt = performance.now();
+    while (
+      nextProductIndex < products.length
+      && performance.now() - sliceStartedAt < 5
+      && (!deadline || deadline.timeRemaining() > 1 || deadline.didTimeout)
+    ) {
+      const currentIndex = nextProductIndex;
+      const characters = Array.from(productSearchText(products[currentIndex]));
+      for (let offset = 0; offset <= characters.length - 3; offset += 1) {
+        const trigram = characters[offset] + characters[offset + 1] + characters[offset + 2];
+        if (lastProductIndexByTrigram.get(trigram) === currentIndex) continue;
+        lastProductIndexByTrigram.set(trigram, currentIndex);
+        const indexes = productIndexesByTrigram.get(trigram) ?? [];
+        indexes.push(currentIndex);
+        productIndexesByTrigram.set(trigram, indexes);
+      }
+      nextProductIndex += 1;
+    }
+
+    if (nextProductIndex < products.length) {
+      scheduleNextSlice();
+      return;
+    }
+
+    const compactIndex = new Map<string, Uint32Array>();
+    for (const [trigram, indexes] of productIndexesByTrigram) {
+      compactIndex.set(trigram, Uint32Array.from(indexes));
+    }
+    searchIndexesByProducts.set(products, { productIndexesByTrigram: compactIndex });
+    if (buildingSearchIndexes.get(products) === buildToken) buildingSearchIndexes.delete(products);
+    productIndexesByTrigram.clear();
+    lastProductIndexByTrigram.clear();
+  };
+
+  scheduleNextSlice();
+  return () => {
+    cancelled = true;
+    if (buildingSearchIndexes.get(products) === buildToken) buildingSearchIndexes.delete(products);
+    productIndexesByTrigram.clear();
+    lastProductIndexByTrigram.clear();
+  };
+}
+
+function indexedProductCandidates(
+  products: readonly ProductCatalogItem[],
+  tokens: readonly string[],
+): Uint32Array | null {
+  const index = searchIndexesByProducts.get(products);
+  if (!index) return null;
+
+  let smallestPosting: Uint32Array | null = null;
+  for (const token of tokens) {
+    const characters = Array.from(token);
+    if (characters.length < 3) continue;
+
+    for (let offset = 0; offset <= characters.length - 3; offset += 1) {
+      const trigram = characters[offset] + characters[offset + 1] + characters[offset + 2];
+      const posting = index.productIndexesByTrigram.get(trigram);
+      if (!posting) return new Uint32Array();
+      if (!smallestPosting || posting.length < smallestPosting.length) {
+        smallestPosting = posting;
+        if (smallestPosting.length === 0) return smallestPosting;
+      }
+    }
+  }
+
+  return smallestPosting;
+}
+
 export function searchProductCatalog(
   products: readonly ProductCatalogItem[],
   query: string,
@@ -181,16 +297,29 @@ export function searchProductCatalog(
   const tokens = searchTokens(normalizedQuery);
   if (tokens.length === 0) return [];
 
+  const candidateIndexes = indexedProductCandidates(products, tokens);
   const result: ProductCatalogItem[] = [];
-  for (const product of products) {
-    if (options.stockManagedOnly && !product.isStockManaged) continue;
-    if (options.excludeIds?.has(product.id)) continue;
+  const considerProduct = (product: ProductCatalogItem) => {
+    if (options.stockManagedOnly && !product.isStockManaged) return;
+    if (options.excludeIds?.has(product.id)) return;
 
     const searchable = productSearchText(product);
-    if (!tokens.every((token) => searchable.includes(token))) continue;
+    if (!tokens.every((token) => searchable.includes(token))) return;
 
     result.push(product);
-    if (result.length >= (options.limit ?? 20)) break;
+  };
+
+  if (candidateIndexes) {
+    for (const productIndex of candidateIndexes) {
+      const product = products[productIndex];
+      if (product) considerProduct(product);
+      if (result.length >= (options.limit ?? 20)) break;
+    }
+  } else {
+    for (const product of products) {
+      considerProduct(product);
+      if (result.length >= (options.limit ?? 20)) break;
+    }
   }
   return result;
 }
