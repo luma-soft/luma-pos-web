@@ -195,6 +195,7 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
 
       const subtotal = sources.reduce((s, o) => s + Number(o.subtotal), 0);
       const discount = sources.reduce((s, o) => s + Number(o.discount), 0);
+      const tax = sources.reduce((s, o) => s + Number(o.tax), 0);
       const shippingFee = sources.reduce((s, o) => s + Number(o.shippingFee), 0);
       const total = sources.reduce((s, o) => s + Number(o.total), 0);
       const paid = sources.reduce((s, o) => s + Number(o.amountPaid), 0);
@@ -211,6 +212,7 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
         projectName: sources[0].projectName,
         subtotal: toMoney(subtotal),
         discount: toMoney(discount),
+        tax: toMoney(tax),
         shippingFee: toMoney(shippingFee),
         total: toMoney(total),
         amountPaid: toMoney(paid),

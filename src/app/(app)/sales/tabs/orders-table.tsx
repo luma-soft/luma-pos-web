@@ -1,6 +1,7 @@
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
+import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -117,6 +118,7 @@ export function OrderBatchToolbar({
   };
 }) {
   const batchHref = `/orders/print-batch?${selectedIds.map((id) => `ids=${encodeURIComponent(id)}`).join("&")}`;
+  const mergeHref = `/orders/merge?${selectedIds.map((id) => `ids=${encodeURIComponent(id)}`).join("&")}`;
   return (
     <div className="flex w-full items-center justify-end gap-2 text-sm">
       <span
@@ -126,14 +128,22 @@ export function OrderBatchToolbar({
         {labels.selected ?? selectedCount}
       </span>
       <div className="grid grid-cols-2 gap-2 lg:contents">
-        <button
-          type="submit"
-          formAction="/orders/merge"
-          disabled={selectedCount < 2}
-          className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:min-w-0"
-        >
-          {labels.merge}
-        </button>
+        {selectedCount < 2 ? (
+          <button
+            type="button"
+            disabled
+            className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold opacity-50 disabled:cursor-not-allowed lg:min-h-0 lg:min-w-0"
+          >
+            {labels.merge}
+          </button>
+        ) : (
+          <Link
+            href={mergeHref}
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 lg:min-h-0 lg:min-w-0"
+          >
+            {labels.merge}
+          </Link>
+        )}
         {selectedCount > 0 ? (
           <PrintTemplateMenu
             baseHref={batchHref}
