@@ -37,6 +37,12 @@ export async function OrderDetailPanel({
   const total = Number(order.total);
   const paid = Number(order.amountPaid);
   const remaining = Math.max(0, total - paid);
+  const taxAmount = Number(order.tax);
+  const subtotalAfterDiscount = Math.max(0, Number(order.subtotal) - Number(order.discount));
+  const taxableBase = Math.max(0, subtotalAfterDiscount - (store.prefs.tax.priceIncludesTax ? taxAmount : 0));
+  const effectiveTaxRate = taxableBase > 0
+    ? Math.round((taxAmount / taxableBase) * 10_000) / 100
+    : null;
   const isQuote = order.status === "quote";
   const isBooking = order.status === "confirmed";
   const cancelled = order.status === "cancelled" || order.status === "merged";
@@ -312,7 +318,10 @@ export async function OrderDetailPanel({
             {order.sourceSaleTime && <InfoLine label="Source time" value={formatDate(order.sourceSaleTime)} />}
             <InfoLine label={t("pos.subtotal")} value={formatCurrency(Number(order.subtotal))} />
             <InfoLine label={t("pos.discount")} value={formatCurrency(Number(order.discount))} />
-            <InfoLine label={t("pos.tax")} value={formatCurrency(Number(order.tax))} />
+            <InfoLine
+              label={t("pos.tax")}
+              value={`${formatCurrency(taxAmount)}${effectiveTaxRate === null ? "" : ` (${formatNumber(effectiveTaxRate)}%)`}`}
+            />
             <InfoLine label={t("pos.shipping")} value={formatCurrency(Number(order.shippingFee))} />
             <InfoLine label={t("pos.total")} value={formatCurrency(total)} valueClassName="text-base text-primary-600" strong />
             {!isQuote && <InfoLine label={t("orders.detail.paid")} value={formatCurrency(paid)} valueClassName={paid > 0 ? "text-ok" : "text-slate-500"} strong />}
