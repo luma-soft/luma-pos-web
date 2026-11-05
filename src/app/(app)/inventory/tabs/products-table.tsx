@@ -1332,7 +1332,13 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
   const t = useTranslations();
   const { snapshot } = useProductCatalog();
   const [page, setPage] = useState(1);
-  const [history, setHistory] = useState<{ rows: StockMovementRow[]; hasMore: boolean } | null>(null);
+  const [history, setHistory] = useState<{
+    scopeId: string;
+    productId: string;
+    page: number;
+    rows: StockMovementRow[];
+    hasMore: boolean;
+  } | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "offline" | "error">("loading");
   const tracked = isProductStockManaged(product.categoryName);
   const scopeId = snapshot?.scopeId;
@@ -1356,7 +1362,7 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
         setHistory(null);
         setLoadState("loading");
       } else {
-        setHistory({ rows: cached.rows, hasMore: cached.hasMore });
+        setHistory({ scopeId, productId: product.id, page, rows: cached.rows, hasMore: cached.hasMore });
         setLoadState("ready");
       }
       if (!navigator.onLine) {
@@ -1369,7 +1375,7 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
         const result = await fetchStockHistoryOnce(scopeId, product.id, page, revision);
         if (cancelled) return;
         if (result.ok) {
-          setHistory({ rows: result.data.rows, hasMore: result.data.hasMore });
+          setHistory({ scopeId, productId: product.id, page, rows: result.data.rows, hasMore: result.data.hasMore });
           setLoadState("ready");
         } else if (!cached) {
           setLoadState("error");
@@ -1384,7 +1390,11 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
   if (!tracked)
     return <EmptyPanel message={t("products.stock.notTracked")} />;
 
-  if (!history) {
+  // A scope/product/page switch must not display rows cached for the previous
+  // actor or product while asynchronous IndexedDB hydration is in progress.
+  const visibleHistory = history?.scopeId === scopeId
+    && history.productId === product.id && history.page === page ? history : null;
+  if (!visibleHistory) {
     if (loadState === "offline") {
       return <EmptyPanel message="Lịch sử Thẻ kho chưa được tải trên thiết bị này. Hãy kết nối mạng và mở lại Thẻ kho." />;
     }
@@ -1394,7 +1404,7 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
     return <div role="status" className="p-4 text-sm text-muted-foreground">Đang tải lịch sử Thẻ kho…</div>;
   }
 
-  const movements = history.rows;
+  const movements = visibleHistory.rows;
   if (movements.length === 0)
     return <EmptyPanel message={t("products.expand.stockCardEmpty")} />;
 
@@ -1499,7 +1509,7 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
       <button
         type="button"
         className="rounded-md border border-border-soft px-3 py-2 disabled:opacity-40"
-        disabled={!history.hasMore}
+        disabled={!visibleHistory.hasMore}
         onClick={() => setPage((current) => current + 1)}
       >
         Trang sau
