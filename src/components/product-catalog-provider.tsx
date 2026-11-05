@@ -20,11 +20,13 @@ import {
 import {
   catalogRevisionChanged,
   mergeProductCatalogDelta,
+  prepareProductCatalogSearchIndex,
   searchProductCatalog,
   type ProductCatalogItem,
   type ProductCatalogSearchOptions,
   type ProductCatalogSnapshot,
 } from "@/lib/product-catalog";
+import { getInventorySearchableProducts } from "@/lib/product-catalog-explorer";
 import { createClient } from "@/lib/supabase/client";
 import { createRefreshQueue } from "@/lib/sync/refresh-queue";
 
@@ -364,6 +366,21 @@ export function ProductCatalogProvider({
       channel.close();
     };
   }, [scopeId, userId]);
+
+  // Prepare both canonical and Inventory-only indexes in idle slices, outside
+  // render and keystroke handlers. Non-variant catalogs share one index.
+  useEffect(() => {
+    if (!snapshot) return;
+    const inventoryProducts = getInventorySearchableProducts(snapshot.products);
+    const stopCanonical = prepareProductCatalogSearchIndex(snapshot.products);
+    const stopInventory = inventoryProducts === snapshot.products
+      ? () => undefined
+      : prepareProductCatalogSearchIndex(inventoryProducts);
+    return () => {
+      stopCanonical();
+      stopInventory();
+    };
+  }, [snapshot?.products]);
 
   const search = useCallback((
     query: string,
