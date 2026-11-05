@@ -283,12 +283,14 @@ function groupActionHref(groupId: string, action: "copy" | "groupAdd" | "groupEd
 export function ProductsTable({
   rows,
   resetScrollKey,
+  queryOverride,
   selectionEnabled = true,
   grouped = true,
   empty,
 }: {
   rows: ProductListResult["rows"];
   resetScrollKey?: string | number;
+  queryOverride?: string;
   selectionEnabled?: boolean;
   grouped?: boolean;
   empty?: ReactNode;
@@ -301,7 +303,7 @@ export function ProductsTable({
   const [selectedUnits, setSelectedUnits] = useState<Record<string, string>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [allVariants, setAllVariants] = useState<Record<string, boolean>>({});
-  const query = params.get("q") ?? "";
+  const query = queryOverride ?? params.get("q") ?? "";
   const expansionStorageKey = `luma:products:variants:${resetScrollKey ?? "default"}`;
 
   useEffect(() => {

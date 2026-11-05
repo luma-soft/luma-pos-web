@@ -1,24 +1,34 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { useProductCatalog } from "@/components/product-catalog-provider";
+import { productCatalogMatches } from "@/lib/product-catalog-explorer";
 
 export function ProductCatalogSwitcher({
   activeView,
-  productCount,
+  productCount: providedProductCount,
   categoryCount,
 }: {
   activeView: "products" | "categories";
-  productCount: number;
-  categoryCount: number;
+  productCount?: number;
+  categoryCount?: number;
 }) {
   const t = useTranslations();
   const locale = useLocale();
+  const catalog = useProductCatalog();
+  const productCount = useMemo(() => providedProductCount ?? productCatalogMatches(
+    catalog.products,
+    catalog.snapshot?.warehouses ?? [],
+    { status: "active", view: "grouped" },
+  ), [catalog.products, catalog.snapshot?.warehouses, providedProductCount]);
+  const resolvedCategoryCount = categoryCount ?? catalog.snapshot?.metadata?.categories.length ?? 0;
   const options = [
     { id: "products", label: t("nav.products"), count: productCount },
-    { id: "categories", label: t("categories.title"), count: categoryCount },
+    { id: "categories", label: t("categories.title"), count: resolvedCategoryCount },
   ] as const;
 
   return (

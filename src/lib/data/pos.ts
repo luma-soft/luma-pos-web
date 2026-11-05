@@ -9,7 +9,8 @@ import { posProductSearchCondition } from "@/lib/search";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 import { applySystemPriceBooks } from "@/lib/pos/system-price-projection";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
-import { priceComparisonCondition, type PriceComparison } from "@/lib/pricing/price-comparison";
+import type { PriceComparison } from "@/lib/pricing/price-comparison";
+import { priceComparisonCondition } from "@/lib/pricing/price-comparison-sql";
 import { getRawStorePrefs } from "@/lib/data/settings";
 import { lastCompletedProductSaleAt, recentProductSaleOrder } from "@/lib/data/recent-product-sales";
 

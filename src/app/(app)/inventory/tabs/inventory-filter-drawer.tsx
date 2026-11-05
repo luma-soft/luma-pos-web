@@ -61,6 +61,9 @@ type Props = {
   brands?: Option[];
   reasons?: Option[];
   departments?: Option[];
+  queryValue?: string;
+  localCount?: (draft: Record<string, string>, query: string) => number;
+  useLocalOptions?: boolean;
 };
 
 const all = { value: "", label: "Tất cả" };
@@ -99,6 +102,9 @@ export function InventoryFilterDrawer({
   brands = [],
   reasons = [],
   departments = [],
+  queryValue,
+  localCount,
+  useLocalOptions = false,
 }: Props) {
   const router = useRouter();
   const t = useTranslations();
@@ -143,9 +149,12 @@ export function InventoryFilterDrawer({
   const [draft, setDraft] = useState(initial);
   const [entityLabels, setEntityLabels] = useState<Record<string, string>>({});
   const [previewCount, setPreviewCount] = useState<number | null>(initialResultCount ?? null);
-  const resultCount = previewCount ?? initialResultCount;
-  const activeCountEndpoint =
-    countEndpoint ??
+  const localPreviewCount = useMemo(
+    () => open && localCount ? localCount(draft, queryValue ?? params.get("q") ?? "") : null,
+    [draft, localCount, open, params, queryValue],
+  );
+  const resultCount = localCount ? localPreviewCount ?? initialResultCount : previewCount ?? initialResultCount;
+  const activeCountEndpoint = localCount ? undefined : countEndpoint ??
     (title.includes("sản phẩm") || title.includes("thiết lập giá")
       ? "/api/inventory/products/count"
       : undefined);
@@ -209,7 +218,8 @@ export function InventoryFilterDrawer({
   }, [close, open]);
 
   useEffect(() => {
-    if (!open || !activeCountEndpoint || customDateError) return;
+    if (!open || customDateError) return;
+    if (!activeCountEndpoint) return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       const isPricingCount = activeCountEndpoint.includes("/pricing/count");
@@ -217,7 +227,7 @@ export function InventoryFilterDrawer({
       const query = new URLSearchParams(
         isProductCount
           ? {
-              q: params.get("q") ?? "",
+              q: queryValue ?? params.get("q") ?? "",
               categoryId: draft.category,
               brandId: draft.brand,
               supplierId: draft.supplier,
@@ -236,7 +246,7 @@ export function InventoryFilterDrawer({
             }
           : isInternalUseFilter
             ? {
-              q: params.get("q") ?? "",
+              q: queryValue ?? params.get("q") ?? "",
               status: draft.status,
               warehouseId: draft.warehouse,
               reason: draft.reason,
@@ -245,7 +255,7 @@ export function InventoryFilterDrawer({
               to: range.to,
             }
             : {
-              q: params.get("q") ?? "",
+              q: queryValue ?? params.get("q") ?? "",
               status: draft.status,
               supplierId: draft.supplier,
               warehouseId: draft.warehouse,
@@ -275,7 +285,7 @@ export function InventoryFilterDrawer({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [activeCountEndpoint, customDateError, draft, isInternalUseFilter, open, params, range.from, range.to, showPriceComparison]);
+  }, [activeCountEndpoint, customDateError, draft, isInternalUseFilter, localCount, open, params, queryValue, range.from, range.to, showPriceComparison]);
 
   function update(field: DraftField, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -292,6 +302,7 @@ export function InventoryFilterDrawer({
     options: Option[],
     kind: EntityPickerKind,
   ) {
+    if (useLocalOptions && field !== "warehouse") return picker(field, label, options);
     return (
       <LumaEntityPicker
         label={label}
@@ -352,6 +363,10 @@ export function InventoryFilterDrawer({
   function apply() {
     const next = new URLSearchParams(params.toString());
     next.delete("page");
+    if (queryValue != null) {
+      if (queryValue.trim()) next.set("q", queryValue.trim());
+      else next.delete("q");
+    }
     for (const key of [
       "category",
       "status",

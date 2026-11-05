@@ -68,12 +68,18 @@ export function ProductCatalogProvider({
   const checkingRef = useRef<Promise<void> | null>(null);
   const snapshotRef = useRef<ProductCatalogSnapshot | null>(null);
   const revisionRef = useRef<string | null>(null);
+  const syncStartedAtRef = useRef<number | null>(null);
   const realtimeConnectedRef = useRef(false);
 
   useEffect(() => {
     const queue = createRefreshQueue({
-      load: () => syncProductCatalog(revisionRef.current),
+      load: () => {
+        syncStartedAtRef.current = performance.now();
+        return syncProductCatalog(revisionRef.current);
+      },
       apply: async (result) => {
+        const applyStartedAt = performance.now();
+        const revisionBefore = revisionRef.current;
         let fresh: ProductCatalogSnapshot | null = result?.mode === "full"
           ? result.snapshot
           : null;
@@ -96,6 +102,9 @@ export function ProductCatalogProvider({
         // A stale/mismatched local snapshot or unavailable delta journal must
         // never be persisted as a partial catalog. Recover with the full path.
         if (!fresh && result) {
+          if (process.env.NODE_ENV !== "production") {
+            console.debug("[product-catalog] full recovery", { reason: "invalid-or-stale-delta" });
+          }
           const recovered = await syncProductCatalog();
           fresh = recovered?.mode === "full" ? recovered.snapshot : null;
         }
@@ -108,8 +117,52 @@ export function ProductCatalogProvider({
         setSnapshot(fresh);
         setStatus("synced");
         revisionRef.current = fresh.revision;
-        await writeProductCatalogSnapshot(fresh);
+        const delta = result?.mode === "delta" ? result.delta : null;
+        const changedProductIDs = new Set(delta?.upserts.map((product) => product.id) ?? []);
+        const deletedProductIDs = delta?.deletedIds ?? [];
+        if (delta?.metadata) {
+          const categoryIDs = new Set(delta.metadata.categories?.upserts.map((item) => item.id) ?? []);
+          delta.metadata.categories?.deletedIds.forEach((id) => categoryIDs.add(id));
+          const brandIDs = new Set(delta.metadata.brands?.upserts.map((item) => item.id) ?? []);
+          delta.metadata.brands?.deletedIds.forEach((id) => brandIDs.add(id));
+          const supplierIDs = new Set(delta.metadata.suppliers?.upserts.map((item) => item.id) ?? []);
+          delta.metadata.suppliers?.deletedIds.forEach((id) => supplierIDs.add(id));
+          for (const product of fresh.products) {
+            if (
+              (product.categoryId && categoryIDs.has(product.categoryId)) ||
+              (product.brandId && brandIDs.has(product.brandId)) ||
+              (product.supplierId && supplierIDs.has(product.supplierId))
+            ) changedProductIDs.add(product.id);
+          }
+          if (delta.metadata.warehouses) {
+            fresh.products.forEach((product) => changedProductIDs.add(product.id));
+          }
+        }
+        const persistStartedAt = performance.now();
+        await writeProductCatalogSnapshot(
+          fresh,
+          delta ? { changedProductIDs: [...changedProductIDs], deletedProductIDs } : undefined,
+        );
+        if (process.env.NODE_ENV !== "production") {
+          const encoded = JSON.stringify(result);
+          console.debug("[product-catalog] sync", {
+            mode: result?.mode ?? "unavailable",
+            revisionBefore,
+            revisionAfter: fresh.revision,
+            changedEntities: delta ? changedProductIDs.size + deletedProductIDs.length : fresh.products.length,
+            responseBytes: encoded ? new TextEncoder().encode(encoded).byteLength : 0,
+            syncDurationMs: syncStartedAtRef.current == null ? null : Math.round(applyStartedAt - syncStartedAtRef.current),
+            applyDurationMs: Math.round(performance.now() - applyStartedAt),
+            indexedDBDurationMs: Math.round(performance.now() - persistStartedAt),
+          });
+        }
+        syncStartedAtRef.current = null;
         broadcastCatalogUpdate(fresh.scopeId, fresh.revision);
+        if (result?.mode === "delta" && result.delta.hasMore) {
+          // Continue bounded pages from the just-committed revision. Each
+          // page becomes locally usable before the next request starts.
+          void queue.refresh();
+        }
       },
       onError: () => {
         setStatus((current) => current === "cached" ? current : "unavailable");
@@ -183,8 +236,16 @@ export function ProductCatalogProvider({
   useEffect(() => {
     let cancelled = false;
 
+    const hydrationStartedAt = performance.now();
     readProductCatalogSnapshot(scopeId).then((cached) => {
       if (cancelled) return;
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[product-catalog] hydration", {
+          durationMs: Math.round(performance.now() - hydrationStartedAt),
+          products: cached?.products.length ?? 0,
+          hasSnapshot: Boolean(cached),
+        });
+      }
       if (cached && cached.userId === userId && cached.scopeId === scopeId) {
         if (catalogRevisionChanged(cached.revision, revisionRef.current)) return;
         snapshotRef.current = cached;
@@ -292,7 +353,18 @@ export function ProductCatalogProvider({
   const search = useCallback((
     query: string,
     options?: ProductCatalogSearchOptions,
-  ) => searchProductCatalog(snapshot?.products ?? [], query, options), [snapshot]);
+  ) => {
+    const startedAt = performance.now();
+    const rows = searchProductCatalog(snapshot?.products ?? [], query, options);
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[product-catalog] search", {
+        latencyMs: Math.round(performance.now() - startedAt),
+        candidateCount: snapshot?.products.length ?? 0,
+        resultCount: rows.length,
+      });
+    }
+    return rows;
+  }, [snapshot]);
 
   const value = useMemo<ProductCatalogContextValue>(() => ({
     snapshot,

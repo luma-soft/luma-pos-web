@@ -79,4 +79,20 @@ describe("POS search selling units", () => {
       ["pipe-110", "bó"],
     ]);
   });
+
+  test("matches native catalog parity fixtures for exact codes, exact names, and prefixes", () => {
+    const products = [
+      { id: "prefix", name: "Other", sku: "AB123X", barcode: null, baseUnit: "cái", isVariantParent: false, units: [] },
+      { id: "name", name: "AB 123", sku: "OTHER", barcode: null, baseUnit: "cái", isVariantParent: false, units: [] },
+      { id: "barcode", name: "Third", sku: "OTHER2", barcode: "AB123", baseUnit: "cái", isVariantParent: false, units: [] },
+      { id: "sku", name: "Fourth", sku: "AB123", barcode: null, baseUnit: "cái", isVariantParent: false, units: [] },
+    ];
+    const results = rankProductSearchUnitResults(
+      expandPosSearchUnitResults(products),
+      "AB 123",
+      (product) => product.name,
+    );
+
+    expect(results.map(({ product }) => product.id)).toEqual(["sku", "barcode", "name", "prefix"]);
+  });
 });
