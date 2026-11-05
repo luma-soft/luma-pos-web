@@ -14,11 +14,18 @@ on:
       - "src/lib/pos/product-catalog-adapter*"
       - "src/app/(pos)/pos/pos-client.tsx"
       - "src/components/product-catalog-provider.tsx"
+      - "src/components/logout-button.tsx"
       - "src/app/(app)/inventory/tabs/products-table.tsx"
   workflow_dispatch:
 
 permissions:
   contents: read
+
+# Direct-to-main commits can arrive in quick succession. Validate the latest
+# revision without burning Actions minutes on already superseded builds.
+concurrency:
+  group: catalog-verification-main
+  cancel-in-progress: true
 
 jobs:
   verify:
@@ -38,10 +45,8 @@ jobs:
       - name: ESLint full repository
         run: bun run lint
       - name: Focused catalog regressions
-        if: ${{ always() }}
         run: bun test src/lib/product-catalog.test.mjs src/lib/product-catalog-explorer.test.mjs src/lib/catalog-delta.test.mjs src/lib/catalog-delta-db.test.mjs src/lib/pos/product-catalog-adapter.test.mjs
       - name: Production build (compile-only)
-        if: ${{ always() }}
         # The app constructs a PG pool during route import. This dummy URL
         # lets Next compile routes without connecting to a real database.
         # Runtime/integration checks must use separately configured secrets.
