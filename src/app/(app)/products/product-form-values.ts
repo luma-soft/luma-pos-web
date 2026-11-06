@@ -155,7 +155,8 @@ export function productToFormInitialValues(
       imageMediaIds: imageMedia.map((image) => image.mediaId),
       imageSourceProductIds,
       ...(addingOne ? {
-        variantTemplateProductId: product.id,
+        variantTemplateProductId: latestVariantMemberId(product),
+        imageSourceProductIds: [...new Set([...imageSourceProductIds, product.id])],
         variantAddValues: Object.fromEntries(attributes.map((attribute) => ["attributeId" in attribute ? attribute.attributeId : "", ""])),
         variantExistingCombinationKeys: children.flatMap((child) => child.combinationKey ? [child.combinationKey] : []),
       } : {}),

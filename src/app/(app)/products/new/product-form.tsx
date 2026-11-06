@@ -1266,6 +1266,14 @@ function VariantAddFields() {
               {...register(`variantAddValues.${attribute.attributeId}`)}
               placeholder={`Nhập ${fieldLabel.toLocaleLowerCase("vi")}`}
               autoComplete="off"
+              onFocus={(event) => {
+                if (!window.matchMedia("(max-width: 767px)").matches) return;
+                const input = event.currentTarget;
+                window.setTimeout(() => {
+                  if (document.activeElement !== input || !input.isConnected) return;
+                  input.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+                }, 300);
+              }}
             />
           </Field>
         </div>
