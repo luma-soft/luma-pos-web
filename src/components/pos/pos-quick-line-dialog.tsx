@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 
 export type QuickPosLineInput = {
   name: string;
@@ -29,7 +30,7 @@ export function PosQuickLineDialog({ onClose, onAdd }: PosQuickLineDialogProps) 
   const [name, setName] = useState("");
   const [sku, setSku] = useState(generateQuickLineSku);
   const [unit, setUnit] = useState(locale === "vi" ? "cái" : "piece");
-  const [price, setPrice] = useState("");
+  const [price, setPrice] = useState<number | null>(null);
   const [invalid, setInvalid] = useState(false);
   const onCloseRef = useRef(onClose);
 
@@ -45,8 +46,7 @@ export function PosQuickLineDialog({ onClose, onAdd }: PosQuickLineDialogProps) 
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const parsedPrice = Number(price);
-    if (!name.trim() || !unit.trim() || !price.trim() || !Number.isFinite(parsedPrice) || parsedPrice < 0) {
+    if (!name.trim() || !unit.trim() || price == null || !Number.isFinite(price) || price < 0) {
       setInvalid(true);
       return;
     }
@@ -54,7 +54,7 @@ export function PosQuickLineDialog({ onClose, onAdd }: PosQuickLineDialogProps) 
       name: name.trim(),
       sku: sku.trim() || generateQuickLineSku(),
       unit: unit.trim(),
-      price: parsedPrice,
+      price,
     });
     onClose();
   };
@@ -91,13 +91,11 @@ export function PosQuickLineDialog({ onClose, onAdd }: PosQuickLineDialogProps) 
           </label>
           <label className="block space-y-1.5 text-sm font-medium">
             <span>{t("price")}</span>
-            <Input
-              type="number"
-              min="0"
-              step="1"
-              inputMode="numeric"
+            <MoneyInput
+              min={0}
               value={price}
-              onChange={(event) => { setPrice(event.target.value); setInvalid(false); }}
+              onChange={(value) => { setPrice(value); setInvalid(false); }}
+              className="flex h-11 w-full rounded-lg border border-border bg-surface px-3 text-base transition-[border-color,background-color] duration-150 placeholder:text-slate-400 focus:border-primary-600 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 lg:h-10 lg:text-sm"
             />
           </label>
           {invalid && <p role="alert" className="text-sm text-red-600">{t("invalid")}</p>}
