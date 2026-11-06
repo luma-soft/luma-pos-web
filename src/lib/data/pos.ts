@@ -13,6 +13,7 @@ import type { PriceComparison } from "@/lib/pricing/price-comparison";
 import { priceComparisonCondition } from "@/lib/pricing/price-comparison-sql";
 import { getRawStorePrefs } from "@/lib/data/settings";
 import { lastCompletedProductSaleAt, recentProductSaleOrder } from "@/lib/data/recent-product-sales";
+import { DEFAULT_PRODUCT_SORT, type ProductSort } from "@/lib/product-sort-policy";
 
 export interface PosUnit {
   unitName: string;
@@ -42,6 +43,17 @@ function sortByRecentSale<T extends { lastSoldAt: Date | string | null; name: st
     const bTime = b.lastSoldAt == null ? 0 : new Date(b.lastSoldAt).getTime();
     return bTime - aTime || a.name.localeCompare(b.name, "vi");
   });
+}
+
+function productBrowseOrder(sort: ProductSort) {
+  if (sort === "recent_sales") return [...recentProductSaleOrder()];
+  const primary = sort === "updated" ? desc(products.updatedAt)
+    : sort === "sku" ? asc(products.sku)
+      : sort === "cost" ? desc(products.costPrice)
+        : sort === "retail" ? desc(products.retailPrice)
+          : sort === "stock" ? asc(products.totalStock)
+            : asc(products.name);
+  return [primary, asc(products.name), asc(products.id)];
 }
 
 /** Select dùng chung cho lưới POS + tìm kiếm (cùng shape PosProduct). */
@@ -79,6 +91,8 @@ function posProductSelect(
     categoryName: categories.name,
     vatRate: hasComplianceColumns ? products.vatRate : sql<string | null>`null`,
     lastSoldAt: lastCompletedProductSaleAt(),
+    updatedAt: products.updatedAt,
+    totalStock: products.totalStock,
     comboItems: sql<Array<{ productId: string; quantity: string }>>`coalesce((
       select json_agg(json_build_object(
         'productId', ${productComboItems.componentProductId},
@@ -219,13 +233,16 @@ export async function getPosData(storeId: string, options?: {
   includeProductSkus?: readonly string[];
   includeProductCategories?: readonly string[];
   role?: Role;
-  sort?: "recent_sales" | "created";
+  sort?: ProductSort;
   rootProductLimit?: number;
   customerLimit?: number;
   projectLimit?: number;
 }) {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const includePurchasePrices = canViewPurchasePrices(options?.role);
+  const sort = options?.sort === "cost" && !includePurchasePrices
+    ? DEFAULT_PRODUCT_SORT
+    : options?.sort ?? DEFAULT_PRODUCT_SORT;
   const [defaultWh] = await db
     .select({ id: warehouses.id, name: warehouses.name })
     .from(warehouses)
@@ -242,9 +259,7 @@ export async function getPosData(storeId: string, options?: {
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(activeRootCondition(storeId))
-      .orderBy(...(options?.sort === "created"
-        ? [desc(products.createdAt), desc(products.id)] as const
-        : recentProductSaleOrder()))
+      .orderBy(...productBrowseOrder(sort))
       .limit(options?.rootProductLimit ?? 200),
     includeProductIds.length || includeProductSkus.length || includeProductCategories.length
       ? db
@@ -288,7 +303,7 @@ export async function getPosData(storeId: string, options?: {
           sellableUnitCondition(),
           inArray(products.parentProductId, parentIds),
         ))
-        .orderBy(...recentProductSaleOrder())
+        .orderBy(...productBrowseOrder(sort))
     : [];
 
   const productRows = attachChildren(rootRows, childRows);

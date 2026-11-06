@@ -5,6 +5,7 @@ import {
 } from "@/lib/product-catalog";
 import type { ProductListResult } from "@/lib/data/products";
 import type { PriceComparison } from "@/lib/pricing/price-comparison";
+import { compareProductsBySort, DEFAULT_PRODUCT_SORT, type ProductSort } from "@/lib/product-sort-policy";
 
 export type ProductExplorerFilters = PriceComparison & {
   query?: string;
@@ -15,7 +16,7 @@ export type ProductExplorerFilters = PriceComparison & {
   stock?: "instock" | "low" | "out";
   status?: "active" | "inactive" | "draft" | "archived" | "all";
   view?: "grouped" | "flat";
-  sort?: "name" | "stock" | "updated";
+  sort?: ProductSort;
   page?: number;
   pageSize?: number;
   cameraSkus?: ReadonlySet<string>;
@@ -220,15 +221,6 @@ function makeProductRow(
   return row as unknown as ProductRow;
 }
 
-function compareNumbers(left: string, right: string, descending: boolean) {
-  const a = Number(left);
-  const b = Number(right);
-  const aInvalid = !Number.isFinite(a);
-  const bInvalid = !Number.isFinite(b);
-  if (aInvalid || bInvalid) return Number(aInvalid) - Number(bInvalid);
-  return (descending ? b - a : a - b);
-}
-
 // ProductExplorer receives an immutable catalog array for each revision.
 // Cache its variant-filtered search view by that identity so the trigram
 // index can be reused across keystrokes, filters, sorting and pagination.
@@ -283,7 +275,7 @@ export function exploreProductCatalog(
   // Rank against the canonical array so Inventory shares the provider's
   // catalog-revision index. Variant parents remain excluded from matches.
   const searchRows = q
-    ? searchProductCatalog(products, q, { limit: products.length }).filter((product) => !product.isVariantParent)
+    ? searchProductCatalog(products, q, { limit: products.length, sort: filters.sort ?? DEFAULT_PRODUCT_SORT }).filter((product) => !product.isVariantParent)
     : searchable;
   const searchRank = q
     ? new Map(searchRows.map((product, index) => [product.id, index]))
@@ -315,15 +307,20 @@ export function exploreProductCatalog(
   }
 
   if (q) {
-    candidates.sort((left, right) => left.rank - right.rank || left.product.id.localeCompare(right.product.id));
-  } else if (filters.sort === "stock") {
-    candidates.sort((left, right) => compareNumbers(String(stockQuantity(left.product)), String(stockQuantity(right.product)), true)
-      || left.product.name.localeCompare(right.product.name, "vi") || left.product.id.localeCompare(right.product.id));
-  } else if (filters.sort === "updated") {
-    candidates.sort((left, right) => right.product.updatedAt.localeCompare(left.product.updatedAt)
-      || left.product.name.localeCompare(right.product.name, "vi") || left.product.id.localeCompare(right.product.id));
+    const sort = filters.sort ?? DEFAULT_PRODUCT_SORT;
+    candidates.sort((left, right) => left.rank - right.rank || compareProductsBySort(left.product, right.product, sort));
   } else {
-    candidates.sort((left, right) => left.product.name.localeCompare(right.product.name, "vi") || left.product.id.localeCompare(right.product.id));
+    const sort = filters.sort ?? DEFAULT_PRODUCT_SORT;
+    const rowStock = (product: ProductCatalogItem) => {
+      const key = groupKey(product);
+      const group = key ? groups.get(key.id) : null;
+      return (group?.members ?? [product]).reduce((total, member) => total + stockQuantity(member), 0);
+    };
+    candidates.sort((left, right) => sort === "stock"
+      ? rowStock(left.product) - rowStock(right.product)
+        || left.product.name.localeCompare(right.product.name, "vi")
+        || left.product.id.localeCompare(right.product.id)
+      : compareProductsBySort(left.product, right.product, sort));
   }
 
   const total = candidates.length;

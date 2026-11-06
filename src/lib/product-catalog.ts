@@ -1,4 +1,5 @@
 import { normalizeSearch, searchTokens } from "@/lib/normalize";
+import { compareProductsBySort, DEFAULT_PRODUCT_SORT, type ProductSort } from "@/lib/product-sort-policy";
 
 export const PRODUCT_CATALOG_SCHEMA_VERSION = 12;
 export const LEGACY_PRODUCT_CATALOG_SCHEMA_VERSION = 10;
@@ -250,6 +251,7 @@ export type ProductCatalogSearchOptions = {
   stockManagedOnly?: boolean;
   excludeIds?: ReadonlySet<string>;
   limit?: number;
+  sort?: ProductSort;
 };
 
 const searchableTextByProduct = new WeakMap<ProductCatalogItem, string>();
@@ -635,11 +637,7 @@ export function searchProductCatalog(
     for (let index = 0; index < left.score.length; index += 1) {
       if (left.score[index] !== right.score[index]) return right.score[index] - left.score[index];
     }
-    const leftDate = left.product.lastSoldAt ? new Date(left.product.lastSoldAt).getTime() : 0;
-    const rightDate = right.product.lastSoldAt ? new Date(right.product.lastSoldAt).getTime() : 0;
-    return rightDate - leftDate
-      || left.product.name.localeCompare(right.product.name, "vi")
-      || left.product.id.localeCompare(right.product.id);
+    return compareProductsBySort(left.product, right.product, options.sort ?? DEFAULT_PRODUCT_SORT);
   });
   return result.slice(0, options.limit ?? 20).map(({ product }) => product);
 }

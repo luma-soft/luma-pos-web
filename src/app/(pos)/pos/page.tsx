@@ -12,6 +12,7 @@ import { Routes } from "@/lib/routes";
 import { formatDate } from "@/lib/utils";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { productCatalogScopeId } from "@/lib/product-catalog";
+import { getProductSortPreference } from "@/lib/product-sort-preference-server";
 import { PosClient, type PosSourceInvoice } from "./pos-client";
 import type { PosInitialContext } from "./pos-client";
 import { ProductEditorModal } from "@/app/(app)/inventory/tabs/products";
@@ -130,12 +131,14 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
     ...aiProductIds,
     ...(validCreatedProductId ? [validCreatedProductId] : []),
   ];
+  const defaultSort = await getProductSortPreference(context.storeId, context.role);
   const [data, settings, t, orderPrintTemplates, quotePrintTemplates, bookingPrintTemplates, returnPrintTemplates] = await Promise.all([
     getPosData(context.storeId, {
       includeProductIds,
       includeProductSkus: CAMERA_QUOTE_UTILITY_SKUS,
       includeProductCategories: ["Camera giám sát"],
       role: context.role,
+      sort: defaultSort,
     }),
     getStoreSettings(context.storeId),
     getTranslations(),

@@ -28,6 +28,13 @@ import {
   type ProductCatalogSnapshot,
 } from "@/lib/product-catalog";
 import { getInventorySearchableProducts } from "@/lib/product-catalog-explorer";
+import {
+  DEFAULT_PRODUCT_SORT,
+  parseProductSort,
+  sortProductsBySort,
+  writeProductSortPreferenceCookie,
+  type ProductSort,
+} from "@/lib/product-sort-policy";
 import { createClient } from "@/lib/supabase/client";
 import { createRefreshQueue } from "@/lib/sync/refresh-queue";
 
@@ -38,6 +45,8 @@ type ProductCatalogContextValue = {
   snapshot: ProductCatalogSnapshot | null;
   products: ProductCatalogItem[];
   status: ProductCatalogStatus;
+  defaultSort: ProductSort;
+  setDefaultSort: (sort: ProductSort) => void;
   refresh: () => Promise<void>;
   search: (query: string, options?: ProductCatalogSearchOptions) => ProductCatalogItem[];
 };
@@ -46,6 +55,30 @@ const ProductCatalogContext = createContext<ProductCatalogContextValue | null>(n
 const REVISION_POLL_INTERVAL_MS = 60_000;
 const CONNECTED_REVISION_POLL_INTERVAL_MS = 5 * 60_000;
 const PRODUCT_CATALOG_CHANNEL = "luma-pos-product-catalog";
+const PRODUCT_SORT_CHANNEL = "luma-product-sort-preference";
+const MAX_IN_MEMORY_CATALOGS = 3;
+const inMemorySnapshots = new Map<string, ProductCatalogSnapshot>();
+const inMemorySortPreferences = new Map<string, ProductSort>();
+
+function readInMemorySnapshot(scopeId: string, userId: string): ProductCatalogSnapshot | null {
+  if (typeof window === "undefined") return null;
+  const snapshot = inMemorySnapshots.get(scopeId);
+  if (!snapshot || snapshot.userId !== userId || snapshot.scopeId !== scopeId) return null;
+  inMemorySnapshots.delete(scopeId);
+  inMemorySnapshots.set(scopeId, snapshot);
+  return snapshot;
+}
+
+function cacheInMemorySnapshot(snapshot: ProductCatalogSnapshot) {
+  if (typeof window === "undefined") return;
+  inMemorySnapshots.delete(snapshot.scopeId);
+  inMemorySnapshots.set(snapshot.scopeId, snapshot);
+  while (inMemorySnapshots.size > MAX_IN_MEMORY_CATALOGS) {
+    const oldestScope = inMemorySnapshots.keys().next().value;
+    if (!oldestScope) break;
+    inMemorySnapshots.delete(oldestScope);
+  }
+}
 
 function broadcastCatalogUpdate(scopeId: string, revision: string) {
   if (typeof BroadcastChannel === "undefined") return;
@@ -58,19 +91,24 @@ export function ProductCatalogProvider({
   userId,
   scopeId,
   serverRevision,
+  initialDefaultSort = DEFAULT_PRODUCT_SORT,
   children,
 }: {
   userId: string;
   scopeId: string;
   serverRevision?: string;
+  initialDefaultSort?: ProductSort;
   children: React.ReactNode;
 }) {
-  const [snapshot, setSnapshot] = useState<ProductCatalogSnapshot | null>(null);
-  const [status, setStatus] = useState<ProductCatalogStatus>("loading");
+  const [snapshot, setSnapshot] = useState<ProductCatalogSnapshot | null>(() => readInMemorySnapshot(scopeId, userId));
+  const [status, setStatus] = useState<ProductCatalogStatus>(() => snapshot ? "cached" : "loading");
+  const [defaultSort, setDefaultSortState] = useState<ProductSort>(
+    () => (typeof window !== "undefined" ? inMemorySortPreferences.get(scopeId) : undefined) ?? initialDefaultSort,
+  );
   const syncQueueRef = useRef<ReturnType<typeof createRefreshQueue<ProductCatalogSyncValue>> | null>(null);
   const checkingRef = useRef<Promise<void> | null>(null);
-  const snapshotRef = useRef<ProductCatalogSnapshot | null>(null);
-  const revisionRef = useRef<string | null>(null);
+  const snapshotRef = useRef<ProductCatalogSnapshot | null>(snapshot);
+  const revisionRef = useRef<string | null>(snapshot?.revision ?? null);
   const syncStartedAtRef = useRef<number | null>(null);
   const realtimeConnectedRef = useRef(false);
 
@@ -163,6 +201,7 @@ export function ProductCatalogProvider({
             && catalogRevisionChanged(fresh.revision, shared.revision)
             ? shared : fresh;
           if (!catalogRevisionChanged(usable.revision, revisionRef.current)) {
+            cacheInMemorySnapshot(usable);
             snapshotRef.current = usable;
             setSnapshot(usable);
             setStatus("synced");
@@ -172,6 +211,7 @@ export function ProductCatalogProvider({
         }
         if (catalogRevisionChanged(fresh.revision, revisionRef.current)) return;
         snapshotRef.current = fresh;
+        cacheInMemorySnapshot(fresh);
         setSnapshot(fresh);
         setStatus("synced");
         revisionRef.current = fresh.revision;
@@ -227,6 +267,7 @@ export function ProductCatalogProvider({
         const sharedIsNotOlder = !current || current.scopeId !== scopeId ||
           !catalogRevisionChanged(shared.revision, current.revision);
         if (sharedIsNotOlder) {
+          cacheInMemorySnapshot(shared);
           snapshotRef.current = shared;
           setSnapshot(shared);
           setStatus("cached");
@@ -240,6 +281,49 @@ export function ProductCatalogProvider({
       await queue.refresh();
     });
   }, [scopeId, userId]);
+
+  const setDefaultSort = useCallback((sort: ProductSort) => {
+    const next = parseProductSort(sort);
+    inMemorySortPreferences.set(scopeId, next);
+    setDefaultSortState(next);
+    writeProductSortPreferenceCookie(scopeId.split(":", 1)[0] ?? "", next);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("luma:product-sort-preference", { detail: { scopeId, sort: next } }));
+      if (typeof BroadcastChannel !== "undefined") {
+        const channel = new BroadcastChannel(PRODUCT_SORT_CHANNEL);
+        channel.postMessage({ scopeId, sort: next });
+        channel.close();
+      }
+    }
+  }, [scopeId]);
+
+  useEffect(() => {
+    inMemorySortPreferences.set(scopeId, defaultSort);
+  }, [defaultSort, scopeId]);
+
+  useEffect(() => {
+    const applyPreference = (value: unknown) => {
+      const event = value as {
+        detail?: { scopeId?: string; sort?: unknown };
+        data?: { scopeId?: string; sort?: unknown };
+      };
+      const update = event.detail ?? event.data;
+      if (update?.scopeId !== scopeId || typeof update.sort !== "string") return;
+      const next = parseProductSort(update.sort);
+      inMemorySortPreferences.set(scopeId, next);
+      setDefaultSortState(next);
+    };
+    window.addEventListener("luma:product-sort-preference", applyPreference);
+    if (typeof BroadcastChannel === "undefined") {
+      return () => window.removeEventListener("luma:product-sort-preference", applyPreference);
+    }
+    const channel = new BroadcastChannel(PRODUCT_SORT_CHANNEL);
+    channel.addEventListener("message", applyPreference);
+    return () => {
+      window.removeEventListener("luma:product-sort-preference", applyPreference);
+      channel.close();
+    };
+  }, [scopeId]);
 
   // Successful server mutations revalidate the layout. Do not wait for the
   // next polling tick or assume a Realtime message will always be delivered.
@@ -284,14 +368,21 @@ export function ProductCatalogProvider({
         });
       }
       if (cached && cached.userId === userId && cached.scopeId === scopeId) {
-        if (catalogRevisionChanged(cached.revision, revisionRef.current)) return;
-        snapshotRef.current = cached;
-        setSnapshot(cached);
-        setStatus("cached");
-        revisionRef.current = cached.revision;
+        const current = snapshotRef.current;
+        if (!current || catalogRevisionChanged(current.revision, cached.revision)) {
+          cacheInMemorySnapshot(cached);
+          snapshotRef.current = cached;
+          setSnapshot(cached);
+          setStatus("cached");
+          revisionRef.current = cached.revision;
+        }
         void checkForUpdates();
       } else {
-        void refresh();
+        if (snapshotRef.current?.userId === userId && snapshotRef.current.scopeId === scopeId) {
+          void checkForUpdates();
+        } else {
+          void refresh();
+        }
       }
     });
 
@@ -375,6 +466,7 @@ export function ProductCatalogProvider({
         ) {
           return;
         }
+        cacheInMemorySnapshot(shared);
         snapshotRef.current = shared;
         setSnapshot(shared);
         setStatus("cached");
@@ -407,7 +499,7 @@ export function ProductCatalogProvider({
     options?: ProductCatalogSearchOptions,
   ) => {
     const startedAt = performance.now();
-    const rows = searchProductCatalog(snapshot?.products ?? [], query, options);
+    const rows = searchProductCatalog(snapshot?.products ?? [], query, { ...options, sort: options?.sort ?? defaultSort });
     if (process.env.NODE_ENV !== "production") {
       console.debug("[product-catalog] search", {
         latencyMs: Math.round(performance.now() - startedAt),
@@ -416,15 +508,22 @@ export function ProductCatalogProvider({
       });
     }
     return rows;
-  }, [snapshot]);
+  }, [defaultSort, snapshot]);
+
+  const products = useMemo(
+    () => snapshot ? sortProductsBySort(snapshot.products, defaultSort) : [],
+    [defaultSort, snapshot],
+  );
 
   const value = useMemo<ProductCatalogContextValue>(() => ({
     snapshot,
-    products: snapshot?.products ?? [],
+    products,
     status,
+    defaultSort,
+    setDefaultSort,
     refresh,
     search,
-  }), [refresh, search, snapshot, status]);
+  }), [defaultSort, products, refresh, search, setDefaultSort, snapshot, status]);
 
   return (
     <ProductCatalogContext.Provider value={value}>

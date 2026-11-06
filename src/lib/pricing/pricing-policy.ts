@@ -1,4 +1,6 @@
-export type PricingSort = "recent_sales" | "updated" | "name" | "sku" | "cost" | "retail" | "stock";
+import { DEFAULT_PRODUCT_SORT, parseProductSort, type ProductSort } from "@/lib/product-sort-policy";
+
+export type PricingSort = ProductSort;
 
 export const pricingProjectionPolicy = {
   isVariantParent: false,
@@ -36,13 +38,6 @@ export function pricingSortSpec(sort: PricingSort): PricingSortSpec {
   return [primary, { key: "id", direction: "asc" }];
 }
 
-export function parsePricingSort(value: string | undefined): PricingSort {
-  return value === "recent_sales" ||
-    value === "name" ||
-    value === "sku" ||
-    value === "cost" ||
-    value === "retail" ||
-    value === "stock"
-    ? value
-    : "updated";
+export function parsePricingSort(value: unknown, fallback: PricingSort = DEFAULT_PRODUCT_SORT): PricingSort {
+  return parseProductSort(value, fallback);
 }

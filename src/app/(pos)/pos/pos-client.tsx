@@ -131,6 +131,7 @@ import { waitForPrintImages } from "@/lib/print/wait-for-images";
 import { isSellPriceBelowPurchase, purchasePriceForSoldUnit } from "@/lib/pos/below-purchase-warning";
 import { calculateTaxBreakdown } from "@/lib/tax/calculations";
 import { productDisplayName } from "@/lib/products/variant-presentation";
+import { sortProductsBySort } from "@/lib/product-sort-policy";
 
 type CartLine = {
   key: string;
@@ -1378,15 +1379,6 @@ export function PosClient({
     setAiHighlightedProductIds([]);
   }
 
-  const sortSearchProducts = useCallback((products: readonly PosProduct[]) => [...products].sort((a, b) => {
-    const bTime = b.lastSoldAt ? new Date(b.lastSoldAt).getTime() : 0;
-    const aTime = a.lastSoldAt ? new Date(a.lastSoldAt).getTime() : 0;
-    return bTime - aTime || a.name.localeCompare(b.name, "vi");
-  }), []);
-  const browseSearchResults = useMemo(
-    () => expandPosSearchUnitResults(sortSearchProducts(data.products)),
-    [data.products, sortSearchProducts],
-  );
   const costPriceBookIds = useMemo(
     () => data.priceBooks.filter((book) => book.costBased).map((book) => book.id),
     [data.priceBooks],
@@ -1440,7 +1432,9 @@ export function PosClient({
       && previous.tokens.every((token) => tokens.some((nextToken) => nextToken.startsWith(token))),
     );
     const candidates = previous && canNarrowPreviousResults ? previous.products : sellableCatalogProducts;
-    const matches = searchProductCatalog(candidates, query, { limit: candidates.length });
+    const matches = tokens.length > 0
+      ? searchProductCatalog(candidates, query, { limit: candidates.length, sort: productCatalog.defaultSort })
+      : sortProductsBySort(candidates, productCatalog.defaultSort);
     catalogSearchResultsRef.current = { catalog: catalogProducts, tokens, products: matches };
 
     return matches.map((product) => {
@@ -1457,10 +1451,27 @@ export function PosClient({
       catalogPosSearchCache.products.set(product, posProduct);
       return posProduct;
     });
-  }, [catalogPosSearchCache, catalogProducts, sellableCatalogProducts]);
+  }, [catalogPosSearchCache, catalogProducts, productCatalog.defaultSort, sellableCatalogProducts]);
+  const sortSearchProducts = useCallback(
+    (products: readonly PosProduct[]) => sortProductsBySort(products, productCatalog.defaultSort),
+    [productCatalog.defaultSort],
+  );
+  const browseSearchResults = useMemo(() => {
+    const products = productCatalog.snapshot
+      ? sortProductsBySort(sellableCatalogProducts, productCatalog.defaultSort).map((product) =>
+          catalogItemToPosProduct(
+            product,
+            catalogPosSearchCache.catalog,
+            catalogPosSearchCache.warehouseId,
+            catalogPosSearchCache.costPriceBookIds,
+            catalogPosSearchCache.childrenByParentId,
+          ),
+        )
+      : sortSearchProducts(data.products);
+    return expandPosSearchUnitResults(sortSearchProducts(products));
+  }, [catalogPosSearchCache, data.products, productCatalog.defaultSort, productCatalog.snapshot, sellableCatalogProducts, sortSearchProducts]);
   const loadPosSearchResults = useCallback((query: string): readonly PosSearchUnitResult<PosProduct>[] | Promise<readonly PosSearchUnitResult<PosProduct>[]> => {
-    // The server search and catalog snapshot both preserve recent-sale order.
-    // Sorting them again here adds a full O(n log n) pass to every keystroke.
+    // Search ranking stays primary; the configured sort breaks equal-relevance ties.
     const formatResults = (products: readonly PosProduct[]) => rankProductSearchUnitResults(
       expandPosSearchUnitResults(products),
       query,
@@ -1919,6 +1930,8 @@ export function PosClient({
       categoryName: null,
       vatRate: null,
       lastSoldAt: null,
+      updatedAt: new Date(),
+      totalStock: "0",
       comboItems: [],
       childCount: 0,
       minRetailPrice: priceText,

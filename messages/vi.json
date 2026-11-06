@@ -4177,6 +4177,7 @@
       "store": "Cửa hàng",
       "staff": "Nhân viên",
       "pos": "POS",
+      "productBrowse": "Sắp xếp sản phẩm",
       "cameraQuote": "Báo giá camera",
       "hardware": "Thiết bị",
       "payments": "Thanh toán",
@@ -4665,6 +4666,20 @@
         "unsupportedVision": "Provider này không hỗ trợ vision/OCR.",
         "unsupportedTextPlanning": "Provider này không hỗ trợ lập kế hoạch text."
       },
+      "productBrowse": {
+        "defaultSort": "Thứ tự sản phẩm mặc định",
+        "defaultSortHint": "Chọn thứ tự mặc định khi mở các danh sách sản phẩm.",
+        "localHint": "Được lưu trên trình duyệt này cho cửa hàng hiện tại; không làm thay đổi ngôn ngữ ứng dụng.",
+        "sort": {
+          "recent_sales": "Bán gần đây",
+          "updated": "Cập nhật gần nhất",
+          "name": "Tên sản phẩm",
+          "sku": "Mã SKU",
+          "cost": "Giá vốn giảm dần",
+          "retail": "Giá bán giảm dần",
+          "stock": "Tồn kho tăng dần"
+        }
+      },
       "roles": {
         "owner": "Chủ cửa hàng",
         "manager": "Quản lý",
@@ -4712,6 +4727,7 @@
           "store": "Thông tin cửa hàng",
           "staff": "Nhân viên & Phân quyền",
           "pos": "Trang bán hàng POS",
+          "productBrowse": "Sắp xếp sản phẩm",
           "cameraQuote": "Báo giá camera",
           "hardware": "Thiết bị phần cứng",
           "payments": "Thanh toán",
@@ -4736,6 +4752,10 @@
         "pos": {
           "title": "Trang bán hàng POS",
           "subtitle": "Ẩn/hiện các trường tùy chọn khi bán hàng"
+        },
+        "productBrowse": {
+          "title": "Sắp xếp sản phẩm",
+          "subtitle": "Thứ tự mặc định của sản phẩm trong toàn ứng dụng"
         },
         "cameraQuote": {
           "title": "Báo giá camera",

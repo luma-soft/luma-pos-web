@@ -64,6 +64,8 @@ export function catalogItemToPosProduct(
     categoryId: product.categoryId,
     categoryName: product.categoryName,
     lastSoldAt: product.lastSoldAt ? new Date(product.lastSoldAt) : null,
+    updatedAt: new Date(product.updatedAt),
+    totalStock: product.totalStock ?? "0",
     comboItems: product.comboItems,
     childCount: children.length,
     minRetailPrice: String(childPrices.length > 0 ? Math.min(...childPrices) : Number(product.retailPrice)),

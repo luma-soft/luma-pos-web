@@ -4,6 +4,7 @@ import { getCameraQuoteFormOptions } from "@/lib/data/camera-quotes";
 import { requireUser, getRole } from "@/lib/actions/common";
 import { resolveNotificationChannels } from "@/lib/notifications/channels";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       store={store}
       canManage={canManage}
       canEditAi={canEditAi}
+      canViewPurchasePrices={canViewPurchasePrices(context.role)}
       notificationChannels={resolveNotificationChannels()}
       cameraQuoteOptions={cameraQuoteOptions}
       initialTab={params.tab}

@@ -67,9 +67,7 @@ export interface ProductListFilters extends PriceComparison {
   supplierId?: string;
   productKind?: "product" | "service" | "combo";
   stock?: "instock" | "low" | "out";
-  // `recent_sales` is an internal mobile catalog order used by POS search;
-  // it is intentionally not exposed as an Inventory filter choice.
-  sort?: ProductListSort | "recent_sales";
+  sort?: ProductListSort;
   status?: ProductStatusFilter;
   view?: ProductListView;
   /** Keep legacy clients flat for imported KiotViet related-product families. */
@@ -382,10 +380,17 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
         ? recentProductSaleOrder()
         : [
             sort === "stock"
-              ? sql`${groupStockForSort} desc nulls last`
+              ? sql`${groupStockForSort} asc nulls last`
               : sort === "updated"
                 ? desc(products.updatedAt)
-                : asc(products.name),
+                : sort === "cost"
+                  ? desc(products.costPrice)
+                  : sort === "retail"
+                    ? desc(products.retailPrice)
+                    : sort === "sku"
+                      ? asc(products.sku)
+                      : asc(products.name),
+            asc(products.name),
             asc(products.id),
           ]))
       .limit(size)
@@ -483,10 +488,17 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
             ? recentProductSaleOrder()
             : [
                 sort === "stock"
-                  ? desc(products.totalStock)
+                  ? asc(products.totalStock)
                   : sort === "updated"
                     ? desc(products.updatedAt)
-                    : asc(products.name),
+                    : sort === "cost"
+                      ? desc(products.costPrice)
+                      : sort === "retail"
+                        ? desc(products.retailPrice)
+                        : sort === "sku"
+                          ? asc(products.sku)
+                          : asc(products.name),
+                asc(products.name),
                 asc(products.id),
               ]))
       : [];

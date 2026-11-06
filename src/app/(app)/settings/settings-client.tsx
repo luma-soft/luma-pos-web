@@ -24,6 +24,8 @@ import { normalizeSearch } from "@/lib/normalize";
 import { selectAllInputOnClick } from "@/lib/input-selection";
 import { settingsTextByFlag } from "@/lib/i18n/settings-text";
 import { useAppDataQuery } from "@/components/use-app-data-query";
+import { useProductCatalog } from "@/components/product-catalog-provider";
+import { PRODUCT_SORTS, type ProductSort } from "@/lib/product-sort-policy";
 import {
   deletePaymentBankAccount,
   loadSettingsAiUsage,
@@ -209,7 +211,7 @@ function formatAiTestMessage(message: string, L: boolean) {
   return map[message] ? settingsTextByFlag(L, `ui.aiTest.${map[message]}`) : message;
 }
 
-type SectionId = "store" | "pos" | "cameraQuote" | "hardware" | "payments" | "print" | "tax" | "notifications" | "zalo" | "shopee" | "ai";
+type SectionId = "store" | "pos" | "productBrowse" | "cameraQuote" | "hardware" | "payments" | "print" | "tax" | "notifications" | "zalo" | "shopee" | "ai";
 
 const NAV: { groupKey: string; items: { id: SectionId; ico: string; labelKey: string; badge?: string }[] }[] = [
   { groupKey: "store", items: [
@@ -217,6 +219,7 @@ const NAV: { groupKey: string; items: { id: SectionId; ico: string; labelKey: st
   ] },
   { groupKey: "operations", items: [
     { id: "pos", ico: "🛒", labelKey: "pos" },
+    { id: "productBrowse", ico: "📦", labelKey: "productBrowse" },
     { id: "cameraQuote", ico: "📷", labelKey: "cameraQuote" },
     { id: "hardware", ico: "🖨️", labelKey: "hardware" },
     { id: "payments", ico: "💳", labelKey: "payments" },
@@ -237,6 +240,7 @@ const NAV: { groupKey: string; items: { id: SectionId; ico: string; labelKey: st
 const SEC_META: Record<SectionId, { titleKey: string; subtitleKey: string }> = {
   store: { titleKey: "store", subtitleKey: "store" },
   pos: { titleKey: "pos", subtitleKey: "pos" },
+  productBrowse: { titleKey: "productBrowse", subtitleKey: "productBrowse" },
   cameraQuote: { titleKey: "cameraQuote", subtitleKey: "cameraQuote" },
   hardware: { titleKey: "hardware", subtitleKey: "hardware" },
   payments: { titleKey: "payments", subtitleKey: "payments" },
@@ -291,6 +295,7 @@ export function SettingsClient({
   store,
   canManage,
   canEditAi,
+  canViewPurchasePrices,
   notificationChannels,
   initialTab,
   cameraQuoteOptions,
@@ -298,12 +303,14 @@ export function SettingsClient({
   store: StoreSettings;
   canManage: boolean;
   canEditAi: boolean;
+  canViewPurchasePrices: boolean;
   notificationChannels: { id: string; configured: boolean }[];
   initialTab?: string;
   cameraQuoteOptions: CameraQuoteFormOptions;
 }) {
   const locale = useLocale();
   const tSettings = useTranslations("settings");
+  const catalog = useProductCatalog();
   const L = locale === "vi";
   const normalizedInitialTab = initialTab
     && SEC_META[initialTab as SectionId]
@@ -387,6 +394,7 @@ export function SettingsClient({
 
         {active === "store" && <StoreSection L={L} store={store} canManage={canManage} />}
         {active === "pos" && <PosSettingsSection L={L} prefs={store.prefs.pos} canManage={canManage} />}
+        {active === "productBrowse" && <ProductBrowseSettingsSection L={L} value={catalog.defaultSort} onChange={catalog.setDefaultSort} canViewPurchasePrices={canViewPurchasePrices} />}
         {active === "cameraQuote" && <CameraQuoteSettingsSection prefs={store.prefs.cameraQuote} options={cameraQuoteOptions} canManage={canManage} />}
         {active === "hardware" && <HardwareSection L={L} prefs={store.prefs.hardware} canManage={canManage} />}
         {active === "payments" && <PaymentsSection L={L} prefs={store.prefs.payments} canManage={canManage} bankAccounts={bankAccounts ?? []} accountsLoading={Boolean(lazyLoading.payments)} accountsError={lazyError.payments} />}
@@ -399,6 +407,32 @@ export function SettingsClient({
         </div>
       </div>
     </div>
+  );
+}
+
+function ProductBrowseSettingsSection({ L, value, onChange, canViewPurchasePrices }: { L: boolean; value: ProductSort; onChange: (sort: ProductSort) => void; canViewPurchasePrices: boolean }) {
+  const options = PRODUCT_SORTS.filter((sort) => canViewPurchasePrices || sort !== "cost").map((sort) => ({
+    value: sort,
+    label: settingsTextByFlag(L, `ui.productBrowse.sort.${sort}`),
+  }));
+  return (
+    <Card
+      title={settingsTextByFlag(L, "ui.productBrowse.defaultSort")}
+      vi={settingsTextByFlag(L, "ui.productBrowse.defaultSortHint")}
+    >
+      <div className="space-y-2 p-3.5">
+        <span className={FL}>{settingsTextByFlag(L, "ui.productBrowse.defaultSort")}</span>
+        <Select
+          value={value}
+          onValueChange={(sort) => onChange(sort as ProductSort)}
+          options={options}
+          aria-label={settingsTextByFlag(L, "ui.productBrowse.defaultSort")}
+          className="min-h-11"
+          rootClassName="w-full"
+        />
+        <p className="text-[11px] text-slate-500">{settingsTextByFlag(L, "ui.productBrowse.localHint")}</p>
+      </div>
+    </Card>
   );
 }
 

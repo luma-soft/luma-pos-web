@@ -10,7 +10,7 @@ import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { parsePageSize } from "@/lib/pagination";
 import { parsePriceComparisonParams } from "@/lib/pricing/price-comparison";
-import { DEFAULT_PRODUCT_LIST_SORT, parseProductListSort } from "@/lib/inventory/product-list-policy";
+import { parseProductListSort } from "@/lib/inventory/product-list-policy";
 import { Routes } from "@/lib/routes";
 import { exploreProductCatalog, productCatalogMatches, visibleProductIds } from "@/lib/product-catalog-explorer";
 import { ProductCatalogSwitcher } from "./product-catalog-switcher";
@@ -36,6 +36,7 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
   const catalog = useProductCatalog();
   const urlQuery = params.get("q") ?? "";
   const filterKey = params.toString();
+  const canonicalProducts = catalog.snapshot?.products ?? catalog.products;
   const [searchState, setSearchState] = useState({ source: urlQuery, value: urlQuery });
   const query = searchState.source === urlQuery ? searchState.value : urlQuery;
   const [paginationState, setPaginationState] = useState({
@@ -72,21 +73,21 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
       : undefined,
     status,
     view: view === "flat" ? "flat" as const : "grouped" as const,
-    sort: parseProductListSort(params.get("sort")),
+    sort: parseProductListSort(params.get("sort"), catalog.defaultSort),
     page,
     pageSize,
     cameraMaterials,
     cameraSkus: new Set(cameraSkus),
     ...priceComparison,
-  }), [cameraMaterials, cameraSkus, page, pageSize, params, priceComparison, query, status, view]);
+  }), [cameraMaterials, cameraSkus, catalog.defaultSort, page, pageSize, params, priceComparison, query, status, view]);
   const result = useMemo(() => exploreProductCatalog(
-    catalog.products,
+    canonicalProducts,
     catalog.snapshot?.warehouses ?? [],
     filters,
-  ), [catalog.products, catalog.snapshot?.warehouses, filters]);
+  ), [canonicalProducts, catalog.snapshot?.warehouses, filters]);
 
   const localFilterCount = useCallback((draft: Record<string, string>, search: string) => productCatalogMatches(
-    catalog.products,
+    canonicalProducts,
     catalog.snapshot?.warehouses ?? [],
     {
       query: search,
@@ -100,7 +101,7 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
       stock: ["instock", "low", "out"].includes(draft.stock)
         ? draft.stock as "instock" | "low" | "out"
         : undefined,
-      sort: parseProductListSort(draft.sort),
+      sort: parseProductListSort(draft.sort, catalog.defaultSort),
       view: draft.view === "flat" ? "flat" : "grouped",
       cameraMaterials,
       cameraSkus: new Set(cameraSkus),
@@ -109,17 +110,17 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
         priceAgainst: draft.priceAgainst as "cost" | "lastPurchase" | undefined,
       } : {}),
     },
-  ), [cameraMaterials, cameraSkus, catalog.products, catalog.snapshot?.warehouses, showPriceComparison]);
+  ), [cameraMaterials, cameraSkus, canonicalProducts, catalog.defaultSort, catalog.snapshot?.warehouses, showPriceComparison]);
 
   const metadata = catalog.snapshot?.metadata;
   const categories = metadata?.categories ?? [];
   const brands = metadata?.brands ?? [];
   const suppliers = metadata?.suppliers ?? [];
   const switcherCount = useMemo(() => productCatalogMatches(
-    catalog.products,
+    canonicalProducts,
     catalog.snapshot?.warehouses ?? [],
     { status: "active", view: "grouped" },
-  ), [catalog.products, catalog.snapshot?.warehouses]);
+  ), [canonicalProducts, catalog.snapshot?.warehouses]);
 
   if (!catalog.snapshot) {
     if (catalog.status === "loading") return <TableSkeleton cols={8} rows={10} />;
@@ -154,7 +155,7 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
               title="Bộ lọc sản phẩm"
               values={filterValues}
               resultCount={result.total}
-              defaultSort={DEFAULT_PRODUCT_LIST_SORT}
+              defaultSort={catalog.defaultSort}
               showPriceComparison={showPriceComparison}
               fields={["category", "brand", "supplier", "kind", "status", "stock", "sort", "view", "price"]}
               categories={filterOptions(categories)}

@@ -9,6 +9,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { TenantClientScopeProvider } from "@/components/tenant-client-scope";
 import { productCatalogScopeId } from "@/lib/product-catalog";
+import { getProductSortPreference } from "@/lib/product-sort-preference-server";
 import { randomUUID } from "node:crypto";
 
 /**
@@ -30,12 +31,13 @@ export default async function PosLayout({ children }: { children: React.ReactNod
   if (!storeContext) redirect(Routes.Login);
   const role = storeContext.role;
   const catalogScopeId = productCatalogScopeId(storeContext.storeId, user.id, role);
+  const initialDefaultSort = await getProductSortPreference(storeContext.storeId, role);
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
       <TenantClientScopeProvider scopeId={catalogScopeId}>
         <AppDataSyncProvider revision={randomUUID()}>
-          <ProductCatalogProvider key={catalogScopeId} userId={user.id} scopeId={catalogScopeId}>
+          <ProductCatalogProvider key={catalogScopeId} userId={user.id} scopeId={catalogScopeId} initialDefaultSort={initialDefaultSort}>
             <div className="h-dvh overflow-hidden bg-canvas pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:pb-0">
               {children}
               <MobileTabBar />

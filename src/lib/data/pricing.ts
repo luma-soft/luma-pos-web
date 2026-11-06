@@ -376,5 +376,5 @@ function pricingOrderBy(
         return desc(products.updatedAt);
     }
   })();
-  return [primary, asc(products.id)];
+  return [primary, asc(products.name), asc(products.id)];
 }

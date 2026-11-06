@@ -1,11 +1,11 @@
-export const PRODUCT_LIST_SORTS = ["name", "stock", "updated"] as const;
+import { DEFAULT_PRODUCT_SORT, parseProductSort, PRODUCT_SORTS, type ProductSort } from "@/lib/product-sort-policy";
 
-export type ProductListSort = (typeof PRODUCT_LIST_SORTS)[number];
+export const PRODUCT_LIST_SORTS = PRODUCT_SORTS;
 
-export const DEFAULT_PRODUCT_LIST_SORT: ProductListSort = "updated";
+export type ProductListSort = ProductSort;
 
-export function parseProductListSort(value: unknown): ProductListSort {
-  return PRODUCT_LIST_SORTS.includes(value as ProductListSort)
-    ? (value as ProductListSort)
-    : DEFAULT_PRODUCT_LIST_SORT;
+export const DEFAULT_PRODUCT_LIST_SORT: ProductListSort = DEFAULT_PRODUCT_SORT;
+
+export function parseProductListSort(value: unknown, fallback: ProductListSort = DEFAULT_PRODUCT_LIST_SORT): ProductListSort {
+  return parseProductSort(value, fallback);
 }

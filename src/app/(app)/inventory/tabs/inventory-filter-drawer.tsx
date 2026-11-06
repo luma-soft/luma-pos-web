@@ -478,7 +478,16 @@ export function InventoryFilterDrawer({
 
               {!isPurchaseFilter && fields.includes("kind") && <section><h3 className="mb-3 font-bold">Loại hàng</h3>{picker("kind", "Loại hàng", [all, { value: "product", label: "Sản phẩm" }, { value: "service", label: "Dịch vụ" }, { value: "combo", label: "Combo" }])}</section>}
               {!isPurchaseFilter && !isInternalUseFilter && fields.includes("status") && <section><h3 className="mb-3 font-bold">Trạng thái kinh doanh</h3>{statusPicker}</section>}
-              {fields.includes("sort") && <section><h3 className="mb-3 font-bold">Sắp xếp</h3>{picker("sort", "Sắp xếp", [all, { value: "name", label: "Tên sản phẩm" }, { value: "stock", label: "Tồn kho" }, { value: "updated", label: "Cập nhật gần nhất" }])}</section>}
+              {fields.includes("sort") && <section><h3 className="mb-3 font-bold">Sắp xếp</h3>{picker("sort", "Sắp xếp", [
+                all,
+                { value: "recent_sales", label: t("settings.ui.productBrowse.sort.recent_sales") },
+                { value: "updated", label: t("settings.ui.productBrowse.sort.updated") },
+                { value: "name", label: t("settings.ui.productBrowse.sort.name") },
+                { value: "sku", label: t("settings.ui.productBrowse.sort.sku") },
+                ...(showPriceComparison ? [{ value: "cost", label: t("settings.ui.productBrowse.sort.cost") }] : []),
+                { value: "retail", label: t("settings.ui.productBrowse.sort.retail") },
+                { value: "stock", label: t("settings.ui.productBrowse.sort.stock") },
+              ])}</section>}
               {fields.includes("view") && <section><h3 className="mb-3 font-bold">Hiển thị</h3>{picker("view", "Hiển thị", [{ value: "grouped", label: "Nhóm sản phẩm" }, { value: "flat", label: "Danh sách phẳng" }])}</section>}
               {fields.includes("stock") && <section><h3 className="mb-3 font-bold">Tình trạng tồn</h3>{picker("stock", "Tình trạng tồn", stockOptions)}</section>}
               {showPriceComparison && fields.includes("price") && (

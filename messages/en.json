@@ -4177,6 +4177,7 @@
       "store": "Store",
       "staff": "Staff",
       "pos": "POS",
+      "productBrowse": "Product browsing",
       "cameraQuote": "Camera quotes",
       "hardware": "Hardware",
       "payments": "Payments",
@@ -4665,6 +4666,20 @@
         "unsupportedVision": "This provider does not support vision/OCR.",
         "unsupportedTextPlanning": "This provider does not support text planning."
       },
+      "productBrowse": {
+        "defaultSort": "Default product sort",
+        "defaultSortHint": "Choose the default order used when product lists open.",
+        "localHint": "Saved in this browser for this store. It does not change the app language setting.",
+        "sort": {
+          "recent_sales": "Recently sold",
+          "updated": "Recently updated",
+          "name": "Product name",
+          "sku": "SKU",
+          "cost": "Cost (high to low)",
+          "retail": "Retail price (high to low)",
+          "stock": "Stock (low to high)"
+        }
+      },
       "roles": {
         "owner": "Owner",
         "manager": "Manager",
@@ -4712,6 +4727,7 @@
           "store": "Store Profile",
           "staff": "Staff & RBAC",
           "pos": "POS Page",
+          "productBrowse": "Product browsing",
           "cameraQuote": "Camera Quotes",
           "hardware": "Hardware",
           "payments": "Payments",
@@ -4736,6 +4752,10 @@
         "pos": {
           "title": "POS Page",
           "subtitle": "Show or hide optional selling controls"
+        },
+        "productBrowse": {
+          "title": "Product browsing",
+          "subtitle": "Default product order across the app"
         },
         "cameraQuote": {
           "title": "Camera Quotes",

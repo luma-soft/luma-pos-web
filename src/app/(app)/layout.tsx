@@ -19,6 +19,7 @@ import { requireStoreContext } from "@/lib/auth/store-context";
 import { getProductCatalogRevision } from "@/lib/data/product-catalog";
 import { AppDataSyncProvider } from "@/components/app-data-sync-provider";
 import { productCatalogScopeId } from "@/lib/product-catalog";
+import { getProductSortPreference } from "@/lib/product-sort-preference-server";
 import { randomUUID } from "node:crypto";
 
 export const dynamic = "force-dynamic";
@@ -52,12 +53,15 @@ export default async function AppLayout({
   const mode = await getMode();
   const role = context.role;
   const catalogScopeId = productCatalogScopeId(context.storeId, user.id, role);
-  const catalogRevision = await getProductCatalogRevision(context.storeId);
+  const [catalogRevision, initialDefaultSort] = await Promise.all([
+    getProductCatalogRevision(context.storeId),
+    getProductSortPreference(context.storeId, role),
+  ]);
 
   return (
     <TenantClientScopeProvider scopeId={catalogScopeId}>
     <AppDataSyncProvider revision={randomUUID()}>
-    <ProductCatalogProvider key={catalogScopeId} userId={user.id} scopeId={catalogScopeId} serverRevision={catalogRevision}>
+    <ProductCatalogProvider key={catalogScopeId} userId={user.id} scopeId={catalogScopeId} serverRevision={catalogRevision} initialDefaultSort={initialDefaultSort}>
     <div className="flex min-h-dvh bg-canvas">
       <MobileNavBackdrop />
 
