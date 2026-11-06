@@ -663,7 +663,7 @@ export function NewProductForm({
       <div
         className={cn(
           "min-h-0 flex-1 overflow-auto overscroll-contain p-4 sm:p-6 w-full space-y-4",
-          isModal ? "mx-auto max-w-7xl" : "mx-auto max-w-5xl",
+          isModal ? "mx-auto max-w-none" : "mx-auto max-w-5xl",
         )}
       >
         {groupEditing && <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-800">
