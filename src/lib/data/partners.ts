@@ -404,6 +404,8 @@ export async function getCustomers(
         ))
         .where(and(
           inArray(orders.customerId, customerIds),
+          eq(orders.storeId, storeId),
+          saleOrderStatus,
           isNull(customerReceivableAllocations.receiptId),
           notInArray(payments.status, ["pending", "expired", "failed", "cancelled"]),
         ))
@@ -480,17 +482,19 @@ export async function getCustomers(
         paymentMethod: order.paymentMethod,
         productNames: order.productNames,
       });
-      addLedger(order.customerId, {
-        id: order.id,
-        kind: "sale",
-        code: order.code,
-        orderId: order.id,
-        createdAt: order.createdAt,
-        typeLabel: "Bán hàng",
-        value: Number(order.total),
-        reason: null,
-        sort: 10,
-      });
+      if (order.status !== "cancelled") {
+        addLedger(order.customerId, {
+          id: order.id,
+          kind: "sale",
+          code: order.code,
+          orderId: order.id,
+          createdAt: order.createdAt,
+          typeLabel: "Bán hàng",
+          value: Number(order.total),
+          reason: null,
+          sort: 10,
+        });
+      }
     }
 
     for (const ret of returnRows) {
