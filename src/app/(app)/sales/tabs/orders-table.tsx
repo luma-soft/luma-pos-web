@@ -16,7 +16,7 @@ import {
   OrderStatusBadge,
   PaymentStatusBadge,
 } from "../../orders/status-badges";
-import { FileX2, Loader2, XCircle } from "lucide-react";
+import { ChevronDown, FileX2, Loader2, Printer, XCircle } from "lucide-react";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
@@ -156,9 +156,11 @@ export function OrderBatchToolbar({
           <button
             type="button"
             disabled
-            className={`${controlHeightClassName} inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-border px-3 text-xs font-semibold opacity-50 lg:min-h-0 lg:min-w-0 lg:text-sm`}
+            className={`${controlHeightClassName} inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold opacity-50 lg:min-h-0 lg:min-w-0 lg:text-sm`}
           >
+            <Printer className="h-4 w-4" />
             {labels.print}
+            <ChevronDown className="h-3.5 w-3.5" />
           </button>
         )}
         <button
