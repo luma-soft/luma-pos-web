@@ -15,7 +15,7 @@ import { replaceProductMediaInTransaction, resolveProductImageMediaIdsInTransact
 
 export async function saveProductVariantGroup(
   input: CreateProductInput,
-  options: { deferInventoryRefresh?: boolean } = {},
+  options: { deferInventoryRefresh?: boolean; deferProductDetailRefresh?: boolean } = {},
 ): Promise<ActionResult<{ id: string; createdProductId?: string }>> {
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
@@ -69,7 +69,7 @@ export async function saveProductVariantGroup(
     });
     revalidateAppDataPage(Routes.Products);
     if (!options.deferInventoryRefresh) revalidateAppDataPage(Routes.Inventory);
-    revalidateAppDataPage(Routes.productDetail(result.id));
+    if (!options.deferProductDetailRefresh) revalidateAppDataPage(Routes.productDetail(result.id));
     revalidateAppDataPage(Routes.Pricing);
     revalidateAppDataPage(Routes.POS);
     return {

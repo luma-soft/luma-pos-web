@@ -22,12 +22,12 @@ export function AppDataSyncProvider({
   const hasProductModal = searchParams.has("productModal");
   const routeKey = query ? `${pathname}?${query}` : pathname;
   const previousRouteKeyRef = useRef(routeKey);
-  const pendingRefreshPathRef = useRef<string | null>(null);
+  const pendingRefreshPathsRef = useRef<Set<string>>(new Set());
   const [localRevision, setLocalRevision] = useState(0);
   const currentRevision = localRevision ? `${revision}:${localRevision}` : revision;
 
   const scheduleRefreshOnReturn = useCallback((path: string) => {
-    pendingRefreshPathRef.current = path;
+    pendingRefreshPathsRef.current.add(path);
   }, []);
 
   useEffect(() => {
@@ -35,12 +35,12 @@ export function AppDataSyncProvider({
     previousRouteKeyRef.current = routeKey;
     if (!shouldRefreshDeferredAppPath({
       routeChanged,
-      pendingPath: pendingRefreshPathRef.current,
+      pendingPath: pendingRefreshPathsRef.current.has(pathname) ? pathname : null,
       currentPath: pathname,
       modalOpen: hasProductModal,
     })) return;
 
-    pendingRefreshPathRef.current = null;
+    pendingRefreshPathsRef.current.delete(pathname);
     const frame = window.requestAnimationFrame(() => {
       startTransition(() => {
         setLocalRevision((current) => current + 1);

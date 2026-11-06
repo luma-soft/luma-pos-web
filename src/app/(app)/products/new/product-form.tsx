@@ -360,22 +360,30 @@ export function NewProductForm({
   }
 
   async function saveValues(values: CreateProductOutput) {
+    const deferProductDetailRefresh = isModal && closeNavigation === "back"
+      && doneHref.startsWith("/products/") && submitIntent === "save";
     if (values.variantGroupId || values.variantChildren.length > 0) {
-      const result = await saveProductVariantGroup(values, { deferInventoryRefresh: isModal });
+      const result = await saveProductVariantGroup(values, {
+        deferInventoryRefresh: isModal,
+        deferProductDetailRefresh,
+      });
       if (!result.ok) { form.setError("root", { message: result.error }); return; }
       if (isModal && !createdProductReturnTo) {
         scheduleAppDataRefreshOnReturn(Routes.Inventory);
+      }
+      if (deferProductDetailRefresh) {
+        scheduleAppDataRefreshOnReturn(new URL(doneHref, window.location.origin).pathname);
       }
       if (!isEdit && submitIntent === "sameType") {
         navigateAfterModal(sameTypeHref(result.data.createdProductId ?? result.data.id));
         return;
       }
-      if (isModal && submitIntent === "save") dismissProductModalAfterSave?.();
-      navigateAfterModal(
+      const href =
         submitIntent === "sameType"
           ? sameTypeHref(result.data.id)
-          : createdProductHref(result.data.id) ?? (isModal ? doneHref : Routes.product(result.data.id)),
-      );
+          : createdProductHref(result.data.id) ?? (isModal ? doneHref : Routes.product(result.data.id));
+      if (isModal && submitIntent === "save" && !deferProductDetailRefresh) dismissProductModalAfterSave?.();
+      navigateAfterModal(href);
       return;
     }
     if (isEdit && productId) {
@@ -417,8 +425,12 @@ export function NewProductForm({
         && variantIdentityValues.length === variantGroup.attributes.length
         ? { groupId: variantGroup.id, revision: variantGroup.revision, values: variantIdentityValues }
         : undefined;
+      const refreshOptions = {
+        deferInventoryRefresh: isModal,
+        deferProductDetailRefresh,
+      };
       const res = stockOnly
-        ? await updateProductStock({ id: productId, stockAdjustment }, { deferInventoryRefresh: isModal })
+        ? await updateProductStock({ id: productId, stockAdjustment }, refreshOptions)
         : await updateProduct({
           id: productId,
           productKind: values.productKind,
@@ -452,10 +464,13 @@ export function NewProductForm({
           thickness: dimensionsEdited ? values.thickness : undefined,
           dimUnit: dimensionsEdited ? values.dimUnit : undefined,
           stockAdjustment,
-        }, { deferInventoryRefresh: isModal });
+        }, refreshOptions);
       if (res.ok) {
         if (isModal) {
           scheduleAppDataRefreshOnReturn(Routes.Inventory);
+        }
+        if (deferProductDetailRefresh) {
+          scheduleAppDataRefreshOnReturn(new URL(doneHref, window.location.origin).pathname);
         }
         const href =
           submitIntent === "sameType"
@@ -463,7 +478,7 @@ export function NewProductForm({
             : isModal
               ? doneHref
               : Routes.product(productId);
-        if (isModal && submitIntent === "save") dismissProductModalAfterSave?.();
+        if (isModal && submitIntent === "save" && !deferProductDetailRefresh) dismissProductModalAfterSave?.();
         if (isModal) navigateAfterModal(href);
         else router.push(href);
         return;
@@ -514,7 +529,7 @@ export function NewProductForm({
   }
 
   const close = () => {
-    if (isModal) dismissProductModalAfterSave?.();
+    if (isModal && cancelNavigation !== "back") dismissProductModalAfterSave?.();
     if (cancelNavigation === "back") router.back();
     else if (cancelNavigation === "replace") router.replace(doneHref);
     else navigateAfterModal(doneHref);

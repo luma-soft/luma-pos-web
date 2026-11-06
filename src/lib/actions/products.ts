@@ -718,7 +718,10 @@ const updateProductStockSchema = z.object({
   ),
 }).strict();
 
-type ProductRefreshOptions = { deferInventoryRefresh?: boolean };
+type ProductRefreshOptions = {
+  deferInventoryRefresh?: boolean;
+  deferProductDetailRefresh?: boolean;
+};
 
 /** Stock-only save: keep metadata/media/unit work out of the locked transaction. */
 export async function updateProductStock(
@@ -759,7 +762,7 @@ export async function updateProductStock(
 
   revalidateProductPage(Routes.Products);
   if (!options.deferInventoryRefresh) revalidateProductPage(Routes.Inventory);
-  revalidateProductPage(`/products/${id}`);
+  if (!options.deferProductDetailRefresh) revalidateProductPage(`/products/${id}`);
   revalidateProductPage(Routes.POS);
   return { ok: true, data: undefined };
 }
@@ -1110,7 +1113,7 @@ export async function updateProduct(
 
     revalidateProductPage(Routes.Products);
     if (!options.deferInventoryRefresh) revalidateProductPage(Routes.Inventory);
-    revalidateProductPage(`/products/${v.id}`);
+    if (!options.deferProductDetailRefresh) revalidateProductPage(`/products/${v.id}`);
     revalidateProductPage(Routes.Pricing);
     revalidateProductPage(Routes.POS);
     return { ok: true, data: undefined };
