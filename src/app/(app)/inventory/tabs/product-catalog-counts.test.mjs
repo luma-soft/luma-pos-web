@@ -2,110 +2,104 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-let totalProducts = 1584;
-let totalCategories = 42;
-let productCalls = [];
-let categoryCalls = [];
-const noop = () => null;
+let catalog;
 const translate = (key) => ({ "nav.products": "Sản phẩm", "categories.title": "Nhóm hàng" })[key] ?? key;
-mock.module("next-intl", () => ({ useTranslations: () => translate, useLocale: () => "vi" }));
-mock.module("next-intl/server", () => ({ getTranslations: async () => translate }));
-mock.module("@/lib/auth/store-context", () => ({ requireStoreContext: async () => ({ storeId: "store-1", role: "owner" }) }));
-mock.module("@/lib/data/products", () => ({
-  getProduct: async () => null,
-  getProducts: async (storeId, filters) => {
-    productCalls.push({ storeId, filters });
-    return { rows: totalProducts ? [{ id: "p1" }] : [], total: totalProducts, pageCount: Math.max(1, Math.ceil(totalProducts / 30)) };
-  },
-  getProductFormOptions: async () => ({
-    categories: Array.from({ length: totalCategories }, (_, i) => ({ id: `c${i}`, name: `Nhóm ${i}` })),
-    brands: [], suppliers: [], comboProducts: [],
-  }),
-}));
-mock.module("@/lib/data/categories", () => ({
-  getCategoriesWithCounts: async (storeId, filters) => {
-    categoryCalls.push({ storeId, filters });
-    return { rows: totalCategories ? [{ id: "c1", name: "Nhóm 1" }] : [], roots: [], total: totalCategories, pageCount: Math.max(1, Math.ceil(totalCategories / 15)) };
-  },
-}));
-mock.module("@/lib/data/price-books", () => ({ getPriceBooks: async () => [], getPriceOverridesForProducts: async () => ({}) }));
-mock.module("./products-table", () => ({ ProductsTable: noop }));
-mock.module("../../products/new/product-form", () => ({ NewProductForm: noop }));
-mock.module("../../products/product-form-values", () => ({ productToFormInitialValues: noop, resolveProductFormSeed: noop }));
-mock.module("./shopee-listing-modal", () => ({ ShopeeListingModal: noop }));
-mock.module("./camera-material-search", () => ({ CameraMaterialSearch: noop }));
-mock.module("./instant-product-search", () => ({ InstantProductSearch: noop }));
-mock.module("./inventory-filter-drawer", () => ({ InventoryFilterDrawer: noop }));
-mock.module("./product-create-menu", () => ({ ProductCreateMenu: noop }));
-mock.module("./product-selection", () => ({ ProductBulkActions: noop, ProductSelectionProvider: noop }));
-mock.module("../../products/categories/categories-manager", () => ({ CategoriesManager: noop }));
-mock.module("@/lib/media/config", () => ({ getPublicMediaConfig: noop }));
 
-const { ProductsTab } = await import("./products.tsx");
+mock.module("next-intl", () => ({ useTranslations: () => translate, useLocale: () => "vi" }));
+mock.module("next/link", () => ({
+  default: ({ href, children, ...props }) => createElement("a", { href, ...props }, children),
+}));
+mock.module("@/components/product-catalog-provider", () => ({ useProductCatalog: () => catalog }));
+
 const { ProductCatalogSwitcher } = await import("./product-catalog-switcher.tsx");
 
-async function findSwitcher(element) {
-  if (Array.isArray(element)) {
-    for (const child of element) {
-      const found = await findSwitcher(child);
-      if (found) return found;
-    }
-    return null;
-  }
-  if (!element?.props) return null;
-  if (element.type === ProductCatalogSwitcher) return element.props;
-  if (element.type?.name === "ProductsContent") return findSwitcher(await element.type(element.props));
-  return findSwitcher(element.props.children);
+function product(overrides = {}) {
+  return {
+    id: "product-1",
+    sku: "SKU-1",
+    barcode: null,
+    name: "Sản phẩm mẫu",
+    productKind: "product",
+    isActive: true,
+    lifecycleStatus: "active",
+    categoryId: null,
+    brandId: null,
+    supplierId: null,
+    supplierIDs: [],
+    parentProductId: null,
+    relatedProductId: null,
+    variantGroupId: null,
+    variantGroupKind: null,
+    isVariantParent: false,
+    warehouseStock: [],
+    retailPrice: "20",
+    costPrice: "10",
+    lastPurchaseNetPrice: "10",
+    priceBookTypes: {},
+    prices: {},
+    minStock: "0",
+    specs: {},
+    comboItems: [],
+    units: [],
+    baseUnit: "cái",
+    baseUnitDirectSale: true,
+    priceByWeight: false,
+    isStockManaged: true,
+    imageUpdatedAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function renderSwitcher(props = {}) {
+  return renderToStaticMarkup(createElement(ProductCatalogSwitcher, { activeView: "products", ...props }));
 }
 
 beforeEach(() => {
-  totalProducts = 1584;
-  totalCategories = 42;
-  productCalls = [];
-  categoryCalls = [];
+  catalog = {
+    products: [],
+    snapshot: { warehouses: [], metadata: { categories: [], brands: [], suppliers: [] } },
+  };
 });
 
 describe("product catalog tab counts", () => {
-  test("product view supplies both totals, not the current page length", async () => {
-    const props = await findSwitcher(await ProductsTab({ searchParams: { page: "2", size: "30" } }));
-    expect(props).toMatchObject({ activeView: "products", productCount: 1584, categoryCount: 42 });
-    expect(productCalls).toHaveLength(1);
-    expect(productCalls[0]).toMatchObject({ storeId: "store-1", filters: { page: 2, pageSize: 30, view: "grouped", status: "active" } });
-  });
+  test("product count comes from all active local inventory groups", () => {
+    const groupRoot = product({ id: "group-root", sku: "GROUP", isVariantParent: true });
+    const groupMember = product({ id: "group-member", sku: "GROUP-1", variantGroupId: "group-root", variantGroupKind: "native" });
+    const standalone = product({ id: "standalone", sku: "SINGLE" });
+    const inactive = product({ id: "inactive", sku: "OLD", isActive: false, lifecycleStatus: "archived" });
+    catalog.products = [groupRoot, groupMember, standalone, inactive];
 
-  test("product count uses the same filtered total as pagination", async () => {
-    totalProducts = 4;
-    const props = await findSwitcher(await ProductsTab({ searchParams: { q: "2200", status: "all", view: "flat" } }));
-    expect(props.productCount).toBe(4);
-    expect(props.categoryCount).toBe(42);
-    expect(productCalls[0].filters).toMatchObject({ q: "2200", status: "all", view: "flat" });
-  });
+    const html = renderSwitcher();
 
-  test("category view supplies both totals independently of category pagination", async () => {
-    const props = await findSwitcher(await ProductsTab({ searchParams: { catalog: "categories", page: "2", size: "15" } }));
-    expect(props).toMatchObject({ activeView: "categories", productCount: 1584, categoryCount: 42 });
-    expect(categoryCalls[0]).toMatchObject({ storeId: "store-1", filters: { page: 2, pageSize: 15 } });
-    expect(productCalls).toHaveLength(1);
-    expect(productCalls[0]).toMatchObject({ storeId: "store-1", filters: { page: 1, view: "grouped", status: "active" } });
-  });
-
-  test("empty catalogs show zero for both tabs", async () => {
-    totalProducts = 0;
-    totalCategories = 0;
-    const props = await findSwitcher(await ProductsTab({ searchParams: {} }));
-    expect(props).toMatchObject({ productCount: 0, categoryCount: 0 });
-    const html = renderToStaticMarkup(createElement(ProductCatalogSwitcher, props));
-    expect(html.match(/>0<\/span>/g)).toHaveLength(2);
-  });
-
-  test("count labels use the active Vietnamese locale", () => {
-    const html = renderToStaticMarkup(createElement(ProductCatalogSwitcher, { activeView: "products", productCount: 1584, categoryCount: 42 }));
-    expect(html).toContain(">1.584</span>");
-    expect(html).toContain(">42</span>");
+    expect(html).toContain(">2</span>");
     expect(html).toContain('aria-current="page"');
   });
 
-  test("camera materials keep their dedicated view without catalog tabs", async () => {
-    expect(await findSwitcher(await ProductsTab({ searchParams: { cameraMaterials: "1" } }))).toBeNull();
+  test("category count uses the supplied total while product count stays local", () => {
+    catalog.products = [product()];
+
+    const html = renderSwitcher({ activeView: "categories", productCount: undefined, categoryCount: 42 });
+
+    expect(html).toContain(">1</span>");
+    expect(html).toContain(">42</span>");
+    expect(html).toContain('href="/inventory?tab=products&amp;catalog=categories"');
+    expect(html).toContain('aria-current="page"');
+  });
+
+  test("category count falls back to locally cached catalog metadata", () => {
+    catalog.snapshot.metadata.categories = [{ id: "c1", name: "Nhóm 1" }, { id: "c2", name: "Nhóm 2" }];
+
+    const html = renderSwitcher();
+
+    expect(html).toContain(">0</span>");
+    expect(html).toContain(">2</span>");
+  });
+
+  test("counts use the active Vietnamese locale", () => {
+    const html = renderSwitcher({ productCount: 1584, categoryCount: 42 });
+
+    expect(html).toContain(">1.584</span>");
+    expect(html).toContain(">42</span>");
   });
 });
