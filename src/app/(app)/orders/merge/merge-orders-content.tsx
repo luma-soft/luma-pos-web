@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { einvoices } from "@/db/schema";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { getOrder } from "@/lib/data/orders";
+import { getStoreSettings } from "@/lib/data/settings";
 import { getPrintTemplatesForDoc } from "@/lib/print/template";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -28,7 +29,7 @@ export async function MergeOrdersContent({
   ]);
   const ids = [...new Set((Array.isArray(params.ids) ? params.ids : params.ids ? [params.ids] : []).filter(Boolean))].slice(0, 20);
 
-  const [loadedOrders, printTemplates, issuedEInvoices] = await Promise.all([
+  const [loadedOrders, printTemplates, issuedEInvoices, storeSettings] = await Promise.all([
     Promise.all(ids.map((id) => getOrder(context.storeId, id).catch(() => null))),
     getPrintTemplatesForDoc(context.storeId, "order"),
     ids.length
@@ -41,6 +42,7 @@ export async function MergeOrdersContent({
             eq(einvoices.status, "issued"),
           ))
       : Promise.resolve([]),
+    getStoreSettings(context.storeId),
   ]);
 
   const selectedOrders = loadedOrders.filter((order): order is LoadedOrder => order !== null);
@@ -81,6 +83,7 @@ export async function MergeOrdersContent({
           sameCustomer={sameCustomer}
           hasReturns={hasReturns}
           hasEInvoice={hasEInvoice}
+          priceIncludesTax={storeSettings.prefs.tax.priceIncludesTax}
         />
       )}
     </div>

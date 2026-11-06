@@ -20,6 +20,7 @@ export async function MergeOrderDetailPreview({
   sameCustomer,
   hasReturns,
   hasEInvoice,
+  priceIncludesTax,
 }: {
   selectedOrders: OrderDetail[];
   eligibleOrders: OrderDetail[];
@@ -30,6 +31,7 @@ export async function MergeOrderDetailPreview({
   sameCustomer: boolean;
   hasReturns: boolean;
   hasEInvoice: boolean;
+  priceIncludesTax: boolean;
 }) {
   const t = await getTranslations();
   const sourceOrders = eligibleOrders;
@@ -39,6 +41,14 @@ export async function MergeOrderDetailPreview({
   const subtotal = sourceOrders.reduce((sum, order) => sum + Number(order.subtotal), 0);
   const discount = sourceOrders.reduce((sum, order) => sum + Number(order.discount), 0);
   const tax = sourceOrders.reduce((sum, order) => sum + Number(order.tax), 0);
+  const discountedSubtotal = Math.max(0, subtotal - discount);
+  const taxableBase = Math.max(0, discountedSubtotal - (priceIncludesTax ? tax : 0));
+  const effectiveTaxRate = taxableBase > 0
+    ? Math.round((tax / taxableBase) * 10_000) / 100
+    : null;
+  const taxLabel = effectiveTaxRate === null
+    ? t("pos.tax")
+    : `${t("pos.tax")} (${formatNumber(effectiveTaxRate)}%)`;
   const shippingFee = sourceOrders.reduce((sum, order) => sum + Number(order.shippingFee), 0);
   const remaining = Math.max(0, total - paid);
   const items = sourceOrders.flatMap((order) => order.items)
@@ -235,7 +245,7 @@ export async function MergeOrderDetailPreview({
                 <h4 className="font-semibold">{t("merge.paymentSummary")}</h4>
                 <PreviewInfoRow label={t("pos.subtotal")} value={formatCurrency(subtotal)} />
                 <PreviewInfoRow label={t("pos.discount")} value={formatCurrency(discount)} />
-                <PreviewInfoRow label={t("pos.tax")} value={formatCurrency(tax)} />
+                <PreviewInfoRow label={taxLabel} value={formatCurrency(tax)} />
                 <PreviewInfoRow label={t("pos.shipping")} value={formatCurrency(shippingFee)} />
                 <PreviewInfoRow label={t("pos.total")} value={formatCurrency(total)} strong valueClassName="text-primary-600" />
                 <PreviewInfoRow label={t("orders.detail.paid")} value={formatCurrency(paid)} strong valueClassName={paid > 0 ? "text-ok" : undefined} />

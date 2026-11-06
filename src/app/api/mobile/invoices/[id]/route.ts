@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { einvoices } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { getEnabledPaymentBankAccounts } from "@/lib/data/payment-bank-accounts";
+import { getStoreSettings } from "@/lib/data/settings";
 import { updateOrderForUser } from "@/lib/orders/edit";
 import { requireMobileManager, requireMobileSalesAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
@@ -19,7 +20,7 @@ export async function GET(
   const { id } = await params;
   const order = await getOrder(gate.storeId, id);
   if (!order) return mobileError("errors.notFound", 404);
-  const [eInvoiceRows, bankAccounts] = await Promise.all([
+  const [eInvoiceRows, bankAccounts, storeSettings] = await Promise.all([
     db
       .select({
         id: einvoices.id,
@@ -39,6 +40,7 @@ export async function GET(
       .where(and(eq(einvoices.storeId, gate.storeId), eq(einvoices.orderId, id)))
       .limit(1),
     getEnabledPaymentBankAccounts(gate.storeId),
+    getStoreSettings(gate.storeId),
   ]);
   const eInvoice = eInvoiceRows[0];
   const isEditableDraft =
@@ -48,6 +50,7 @@ export async function GET(
     order.payments.length === 0;
   return mobileOk({
     ...order,
+    priceIncludesTax: storeSettings.prefs.tax.priceIncludesTax,
     items: order.items.map((item) => ({ ...item, productName: productLineDisplayName(item) })),
     eInvoice: eInvoice ?? null,
     bankAccounts,
