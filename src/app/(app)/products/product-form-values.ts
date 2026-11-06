@@ -1,6 +1,6 @@
 import type { ProductDetail } from "@/lib/data/products";
 import type { CreateProductInput } from "./new/schema";
-import { buildVariantCombinations, normalizeVariantAttributes, variantCombinationBudget } from "@/lib/products/variant-model";
+import { buildVariantCombinations, normalizeVariantAttributes, variantCombinationBudget, variantNameKey } from "@/lib/products/variant-model";
 
 export type ProductSeedMode = "edit" | "copy" | "groupCopy" | "sameType" | "groupEdit" | "groupAdd";
 const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
@@ -110,9 +110,23 @@ export function productToFormInitialValues(
         maxCombinations: variantCombinationBudget(selectedMembers.length, group?.excludedCombinationKeys?.length ?? 0),
       });
     } catch { /* Incomplete legacy groups require explicit assignments in the editor. */ }
+    const combinationByKey = new Map(combinations.map((combination) => [combination.combinationKey, combination]));
     const possibleMatches = selectedMembers.map((member) => {
-      const visibleSpecs = member.specs as Record<string, string[]> | null;
-      return combinations.find((combo) => Object.entries(combo.specs).every(([name, values]) => JSON.stringify(visibleSpecs?.[name]) === JSON.stringify(values)));
+      // The group projection already resolves aliases and stable value IDs.
+      // Prefer that identity over exact display-name lookups in legacy specs.
+      const identityMatch = member.combinationKey ? combinationByKey.get(member.combinationKey) : undefined;
+      if (identityMatch) return identityMatch;
+
+      const visibleSpecs = Object.fromEntries(Object.entries((member.specs ?? {}) as Record<string, string[]>)
+        .filter(([name]) => !name.startsWith("__")));
+      const entries = Object.entries(visibleSpecs);
+      return combinations.find((combo) => {
+        const axes = Object.entries(combo.specs);
+        return entries.length === axes.length && axes.every(([name, values]) => {
+          const actual = entries.find(([entryName]) => variantNameKey(entryName) === variantNameKey(name))?.[1];
+          return actual?.length === 1 && actual[0].trim() === values[0];
+        });
+      });
     });
     const children: NonNullable<CreateProductInput["variantChildren"]> = selectedMembers.map((member, index) => {
       const visibleSpecs = Object.fromEntries(Object.entries((member.specs ?? {}) as Record<string, string[]>).filter(([name]) => !name.startsWith("__")));
@@ -158,7 +172,12 @@ export function productToFormInitialValues(
         variantTemplateProductId: latestVariantMemberId(product),
         imageSourceProductIds: [...new Set([...imageSourceProductIds, product.id])],
         variantAddValues: Object.fromEntries(attributes.map((attribute) => ["attributeId" in attribute ? attribute.attributeId : "", ""])),
-        variantExistingCombinationKeys: children.flatMap((child) => child.combinationKey ? [child.combinationKey] : []),
+        variantExistingCombinationKeys: selectedMembers.flatMap((member, index) => {
+          const key = member.combinationKey && combinationByKey.has(member.combinationKey)
+            ? member.combinationKey
+            : children[index]?.combinationKey;
+          return key ? [key] : [];
+        }),
       } : {}),
       location: product.location ?? "",
       description: product.description ?? "",
