@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { and, eq, inArray } from "drizzle-orm";
-import { Printer, ScanEye } from "lucide-react";
+import { Printer } from "lucide-react";
 import { db } from "@/db";
 import { customers, einvoices, orders, returns } from "@/db/schema";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -155,15 +155,6 @@ export async function MergeOrdersContent({
               <div className="flex flex-wrap items-center justify-end gap-2 sm:shrink-0">
                 {canMerge ? (
                   <>
-                    <Link
-                      href={previewHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-surface-2 dark:text-slate-200"
-                    >
-                      <ScanEye className="h-4 w-4" />
-                      {t("merge.preview")}
-                    </Link>
                     <PrintTemplateMenu
                       baseHref={previewHref}
                       templates={printTemplates}
