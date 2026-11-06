@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { einvoices } from "@/db/schema";
+import { einvoices, returnItems, returns } from "@/db/schema";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { getOrder } from "@/lib/data/orders";
 import { getStoreSettings } from "@/lib/data/settings";
@@ -29,7 +29,7 @@ export async function MergeOrdersContent({
   ]);
   const ids = [...new Set((Array.isArray(params.ids) ? params.ids : params.ids ? [params.ids] : []).filter(Boolean))].slice(0, 20);
 
-  const [loadedOrders, printTemplates, issuedEInvoices, storeSettings] = await Promise.all([
+  const [loadedOrders, printTemplates, issuedEInvoices, storeSettings, referencedItems] = await Promise.all([
     Promise.all(ids.map((id) => getOrder(context.storeId, id).catch(() => null))),
     getPrintTemplatesForDoc(context.storeId, "order"),
     ids.length
@@ -43,6 +43,16 @@ export async function MergeOrdersContent({
           ))
       : Promise.resolve([]),
     getStoreSettings(context.storeId),
+    ids.length
+      ? db
+          .select({ orderItemId: returnItems.orderItemId })
+          .from(returnItems)
+          .innerJoin(returns, eq(returnItems.returnId, returns.id))
+          .where(and(
+            eq(returnItems.storeId, context.storeId),
+            inArray(returns.orderId, ids),
+          ))
+      : Promise.resolve([]),
   ]);
 
   const selectedOrders = loadedOrders.filter((order): order is LoadedOrder => order !== null);
@@ -51,6 +61,9 @@ export async function MergeOrdersContent({
   const sameCustomer = customerIds.size === 1;
   const hasReturns = selectedOrders.some((order) => order.returns.some((row) => row.status === "completed"));
   const hasEInvoice = issuedEInvoices.length > 0;
+  const protectedItemIds = new Set(
+    referencedItems.map((row) => row.orderItemId).filter((id): id is string => id !== null),
+  );
   const canMerge = eligibleOrders.length >= 2
     && sameCustomer
     && eligibleOrders.length === selectedOrders.length
@@ -84,6 +97,7 @@ export async function MergeOrdersContent({
           hasReturns={hasReturns}
           hasEInvoice={hasEInvoice}
           priceIncludesTax={storeSettings.prefs.tax.priceIncludesTax}
+          protectedItemIds={protectedItemIds}
         />
       )}
     </div>

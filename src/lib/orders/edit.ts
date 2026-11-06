@@ -6,6 +6,7 @@ import {
 import { updateOrderSchema, type UpdateOrderInput } from "@/lib/schemas/order";
 import { type ActionResult, getProfileId, generateCode, toMoney, toQty } from "@/lib/actions/common";
 import { normalizeOrderItems } from "@/lib/orders/normalize";
+import { mergeEquivalentOrderItems } from "@/lib/orders/merge-order-items";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { orderActivitySnapshot, orderActivityType, orderItemActivitySnapshot } from "@/lib/orders/activity";
@@ -193,6 +194,25 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
       const [hasEInvoice] = await tx.select({ id: einvoices.id }).from(einvoices).where(and(inArray(einvoices.orderId, orderIds), eq(einvoices.status, "issued"))).limit(1);
       if (hasEInvoice) throw new Error("HAS_EINVOICE");
 
+      const sourceItems = await tx.select().from(orderItems)
+        .where(and(eq(orderItems.storeId, storeId), inArray(orderItems.orderId, orderIds)))
+        .for("update");
+      const itemIds = sourceItems.map((item) => item.id);
+      const referencedItems = itemIds.length
+        ? await tx.select({ orderItemId: returnItems.orderItemId }).from(returnItems)
+            .where(and(eq(returnItems.storeId, storeId), inArray(returnItems.orderItemId, itemIds)))
+        : [];
+      const protectedItemIds = new Set(
+        referencedItems.map((row) => row.orderItemId).filter((id): id is string => id !== null),
+      );
+      const sourceOrderPosition = new Map(orderIds.map((id, index) => [id, index]));
+      sourceItems.sort((left, right) =>
+        (sourceOrderPosition.get(left.orderId) ?? 0) - (sourceOrderPosition.get(right.orderId) ?? 0)
+        || left.lineOrder - right.lineOrder
+        || left.id.localeCompare(right.id),
+      );
+      const mergedItems = mergeEquivalentOrderItems(sourceItems, protectedItemIds);
+
       const subtotal = sources.reduce((s, o) => s + Number(o.subtotal), 0);
       const discount = sources.reduce((s, o) => s + Number(o.discount), 0);
       const tax = sources.reduce((s, o) => s + Number(o.tax), 0);
@@ -220,7 +240,19 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
         createdBy: profileId,
       }).returning({ id: orders.id, code: orders.code });
 
-      await tx.update(orderItems).set({ orderId: merged.id }).where(and(eq(orderItems.storeId, storeId), inArray(orderItems.orderId, orderIds)));
+      const duplicateItemIds = mergedItems.flatMap(({ item, sourceItemIds }) => sourceItemIds.filter((id) => id !== item.id));
+      if (duplicateItemIds.length) {
+        await tx.delete(orderItems).where(and(eq(orderItems.storeId, storeId), inArray(orderItems.id, duplicateItemIds)));
+      }
+      for (const { item } of mergedItems) {
+        await tx.update(orderItems).set({
+          orderId: merged.id,
+          lineOrder: item.lineOrder,
+          quantity: item.quantity,
+          discount: item.discount,
+          total: item.total,
+        }).where(and(eq(orderItems.storeId, storeId), eq(orderItems.id, item.id)));
+      }
       await tx.update(payments).set({ orderId: merged.id }).where(and(eq(payments.storeId, storeId), inArray(payments.orderId, orderIds)));
       void returnItems;
 

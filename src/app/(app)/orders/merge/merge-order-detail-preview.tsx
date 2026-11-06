@@ -3,6 +3,7 @@ import { Printer } from "lucide-react";
 import type { OrderDetail } from "@/lib/data/orders";
 import { productDisplayName } from "@/lib/products/variant-presentation";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
+import { mergeEquivalentOrderItems } from "@/lib/orders/merge-order-items";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import type { getPrintTemplatesForDoc } from "@/lib/print/template";
@@ -21,6 +22,7 @@ export async function MergeOrderDetailPreview({
   hasReturns,
   hasEInvoice,
   priceIncludesTax,
+  protectedItemIds,
 }: {
   selectedOrders: OrderDetail[];
   eligibleOrders: OrderDetail[];
@@ -32,6 +34,7 @@ export async function MergeOrderDetailPreview({
   hasReturns: boolean;
   hasEInvoice: boolean;
   priceIncludesTax: boolean;
+  protectedItemIds: ReadonlySet<string>;
 }) {
   const t = await getTranslations();
   const sourceOrders = eligibleOrders;
@@ -51,8 +54,11 @@ export async function MergeOrderDetailPreview({
     : `${t("pos.tax")} (${formatNumber(effectiveTaxRate)}%)`;
   const shippingFee = sourceOrders.reduce((sum, order) => sum + Number(order.shippingFee), 0);
   const remaining = Math.max(0, total - paid);
-  const items = sourceOrders.flatMap((order) => order.items)
-    .sort((left, right) => Number(left.lineOrder) - Number(right.lineOrder) || left.id.localeCompare(right.id));
+  const items = mergeEquivalentOrderItems(
+    sourceOrders.flatMap((order) => order.items)
+      .sort((left, right) => Number(left.lineOrder) - Number(right.lineOrder) || left.id.localeCompare(right.id)),
+    protectedItemIds,
+  ).map(({ item }) => item);
   const payments = sourceOrders.flatMap((order) => order.payments.map((payment) => ({
     ...payment,
     sourceCode: order.code,
