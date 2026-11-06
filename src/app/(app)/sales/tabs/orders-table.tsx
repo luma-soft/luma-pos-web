@@ -23,6 +23,7 @@ import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { cancelOrders } from "@/lib/actions/orders";
 import { SalesTableEmptyState } from "./sales-table-empty-state";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
+import { controlHeightClassName } from "@/components/ui/button-variants";
 
 export function normalizeOrderBatchSelection(
   selectedIds: Set<string>,
@@ -132,14 +133,14 @@ export function OrderBatchToolbar({
           <button
             type="button"
             disabled
-            className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold opacity-50 disabled:cursor-not-allowed lg:min-h-0 lg:min-w-0"
+            className={`${controlHeightClassName} inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-border px-3 text-xs font-semibold opacity-50 disabled:cursor-not-allowed lg:min-h-0 lg:min-w-0 lg:text-sm`}
           >
             {labels.merge}
           </button>
         ) : (
           <Link
             href={mergeHref}
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 lg:min-h-0 lg:min-w-0"
+            className={`${controlHeightClassName} inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-border px-3 text-xs font-semibold hover:bg-surface-2 lg:min-h-0 lg:min-w-0 lg:text-sm`}
           >
             {labels.merge}
           </Link>
@@ -149,13 +150,13 @@ export function OrderBatchToolbar({
             baseHref={batchHref}
             templates={templates}
             label={labels.print}
-            className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 lg:min-h-0 lg:min-w-0"
+            className={`${controlHeightClassName} min-h-11 min-w-11 justify-center rounded-lg border border-border px-3 text-xs font-semibold hover:bg-surface-2 lg:min-h-0 lg:min-w-0 lg:text-sm`}
           />
         ) : (
           <button
             type="button"
             disabled
-            className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold opacity-50 lg:min-h-0 lg:min-w-0"
+            className={`${controlHeightClassName} inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-border px-3 text-xs font-semibold opacity-50 lg:min-h-0 lg:min-w-0 lg:text-sm`}
           >
             {labels.print}
           </button>
@@ -165,7 +166,7 @@ export function OrderBatchToolbar({
           disabled={selectedCount === 0 || cancelling}
           onClick={onCancel}
           aria-label={labels.cancel}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-er hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/40 lg:min-h-0 lg:min-w-0"
+          className={`${controlHeightClassName} inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 text-xs font-semibold text-er hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/40 lg:min-h-0 lg:min-w-0 lg:text-sm`}
         >
           {cancelling ? (
             <Loader2 className="h-4 w-4 animate-spin" />
