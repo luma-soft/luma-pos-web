@@ -79,15 +79,16 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
     const raw = item as unknown as Record<string, unknown>;
     const productId = String(raw.productId ?? "");
     const product = catalog.products.find((p) => p.id === productId);
-    const quantity = Number(raw.quantity ?? 0);
+    const sourceQuantity = Number(raw.quantity ?? 0);
+    const quantity = initialPurchase && !initial ? 0 : sourceQuantity;
     const unitCost = Number(raw.unitCost ?? raw.cost ?? 0);
-    const total = Number(raw.total ?? quantity * unitCost);
+    const total = Number(raw.total ?? sourceQuantity * unitCost);
     return {
       key: String(raw.id ?? productId), productId, sku: String(raw.sku ?? ""), name: String(raw.productName ?? raw.name ?? ""),
       purchaseOrderItemId: raw.purchaseOrderItemId ? String(raw.purchaseOrderItemId) : !initial && initialPurchase && raw.id ? String(raw.id) : undefined,
       unitName: String(raw.unitName ?? raw.baseUnit ?? "Cái"), unitMultiplier: Number(raw.unitMultiplier) || 1,
       quantity, unitCost,
-      returnUnitCost: quantity > 0 ? total / quantity : Number(raw.returnUnitCost ?? unitCost),
+      returnUnitCost: sourceQuantity > 0 ? total / sourceQuantity : Number(raw.returnUnitCost ?? unitCost),
       stock: product ? getCatalogWarehouseStock(product, initial?.warehouseId ?? initialPurchase?.warehouseId ?? warehouseId) : Number.POSITIVE_INFINITY,
     };
   }) ?? []);
@@ -119,7 +120,8 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
     })), query, productDisplayName);
   }, [catalog]);
 
-  const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.returnUnitCost, 0);
+  const selectedLines = lines.filter((line) => line.quantity > 0);
+  const subtotal = selectedLines.reduce((sum, line) => sum + line.quantity * line.returnUnitCost, 0);
   const afterDiscount = Math.max(0, subtotal - discount);
   const tax = Math.round((afterDiscount * vatRate) / 100);
   const totalRefund = afterDiscount + tax;
@@ -205,8 +207,9 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   }
 
   async function submit() {
-    if (busy || submitInFlightRef.current || !supplierId || !warehouseId || lines.length === 0) return;
-    const invalid = lines.some((line) => line.quantity <= 0 || line.returnUnitCost < 0 || line.quantity > totalStock(line) + 1e-9);
+    if (busy || submitInFlightRef.current || !supplierId || !warehouseId || selectedLines.length === 0) return;
+    const invalid = lines.some((line) => !Number.isFinite(line.quantity) || line.quantity < 0)
+      || selectedLines.some((line) => line.returnUnitCost < 0 || line.quantity > totalStock(line) + 1e-9);
     if (invalid) {
       setError(t("purchaseReturns.errors.insufficientStock"));
       return;
@@ -224,7 +227,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
       refundMethod: clampedRefund > 0 ? refundMethod : null,
       debtAmount,
       note: note || undefined,
-      items: lines.map((line) => ({
+      items: selectedLines.map((line) => ({
         purchaseOrderItemId: line.purchaseOrderItemId ?? null,
         productId: line.productId,
         unitName: line.unitName,
@@ -404,12 +407,11 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
               )}
             </div>
             <div className="hidden lg:block">
-              <table className="w-full min-w-[1080px] table-fixed text-sm">
+              <table className="w-full min-w-[940px] table-fixed text-sm">
               <colgroup>
                 <col className="w-14" />
-                <col className="w-28" />
-                <col className="w-60" />
-                <col className="w-24" />
+                <col className="w-64" />
+                <col className="w-20" />
                 <col className="w-32" />
                 <col className="w-28" />
                 <col className="w-30" />
@@ -419,7 +421,6 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
               <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800/80">
                 <tr className="text-left text-xs text-slate-700 dark:text-slate-200">
                   <th className="px-3 py-3 font-semibold text-center">{t("purchaseReturns.cols.index")}</th>
-                  <th className="px-3 py-3 font-semibold">{t("purchaseReturns.cols.sku")}</th>
                   <th className="px-3 py-3 font-semibold">{t("purchaseReturns.cols.productName")}</th>
                   <th className="px-3 py-3 font-semibold">{t("purchaseReturns.cols.unit")}</th>
                   <th className="px-3 py-3 font-semibold text-right">{t("purchaseReturns.cols.qty")}</th>
@@ -432,7 +433,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
               <tbody className="divide-y divide-border-soft">
                 {lines.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="h-[420px] text-center text-slate-400">
+                    <td colSpan={8} className="h-[420px] text-center text-slate-400">
                       <div className="font-semibold text-slate-700 dark:text-slate-200">{t("purchaseReturns.emptyLinesTitle")}</div>
                       <div className="mt-2 text-sm">{t("purchaseReturns.emptyLinesHint")}</div>
                     </td>
@@ -442,8 +443,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                   return (
                     <tr key={line.key}>
                       <td className="px-3 py-2 text-center text-slate-500">{index + 1}</td>
-                      <td className="px-3 py-2 font-medium text-primary-600">{line.sku}</td>
-                      <td className="px-3 py-2">
+                                            <td className="px-3 py-2">
                         <div className="truncate font-medium">{line.name}</div>
                         <div className={cn("text-xs", overStock ? "text-er" : "text-slate-400")}>
                           {t("purchaseReturns.availableStock", { stock: formatNumber(totalStock(line)), unit: line.unitName })}
@@ -549,7 +549,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                   {!initial && <Button type="button" variant="outline" disabled title={t("purchaseReturns.draftTodo")} className="h-12 rounded-card font-semibold">
                     {t("purchaseReturns.saveDraft")}
                   </Button>}
-                  <Button type="button" onClick={submit} disabled={lines.length === 0 || !supplierId || !warehouseId} loading={busy} className="h-12 rounded-card font-semibold">
+                  <Button type="button" onClick={submit} disabled={selectedLines.length === 0 || !supplierId || !warehouseId} loading={busy} className="h-12 rounded-card font-semibold">
                     {initial ? (initial.status === "draft" ? "Hoàn tất phiếu trả" : "Lưu thay đổi") : t("purchaseReturns.complete")}
                   </Button>
                 </>
