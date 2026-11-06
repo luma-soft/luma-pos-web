@@ -5,7 +5,7 @@ import {
 } from "@/lib/product-catalog";
 import type { ProductListResult } from "@/lib/data/products";
 import type { PriceComparison } from "@/lib/pricing/price-comparison";
-import { compareProductsBySort, DEFAULT_PRODUCT_SORT, type ProductSort } from "@/lib/product-sort-policy";
+import { compareProductsBySort, DEFAULT_PRODUCT_SORT, sortProductsBySort, type ProductSort } from "@/lib/product-sort-policy";
 
 export type ProductExplorerFilters = PriceComparison & {
   query?: string;
@@ -277,9 +277,12 @@ export function exploreProductCatalog(
   const searchRows = q
     ? searchProductCatalog(products, q, { limit: products.length, sort: filters.sort ?? DEFAULT_PRODUCT_SORT }).filter((product) => !product.isVariantParent)
     : searchable;
-  const searchRank = q
-    ? new Map(searchRows.map((product, index) => [product.id, index]))
-    : new Map<string, number>();
+  const sort = filters.sort ?? DEFAULT_PRODUCT_SORT;
+  // Inventory groups related SKUs into one row, while POS shows each sellable
+  // SKU. Rank the group by its first matching member in the same flat order
+  // POS uses instead of sorting on the group's root product fields.
+  const orderedProducts = q ? searchRows : sortProductsBySort(searchable, sort);
+  const searchRank = new Map(orderedProducts.map((product, index) => [product.id, index]));
   const matched = new Set(searchRows.filter((product) => matchesProduct(product, filters)).map((product) => product.id));
 
   const candidates: Array<{ product: ProductCatalogItem; rank: number }> = [];
@@ -306,22 +309,10 @@ export function exploreProductCatalog(
     }
   }
 
-  if (q) {
-    const sort = filters.sort ?? DEFAULT_PRODUCT_SORT;
-    candidates.sort((left, right) => left.rank - right.rank || compareProductsBySort(left.product, right.product, sort));
-  } else {
-    const sort = filters.sort ?? DEFAULT_PRODUCT_SORT;
-    const rowStock = (product: ProductCatalogItem) => {
-      const key = groupKey(product);
-      const group = key ? groups.get(key.id) : null;
-      return (group?.members ?? [product]).reduce((total, member) => total + stockQuantity(member), 0);
-    };
-    candidates.sort((left, right) => sort === "stock"
-      ? rowStock(left.product) - rowStock(right.product)
-        || left.product.name.localeCompare(right.product.name, "vi")
-        || left.product.id.localeCompare(right.product.id)
-      : compareProductsBySort(left.product, right.product, sort));
-  }
+  candidates.sort((left, right) => (
+    left.rank - right.rank
+    || compareProductsBySort(left.product, right.product, sort)
+  ));
 
   const total = candidates.length;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));

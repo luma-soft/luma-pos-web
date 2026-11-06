@@ -89,6 +89,49 @@ test("ranks the complete local candidate set before pagination", () => {
   expect(result.total).toBe(3);
 });
 
+test("orders a grouped family by its first SKU in the configured product order", () => {
+  const parent = product({
+    id: "variant-parent",
+    sku: "PARENT",
+    name: "Family",
+    isVariantParent: true,
+    lastSoldAt: null,
+  });
+  const newestMember = product({
+    id: "variant-newest",
+    sku: "SKU-NEWEST",
+    name: "Family newest",
+    parentProductId: "variant-parent",
+    lastSoldAt: "2026-11-05T00:00:00.000Z",
+  });
+  const olderMember = product({
+    id: "variant-older",
+    sku: "SKU-OLDER",
+    name: "Family older",
+    parentProductId: "variant-parent",
+    lastSoldAt: "2026-11-01T00:00:00.000Z",
+  });
+  const standalone = product({
+    id: "standalone",
+    sku: "SKU-STANDALONE",
+    name: "Standalone",
+    lastSoldAt: "2026-11-03T00:00:00.000Z",
+  });
+  const catalog = [parent, olderMember, standalone, newestMember];
+
+  const flat = exploreProductCatalog(catalog, [], {
+    status: "active", view: "flat", sort: "recent_sales",
+  });
+  const grouped = exploreProductCatalog(catalog, [], {
+    status: "active", view: "grouped", sort: "recent_sales",
+  });
+
+  expect(flat.rows.map((row) => row.id)).toEqual([
+    "variant-newest", "standalone", "variant-older",
+  ]);
+  expect(grouped.rows.map((row) => row.id)).toEqual(["variant-parent", "standalone"]);
+});
+
 test("applies lifecycle and price comparisons locally", () => {
   const rows = [
     product({ id: "active", sku: "A", priceBookTypes: { costBook: "cost" } }),
