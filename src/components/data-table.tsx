@@ -853,7 +853,7 @@ export function RowPreviewModal({
           size === "md" && "max-h-[92dvh] sm:max-w-lg",
           size === "lg" && "max-h-[92dvh] sm:max-w-2xl",
           size === "xl" && "max-h-[92dvh] sm:max-w-4xl",
-          size === "full" && "h-full max-h-[900px] sm:max-w-6xl",
+          size === "full" && "h-full max-h-[900px] sm:max-w-[1600px]",
           panelClassName,
         )}
         onMouseDown={(event) => event.stopPropagation()}

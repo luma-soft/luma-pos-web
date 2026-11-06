@@ -67,7 +67,7 @@ export function ProjectDetailDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="project-detail-title"
-        className="flex h-dvh w-full max-w-7xl flex-col overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl"
+        className="flex h-dvh w-full max-w-[1600px] flex-col overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-6">
