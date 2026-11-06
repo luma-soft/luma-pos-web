@@ -3667,7 +3667,6 @@ export function PosClient({
             grandTotal={printJob.grandTotal}
             paymentQr={printJob.paymentQr}
             afterTotals={printJob.template.options.showDebt && printJob.showPaymentTotals
-              && (printJob.isTemporarySlip || (printJob.payMethod !== "credit" && printJob.paid > 0))
               ? [
                   { label: t("print.paid"), value: printJob.paid },
                   ...(printJob.isTemporarySlip || printJob.remaining > 0
