@@ -2784,7 +2784,8 @@ export function PosClient({
                       stock={Number(l.product.stock)}
                       ordered={ordered}
                       reserved={Number(l.product.booked)}
-                      unit={l.product.baseUnit}
+                      unit={l.unitName}
+                      unitMultiplier={l.unitMultiplier}
                     />
                   )}
                 </PosQuantitySlot>

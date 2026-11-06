@@ -46,17 +46,24 @@ export function PosStockQuantityTooltip({
   ordered,
   reserved,
   unit,
+  unitMultiplier = 1,
 }: {
   stock: number;
   ordered: number;
   reserved: number;
   unit: string;
+  /** Number of base units represented by one selected cart unit. */
+  unitMultiplier?: number;
 }) {
+  const multiplier = Number.isFinite(unitMultiplier) && unitMultiplier > 0
+    ? unitMultiplier
+    : 1;
+
   return (
     <div className="pointer-events-none absolute left-1/2 top-full z-[80] mt-2 min-w-40 -translate-x-1/2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-slate-800 opacity-0 shadow-e2 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-100">
-      <div>{`Tồn: ${formatNumber(stock)} ${unit}`}</div>
-      <div>{`Trong đơn: ${formatNumber(ordered)} ${unit}`}</div>
-      <div>{`Đã giữ: ${formatNumber(reserved)} ${unit}`}</div>
+      <div>{`Tồn: ${formatNumber(stock / multiplier)} ${unit}`}</div>
+      <div>{`Trong đơn: ${formatNumber(ordered / multiplier)} ${unit}`}</div>
+      <div>{`Đã giữ: ${formatNumber(reserved / multiplier)} ${unit}`}</div>
     </div>
   );
 }
