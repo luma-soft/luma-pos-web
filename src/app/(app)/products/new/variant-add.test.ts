@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createProductSchema } from "./schema";
 import { prepareVariantAddition, variantAddFieldLabel } from "./variant-add";
+import { buildVariantCombinations } from "@/lib/products/variant-model";
 
 const base = createProductSchema.parse({
   name: "Gạch Lâm Hưng - 10124",
@@ -42,6 +43,50 @@ test("compact group addition creates exactly one new SKU and preserves existing 
   assert.equal(result.variantChildren[0].variantName, "10124");
   assert.equal(result.variantChildren[0].initialStock, 0);
   assert.deepEqual(result.attributes[0].values, ["10121", "10122", "10124"]);
+  assert.deepEqual(result.excludedCombinationKeys, []);
+});
+
+test("first same-type addition keeps the standalone SKU while adding one new size", () => {
+  const attributeId = "attribute:size";
+  const attributes = [{
+    attributeId,
+    name: "SIZE",
+    values: ["8/12"],
+    valueIds: ["size-8-12"],
+    createsVariants: true,
+  }];
+  const [existingCombination] = buildVariantCombinations(attributes);
+  const existingProductId = "00000000-0000-4000-8000-000000000099";
+  const initial = createProductSchema.parse({
+    ...base,
+    name: "Tủ điện Tranh âm tường VANNI",
+    variantContractVersion: undefined,
+    attributes,
+    variantChildren: [{
+      ...existingCombination,
+      productId: existingProductId,
+      sku: "SP053355",
+      barcode: "",
+      baseUnit: "cái",
+      costPrice: 100_000,
+      retailPrice: 150_000,
+      initialStock: 0,
+      minLevel: 0,
+      specs: existingCombination.specs,
+      imageUrls: [],
+    }],
+    variantAddValues: { [attributeId]: "12/24" },
+    variantExistingCombinationKeys: [existingCombination.combinationKey],
+    excludedCombinationKeys: [],
+  });
+
+  const result = prepareVariantAddition(initial);
+
+  assert.equal(result.variantChildren.length, 2);
+  assert.equal(result.variantChildren[0].productId, existingProductId);
+  assert.equal(result.variantChildren[0].variantName, "8/12");
+  assert.equal(result.variantChildren[1].productId, undefined);
+  assert.equal(result.variantChildren[1].variantName, "12/24");
   assert.deepEqual(result.excludedCombinationKeys, []);
 });
 

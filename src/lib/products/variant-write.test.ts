@@ -9,6 +9,7 @@ import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
 import * as schema from "@/db/schema";
 import { createProductSchema, type CreateProductInput } from "@/app/(app)/products/new/schema";
 import { buildVariantCombinations, variantCombinationBudget } from "./variant-model";
+import { prepareVariantAddition } from "@/app/(app)/products/new/variant-add";
 import { saveVariantGroupInTransaction } from "./variant-write";
 
 const pg = new PGlite();
@@ -99,6 +100,77 @@ test("creating E/F stores prices and 0/2 stock, then an identical retry creates 
   assert.equal(retry.id, result.id);
   assert.deepEqual((await pg.query("select (select count(*) from products) products,(select count(*) from stock_movements) movements")).rows, before);
   assert.equal((await pg.query<{ n: number }>("select count(*)::int n from stock_movements where product_id=any($1::uuid[])", [result.memberIds])).rows[0].n, 1);
+});
+
+test("first same-type addition adopts a standalone SKU and adds the new attribute value", async () => {
+  const standaloneId = randomUUID();
+  const standaloneSku = `SIZE-${standaloneId.slice(0, 8)}`;
+  await pg.query(
+    "insert into products(id,store_id,sku,name,category_id,specs,cost_price,retail_price) values ($1,$2,$3,$4,$5,$6,100000,150000)",
+    [standaloneId, store, standaloneSku, "Tủ điện Tranh âm tường VANNI - 8/12", category, JSON.stringify({ SIZE: ["8/12"] })],
+  );
+
+  const legacyAttributeId = "attribute:size";
+  const attributes = [{
+    attributeId: legacyAttributeId,
+    name: "SIZE",
+    values: ["8/12"],
+    valueIds: ["size-8-12"],
+    createsVariants: true,
+  }];
+  const [existingCombination] = buildVariantCombinations(attributes);
+  const initial = createProductSchema.parse({
+    name: "Tủ điện Tranh âm tường VANNI",
+    categoryId: category,
+    sku: "",
+    barcode: "",
+    baseUnit: "cái",
+    costPrice: 100_000,
+    retailPrice: 150_000,
+    initialStock: 0,
+    variantContractVersion: undefined,
+    variantOperation: "add",
+    variantGroupId: standaloneId,
+    variantRevision: 0,
+    variantTemplateProductId: standaloneId,
+    requestId: randomUUID(),
+    attributes,
+    variantChildren: [{
+      ...existingCombination,
+      productId: standaloneId,
+      name: "Tủ điện Tranh âm tường VANNI",
+      sku: standaloneSku,
+      barcode: "",
+      baseUnit: "cái",
+      costPrice: 100_000,
+      retailPrice: 150_000,
+      initialStock: 0,
+      minLevel: 0,
+      imageUrls: [],
+      specs: existingCombination.specs,
+    }],
+    variantAddValues: { [legacyAttributeId]: "12/24" },
+    variantExistingCombinationKeys: [existingCombination.combinationKey],
+    excludedCombinationKeys: [],
+  });
+
+  const saved = await save(prepareVariantAddition(initial));
+
+  assert.equal(saved.id, standaloneId);
+  assert.equal(saved.createdIds.length, 1);
+  assert.equal(saved.memberIds.length, 2);
+  const members = await pg.query<{ id: string; related_product_id: string | null; size: string; sku: string }>(
+    "select p.id,p.related_product_id,p.specs->'SIZE'->>0 as size,p.sku from products p join product_variant_members vm on vm.store_id=p.store_id and vm.product_id=p.id where vm.group_id=$1 order by p.specs->'SIZE'->>0",
+    [standaloneId],
+  );
+  assert.deepEqual(members.rows.map((row) => [row.id, row.related_product_id, row.size]), [
+    [saved.createdIds[0], standaloneId, "12/24"],
+    [standaloneId, null, "8/12"],
+  ]);
+  const canonicalSize = await pg.query<{ id: string }>("select id from product_attributes where store_id=$1 and name='SIZE'", [store]);
+  const groupAttributes = await pg.query<{ attribute_id: string }>("select attribute_id from product_variant_group_attributes where store_id=$1 and group_id=$2", [store, standaloneId]);
+  assert.deepEqual(groupAttributes.rows.map((row) => row.attribute_id), [canonicalSize.rows[0].id]);
+  assert.equal((await pg.query("select id from product_variant_groups where id=$1", [standaloneId])).rows.length, 1);
 });
 
 test("variant creation applies editable custom and list price books to every created SKU", async () => {

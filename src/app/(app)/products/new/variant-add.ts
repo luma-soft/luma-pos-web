@@ -42,22 +42,28 @@ export function prepareVariantAddition(values: CreateProductOutput): CreateProdu
   return {
     ...values,
     attributes: expanded,
-    variantChildren: [{
-      ...added,
-      name: values.name.trim(),
-      sku: values.sku?.trim() ?? "",
-      barcode: values.barcode?.trim() ?? "",
-      baseUnit: values.baseUnit,
-      costPrice: values.costPrice,
-      retailPrice: values.retailPrice,
-      wholesalePrice: values.wholesalePrice,
-      contractorPrice: values.contractorPrice,
-      agentPrice: values.agentPrice,
-      initialStock: values.initialStock,
-      minLevel: values.minLevel,
-      imageUrls: values.imageUrls,
-      directSale: values.directSale,
-    }],
+    // When the first extra SKU is added to a standalone legacy product, the
+    // current SKU must be submitted too so the writer can adopt it into the
+    // new related-product group without dropping its identity.
+    variantChildren: [
+      ...values.variantChildren.filter((child) => Boolean(child.productId)),
+      {
+        ...added,
+        name: values.name.trim(),
+        sku: values.sku?.trim() ?? "",
+        barcode: values.barcode?.trim() ?? "",
+        baseUnit: values.baseUnit,
+        costPrice: values.costPrice,
+        retailPrice: values.retailPrice,
+        wholesalePrice: values.wholesalePrice,
+        contractorPrice: values.contractorPrice,
+        agentPrice: values.agentPrice,
+        initialStock: values.initialStock,
+        minLevel: values.minLevel,
+        imageUrls: values.imageUrls,
+        directSale: values.directSale,
+      },
+    ],
     excludedCombinationKeys: combinations
       .filter((combination) => combination.combinationKey !== added.combinationKey && !existing.has(combination.combinationKey))
       .map((combination) => combination.combinationKey),

@@ -153,23 +153,28 @@ export function productToFormInitialValues(
         imageUrls: isCopy ? [] : member.imageUrls ?? [],
       };
     });
-    const addingOne = Boolean(group) && (mode === "groupAdd" || mode === "sameType");
+    const variantAddition = mode === "groupAdd" || mode === "sameType";
+    const addingOne = Boolean(group) && variantAddition;
+    const templateVariantName = product.variantName
+      ?? children.find((child) => child.productId === product.id)?.variantName;
     return {
       ...shared,
-      variantContractVersion: 2,
-      variantOperation: isCopy ? "create" : mode === "groupAdd" || mode === "sameType" ? "add" : "edit",
+      // A standalone legacy SKU has no persisted group attribute IDs yet. Let
+      // the writer resolve those axes through the attribute catalog by name.
+      variantContractVersion: !group && variantAddition ? undefined : 2,
+      variantOperation: isCopy ? "create" : variantAddition ? "add" : "edit",
       ...(!isCopy ? { variantGroupId: group?.id ?? product.id, variantRevision: group?.revision ?? 0 } : {}),
       attributes,
       variantChildren: addingOne ? [] : children,
       excludedCombinationKeys: group?.excludedCombinationKeys ?? combinations.filter((combo) => !children.some((child) => child.combinationKey === combo.combinationKey)).map((combo) => combo.combinationKey),
       sku: clearsIdentity ? "" : product.sku,
       barcode: clearsIdentity ? "" : product.barcode ?? "",
-      name: addingOne ? variantBaseName(product.name, product.variantName) : group?.name ?? product.name,
+      name: variantAddition ? variantBaseName(product.name, templateVariantName) : group?.name ?? product.name,
       imageUrls: product.imageUrls ?? [],
       imageMediaIds: imageMedia.map((image) => image.mediaId),
       imageSourceProductIds,
-      ...(addingOne ? {
-        variantTemplateProductId: latestVariantMemberId(product),
+      ...(variantAddition ? {
+        variantTemplateProductId: latestVariantMemberId(product) ?? (!group ? product.id : undefined),
         imageSourceProductIds: [...new Set([...imageSourceProductIds, product.id])],
         variantAddValues: Object.fromEntries(attributes.map((attribute) => ["attributeId" in attribute ? attribute.attributeId : "", ""])),
         variantExistingCombinationKeys: selectedMembers.flatMap((member, index) => {

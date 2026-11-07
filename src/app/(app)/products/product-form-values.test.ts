@@ -69,6 +69,31 @@ test("same-type action targets the existing group instead of making another pare
   assert.deepEqual(draft.variantExistingCombinationKeys?.length, 2);
 });
 
+test("same-type action can start a group from a standalone SKU with legacy specs", () => {
+  const standalone = {
+    ...base,
+    id: "standalone-size",
+    name: "Tủ điện Tranh âm tường VANNI - 8/12",
+    specs: { SIZE: ["8/12"] },
+    variantGroup: undefined,
+  } as unknown as ProductDetail;
+
+  const draft = productToFormInitialValues(standalone, "sameType");
+  const existing = draft.variantChildren?.[0];
+  const sizeAttributeId = draft.attributes?.[0].attributeId;
+
+  assert.equal(draft.variantOperation, "add");
+  assert.equal(draft.variantGroupId, standalone.id);
+  assert.equal(draft.variantContractVersion, undefined);
+  assert.equal(draft.name, "Tủ điện Tranh âm tường VANNI");
+  assert.equal(existing?.productId, standalone.id);
+  assert.ok(existing?.combinationKey);
+  assert.deepEqual(draft.variantExistingCombinationKeys, [existing?.combinationKey]);
+  assert.equal(draft.variantTemplateProductId, standalone.id);
+  assert.equal(draft.variantAddValues?.[sizeAttributeId ?? ""], "");
+  assert.deepEqual(draft.imageSourceProductIds, [standalone.id]);
+});
+
 test("a simple product without identifying attributes needs an explicit combination assignment", () => {
   const draft = productToFormInitialValues(base as unknown as ProductDetail, "sameType");
   assert.equal(draft.variantGroupId, "parent");
