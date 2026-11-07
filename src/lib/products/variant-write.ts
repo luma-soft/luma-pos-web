@@ -71,7 +71,13 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
   axes = axes.map((axis) => {
     const attribute = catalog.rows.find((a) => a.id === axis.attributeId) ?? catalog.rows.find((a) => a.name_key === variantNameKey(axis.name));
     if (!attribute) return fail("products.attributes.notFound");
-    if (v.variantContractVersion === 2 && axis.attributeId !== attribute.id) return fail("products.variants.invalidAttributes");
+    const inferredAttributeId = `attribute:${variantNameKey(axis.name)}`;
+    // Legacy standalone products derive a temporary identity from the label
+    // before they have a persisted group. Resolve only that exact placeholder;
+    // real but stale/mismatched v2 catalog IDs must still be rejected.
+    if (v.variantContractVersion === 2 && axis.attributeId !== attribute.id && axis.attributeId !== inferredAttributeId) {
+      return fail("products.variants.invalidAttributes");
+    }
     return { ...axis, attributeId: attribute.id, name: attribute.name };
   });
   const canonicalCombos = buildVariantCombinations(axes, { maxCombinations });

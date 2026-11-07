@@ -128,7 +128,7 @@ test("first same-type addition adopts a standalone SKU and adds the new attribut
     costPrice: 100_000,
     retailPrice: 150_000,
     initialStock: 0,
-    variantContractVersion: undefined,
+    variantContractVersion: 2,
     variantOperation: "add",
     variantGroupId: standaloneId,
     variantRevision: 0,
