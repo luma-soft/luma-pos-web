@@ -243,7 +243,9 @@ export function OrderMobileRow({
           <span className="font-semibold tabular-nums">
             {formatCurrency(Number(order.total))}
           </span>
-          {remaining > 0 && order.status !== "cancelled" ? (
+          {order.status === "cancelled" || order.status === "merged" ? (
+            <span className="text-slate-400">—</span>
+          ) : remaining > 0 ? (
             <span className="text-right font-semibold tabular-nums text-er">
               {labels.remaining}: {formatCurrency(remaining)}
             </span>
@@ -439,7 +441,9 @@ export function OrdersTable({
       label: t("orders.cols.payment"),
       defaultVisible: true,
       width: "130px",
-      render: (order) => <PaymentStatusBadge status={order.paymentStatus} />,
+      render: (order) => order.status === "cancelled" || order.status === "merged"
+        ? <span className="text-slate-400">—</span>
+        : <PaymentStatusBadge status={order.paymentStatus} />,
     },
     {
       key: "status",
