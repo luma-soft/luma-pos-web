@@ -171,7 +171,8 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
 
 /**
  * Lõi gộp nhiều đơn cùng khách thành 1 đơn — KHÔNG phải server action.
- * items/payments chuyển sang đơn gộp, đơn gốc → status 'merged'. Không đụng kho/nợ.
+ * Chuyển items/payments sang đơn gộp, hủy các đơn nguồn để không tính trùng doanh thu/công nợ.
+ * Đây là hủy do gộp, KHÔNG chạy quy trình hủy đơn thông thường (không hoàn kho/trừ nợ).
  */
 export async function mergeOrdersForUser(userId: string, orderIds: string[]): Promise<ActionResult<{ id: string; code: string }>> {
   if (orderIds.length < 2 || orderIds.length > 20) return { ok: false, error: "merge.errors.needTwo" };
@@ -257,7 +258,8 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
       void returnItems;
 
       await tx.update(orders).set({
-        status: "merged",
+        status: "cancelled",
+        replacedByOrderId: merged.id,
         note: sql`coalesce(${orders.note} || ' · ', '') || ${"Đã gộp vào " + merged.code}`,
         updatedAt: sql`now()`,
       }).where(and(eq(orders.storeId, storeId), inArray(orders.id, orderIds)));
@@ -265,7 +267,7 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
       await recordActivity(tx, {
         storeId, actorId: profileId, action: "order.merged", entityType: "order", entityId: merged.id,
         before: { orders: sources.map(orderActivitySnapshot) },
-        after: { code: merged.code, total, amountPaid: paid, status: "completed", paymentStatus: paid >= total ? "paid" : paid > 0 ? "partial" : "unpaid" },
+        after: { code: merged.code, total, amountPaid: paid, status: "completed", sourceOrdersStatus: "cancelled", paymentStatus: paid >= total ? "paid" : paid > 0 ? "partial" : "unpaid" },
         affectedRecords: [{ type: "order", id: merged.id, code: merged.code }, ...sources.map((order) => ({ type: "order", id: order.id, code: order.code }))],
       });
       return merged;
