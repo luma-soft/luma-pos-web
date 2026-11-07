@@ -46,6 +46,8 @@ export async function OrderDetailPanel({
   const isQuote = order.status === "quote";
   const isBooking = order.status === "confirmed";
   const cancelled = order.status === "cancelled" || order.status === "merged";
+  const mergedSource = order.status === "merged"
+    || (cancelled && Boolean(order.replacedByOrderId) && Boolean(order.note?.includes("Đã gộp vào ")));
   const editableDraft = order.status === "draft"
     && order.documentType === "sale"
     && Number(order.amountPaid) === 0
@@ -101,7 +103,12 @@ export async function OrderDetailPanel({
             </h2>
             <span className="text-sm font-semibold text-slate-500">{order.code}</span>
             <OrderStatusBadge status={order.status} />
-            {!isQuote && <PaymentStatusBadge status={order.paymentStatus} />}
+            {!isQuote && !cancelled && <PaymentStatusBadge status={order.paymentStatus} />}
+            {mergedSource && order.replacedByOrderId && (
+              <Link href={Routes.order(order.replacedByOrderId)} className="text-xs font-semibold text-primary-600 hover:underline">
+                Xem đơn gộp
+              </Link>
+            )}
             {order.returns.length > 0 && (
               <Link href="#order-returns" className="inline-flex rounded-full bg-warn-soft px-2.5 py-0.5 text-xs font-semibold text-warn hover:underline">
                 Đã trả hàng ({order.returns.length})
@@ -324,8 +331,8 @@ export async function OrderDetailPanel({
             />
             <InfoLine label={t("pos.shipping")} value={formatCurrency(Number(order.shippingFee))} />
             <InfoLine label={t("pos.total")} value={formatCurrency(total)} valueClassName="text-base text-primary-600" strong />
-            {!isQuote && <InfoLine label={t("orders.detail.paid")} value={formatCurrency(paid)} valueClassName={paid > 0 ? "text-ok" : "text-slate-500"} strong />}
-            {!isQuote && <InfoLine label={t("orders.detail.remaining")} value={formatCurrency(remaining)} valueClassName={remaining > 0 ? "text-er" : "text-ok"} strong />}
+            {!isQuote && !mergedSource && <InfoLine label={t("orders.detail.paid")} value={formatCurrency(paid)} valueClassName={paid > 0 ? "text-ok" : "text-slate-500"} strong />}
+            {!isQuote && !mergedSource && <InfoLine label={t("orders.detail.remaining")} value={formatCurrency(remaining)} valueClassName={remaining > 0 ? "text-er" : "text-ok"} strong />}
             {order.grossProfit !== null && <ProfitVisibility label={t("dashboard.grossProfit")} value={Number(order.grossProfit)} className="border-t border-border-soft pt-2" />}
           </div>
 
