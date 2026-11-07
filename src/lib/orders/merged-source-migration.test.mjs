@@ -21,6 +21,20 @@ test("historical merged sources become cancelled and point to the matching store
         replaced_by_order_id uuid,
         updated_at timestamptz not null default now()
       );
+      create table stock_movements (
+        id uuid primary key,
+        store_id uuid not null,
+        ref_type text,
+        ref_id uuid,
+        quantity numeric not null
+      );
+      create table stock_lot_movements (
+        id uuid primary key,
+        store_id uuid not null,
+        ref_type text not null,
+        ref_id uuid not null,
+        quantity numeric not null
+      );
       insert into orders (id, store_id, code, status, note) values
         ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010',
          'DHG-01', 'completed', 'Gộp từ: DH-01, DH-02'),
@@ -34,6 +48,14 @@ test("historical merged sources become cancelled and point to the matching store
          'DH-03', 'merged', 'Đã gộp vào UNKNOWN'),
         ('00000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000010',
          'DH-OLD', 'cancelled', 'Hủy thủ công');
+      insert into stock_movements (id, store_id, ref_type, ref_id, quantity) values
+        ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-000000000010',
+         'order', '00000000-0000-0000-0000-000000000002', -3),
+        ('00000000-0000-0000-0000-000000000102', '00000000-0000-0000-0000-000000000020',
+         'order', '00000000-0000-0000-0000-000000000005', -2);
+      insert into stock_lot_movements (id, store_id, ref_type, ref_id, quantity) values
+        ('00000000-0000-0000-0000-000000000103', '00000000-0000-0000-0000-000000000010',
+         'order', '00000000-0000-0000-0000-000000000003', -3);
     `);
     await pg.exec(migration);
     await pg.exec(migration); // Rerunning a data migration must be safe.
@@ -48,6 +70,19 @@ test("historical merged sources become cancelled and point to the matching store
       { code: "DHG-01", status: "completed", replacedBy: null },
       { code: "DH-03", status: "cancelled", replacedBy: null },
       { code: "DH-OLD", status: "cancelled", replacedBy: null },
+    ]);
+    const { rows: stockRows } = await pg.query(
+      'select ref_id as "refId", quantity::text as quantity from stock_movements order by id',
+    );
+    expect(stockRows).toEqual([
+      { refId: "00000000-0000-0000-0000-000000000001", quantity: "-3" },
+      { refId: "00000000-0000-0000-0000-000000000005", quantity: "-2" },
+    ]);
+    const { rows: lotRows } = await pg.query(
+      'select ref_id as "refId", quantity::text as quantity from stock_lot_movements order by id',
+    );
+    expect(lotRows).toEqual([
+      { refId: "00000000-0000-0000-0000-000000000001", quantity: "-3" },
     ]);
   } finally {
     await pg.close();
