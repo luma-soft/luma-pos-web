@@ -199,7 +199,7 @@ export function OrderMobileRow({
   };
 }) {
   const remaining = Number(order.total) - Number(order.amountPaid);
-  const selectable = order.status !== "cancelled";
+  const selectable = order.status !== "cancelled" && order.status !== "merged";
   return (
     <div
       className={cn(
@@ -282,7 +282,7 @@ export function OrdersTable({
   const selectedIds = selection?.selectedIds ?? internalSelectedIds;
   const setSelectedIds = selection?.onChange ?? setInternalSelectedIds;
   const selectableIds = rows
-    .filter((order) => order.status !== "cancelled")
+    .filter((order) => order.status !== "cancelled" && order.status !== "merged")
     .map((order) => order.id);
   const normalizedSelection = normalizeOrderBatchSelection(
     selectedIds,
@@ -368,7 +368,7 @@ export function OrdersTable({
       render: (order) => (
         <OrderSelectionCheckbox
           checked={normalizedSelection.has(order.id)}
-          disabled={order.status === "cancelled"}
+          disabled={order.status === "cancelled" || order.status === "merged"}
           onChange={() => toggle(order.id)}
           label={order.code}
         />
@@ -425,13 +425,13 @@ export function OrdersTable({
       width: "150px",
       cellClassName: (order) => {
         const remaining = Number(order.total) - Number(order.amountPaid);
-        return remaining > 0 && order.status !== "cancelled"
+        return remaining > 0 && order.status !== "cancelled" && order.status !== "merged"
           ? "font-semibold text-er"
           : "text-slate-400";
       },
       render: (order) => {
         const remaining = Number(order.total) - Number(order.amountPaid);
-        return remaining > 0 && order.status !== "cancelled"
+        return remaining > 0 && order.status !== "cancelled" && order.status !== "merged"
           ? formatCurrency(remaining)
           : "—";
       },
@@ -469,7 +469,7 @@ export function OrdersTable({
         rowClickMode="row"
         rowClassName={(order) =>
           cn(
-            order.status === "cancelled" && "opacity-60",
+            (order.status === "cancelled" || order.status === "merged") && "opacity-60",
             normalizedSelection.has(order.id) &&
               "bg-primary-50/50 dark:bg-primary-950/20",
           )
