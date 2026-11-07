@@ -1,4 +1,28 @@
+import type { ProductCatalogItem } from "@/lib/product-catalog";
 import type { PricingRow } from "./pricing-table";
+
+/** Keep product identity metadata when projecting catalog entries into price rows. */
+export function toPricingRow(product: ProductCatalogItem, books: { id: string }[], canViewPurchasePrices: boolean): PricingRow {
+  return {
+    id: product.id,
+    sku: product.sku,
+    name: product.name,
+    variantName: product.variantName,
+    specs: product.specs,
+    baseUnit: product.baseUnit,
+    units: product.units.map((unit) => ({
+      unitName: unit.unitName,
+      multiplier: Number(unit.multiplier),
+      priceOverride: unit.priceOverride == null ? null : Number(unit.priceOverride),
+    })),
+    costPrice: canViewPurchasePrices && product.costPrice != null ? Number(product.costPrice) : null,
+    lastPurchase: canViewPurchasePrices && product.lastPurchaseNetPrice != null ? Number(product.lastPurchaseNetPrice) : null,
+    prices: Object.fromEntries(books.map((book) => {
+      const value = product.prices[book.id];
+      return [book.id, value == null ? null : Number(value)];
+    })),
+  };
+}
 
 /** Merge refreshed data without discarding edits or reordering the current list. */
 export function reconcilePricingRows(

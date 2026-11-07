@@ -13,6 +13,7 @@ import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 import { InstantProductSearch } from "./instant-product-search";
 import { ListSearchFilterBar } from "@/components/list-search-filter";
 import { PricingTable, type PricingBook, type PricingRow } from "../../pricing/pricing-table";
+import { toPricingRow } from "../../pricing/pricing-rows";
 import type { PriceFormulaFilters } from "@/lib/pricing/price-edit";
 
 type SearchParams = Record<string, string | undefined>;
@@ -103,23 +104,8 @@ export function PricingCatalogContent({
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const rows = useMemo<PricingRow[]>(() => sortedProducts
     .slice((page - 1) * pageSize, page * pageSize)
-    .map((product) => ({
-      id: product.id,
-      sku: product.sku,
-      name: product.name,
-      baseUnit: product.baseUnit,
-      units: product.units.map((unit) => ({
-        unitName: unit.unitName,
-        multiplier: Number(unit.multiplier),
-        priceOverride: unit.priceOverride == null ? null : Number(unit.priceOverride),
-      })),
-      costPrice: canViewPurchasePrices && product.costPrice != null ? Number(product.costPrice) : null,
-      lastPurchase: canViewPurchasePrices && product.lastPurchaseNetPrice != null ? Number(product.lastPurchaseNetPrice) : null,
-      prices: Object.fromEntries(books.map((book) => {
-        const value = product.prices[book.id];
-        return [book.id, value == null ? null : Number(value)];
-      })),
-    })), [books, canViewPurchasePrices, page, pageSize, sortedProducts]);
+    .map((product) => toPricingRow(product, books, canViewPurchasePrices)),
+  [books, canViewPurchasePrices, page, pageSize, sortedProducts]);
 
   if (!catalog.snapshot) {
     if (catalog.status === "loading") return <TableSkeleton cols={4} rows={10} />;

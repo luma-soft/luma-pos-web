@@ -16,6 +16,7 @@ import { reconcilePricingRows } from "./pricing-rows";
 import { preparePricingPriceEdit, resolvePricingPriceEdit, type PricingPriceEdit } from "./pricing-price-edit";
 import { PricingUnitEditors, pricingMoneyLabel } from "./pricing-unit-editors";
 import { formulaPrice, type PriceFormulaFilters, type UnitPriceMode } from "@/lib/pricing/price-edit";
+import { productDisplayName } from "@/lib/products/variant-presentation";
 import { UnitPriceConfirmation } from "../products/new/unit-price-confirmation";
 import type { EditablePriceUnit, UnitPriceChoice, UnitPricingSnapshot } from "@/lib/products/unit-price-edit";
 
@@ -31,6 +32,8 @@ export interface PricingRow {
   id: string;
   sku: string;
   name: string;
+  variantName?: string | null;
+  specs?: unknown;
   baseUnit: string;
   units?: EditablePriceUnit[];
   costPrice: number | null;
@@ -218,7 +221,7 @@ export function PricingMobileRow({
   return (
     <article className="min-w-0 p-4">
       <div className="min-w-0">
-        <h3 className="break-words text-sm font-semibold">{row.name}</h3>
+        <h3 className="break-words text-sm font-semibold">{productDisplayName(row)}</h3>
         <p className="mt-1 text-xs text-slate-500">{row.sku}</p>
       </div>
       <div className="mt-3 divide-y divide-border-soft border-y border-border-soft">
@@ -574,7 +577,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
       cellClassName: "whitespace-normal",
       render: (r) => (
         <div className="whitespace-normal break-words">
-          <div className="font-medium">{r.name}</div>
+          <div className="font-medium">{productDisplayName(r)}</div>
           <div className="text-xs text-slate-400">{r.sku} · {r.baseUnit} <span className="text-slate-500">· Đơn vị gốc</span></div>
         </div>
       ),
@@ -821,7 +824,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
           />
         )}
       />
-      {pendingPriceEdit && <UnitPriceConfirmation name={pendingPriceEdit.row.name} before={pendingPriceEdit.before}
+      {pendingPriceEdit && <UnitPriceConfirmation name={productDisplayName(pendingPriceEdit.row)} before={pendingPriceEdit.before}
         draft={pendingPriceEdit.draft} books={pendingPriceEdit.books}
         resolveChoice={(mode, source) => resolvePricingPriceEdit(pendingPriceEdit, mode, source).draft}
         onCancel={cancelPriceEdit} onConfirm={confirmPriceEdit} />}
@@ -873,7 +876,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="font-semibold">{t("pricing.formula.title")}</div>
-                <div className="mt-1 truncate text-sm text-slate-500">{formulaRow.name} · {formulaBook.name}</div>
+                <div className="mt-1 truncate text-sm text-slate-500">{productDisplayName(formulaRow)} · {formulaBook.name}</div>
               </div>
               <button
                 type="button"

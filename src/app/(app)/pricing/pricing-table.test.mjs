@@ -8,6 +8,7 @@ mock.module("@/lib/actions/price-books", () => ({
   renamePriceBook: async () => ({ ok: false }),
   deletePriceBook: async () => ({ ok: false }),
   setProductPrice: async (input) => { priceWrites.push(input); return { ok: true }; },
+  setProductCostPrice: async () => ({ ok: true }),
   applyPriceFormulaAll: async () => ({ ok: false }),
 }));
 
@@ -87,6 +88,29 @@ describe("pricing table sources and editing", () => {
     const html = editor(books[2]);
     expect(html).toContain("Chưa có dữ liệu");
     expect(html).not.toContain("120.000");
+  });
+
+  test("shows variant name and attributes on desktop and mobile", () => {
+    const variantRow = {
+      ...row,
+      name: "Đèn pha",
+      variantName: "Phiên bản A",
+      specs: { "Ánh sáng": ["Trắng"], "Công suất": ["100W"], __privateNote: ["ẩn"] },
+    };
+    const expected = "Đèn pha · Phiên bản A · Trắng · 100W";
+
+    const mobile = renderToStaticMarkup(createElement(PricingMobileRow, {
+      row: variantRow, books, defaultBookId: "retail", savingCell: new Set(), savedCell: new Set(),
+      labels, onOpenFormula: noop, onPriceChange: noop, onPriceCommit: noop,
+      onCostPriceChange: noop, onCostPriceCommit: noop,
+    }));
+    renderToStaticMarkup(createElement(PricingTable, { books, rows: [variantRow], total: 1 }));
+    const desktop = renderToStaticMarkup(tableProps.columns.find((column) => column.key === "product").render(variantRow));
+
+    expect(mobile).toContain(expected);
+    expect(desktop).toContain(expected);
+    expect(mobile).not.toContain("ẩn");
+    expect(desktop).not.toContain("ẩn");
   });
 
   test("a zero purchase price is a valid amount", () => {

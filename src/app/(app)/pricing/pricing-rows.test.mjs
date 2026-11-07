@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { reconcilePricingRows } from "./pricing-rows";
+import { reconcilePricingRows, toPricingRow } from "./pricing-rows";
 
 const row = {
   id: "p1", sku: "SP001", name: "Ống nhựa", baseUnit: "m",
@@ -8,6 +8,17 @@ const row = {
 };
 
 describe("pricing refresh reconciliation", () => {
+  test("keeps product variant attributes when projecting catalog rows", () => {
+    const specs = { "Ánh sáng": ["Trắng"], "Công suất": ["100W"], __privateNote: ["ẩn"] };
+    const projected = toPricingRow({
+      id: "p1", sku: "SP001", name: "Đèn pha", variantName: "Phiên bản A",
+      specs, baseUnit: "cái", units: [], costPrice: "50000", lastPurchaseNetPrice: null,
+      prices: {},
+    }, [], true);
+
+    expect(projected).toMatchObject({ name: "Đèn pha", variantName: "Phiên bản A", specs });
+  });
+
   test("refreshes untouched cells after a bulk formula or external update", () => {
     const incoming = [{ ...row, costPrice: 95000, prices: { ...row.prices, cost: 95000, list: 150000, retail: 130000 } }];
     expect(reconcilePricingRows([row], [row], incoming)).toEqual(incoming);
