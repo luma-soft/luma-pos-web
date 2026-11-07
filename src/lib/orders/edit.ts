@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  customers, einvoices, orderItems, orders, payments, products, returnItems, returns, stockLevels, stockMovements,
+  customers, einvoices, orderItems, orders, payments, products, returnItems, returns, stockLevels, stockLotMovements, stockMovements,
 } from "@/db/schema";
 import { updateOrderSchema, type UpdateOrderInput } from "@/lib/schemas/order";
 import { type ActionResult, getProfileId, generateCode, toMoney, toQty } from "@/lib/actions/common";
@@ -255,7 +255,22 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
         }).where(and(eq(orderItems.storeId, storeId), eq(orderItems.id, item.id)));
       }
       await tx.update(payments).set({ orderId: merged.id }).where(and(eq(payments.storeId, storeId), inArray(payments.orderId, orderIds)));
-      void returnItems;
+
+      // Transfer ledger references, NOT stock quantities. The merged invoice
+      // becomes the owner of the original stock/lot movements, so a later
+      // cancellation or edit can restore the exact quantities and warehouses.
+      // Original invoice codes are preserved in movement notes and audit log.
+      const sourceStockRefTypes = ["order", "exchange_order", "order_edit_cancel", "order_cancel"];
+      await tx.update(stockMovements).set({ refId: merged.id }).where(and(
+        eq(stockMovements.storeId, storeId),
+        inArray(stockMovements.refId, orderIds),
+        inArray(stockMovements.refType, sourceStockRefTypes),
+      ));
+      await tx.update(stockLotMovements).set({ refId: merged.id }).where(and(
+        eq(stockLotMovements.storeId, storeId),
+        inArray(stockLotMovements.refId, orderIds),
+        inArray(stockLotMovements.refType, sourceStockRefTypes),
+      ));
 
       await tx.update(orders).set({
         status: "cancelled",
