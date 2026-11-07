@@ -26,6 +26,11 @@ export async function mergeOrders(orderIds: string[]): Promise<ActionResult<{ id
   const gate = await requireManager();
   if (!gate.ok) return gate;
   const result = await mergeOrdersForUser(gate.userId, orderIds);
-  if (result.ok) revalidatePath(Routes.Orders);
+  if (result.ok) {
+    revalidatePath(Routes.Orders);
+    revalidatePath(Routes.Sales);
+    revalidatePath(Routes.Partners);
+    for (const id of orderIds) revalidatePath(Routes.order(id));
+  }
   return result;
 }
