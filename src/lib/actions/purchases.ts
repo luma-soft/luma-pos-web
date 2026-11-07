@@ -29,8 +29,8 @@ type PurchaseCalcInput = Pick<CreatePurchaseOutput, "items" | "discount" | "vatR
 function calcPurchaseTotals(v: PurchaseCalcInput) {
   const costs = calculatePurchaseCosts(v);
   const { subtotal, tax, total } = costs;
-  const paid = Math.min(v.amountPaid, total);
-  return { ...costs, subtotal, tax, total, paid, owed: Math.max(0, total - paid) };
+  const paid = Math.max(0, v.amountPaid);
+  return { ...costs, subtotal, tax, total, paid, owed: total - paid };
 }
 
 function revalidatePurchasePaths(id?: string) {
@@ -253,7 +253,7 @@ export async function createPurchase(
         .set({ supplierId: v.supplierId })
         .where(and(eq(products.storeId, gate.storeId), inArray(products.id, v.items.map((i) => i.productId)), isNull(products.supplierId)));
 
-      if (totals.owed > 0) {
+      if (totals.owed !== 0) {
         await tx.update(suppliers).set({
           currentDebt: sql`${suppliers.currentDebt} + ${toMoney(totals.owed)}`,
         }).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.supplierId)));
@@ -360,10 +360,10 @@ export async function updatePurchase(
         || !activityValuesEqual(comparableItems(oldItems), comparableItems(v.items));
       // Imported receipts retain their original line rounding when only notes,
       // invoice reference, supplier or payment changes. Do not rebuild stock.
-      const paid = Math.min(v.amountPaid, Number(po.total));
+      const paid = Math.max(0, v.amountPaid);
       const totals = stockChanged ? proposedTotals : { ...proposedTotals,
         subtotal: Number(po.subtotal), discount: Number(po.discount), tax: Number(po.tax), total: Number(po.total),
-        paid, owed: Math.max(0, Number(po.total) - paid),
+        paid, owed: Number(po.total) - paid,
       };
       const affectedIds = [...new Set([...ids, ...oldItems.map((item) => item.productId)])];
       if (stockChanged) {
@@ -383,7 +383,7 @@ export async function updatePurchase(
         throw new Error("BATCH_ALREADY_CONSUMED");
       }
       const oldPaid = po.status === "received" ? Number(po.amountPaid) : 0;
-      const oldOwed = po.status === "received" ? Math.max(0, Number(po.total) - oldPaid) : 0;
+      const oldOwed = po.status === "received" ? Number(po.total) - oldPaid : 0;
 
       if (stockChanged && po.status === "received") {
         for (const i of oldItems) {
@@ -502,32 +502,18 @@ export async function updatePurchase(
       if (po.supplierId === v.supplierId) {
         const debtDiff = totals.owed - oldOwed;
         if (Math.abs(debtDiff) > 1e-9) {
-          const [supplier] = await tx
-            .select({ currentDebt: suppliers.currentDebt })
-            .from(suppliers)
-            .where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.supplierId)))
-            .limit(1)
-            .for("update");
-          debtDelta = debtDiff < 0
-            ? -Math.min(Number(supplier?.currentDebt ?? 0), -debtDiff)
-            : debtDiff;
+          debtDelta = debtDiff;
           await tx.update(suppliers).set({
-            currentDebt: sql`greatest(${suppliers.currentDebt} + ${toMoney(debtDiff)}, 0)`,
+            currentDebt: sql`${suppliers.currentDebt} + ${toMoney(debtDiff)}`,
           }).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.supplierId)));
         }
       } else {
-        const supplierDebts = await tx
-          .select({ id: suppliers.id, currentDebt: suppliers.currentDebt })
+        await tx
+          .select({ id: suppliers.id })
           .from(suppliers)
           .where(and(eq(suppliers.storeId, gate.storeId), inArray(suppliers.id, [po.supplierId, v.supplierId])))
           .for("update");
-        const debtBySupplier = new Map(
-          supplierDebts.map((supplier) => [supplier.id, Number(supplier.currentDebt)]),
-        );
-        const oldSupplierDelta = -Math.min(
-          debtBySupplier.get(po.supplierId) ?? 0,
-          oldOwed,
-        );
+        const oldSupplierDelta = -oldOwed;
         const newSupplierDelta = totals.owed;
         debtDelta = oldSupplierDelta + newSupplierDelta;
         relatedAdjustments = [
@@ -542,12 +528,12 @@ export async function updatePurchase(
             delta: newSupplierDelta,
           },
         ];
-        if (oldOwed > 0) {
+        if (oldSupplierDelta !== 0) {
           await tx.update(suppliers).set({
-            currentDebt: sql`greatest(${suppliers.currentDebt} - ${toMoney(oldOwed)}, 0)`,
+            currentDebt: sql`${suppliers.currentDebt} + ${toMoney(oldSupplierDelta)}`,
           }).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, po.supplierId)));
         }
-        if (totals.owed > 0) {
+        if (newSupplierDelta !== 0) {
           await tx.update(suppliers).set({
             currentDebt: sql`${suppliers.currentDebt} + ${toMoney(totals.owed)}`,
           }).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.supplierId)));
@@ -717,17 +703,17 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
         }
 
         const paid = Number(po.amountPaid);
-        const owed = Math.max(0, Number(po.total) - paid);
-        const [supplier] = await tx
-          .select({ currentDebt: suppliers.currentDebt })
+        const owed = Number(po.total) - paid;
+        await tx
+          .select({ id: suppliers.id })
           .from(suppliers)
           .where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, po.supplierId)))
           .limit(1)
           .for("update");
-        const debtDelta = -Math.min(Number(supplier?.currentDebt ?? 0), owed);
-        if (owed > 0) {
+        const debtDelta = -owed;
+        if (debtDelta !== 0) {
           await tx.update(suppliers).set({
-            currentDebt: sql`greatest(${suppliers.currentDebt} - ${toMoney(owed)}, 0)`,
+            currentDebt: sql`${suppliers.currentDebt} + ${toMoney(debtDelta)}`,
           }).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, po.supplierId)));
         }
         if (paid > 0) {
@@ -763,7 +749,7 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
         metadata: {
           previousStatus: po.status,
           debtDelta: po.status === "received"
-            ? (-Math.max(0, Number(po.total) - Number(po.amountPaid))).toFixed(2)
+            ? (Number(po.amountPaid) - Number(po.total)).toFixed(2)
             : "0.00",
         },
       });

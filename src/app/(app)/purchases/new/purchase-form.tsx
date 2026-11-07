@@ -448,7 +448,7 @@ export function PurchaseForm({
   const afterDiscount = Math.max(0, subtotal - discount);
   const tax = Math.round((afterDiscount * vatRate) / 100);
   const total = afterDiscount + tax + shippingFee;
-  const paid = payFull ? total : Math.min(amountPaid, total);
+  const paid = payFull ? total : Math.max(0, amountPaid);
   const owed = total - paid;
 
   function clearError() {
