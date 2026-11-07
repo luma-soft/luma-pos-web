@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { customers, orders, products, projects, warehouses } from "@/db/schema";
 import { requireSalesAccess } from "@/lib/actions/common";
 import { accentInsensitiveLike, catalogProductSearchCondition } from "@/lib/search";
+import { productDisplayName } from "@/lib/products/variant-presentation";
 
 const kinds = ["customer", "product", "project", "order", "warehouse"] as const;
 type FilterOptionKind = (typeof kinds)[number];
@@ -53,12 +54,23 @@ async function getFilterOptions(kind: FilterOptionKind, query: string) {
     const match = query
       ? catalogProductSearchCondition(products, query)
       : undefined;
-    return db
-      .select({ id: products.id, label: products.name, hint: products.sku })
+    const matches = await db
+      .select({
+        id: products.id,
+        name: products.name,
+        sku: products.sku,
+        variantName: products.variantName,
+        specs: products.specs,
+      })
       .from(products)
       .where(match)
       .orderBy(desc(products.createdAt))
       .limit(30);
+    return matches.map((product) => ({
+      id: product.id,
+      label: productDisplayName(product),
+      hint: product.sku,
+    }));
   }
   if (kind === "project") {
     const match = query
