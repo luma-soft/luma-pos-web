@@ -471,7 +471,7 @@ export function PurchaseForm({
     setLines((ls) => {
       const existing = ls.find((item) => item.productId === p.id);
       return existing
-        ? ls.map((item) => item.productId === p.id ? withPurchaseLineUnit(item, unitName) : item)
+        ? [withPurchaseLineUnit(existing, unitName), ...ls.filter((item) => item.productId !== p.id)]
         : [nextLine, ...ls];
     });
     setAiPendingLines((rows) => rows.filter((row) => row.sku !== p.sku && row.label !== p.name));
