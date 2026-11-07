@@ -16,6 +16,28 @@ WHERE source.status = 'merged'
   AND source.note IS NOT NULL
   AND right(source.note, length('Đã gộp vào ' || target.code)) = 'Đã gộp vào ' || target.code;
 
+-- Reparent only the ledger references that belong to the source sale.
+-- Do not insert movements or change stock_levels / stock_lots balances. This
+-- makes later cancellation/edit of the consolidated invoice restore real stock
+-- across the source warehouses, including tracked batches.
+UPDATE stock_movements AS movement
+SET ref_id = source.replaced_by_order_id
+FROM orders AS source
+WHERE source.status = 'merged'
+  AND source.replaced_by_order_id IS NOT NULL
+  AND movement.store_id = source.store_id
+  AND movement.ref_id = source.id
+  AND movement.ref_type IN ('order', 'exchange_order', 'order_edit_cancel', 'order_cancel');
+
+UPDATE stock_lot_movements AS movement
+SET ref_id = source.replaced_by_order_id
+FROM orders AS source
+WHERE source.status = 'merged'
+  AND source.replaced_by_order_id IS NOT NULL
+  AND movement.store_id = source.store_id
+  AND movement.ref_id = source.id
+  AND movement.ref_type IN ('order', 'exchange_order', 'order_edit_cancel', 'order_cancel');
+
 UPDATE orders
 SET status = 'cancelled', updated_at = now()
 WHERE status = 'merged';
