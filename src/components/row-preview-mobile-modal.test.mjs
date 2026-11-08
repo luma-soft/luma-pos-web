@@ -26,8 +26,7 @@ test("mobile detail panel respects safe areas while desktop geometry stays intac
     open: true,
     onClose() {},
     footer: createElement("span", null, "Hoàn tất"),
-    children: createElement("p", null, "Nội dung"),
-  }));
+  }, createElement("p", null, "Nội dung")));
   expect(html).toContain('role="dialog"');
   expect(html).toContain('aria-modal="true"');
   expect(html).toContain("safe-area-inset-top");
@@ -38,6 +37,6 @@ test("mobile detail panel respects safe areas while desktop geometry stays intac
 
 test("modal is not rendered while closed", () => {
   expect(renderToStaticMarkup(createElement(RowPreviewModal, {
-    title: "Chi tiết", open: false, onClose() {}, children: "hidden",
-  }))).toBe("");
+    title: "Chi tiết", open: false, onClose() {},
+  }, "hidden"))).toBe("");
 });
