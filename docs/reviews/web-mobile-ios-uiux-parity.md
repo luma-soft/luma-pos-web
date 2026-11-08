@@ -309,3 +309,8 @@ The GitHub connector exposes repository contents but not an authenticated browse
 
 - The unified `ProductSearchPicker` search input now uses 16px on phones (14px at `lg`) to prevent Safari focus zoom during large offline catalog searches. The clear/search-close control is a 44×44px phone hit target and retains its original Desktop 28px size.
 - Existing debounce, result ranking/pagination, accessibility combobox semantics, selection callbacks and catalog/offline data provider remain unchanged; no new network fetches or duplicated search indexes.
+
+## Camera quotation package editor — narrow phone grid
+
+- Camera quotation package selector and quantity now wrap instead of forcing a wide single row on 360–390px phones. Material lines stack their selection across a full row, followed by quantity and a 44px remove button. At `lg`, the previous three-column material grid and small action controls remain.
+- Price calculations, material-unit conversion, camera/quantity state, SKU association and offline catalog source stay unchanged; the change is responsive presentation only.

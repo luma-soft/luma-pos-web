@@ -210,11 +210,12 @@ export function CameraQuotePanel({ products, packages, priceBook, cameraQuoteSet
                     <div className="text-[11px] font-bold uppercase tracking-wide text-primary-600">
                       {t("pos.cameraQuote.package", { n: String(index + 1).padStart(2, "0") })}
                     </div>
-                    <div className="mt-1 flex items-center gap-2">
+                    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
                       <Select
                         size="sm"
                         wrapLabel
                         className="min-w-0 flex-1"
+                        rootClassName="min-w-[140px] flex-1"
                         value={pkg.cameraId}
                         options={cameras.map((product) => ({ value: product.id, label: label(product, cameraQuoteSettings) }))}
                         onValueChange={(cameraId) => updatePackage(pkg.key, { cameraId })}
@@ -261,16 +262,19 @@ export function CameraQuotePanel({ products, packages, priceBook, cameraQuoteSet
                     {pkg.materialLines.map((line, materialIndex) => {
                       const product = byId.get(line.productId);
                       return (
-                        <div key={`${pkg.key}-${line.productId}-${materialIndex}`} className="grid grid-cols-[minmax(0,1fr)_120px_32px] items-center gap-2">
+                        <div key={`${pkg.key}-${line.productId}-${materialIndex}`} className="grid min-w-0 grid-cols-[minmax(0,1fr)_44px] items-center gap-2 lg:grid-cols-[minmax(0,1fr)_120px_32px]">
                           <Select
                         size="sm"
                         wrapLabel
+                            rootClassName="col-span-2 min-w-0 w-full lg:col-span-1"
+                            className="w-full min-w-0"
                             value={line.productId}
                             options={materials.map((item) => ({ value: item.id, label: label(item, cameraQuoteSettings) }))}
                             onValueChange={(productId) => updateMaterial(pkg, materialIndex, productId)}
                           />
                           <NumberInput
                             size="sm"
+                            className="w-full min-w-0"
                             value={line.quantity}
                             min={0.01}
                             decimals={2}
@@ -286,6 +290,7 @@ export function CameraQuotePanel({ products, packages, priceBook, cameraQuoteSet
                             size="iconSm"
                             disabled={pkg.materialLines.length === 1}
                             aria-label={t("pos.cameraQuote.removeMaterial")}
+                            className="h-11 w-11 min-h-11 min-w-11 lg:h-9 lg:w-8 lg:min-h-0 lg:min-w-0"
                             onClick={() => updatePackage(pkg.key, { materialLines: pkg.materialLines.filter((_, itemIndex) => itemIndex !== materialIndex) })}
                           >
                             <Trash2 className="h-3.5 w-3.5 text-slate-400" />

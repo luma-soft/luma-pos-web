@@ -73,4 +73,5 @@ jobs:
             'src/app/(app)/settings/settings-native-mobile-root.test.mjs' \
             'src/components/pos/pos-quick-line-native-sheet.test.mjs' \
             'src/components/pos/camera-picker-native-mobile.test.mjs' \
-            'src/components/product-search/product-search-mobile-native.test.mjs'
+            'src/components/product-search/product-search-mobile-native.test.mjs' \
+            'src/components/pos/camera-quote-phone-rows.test.mjs'
