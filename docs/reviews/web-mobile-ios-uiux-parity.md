@@ -173,3 +173,8 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 ## Full added Mobile test coverage
 
 - GitHub Actions now invokes the product wizard, receiving/return, internal-use/stock, and unified catalog skeleton Bun assertions in addition to prior Mobile and PWA checks.
+
+## Cashbook transactions — iOS Mobile row
+
+- Cashbook Mobile rows now align with `NativeCashbookTransactionRow`: separate incoming/outgoing icons, counterparty, signed amount, category+note, timestamp/code/fund and cancelled state. The row expands the existing detail and authorized cancel/print controls.
+- No change to desktop financial table, ledger data, cancellation permissions, or totals.

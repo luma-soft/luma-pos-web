@@ -5,7 +5,7 @@ import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { CancelFinancialVoucherButton } from "@/components/partners/cancel-financial-voucher-button";
 import Link from "next/link";
-import { Printer } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Printer } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { getCashbook } from "@/lib/data/cashbook";
@@ -46,6 +46,48 @@ export function CashbookTable({ rows }: { rows: CashbookRow[] }) {
       rows={rows}
       columns={columns}
       getRowId={(row) => row.id}
+      renderMobileRow={({ row, toggle }) => (
+        <div className="relative flex min-h-[94px] items-start gap-3 p-3">
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={row.code}
+            className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
+          />
+          <span className={cn(
+            "pointer-events-none relative grid h-10 w-10 shrink-0 place-items-center rounded-xl",
+            row.type === "in" ? "bg-ok-soft text-ok" : "bg-er-soft text-er",
+          )}>
+            {row.type === "in"
+              ? <ArrowDownLeft className="h-5 w-5" aria-hidden="true" />
+              : <ArrowUpRight className="h-5 w-5" aria-hidden="true" />}
+          </span>
+          <div className="pointer-events-none relative min-w-0 flex-1">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0 flex-1 truncate text-[15px] font-semibold">
+                {row.counterparty ?? row.code}
+                {row.status === "cancelled" && (
+                  <span className="ml-1 inline-flex rounded-full bg-warn-soft px-2 py-0.5 text-[10px] font-bold text-warn">
+                    {t("financialVoucherCancellation.cancelled")}
+                  </span>
+                )}
+              </div>
+              <span className={cn(
+                "max-w-[48%] shrink-0 text-right text-sm font-bold tabular-nums [overflow-wrap:anywhere]",
+                row.type === "in" ? "text-ok" : "text-er",
+              )}>
+                {row.type === "in" ? "+" : "−"}{formatCurrency(Number(row.amount))}
+              </span>
+            </div>
+            <div className="mt-1 line-clamp-2 text-xs text-slate-600 dark:text-slate-300">
+              {t(`cashbook.categories.${row.category}` as never)} · {row.note ?? "—"}
+            </div>
+            <div className="mt-1.5 truncate text-[11px] text-slate-500">
+              {formatDate(row.createdAt)} · {row.code} · {row.fund === "cash" ? t("cashbook.fundCash") : t("cashbook.fundBank")}
+            </div>
+          </div>
+        </div>
+      )}
       minWidth="940px"
       renderDetail={(row) => (
         <div className="grid gap-4 bg-surface px-4 py-4 md:grid-cols-4">
