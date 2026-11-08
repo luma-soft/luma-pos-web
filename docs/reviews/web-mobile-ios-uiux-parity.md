@@ -117,3 +117,8 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 
 - A scoped GitHub Actions workflow `.github/workflows/mobile-parity-checks.yml` is configured to run Bun lockfile install, Next type generation, TypeScript, full ESLint and targeted Mobile parity tests on main changes.
 - This is configuration only; **do not mark tests passed** until a real workflow run is checked. Vercel checks remain separate.
+
+## Secondary Partners / Finance mobile layout
+
+- Added opt-in `mobileSegmented` GroupTabs for two-way Partners and Finance navigation, with desktop classes intact.
+- Customer (including walk-in) and supplier mobile card surfaces now open details from any empty area, not only by tapping a text link. Explicit links remain independently tappable, and desktop tables and actions are unchanged.

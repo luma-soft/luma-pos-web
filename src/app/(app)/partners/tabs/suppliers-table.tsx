@@ -348,11 +348,12 @@ export function SuppliersTable({
           const debt = Number(row.currentDebt);
           const purchase = Number(row.totalPurchase);
           return (
-            <article className="w-full p-3 text-left min-h-11">
+            <article className="relative w-full min-h-[76px] p-3 text-left">
+              <button type="button" onClick={() => openSupplier(row)} aria-label={row.name} className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500" />
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="min-w-0 whitespace-normal break-words font-semibold"><PartnerDetailLink kind="supplier" partnerId={row.id} name={row.name} openInCurrentTab className="block w-full whitespace-normal break-words" /></div>
-                  <span className="inline-flex min-h-11 items-center text-xs text-slate-400">{row.phone ?? row.code ?? t("suppliers.title")}</span>
+                  <div className="min-w-0 whitespace-normal break-words font-semibold"><PartnerDetailLink kind="supplier" partnerId={row.id} name={row.name} openInCurrentTab className="pointer-events-auto relative z-10 block w-full whitespace-normal break-words" /></div>
+                  <span className="mt-1 inline-flex items-center text-xs text-slate-400">{row.phone ?? row.code ?? t("suppliers.title")}</span>
                 </div>
                 <div className="shrink-0 space-y-1 text-right">
                   <div className="text-xs text-slate-500">

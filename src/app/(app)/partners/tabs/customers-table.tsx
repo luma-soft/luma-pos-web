@@ -391,7 +391,8 @@ function CustomerRows({
           </div>
         }
         renderMobileRow={({ row: customer }) => customer.id === WALK_IN_ROW_ID ? (
-          <article className="w-full p-3 text-left min-h-11">
+          <article className="relative w-full min-h-[76px] p-3 text-left">
+            <button type="button" onClick={() => openCustomer(customer)} aria-label={t("orders.walkIn")} className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500" />
             <div className="font-semibold">{t("orders.walkIn")}</div>
             <div className="mt-1 text-xs text-slate-500">
               {new Intl.NumberFormat(locale).format(data.walkInSummary?.orderCount ?? 0)} {t("customers.walkInCount")}
@@ -402,7 +403,8 @@ function CustomerRows({
             </div>
           </article>
         ) : (
-          <article className="w-full p-3 text-left min-h-11">
+          <article className="relative w-full min-h-[76px] p-3 text-left">
+            <button type="button" onClick={() => openCustomer(customer)} aria-label={customer.name} className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500" />
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="min-w-0 whitespace-normal break-words font-semibold">
@@ -411,16 +413,16 @@ function CustomerRows({
                     partnerId={customer.id}
                     name={customer.name}
                     openInCurrentTab
-                    className="block w-full whitespace-normal break-words"
+                    className="pointer-events-auto relative z-10 block w-full whitespace-normal break-words"
                   />
                 </div>
-                <span className="inline-flex min-h-11 items-center text-xs text-slate-400">
+                <span className="mt-1 inline-flex items-center text-xs text-slate-400">
                   {customer.code ?? t("customers.expand.profile")} ·{" "}
                   {customer.phone ?? "—"}
                 </span>
               </div>
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+            <div className="pointer-events-none relative mt-3 grid grid-cols-3 gap-2 text-xs">
               <Metric
                 label={t("customers.cols.debt")}
                 value={formatCurrency(Number(customer.currentDebt))}

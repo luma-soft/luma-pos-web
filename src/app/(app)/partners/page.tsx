@@ -25,7 +25,7 @@ export default async function PartnersPage({ searchParams }: { searchParams: Pro
         <div className="min-h-13 px-4 sm:px-6 pt-2.5 flex items-center">
           <Text as="h1" weight="bold" className="text-[17px]" text={t("nav.groups.partners")} />
         </div>
-        <div className="px-4 sm:px-6 pb-1.5"><GroupTabs base={Routes.Partners} items={TABS} /></div>
+        <div className="px-4 sm:px-6 pb-1.5"><GroupTabs base={Routes.Partners} items={TABS} edgeToEdge={false} mobileSegmented /></div>
       </div>
 
       {tab === "suppliers" ? <SuppliersTab searchParams={params} /> : <CustomersTab searchParams={params} />}

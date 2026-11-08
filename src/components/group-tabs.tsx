@@ -20,6 +20,7 @@ export function GroupTabs({
   edgeToEdge = true,
   linkClassName,
   nativeMobileStyle = false,
+  mobileSegmented = false,
 }: {
   base: string;
   items: GroupTab[];
@@ -28,6 +29,8 @@ export function GroupTabs({
   linkClassName?: string;
   /** 56px/3px iOS section tabs; opt in only for native-matched mobile pages. */
   nativeMobileStyle?: boolean;
+  /** Native two-option segmented bar for secondary mobile pages. */
+  mobileSegmented?: boolean;
 }) {
   const t = useTranslations();
   const sp = useSearchParams();
@@ -49,6 +52,7 @@ export function GroupTabs({
       <div className={cn(
         "flex snap-x snap-mandatory items-center gap-3 overflow-x-auto overscroll-x-contain scroll-px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:gap-1",
         nativeMobileStyle && "gap-5",
+        mobileSegmented && "w-full gap-1 rounded-full bg-primary-50/75 p-[3px] dark:bg-primary-950/30 lg:w-auto lg:gap-1 lg:rounded-none lg:bg-transparent lg:p-0",
         edgeToEdge && "-mx-4 px-4 sm:-mx-6 sm:px-6",
       )}>
         {items.map((it) => {
@@ -68,6 +72,10 @@ export function GroupTabs({
                 nativeMobileStyle
                   ? "inline-flex h-14 min-h-14 min-w-11 lg:h-11 lg:min-h-11 lg:min-w-0"
                   : "inline-flex h-11 min-h-11 min-w-11 sm:h-11 sm:min-h-11 sm:min-w-11 md:h-11 md:min-h-11 md:min-w-11",
+                mobileSegmented && "flex-1 justify-center rounded-full border-b-0 px-2 text-[13px] lg:flex-none lg:justify-start lg:rounded-[10px] lg:px-3.5 lg:text-xs",
+                mobileSegmented && (on
+                  ? "bg-primary-600 text-white dark:text-white lg:bg-primary-50 lg:text-primary-700 lg:dark:bg-primary-950/40 lg:dark:text-primary-300"
+                  : "bg-transparent text-slate-600 hover:bg-surface/70 lg:text-slate-500 lg:hover:bg-surface-2"),
               )}
             >
               <Text as="span" size="xs" weight="semibold" className={nativeMobileStyle ? "text-current text-[15px] lg:text-xs" : "text-current"} text={t(it.labelKey)} />

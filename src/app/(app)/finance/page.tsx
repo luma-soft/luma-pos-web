@@ -36,7 +36,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         <div className="min-h-13 px-4 sm:px-6 pt-2.5 flex items-center">
           <Text as="h1" weight="bold" className="text-[17px]" text={t("nav.groups.finance")} />
         </div>
-        <div className="px-4 sm:px-6 pb-1.5"><GroupTabs base={Routes.Finance} items={TABS} /></div>
+        <div className="px-4 sm:px-6 pb-1.5"><GroupTabs base={Routes.Finance} items={TABS} edgeToEdge={false} mobileSegmented /></div>
       </div>
 
       {tab === "shifts" && SHIFT_MANAGEMENT_UI_ENABLED
