@@ -23,10 +23,10 @@ export function OrderDetailDialog({
     if (url.searchParams.get("detailOrderId") !== orderId) return;
 
     // URL-only change: do not navigate/re-fetch the server-rendered list on close.
-    // Next.js syncs native History API updates with useSearchParams.
+    // Passing null lets Next.js sync useSearchParams and preserve its router state.
     url.searchParams.delete("detailOrderId");
     window.history.replaceState(
-      window.history.state,
+      null,
       "",
       `${url.pathname}${url.search}${url.hash}`,
     );

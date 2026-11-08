@@ -76,7 +76,8 @@ describe("invoice opened from customer history", () => {
 
   test("invoice close updates the URL without server navigation", () => {
     const source = readFileSync(new URL("./order-detail-dialog.tsx", import.meta.url), "utf8");
-    expect(source).toContain("window.history.replaceState(");
+    expect(source).toContain("window.history.replaceState(\n      null,");
+    expect(source).not.toContain("window.history.state,");
     expect(source).not.toContain("router.replace(");
     expect(source).toContain('url.searchParams.delete("detailOrderId")');
     expect(source).toContain("${url.pathname}${url.search}${url.hash}");
