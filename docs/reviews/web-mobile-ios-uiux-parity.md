@@ -133,3 +133,12 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - All four Web Mobile document tabs now show a localized day heading at each change of date within the existing result order, following `NativeInvoiceHistoryDayGroup` in iOS. Bookings use scheduled delivery date if present; other tabs use creation date.
 - Added a pure `mobileDocumentDayHeadings` helper; it only processes fetched/paginated rows and adds no queries, sorting or historical data to offline catalog.
 - Desktop table columns and row order are unchanged. This reproduces grouping within the current paginated page; cross-page/infinite scrolling parity remains future work.
+
+## PWA security — no cached authenticated POS HTML
+
+**Security issue found:** Previous `public/sw.js` cached successful `/pos` navigation HTML under an unscoped CacheStorage key and could replay one account's server-rendered POS data to another offline session.
+
+- Service Worker v7 now caches only static Next assets, public icons and a deliberately generic `/offline.html`. It deletes older `lumapos-` caches (including the unsafe v6 POS HTML) on activation. It does not intercept/persist RSC or API responses.
+- Online navigation is network-first; when offline, it shows a public recovery shell. Existing **already open** POS screens still retain their user/store-scoped local catalog and pending orders; those modules were not changed.
+- **Known limitation:** Offline **cold launch** of a fully functional POS can no longer rely on cached private HTML. The safe recovery shell does not reconstruct the POS UI. A separate authenticated-independent offline app-shell boot mechanism would be required for full cold-launch parity. This task cannot be marked fully done until that is implemented and tested on device.
+- No tenant/user/order data is embedded in the static fallback. Manifest start URL remains unchanged.
