@@ -1841,6 +1841,8 @@
     "saveQuote": "Save quote",
     "placeBooking": "Place booking",
     "deliveryTime": "Delivery time",
+    "quotePricingDetails": "Quotation details",
+    "paymentDetails": "Payment details",
     "quoteAmount": "Quote amount",
     "customerDue": "Customer due",
     "noProject": "— Existing project —",

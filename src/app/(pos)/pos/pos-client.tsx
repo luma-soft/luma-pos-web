@@ -3333,8 +3333,11 @@ export function PosClient({
           )}
         </div>
 
-        {/* totals + payment — đẩy lên ngay dưới khách hàng */}
+        {/* Pricing follows the native confirmation sheet; mobile heading differs for quotes. */}
         <div className="p-3 border-t border-border space-y-2 text-sm">
+          <h2 className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400 lg:hidden">
+            {t(isQuoteDraft ? "pos.quotePricingDetails" : "pos.paymentDetails")}
+          </h2>
           <div className="flex justify-between items-center">
             <span className="text-slate-500">{t("pos.subtotal")}</span>
             <span className="tabular-nums">{formatCurrency(subtotal)}</span>

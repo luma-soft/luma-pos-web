@@ -199,3 +199,8 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - `RowPreviewModal` is now keyboard-scoped to the topmost `aria-modal` sheet, so Escape does not accidentally close a background document sheet. Tab/Shift+Tab stays within the active dialog, focus is restored on dismissal, and background page scrolling is locked during its lifetime.
 - Phone-sized modal bounds account for `safe-area-inset-top`; existing small/tablet/desktop modal widths and max-heights at `sm:` and above are retained. Existing footer still pads the iPhone bottom safe area.
 - Added a render + pure Escape-policy regression test. Authenticated visual tests on mobile and desktop still required.
+
+## POS quotation confirmation heading
+
+- The native `POSCheckoutPricingSection.swift` distinguishes `Chi tiết báo giá` from `Chi tiết thanh toán`. Web Mobile now uses the same localized summary heading for quote drafts, including camera quotes, and the payment-specific heading for other draft types.
+- Only a small `lg:hidden` heading was added to the existing settlement panel. Discount/VAT/shipping inputs, quote save action, document calculations and desktop layout stay unchanged.

@@ -1841,6 +1841,8 @@
     "saveQuote": "Lưu báo giá",
     "placeBooking": "Đặt hàng",
     "deliveryTime": "Thời gian giao hàng",
+    "quotePricingDetails": "Chi tiết báo giá",
+    "paymentDetails": "Chi tiết thanh toán",
     "quoteAmount": "Giá trị báo giá",
     "customerDue": "Khách cần trả",
     "noProject": "— Công trình có sẵn —",
