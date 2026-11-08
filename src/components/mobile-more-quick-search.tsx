@@ -12,7 +12,7 @@ export type MobileMoreSearchEntry = {
 };
 
 function normalized(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().trim();
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[đĐ]/g, "d").toLocaleLowerCase().trim();
 }
 
 /** Search available More destinations without copying or refetching any data. */
