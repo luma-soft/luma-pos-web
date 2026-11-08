@@ -61,4 +61,5 @@ jobs:
             'src/app/(app)/inventory/tabs/inventory-filter-native-sheet.test.mjs' \
             'src/app/(app)/inventory/tabs/product-detail-native-tabs.test.mjs' \
             'src/components/mobile-dashboard-offline-notice.test.mjs' \
-            'src/app/(app)/reports/report-mobile-range-sheet.test.mjs'
+            'src/app/(app)/reports/report-mobile-range-sheet.test.mjs' \
+            'src/app/(app)/sales/tabs/filter-native-mobile-layout.test.mjs'

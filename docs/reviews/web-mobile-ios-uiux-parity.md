@@ -232,3 +232,9 @@ The GitHub connector exposes repository contents but not an authenticated browse
 - Mobile reports now expose a single accessible full-screen date-range selector, matching the native `NativeReportFilterView`: Today / Week / 7, 30, 90 days / This Month / Last Month / This Year / Custom. The active value remains visible in the trigger. The previously cramped four-chip row is removed from the Mobile page.
 - Selecting a range is **draft-only** until Apply; Cancel does not change URLs, data or current report. Custom dates are validated before Apply. The selector uses the existing Next navigation and report period resolver, without additional data providers or background polling.
 - Desktop still uses the existing drop-down (and original custom-date modal); mobile-only overlay uses the existing focus-trapping, safe-area-aware `RowPreviewModal`.
+
+## Invoice filter panels — full-screen iPhone and safe-area control
+
+- Orders, quotations, reservations, and returns now use a full-viewport mobile filtering sheet with an independent scroll region, keyboard-focus handling, safe-area header, and persistent action footer. This matches the native invoice filter presentation more closely while retaining the original 460px slide-over at `lg` desktop widths.
+- All existing filter fields, date presets, entity pickers, debounced result-count queries, Cancel/Clear/Apply behavior, validation, and URL navigation remain untouched. The shared popup's search field uses 16px on iPhone to prevent Safari focus zoom; desktop retains 14px.
+- Production screenshot comparisons (including a visible keyboard) are still required.

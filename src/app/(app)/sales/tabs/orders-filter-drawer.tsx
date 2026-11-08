@@ -385,10 +385,10 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="orders-filter-title"
-            className="ml-auto flex h-full w-full max-w-md flex-col bg-surface shadow-2xl"
+            className="ml-auto flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-surface shadow-2xl lg:h-full lg:max-w-md lg:overflow-visible"
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <div className="flex items-start border-b border-border px-6 py-5">
+            <div className="flex shrink-0 items-start border-b border-border px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-4 lg:px-6 lg:py-5">
               <div className="min-w-0 flex-1">
                 <h2
                   id="orders-filter-title"
@@ -418,7 +418,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
             >
               <input type="hidden" name="tab" value="orders" />
               {values.q && <input type="hidden" name="q" value={values.q} />}
-              <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 lg:space-y-6 lg:px-6 lg:py-5">
                 <FilterSection title="Tìm theo">
                   <LumaEntityPicker
                     label="Khách hàng"
@@ -605,7 +605,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                 </FilterSection>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 border-t border-border bg-surface px-6 py-4">
+              <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-border bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] lg:px-6 lg:py-4 lg:pb-4">
                 <button
                   type="button"
                   onClick={clearFilters}

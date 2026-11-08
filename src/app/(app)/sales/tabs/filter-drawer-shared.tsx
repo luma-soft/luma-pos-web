@@ -229,7 +229,7 @@ export function LumaWebPicker({
                   onChange={(event) => setSearch(event.target.value)}
                   onClick={selectAllInputOnClick}
                   placeholder={searchPlaceholder}
-                  className="h-11 min-h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 lg:h-10 lg:min-h-0"
+                  className="h-11 min-h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-base outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 lg:h-10 lg:min-h-0 lg:text-sm"
                 />
               </div>
             </div>
