@@ -17,7 +17,8 @@ import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
 
-const RANGES: DashboardRange[] = ["today", "7d", "30d", "month"];
+const RANGES: DashboardRange[] = ["today", "7d", "30d", "month"]; // Desktop preserved
+const MOBILE_RANGES: DashboardRange[] = ["today", "week", "month", "year"];
 const DOW_LABEL = ["", "T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
 type DashboardDebtRow = {
@@ -38,12 +39,14 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const range = resolveDashboardRange(params.range);
   const data = await getDashboard(context.storeId, range);
+  const mobileRevenuePoints = range === "year" ? groupDashboardRevenueByMonth(data.revenueByDay) : data.revenueByDay;
   const mobileDayFormatter = new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "2-digit",
   });
 
   const maxDay = Math.max(1, ...data.revenueByDay.map((d) => Number(d.revenue)));
+  const mobileMaxDay = Math.max(1, ...mobileRevenuePoints.map((d) => Number(d.revenue)));
   const debtorRows: DashboardDebtRow[] = data.topDebtors.map((customer) => {
     const debt = Number(customer.currentDebt);
     const limit = Number(customer.debtLimit ?? 0);
@@ -65,7 +68,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     <>
       <div className="min-h-full bg-canvas lg:hidden">
         <MobileTopBar
-          title={t("dashboard.title")}
+          title={context.storeName.trim() || "LumaPOS"}
           subtitle={t("mobile.dashboard.subtitle")}
           trailing={(
             <Link
@@ -79,18 +82,18 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           bottom={(
             <nav
               aria-label={t("mobile.dashboard.rangeLabel")}
-              className="flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="grid grid-cols-4 gap-1 rounded-full bg-primary-50/75 p-1 dark:bg-primary-950/30"
             >
-              {RANGES.map((r) => (
+              {MOBILE_RANGES.map((r) => (
                 <Link
                   key={r}
                   href={`${Routes.Dashboard}?range=${r}`}
                   aria-current={range === r ? "page" : undefined}
                   className={cn(
-                    "inline-flex min-h-11 shrink-0 snap-start items-center justify-center rounded-full border px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11",
+                    "inline-flex min-h-11 min-w-0 items-center justify-center rounded-full px-1 text-center text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11",
                     range === r
-                      ? "border-primary-600 bg-primary-600 text-white shadow-sm"
-                      : "border-border bg-surface text-slate-600 hover:bg-surface-2 dark:text-slate-300",
+                      ? "bg-primary-600 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-surface/70 dark:text-slate-300",
                   )}
                 >
                   {t(`dashboard.range.${r}`)}
@@ -142,16 +145,16 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                 {t("mobile.dashboard.selectedRange", { range: t(`dashboard.range.${range}`) })}
               </p>
             </div>
-            {data.revenueByDay.length === 0 ? (
+            {mobileRevenuePoints.length === 0 ? (
               <p className="px-3 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                 {t("dashboard.noData")}
               </p>
             ) : (
               <div className="overflow-x-auto overscroll-x-contain px-3 pb-3 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <div className="flex h-40 min-w-max items-end gap-2">
-                  {data.revenueByDay.map((d) => {
+                  {mobileRevenuePoints.map((d) => {
                     const v = Number(d.revenue);
-                    const date = mobileDayFormatter.format(new Date(`${d.day}T00:00:00`));
+                    const date = range === "year" ? new Intl.DateTimeFormat(locale, { month: "short" }).format(new Date(`${d.day}T00:00:00`)) : mobileDayFormatter.format(new Date(`${d.day}T00:00:00`));
                     const label = t("mobile.dashboard.trendBarLabel", {
                       date,
                       revenue: formatCurrency(v),
@@ -167,7 +170,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                               "w-7 min-w-7 rounded-t-md",
                               d.dow === 7 ? "bg-surface-2" : "bg-primary-600/90",
                             )}
-                            style={{ height: `${Math.max(4, (v / maxDay) * 100)}%` }}
+                            style={{ height: `${Math.max(4, (v / mobileMaxDay) * 100)}%` }}
                           />
                         </div>
                         <span aria-hidden="true" className="text-[9px] font-bold tabular-nums text-slate-500 dark:text-slate-400">
@@ -586,4 +589,15 @@ function formatCompactCurrency(value: number) {
   if (amount >= 1_000_000) return `${sign}${(amount / 1_000_000).toFixed(1).replace(".0", "")}Mđ`;
   if (amount >= 1_000) return `${sign}${Math.round(amount / 1_000)}Kđ`;
   return `${sign}${Math.round(amount)}đ`;
+}
+
+/** Reduce a year's already loaded daily points to monthly bars for small screens. */
+function groupDashboardRevenueByMonth(days: Array<{ day: string; dow: number; revenue: number }>) {
+  const months = new Map<string, number>();
+  for (const { day, revenue } of days) {
+    const month = day.slice(0, 7);
+    months.set(month, (months.get(month) ?? 0) + Number(revenue));
+  }
+  return [...months.entries()].sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, revenue]) => ({ day: `${month}-01`, dow: 1, revenue }));
 }

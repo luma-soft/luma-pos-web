@@ -17,7 +17,7 @@
 | Main navigation | 5 tabs; house, cart, shippingbox, document, ellipsis; technician More-only | Previously 5 tabs with different icons and unconditional visibility | Updated icon mapping, active states on nested routes, technician menu visibility, safe area |
 | Inventory navigation | 56pt scrollable underline tabs | Previously 40–44px navigation tabs | Mobile-specific 56px / 3px indicator; desktop rules retained |
 | Invoice section tabs | 56pt scrollable underline bar, no additional title block | Invoice-only 56px / 3px indicator; unrelated web group tabs restored to their earlier mobile style | Partially implemented |
-| Dashboard | Store header, selected-range summary, quick actions, low stock, activity, receivables/payables | Selected-range summary/profit, low-stock list, recent orders added; store header and chart still differ | Partially implemented |
+| Dashboard | Store header, selected-range summary, quick actions, low stock, activity, receivables/payables | Store-name header and Today/Week/Month/Year presets added; activity/offline display still differs | Partially implemented |
 | POS | Multiple open orders, product selectors, totals, quote confirmation | Mobile quote catalog CTA now reads Confirm; moves to existing cart details with VAT/discount before final Save Quote | Partially implemented |
 | Inventory screen details | Native scrollable tabs plus product list/edit, filters, workflows | Removed duplicate mobile title and matched two-choice Products/Categories segmented control; workflows untouched | Partially implemented |
 | Invoices | Customer and amount first, status/detail metadata below | Order-list mobile row restructured; selection/open/cancellation/print unchanged; other document rows remain | Partially implemented |
@@ -35,7 +35,7 @@
 
 ## Remaining work
 
-- Dashboard: store-name header, year/week/month range parity and chart, separate activity feed, offline states. Current range values are constrained by the existing web backend.
+- Dashboard: separate activity feed, offline/cache/error states and chart visual parity; native date presets now supported.
 - POS: line editor/unit switching, multiple-order tabs, search/filter/pickers, quote confirmation including VAT and discount, payment sheets.
 - Inventory: grouped products, native list/filter/detail/edit workflows, stocktake, purchase, returns, internal use.
 - Invoices and More: native filters, swipe/menus, form details and hidden features still pending. List summary rows and Mobile More search are implemented.
@@ -95,3 +95,8 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - The same `invoices.map` tree is used for the sheet and desktop tab strip, avoiding duplicated draft state or subscriptions. Desktop keeps the horizontal tabs.
 - Draft selection is keyboard-operable; the sheet can close via backdrop, close button or Escape. The create-draft menu placement now checks available viewport height.
 - No change was made to draft persistence, POS checkout, products, tax, pricing, offline queue or server logic. Visual/simulator and full build verification remain pending.
+
+## Dashboard native mobile presets
+- Store name from authenticated context with LumaPOS fallback; no additional DB query.
+- Week starts Monday, year begins January 1. Old desktop presets and data semantics are retained.
+- Annual mobile chart groups existing response into months; desktop markup unchanged and no duplicate request.

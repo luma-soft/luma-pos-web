@@ -28,6 +28,8 @@ function rangeStart(range: DashboardRange): Date {
   if (range === "7d") d.setDate(d.getDate() - 6);
   if (range === "30d") d.setDate(d.getDate() - 29);
   if (range === "month") d.setDate(1);
+  if (range === "week") d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  if (range === "year") d.setMonth(0, 1);
   return d;
 }
 

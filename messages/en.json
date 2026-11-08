@@ -1728,12 +1728,16 @@
     "topDebtors": "Top debtors",
     "noDebt": "No outstanding debt 🎉",
     "range": {
+      "week": "This week",
+      "year": "This year",
       "today": "Today",
       "7d": "7 days",
       "30d": "30 days",
       "month": "This month"
     },
     "revenueLabel": {
+      "week": "Revenue this week",
+      "year": "Revenue this year",
       "today": "Revenue today",
       "7d": "Revenue (7 days)",
       "30d": "Revenue (30 days)",

@@ -1728,12 +1728,16 @@
     "topDebtors": "Nợ nhiều nhất",
     "noDebt": "Không có công nợ 🎉",
     "range": {
+      "week": "Tuần này",
+      "year": "Năm nay",
       "today": "Hôm nay",
       "7d": "7 ngày",
       "30d": "30 ngày",
       "month": "Tháng này"
     },
     "revenueLabel": {
+      "week": "Doanh thu tuần này",
+      "year": "Doanh thu năm nay",
       "today": "Doanh thu hôm nay",
       "7d": "Doanh thu 7 ngày",
       "30d": "Doanh thu 30 ngày",
