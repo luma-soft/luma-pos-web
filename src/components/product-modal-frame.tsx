@@ -125,7 +125,7 @@ export function ProductModalFrame({
           aria-labelledby={labelledBy}
           tabIndex={-1}
           className={cn(
-            "flex h-dvh w-full max-w-[1600px] flex-col overflow-hidden bg-surface shadow-2xl outline-none sm:h-[min(92dvh,920px)] sm:rounded-2xl",
+            "flex h-dvh w-full max-w-[1600px] flex-col overflow-hidden bg-surface pt-[env(safe-area-inset-top)] shadow-2xl outline-none sm:h-[min(92dvh,920px)] sm:rounded-2xl sm:pt-0",
             className,
           )}
           onMouseDown={(event) => event.stopPropagation()}

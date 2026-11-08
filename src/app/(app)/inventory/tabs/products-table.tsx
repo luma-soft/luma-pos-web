@@ -1229,7 +1229,7 @@ function ProductImageLightbox({
         onClick={onClose}
         aria-label={t("products.expand.imageClose")}
         autoFocus
-        className="absolute right-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:right-6 sm:top-6"
+        className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:right-6 sm:top-6"
       >
         <X className="h-6 w-6" />
       </button>
@@ -1278,7 +1278,7 @@ function ProductImageLightbox({
         </button>
       )}
 
-      <div className="absolute bottom-4 left-1/2 max-w-[80vw] -translate-x-1/2 truncate rounded-full bg-slate-950/60 px-4 py-2 text-center text-sm font-medium text-white sm:bottom-6">
+      <div className="absolute bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 max-w-[80vw] -translate-x-1/2 truncate rounded-full bg-slate-950/60 px-4 py-2 text-center text-sm font-medium text-white sm:bottom-6">
         {productName}
         {hasMultipleImages && ` · ${activeImage + 1}/${imageUrls.length}`}
       </div>

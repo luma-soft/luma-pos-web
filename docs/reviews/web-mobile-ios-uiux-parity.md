@@ -280,3 +280,9 @@ The GitHub connector exposes repository contents but not an authenticated browse
 ## POS amounts on iPhone (numeric input font)
 
 - Discount, VAT, shipping, paid-amount and line-price inputs now use 16px mobile font and retain prior 14px desktop text at `lg`. This prevents Safari's common focus zoom behavior without changing numeric parsing, values, VAT logic, stock, payments or pricing confirmation.
+
+## Product entry and gallery safe area
+
+- Full-height product create/edit/detail modal frames now respect the iPhone's top safe inset; tablet/desktop `sm:` geometry remains unchanged.
+- Full-screen product-image previews offset Close from the Dynamic Island/status area and the image caption from the bottom home indicator. Original `sm:` offsets remain for larger screens.
+- The data source and image navigation behaviors are unchanged; visual PWA/Safari verification is still required.
