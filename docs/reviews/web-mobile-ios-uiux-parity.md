@@ -152,3 +152,8 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - `NewProductForm` now mirrors `NativeProductFormTabsShell` on iPhone with three equal-width short tabs (48px touch targets), while desktop retains existing tab widths and spacing.
 - Description tab uses the existing localized `products.tabs.description` translation instead of a Vietnamese-only hardcoded string.
 - Invalid submission from either the Units/Variants **or Description** step now navigates back to Info when required Info fields are invalid. Existing form state, validation schema, save handlers and desktop layout are unchanged.
+
+## Internal-use and Stock Mobile list rows
+
+- Internal-use issues now have a native-style compact Mobile row showing document code, reason, total cost, status, time and recipient. Whole-row tap opens the existing detail panel with item list and authorized document actions.
+- Stock tab uses a dedicated Mobile row with product name/SKU, stock severity, quantity, minimum stock and value. Whole-row tap opens the pre-existing product detail route. Both desktop tables, business queries and status/cost rules are unmodified.

@@ -59,6 +59,39 @@ export function StockTable({ rows }: { rows: StockRow[]; stock?: StockFilter }) 
       minWidth="980px"
       onRowClick={(row) => router.push(Routes.productDetail(row.id), { scroll: false })}
       rowClickColumnKey="product"
+      renderMobileRow={({ row }) => {
+        const stock = Number(row.totalStock);
+        const min = Number(row.minLevel);
+        const sev = stockSev(stock, min);
+        return (
+          <div className="relative min-h-[94px] p-3">
+            <button
+              type="button"
+              onClick={() => router.push(Routes.productDetail(row.id), { scroll: false })}
+              aria-label={productDisplayName(row)}
+              className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
+            />
+            <div className="pointer-events-none relative flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="line-clamp-2 text-sm font-semibold">{productDisplayName(row)}</div>
+                <div className="mt-1 truncate text-xs text-slate-500">{row.sku}</div>
+                <div className="mt-2"><StatusBadge sev={sev} /></div>
+              </div>
+              <div className="max-w-[47%] shrink-0 text-right">
+                <div className={cn("text-sm font-bold tabular-nums [overflow-wrap:anywhere]", (sev === "out" || sev === "crit") ? "text-er" : "")}>
+                  {formatNumber(stock)} {row.baseUnit}
+                </div>
+                <div className="mt-1 truncate text-xs text-slate-500">
+                  {t("inventory.cols.min")}: {min > 0 ? formatNumber(min) : "—"}
+                </div>
+                <div className="mt-1 text-xs font-medium tabular-nums text-slate-500">
+                  {formatCurrency(Number(row.stockValue))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }}
       renderDetail={(row) => <ExpandedStock row={row} />}
       detailPanelClassName="h-auto max-h-[min(720px,calc(100dvh-3rem))] sm:max-w-6xl"
       detailBodyClassName="p-0"

@@ -77,6 +77,34 @@ export function InternalUseTable({ rows, capabilities }: { rows: InternalUseRow[
           </div>
         )}
         rowClassName={(row) => cn(row.status === "pending" && "bg-warn-soft/25")}
+        renderMobileRow={({ row, toggle }) => (
+          <div className="relative min-h-[94px] p-3">
+            <button
+              type="button"
+              onClick={toggle}
+              aria-label={row.code}
+              className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
+            />
+            <div className="pointer-events-none relative flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-primary-600">{row.code}</div>
+                <div className="mt-1 line-clamp-2 text-sm text-slate-700 dark:text-slate-200">
+                  {internalUseReasonLabel(row.reason, locale)}
+                </div>
+              </div>
+              <div className="max-w-[45%] shrink-0 text-right">
+                <div className="text-sm font-bold tabular-nums text-warn [overflow-wrap:anywhere]">
+                  {formatCurrency(row.totalCost)}
+                </div>
+                <div className="mt-1"><StatusBadge status={row.status} /></div>
+              </div>
+            </div>
+            <div className="pointer-events-none relative mt-2 truncate text-xs text-slate-500">
+              {formatDate(row.createdAt)}
+              {row.department ? ` · ${row.department}` : ""}
+            </div>
+          </div>
+        )}
         renderDetail={(row) => <ExpandedIssue row={row} />}
         detailSize="full"
         detailFooter={(row) => <InventoryDocumentActions kind="internal-use" id={row.id} code={row.code} status={row.status} capabilities={capabilities} inFooter />}
