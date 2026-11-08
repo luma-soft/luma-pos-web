@@ -38,7 +38,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const range = resolveDashboardRange(params.range);
   const data = await getDashboard(context.storeId, range);
-  const mobileData = range === "today" ? data : await getDashboard(context.storeId, "today");
   const mobileDayFormatter = new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "2-digit",
@@ -102,25 +101,25 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         />
         <div className="space-y-4 px-3 py-3">
           <section className="space-y-2">
-            <MobileSectionLabel>{t("mobile.dashboard.todayOverview")}</MobileSectionLabel>
+            <MobileSectionLabel>{t("nav.dashboard")} · {t(`dashboard.range.${range}`)}</MobileSectionLabel>
             <div className="grid grid-cols-2 gap-2.5">
               <MobileMetricTile
                 label={t("mobile.dashboard.revenue")}
-                value={formatCompactCurrency(mobileData.revenue)}
-                subtitle={t("mobile.dashboard.today")}
+                value={formatCompactCurrency(data.revenue)}
+                subtitle={t(`dashboard.range.${range}`)}
                 tone="success"
               />
               <MobileMetricTile
                 label={t("mobile.dashboard.orders")}
-                value={mobileData.orderCount}
+                value={data.orderCount}
                 subtitle={t("mobile.dashboard.recorded")}
                 tone="info"
               />
               <MobileMetricTile
-                label={t("mobile.dashboard.lowStock")}
-                value={mobileData.lowStock.length}
-                subtitle={t("mobile.dashboard.needRestock")}
-                tone="warning"
+                label={t("dashboard.grossProfit")}
+                value={formatCompactCurrency(data.grossProfit)}
+                subtitle={t("dashboard.marginPct", { pct: data.marginPct.toFixed(1) })}
+                tone={data.grossProfit >= 0 ? "success" : "warning"}
               />
               <Link
                 href={`${Routes.Customers}?owing=1`}
@@ -128,7 +127,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
               >
                 <MobileMetricTile
                   label={t("mobile.dashboard.receivables")}
-                  value={mobileData.debt.debtors}
+                  value={data.debt.debtors}
                   subtitle={t("mobile.dashboard.owingCustomers")}
                   tone="neutral"
                 />
@@ -190,11 +189,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
               title={t("mobile.dashboard.openPos")}
               subtitle={t("mobile.dashboard.openPosHint")}
             />
-            {mobileData.lowStock.length > 0 && (
+            {data.lowStock.length > 0 && (
               <MobileActionRow
                 href={`${Routes.Inventory}?low=1`}
                 icon={Package}
-                title={t("mobile.dashboard.lowStockAction", { count: mobileData.lowStock.length })}
+                title={t("mobile.dashboard.lowStockAction", { count: data.lowStock.length })}
                 subtitle={t("mobile.dashboard.lowStockHint")}
                 tone="orange"
               />
@@ -202,10 +201,66 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             <MobileActionRow
               href={Routes.Sales}
               icon={FileText}
-              title={t("mobile.dashboard.ordersAction", { count: mobileData.orderCount })}
+              title={t("mobile.dashboard.ordersAction", { count: data.orderCount })}
               subtitle={t("mobile.dashboard.ordersHint")}
               tone="blue"
             />
+          </section>
+
+
+          <section className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <MobileSectionLabel>{t("dashboard.lowStockTitle")}</MobileSectionLabel>
+              <Link href={`${Routes.Inventory}?low=1`} className="text-xs font-semibold text-primary-600">{t("dashboard.viewAll")}</Link>
+            </div>
+            <div className="divide-y divide-border-soft overflow-hidden rounded-2xl border border-border bg-surface px-3 shadow-e1">
+              {data.lowStock.length === 0 ? (
+                <p className="py-5 text-center text-sm text-slate-500">{t("dashboard.stockOk")}</p>
+              ) : data.lowStock.slice(0, 5).map((product) => (
+                <Link key={product.id} href={Routes.product(product.id)}
+                  className="flex min-h-14 items-center gap-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-lg" aria-hidden="true">
+                    {categoryEmoji(product.categoryName)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">{productDisplayName(product)}</span>
+                    <span className="block text-xs text-slate-500">
+                      {t("dashboard.stockOfMin", {
+                        stock: formatNumber(Number(product.totalStock)),
+                        unit: product.baseUnit,
+                        min: formatNumber(Number(product.minLevel)),
+                      })}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold text-warn">{t("dashboard.badgeLow")}</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+          <section className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <MobileSectionLabel>{t("dashboard.recentOrders")}</MobileSectionLabel>
+              <Link href={Routes.Sales} className="text-xs font-semibold text-primary-600">{t("dashboard.allOrders")}</Link>
+            </div>
+            <div className="divide-y divide-border-soft overflow-hidden rounded-2xl border border-border bg-surface px-3 shadow-e1">
+              {data.recentOrders.length === 0 ? (
+                <p className="py-5 text-center text-sm text-slate-500">{t("orders.empty")}</p>
+              ) : data.recentOrders.slice(0, 5).map((order) => (
+                <div key={order.id} className="flex min-h-[72px] items-center gap-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <OrderDetailLink orderId={order.id} className="block truncate text-sm font-semibold text-primary-600">{order.code}</OrderDetailLink>
+                    <span className="block truncate text-xs text-slate-500">{order.customerName ?? t("orders.walkIn")}</span>
+                    <span className="mt-1 inline-flex flex-wrap gap-1.5">
+                      <OrderStatusBadge status={order.status} />
+                      <PaymentStatusBadge status={order.paymentStatus} />
+                    </span>
+                  </div>
+                  <span className="max-w-[45%] shrink-0 text-right text-sm font-bold tabular-nums [overflow-wrap:anywhere]">
+                    {formatCurrency(Number(order.total))}
+                  </span>
+                </div>
+              ))}
+            </div>
           </section>
 
           {debtorRows.length > 0 && (

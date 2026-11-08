@@ -17,7 +17,7 @@
 | Main navigation | 5 tabs; house, cart, shippingbox, document, ellipsis; technician More-only | Previously 5 tabs with different icons and unconditional visibility | Updated icon mapping, active states on nested routes, technician menu visibility, safe area |
 | Inventory navigation | 56pt scrollable underline tabs | Previously 40–44px navigation tabs | Mobile-specific 56px / 3px indicator; desktop rules retained |
 | Invoice/other group tabs | 56pt scrollable underline tab bar | Previously 44px small-text tabs | Mobile-only height, font and indicator alignment |
-| Dashboard | Store header, selected-range summary, quick actions, low stock, activity, receivables/payables | Existing separate mobile view but structure/range parity not complete | Pending full parity |
+| Dashboard | Store header, selected-range summary, quick actions, low stock, activity, receivables/payables | Selected-range summary/profit, low-stock list, recent orders added; store header and chart still differ | Partially implemented |
 | POS | Multiple open orders, product selectors, totals, quote confirmation | Significant separate web flow | Not yet changed |
 | Inventory screen details | Product list/edit, filters, document workflows, offline provider | Existing web implementations | Not yet changed |
 | Invoices | Sales/returns/quotes/bookings, filters, details, merge/print | Existing web implementations | Not yet changed |
@@ -35,7 +35,7 @@
 
 ## Remaining work
 
-- Dashboard: store-name header, selected date-range consistency, section order, debt and activity cards, offline states.
+- Dashboard: store-name header, year/week/month range parity and chart, separate activity feed, offline states. Current range values are constrained by the existing web backend.
 - POS: line editor/unit switching, multiple-order tabs, search/filter/pickers, quote confirmation including VAT and discount, payment sheets.
 - Inventory: grouped products, native list/filter/detail/edit workflows, stocktake, purchase, returns, internal use.
 - Invoices and More: native grouping, search, filters, swipe/menus, form details and hidden features.
@@ -45,3 +45,10 @@
 ## Verification limitations in this environment
 
 The GitHub connector exposes repository contents but not a checked-out dependency tree or an authenticated browser session. A full Next.js lint/typecheck/build and authenticated responsive screenshots cannot be claimed here. Source-level invariants were checked for this navigation change. Further changes require the complete test matrix before declaring done.
+
+## Dashboard follow-up implementation
+
+- Mobile KPIs now use the selected dashboard range rather than querying a second fixed-today snapshot. This removes one dashboard query when the selected range is not today.
+- Added gross profit and margin, low-stock product links, and recent orders with statuses in the mobile-only tree.
+- The desktop dashboard component tree is unchanged; no backend business calculations were altered.
+- Full visual/build regression remains unverified in this connector-only environment.
