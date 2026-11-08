@@ -47,4 +47,8 @@ jobs:
             'src/app/(app)/partners/tabs/partners-mobile-hit-area.test.mjs' \
             'src/components/ui/mobile-input-zoom.test.mjs' \
             'src/app/(app)/sales/tabs/mobile-document-day.test.mjs' \
-            'src/lib/offline/sw-private-html-safety.test.mjs'
+            'src/lib/offline/sw-private-html-safety.test.mjs' \
+            'src/app/(app)/products/new/product-form-native-tabs.test.mjs' \
+            'src/app/(app)/inventory/tabs/inventory-secondary-native-row.test.mjs' \
+            'src/app/(app)/inventory/tabs/purchase-native-cards.test.mjs' \
+            'src/app/(app)/inventory/tabs/products-loading.test.mjs'

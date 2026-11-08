@@ -169,3 +169,7 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - Product tab server Suspense, inner KeepPreviousContent and shared catalog's IndexedDB-loading state now show the **same** lightweight `MobileInventoryCatalogSkeleton`, so transitioning between server streaming and local cache hydration does not create visibly different consecutive skeleton layouts.
 - Skeleton matches 64px mobile thumbnails and 94px rows; desktop continues to show the original `TableSkeleton` at `lg`. Existing server async boundary, cached product provider and error fallback remain intact.
 - No extra provider, data request, product data copy or delayed polling was introduced.
+
+## Full added Mobile test coverage
+
+- GitHub Actions now invokes the product wizard, receiving/return, internal-use/stock, and unified catalog skeleton Bun assertions in addition to prior Mobile and PWA checks.
