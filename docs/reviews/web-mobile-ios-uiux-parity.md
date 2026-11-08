@@ -83,3 +83,8 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - Mobile return rows reuse `MobileDocumentRow` with red refund amounts. Status, reason, refund method, source invoice navigation, customer navigation, and whole-row expand action remain available.
 - Desktop table, expanded footer, source order details and return data queries are unchanged.
 - Added a render-level Bun assertion for return amount styling and accessible row label.
+
+## More search result isolation
+
+- `MobileMoreQuickSearch` now receives the server-rendered menu sections as children and hides those sections on small screens only when a nonempty search query is present. The results list is no longer duplicated above the unfiltered menu.
+- Desktop shows the same menu sections via `lg:block`, even if search state is retained during a viewport change. Client-side search does not refetch, subscribe, or duplicate server components.

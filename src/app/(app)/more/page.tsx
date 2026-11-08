@@ -102,8 +102,7 @@ export default async function MorePage() {
           searchLabel={t("common.search")}
           emptyLabel={t("common.noResults")}
           clearLabel={t("common.clear")}
-        />
-
+        >
         <MoreSection title={t("nav.groups.overview")}>
           <MobileSettingsRow href={Routes.Notifications} icon={Bell} label={t("nav.notifications")} subtitle={t("mobile.more.notificationsHint")} tone="orange" />
           {manager && <MobileSettingsRow href={Routes.Reports} icon={BarChart3} label={t("nav.reports")} subtitle={t("mobile.more.reportsHint")} tone="blue" />}
@@ -150,6 +149,7 @@ export default async function MorePage() {
             <LogoutButton userId={user.id} />
           </div>
         </section>
+        </MobileMoreQuickSearch>
       </div>
     </div>
   );

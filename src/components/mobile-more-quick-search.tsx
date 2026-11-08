@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { ChevronRight, Search, X } from "lucide-react";
 
 export type MobileMoreSearchEntry = {
@@ -18,11 +18,13 @@ function normalized(value: string) {
 /** Search available More destinations without copying or refetching any data. */
 export function MobileMoreQuickSearch({
   entries,
+  children,
   searchLabel,
   emptyLabel,
   clearLabel,
 }: {
   entries: readonly MobileMoreSearchEntry[];
+  children: ReactNode;
   searchLabel: string;
   emptyLabel: string;
   clearLabel: string;
@@ -37,7 +39,8 @@ export function MobileMoreQuickSearch({
   );
 
   return (
-    <div className="space-y-2 lg:hidden">
+    <div className="space-y-5">
+      <div className="space-y-2 lg:hidden">
       <div className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-primary-500">
         <Search className="h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />
         <input
@@ -77,6 +80,10 @@ export function MobileMoreQuickSearch({
           )) : <p className="px-3 py-5 text-center text-sm text-slate-500">{emptyLabel}</p>}
         </div>
       )}
+      </div>
+      <div className={normalizedQuery ? "hidden lg:block lg:space-y-5" : "space-y-5"}>
+        {children}
+      </div>
     </div>
   );
 }
