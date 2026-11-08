@@ -88,3 +88,10 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 
 - `MobileMoreQuickSearch` now receives the server-rendered menu sections as children and hides those sections on small screens only when a nonempty search query is present. The results list is no longer duplicated above the unfiltered menu.
 - Desktop shows the same menu sections via `lg:block`, even if search state is retained during a viewport change. Client-side search does not refetch, subscribe, or duplicate server components.
+
+## POS iPhone draft selector
+
+- Mobile catalog now shows the current draft as a single 48px picker with the number of open drafts. Tapping it opens a vertically stacked sheet with the same draft records and existing rename/change-type/delete actions.
+- The same `invoices.map` tree is used for the sheet and desktop tab strip, avoiding duplicated draft state or subscriptions. Desktop keeps the horizontal tabs.
+- Draft selection is keyboard-operable; the sheet can close via backdrop, close button or Escape. The create-draft menu placement now checks available viewport height.
+- No change was made to draft persistence, POS checkout, products, tax, pricing, offline queue or server logic. Visual/simulator and full build verification remain pending.

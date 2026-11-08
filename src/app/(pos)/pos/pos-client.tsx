@@ -11,7 +11,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Plus, ListPlus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ShieldCheck, SlidersHorizontal, Star } from "lucide-react";
+import { Search, Plus, ListPlus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ChevronDown, ShieldCheck, SlidersHorizontal, Star } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import { Combobox } from "@/components/combobox";
@@ -600,6 +600,7 @@ export function PosClient({
   const [overKey, setOverKey] = useState<string | null>(null);
   const [dropHover, setDropHover] = useState(false);
   const [mobileView, setMobileView] = useState<"catalog" | "cart">("catalog"); // chuyển đổi trên mobile
+  const [mobileInvoicePickerOpen, setMobileInvoicePickerOpen] = useState(false);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const [customerOptions, setCustomerOptions] = useState<PosCustomer[]>(() => data.customers);
   const [customerCreateOpen, setCustomerCreateOpen] = useState(false);
@@ -1119,6 +1120,7 @@ export function PosClient({
     setInvoices((list) => [...list, inv]);
     setActiveId(inv.id);
     setAddMenuOpen(false);
+    setMobileInvoicePickerOpen(false);
     setError("");
   }
 
@@ -1147,9 +1149,12 @@ export function PosClient({
   function toggleAddMenu() {
     const rect = addMenuButtonRef.current?.getBoundingClientRect();
     if (rect) {
+      // A draft menu opened from the mobile bottom sheet must remain in view.
+      const menuHeight = 4 * 44 + 16;
+      const below = rect.bottom + 6;
       setAddMenuPosition({
-        top: rect.bottom + 6,
-        left: Math.min(rect.left, window.innerWidth - 210),
+        top: below + menuHeight > window.innerHeight ? Math.max(8, rect.top - menuHeight - 6) : below,
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - 210)),
       });
     }
     setAddMenuOpen((open) => !open);
@@ -2495,9 +2500,56 @@ export function PosClient({
           ? t("returns.submit")
           : t("pos.checkout");
 
-  // Tabs hóa đơn — đặt cạnh thanh tìm kiếm (giống KiotViet).
+  // Native iOS uses a compact current-order picker on iPhone. Reuse the same
+  // draft list and action menus in its sheet, while retaining desktop tabs.
   const invoiceTabs = (
-    <div className="flex items-stretch gap-1.5 overflow-x-auto">
+    <>
+      <button
+        type="button"
+        onClick={() => setMobileInvoicePickerOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={mobileInvoicePickerOpen}
+        className="flex min-h-12 w-full items-center gap-3 rounded-[15px] border border-border bg-surface px-3 text-left shadow-sm lg:hidden"
+      >
+        <span className="min-w-0 flex-1 truncate text-base font-bold">
+          {draftDisplayLabel(active, Math.max(0, invoices.findIndex((inv) => inv.id === activeId)))}
+        </span>
+        {invoices.length > 1 && (
+          <span className="shrink-0 rounded-full bg-primary-600 px-2 py-0.5 text-xs font-bold tabular-nums text-white">
+            {invoices.length}
+          </span>
+        )}
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+      </button>
+      {mobileInvoicePickerOpen && (
+        <button
+          type="button"
+          onClick={() => setMobileInvoicePickerOpen(false)}
+          aria-label={t("common.close")}
+          className="fixed inset-0 z-[65] bg-black/40 lg:hidden"
+        />
+      )}
+      <div
+        role={mobileInvoicePickerOpen ? "dialog" : undefined}
+        aria-modal={mobileInvoicePickerOpen ? true : undefined}
+        aria-label={mobileInvoicePickerOpen ? t("pos.order") : undefined}
+        onKeyDown={(event) => { if (event.key === "Escape") setMobileInvoicePickerOpen(false); }}
+        className={cn(
+          "flex items-stretch gap-1.5 overflow-x-auto",
+          mobileInvoicePickerOpen
+            ? "fixed inset-x-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-[66] max-h-[65dvh] flex-col overflow-y-auto rounded-2xl border border-border bg-surface p-3 shadow-e2"
+            : "hidden",
+          "lg:static lg:flex lg:max-h-none lg:flex-row lg:overflow-x-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none",
+        )}
+      >
+        <div className="flex items-center justify-between gap-2 px-1 pb-2 lg:hidden">
+          <span className="text-base font-bold">{t("pos.order")}</span>
+          <button type="button" onClick={() => setMobileInvoicePickerOpen(false)}
+            aria-label={t("common.close")}
+            className="grid h-11 w-11 place-items-center rounded-full text-slate-500">
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
       {invoices.map((inv, idx) => {
         const count = inv.cart.reduce((s, l) => s + l.quantity, 0);
         const isActive = inv.id === activeId;
@@ -2506,9 +2558,21 @@ export function PosClient({
         return (
           <div
             key={inv.id}
-            onClick={() => { setActiveId(inv.id); setError(""); }}
+            onClick={() => { setActiveId(inv.id); setError(""); setMobileInvoicePickerOpen(false); }}
+            role="button"
+            tabIndex={0}
+            aria-pressed={isActive}
+            onKeyDown={(event) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setActiveId(inv.id);
+                setError("");
+                setMobileInvoicePickerOpen(false);
+              }
+            }}
             className={cn(
-              "group flex items-center gap-2 pl-4 pr-2 py-2.5 rounded-lg cursor-pointer whitespace-nowrap border text-sm transition-colors",
+              "group flex min-h-12 items-center gap-2 rounded-lg border py-2.5 pl-4 pr-2 text-sm transition-colors cursor-pointer whitespace-normal lg:min-h-0 lg:whitespace-nowrap",
               isActive
                 ? "bg-primary-50 border-primary-300 text-primary-700 font-semibold dark:bg-primary-950/50 dark:border-primary-800 dark:text-primary-300"
                 : "bg-surface border-border text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
@@ -2530,15 +2594,15 @@ export function PosClient({
                 iconOnly
                 className="-my-2 -mr-1 grid h-11 w-11 place-items-center rounded text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 dark:hover:bg-slate-700"
                 items={[
-                  { key: "rename", label: t("pos.draftActions.rename"), icon: Pencil, onSelect: () => openRenameDraft(inv, idx) },
+                  { key: "rename", label: t("pos.draftActions.rename"), icon: Pencil, onSelect: () => { setMobileInvoicePickerOpen(false); openRenameDraft(inv, idx); } },
                   {
                     key: "change-type",
                     label: t("pos.draftActions.changeType"),
                     icon: RefreshCw,
                     disabled: !canChangeDraftKind(inv),
-                    onSelect: () => openDraftKindPicker(inv),
+                    onSelect: () => { setMobileInvoicePickerOpen(false); openDraftKindPicker(inv); },
                   },
-                  { key: "delete", label: t("pos.draftActions.delete"), icon: Trash2, onSelect: () => void requestDeleteDraft(inv, idx) },
+                  { key: "delete", label: t("pos.draftActions.delete"), icon: Trash2, onSelect: () => { setMobileInvoicePickerOpen(false); void requestDeleteDraft(inv, idx); } },
                 ]}
               />
             </div>
@@ -2549,14 +2613,17 @@ export function PosClient({
         <button
           ref={addMenuButtonRef}
           type="button"
-          onClick={toggleAddMenu}
+          onClick={() => { toggleAddMenu(); setMobileInvoicePickerOpen(false); }}
           title={t("pos.draftTabs.addLabel")}
-          className="grid h-11 w-11 place-items-center rounded-lg border border-border text-slate-400 hover:border-primary-300 hover:text-primary-600"
+          aria-label={t("pos.draftTabs.addLabel")}
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-border text-primary-600 hover:border-primary-300 lg:grid lg:h-11 lg:w-11 lg:place-items-center lg:text-slate-400"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="h-4 w-4" />
+          <span className="text-sm font-semibold lg:hidden">{t("pos.draftTabs.addLabel")}</span>
         </button>
       </div>
     </div>
+    </>
   );
 
   // Danh sách dòng hàng đã chọn — hiển thị ở khu chính (giống KiotViet).
