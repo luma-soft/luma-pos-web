@@ -221,3 +221,8 @@ The GitHub connector exposes repository contents but not an authenticated browse
 
 - Web Mobile product detail tabs now match `NativeProductDetailView.swift` `LumaScrollableTabBar` dimensions: **46px** high, **22px** spacing and a **3px** selected underline. All five native-equivalent tab destinations remain, with the previous Web Desktop 2px underline and gap retained under `lg:`.
 - The GitHub Actions workflow now executes the new modal, quote, product editor, inventory filter and product detail regression tests in addition to existing TypeScript/ESLint.
+
+## Dashboard reconnect notice — online/offline state
+
+- Web Mobile now shows a native-style information notice if the device loses network access **while an already rendered dashboard is on screen**. It listens to browser online/offline events and cleans up both listeners; no refetch, polling, cache write, or duplicate provider was introduced.
+- The label explicitly says existing displayed data **may be stale**. Unlike iOS's cached snapshot, this does not enable server-rendered dashboard cold launch offline. Desktop remains unchanged; offline PWA cold launch is still a documented limitation.

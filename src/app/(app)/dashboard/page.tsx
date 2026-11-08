@@ -7,6 +7,7 @@ import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { getDashboard, categoryEmoji, type DashboardRange } from "@/lib/data/dashboard";
 import { resolveDashboardRange } from "@/lib/dashboard/range";
+import { MobileDashboardOfflineNotice } from "@/components/mobile-dashboard-offline-notice";
 import { OrderStatusBadge, PaymentStatusBadge } from "../orders/status-badges";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Text } from "@/components/ui/text";
@@ -240,6 +241,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
               ))}
             </div>
           </section>
+          <MobileDashboardOfflineNotice />
           <section className="space-y-2">
             <div className="flex items-center justify-between gap-3">
               <MobileSectionLabel>{t("dashboard.recentOrders")}</MobileSectionLabel>

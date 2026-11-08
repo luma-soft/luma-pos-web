@@ -59,4 +59,5 @@ jobs:
             'src/app/(pos)/pos/pos-mobile-quote-pricing.test.mjs' \
             'src/app/(app)/products/new/product-form-native-actions.test.mjs' \
             'src/app/(app)/inventory/tabs/inventory-filter-native-sheet.test.mjs' \
-            'src/app/(app)/inventory/tabs/product-detail-native-tabs.test.mjs'
+            'src/app/(app)/inventory/tabs/product-detail-native-tabs.test.mjs' \
+            'src/components/mobile-dashboard-offline-notice.test.mjs'

@@ -1091,6 +1091,7 @@
       "recorded": "recorded",
       "needRestock": "need restock",
       "owingCustomers": "owing customers",
+      "offlineNotice": "Offline · The information on this screen may be out of date.",
       "attention": "Attention",
       "openPos": "Open POS and find products",
       "openPosHint": "Fast search, ready for barcode input",

@@ -1091,6 +1091,7 @@
       "recorded": "đã ghi nhận",
       "needRestock": "cần nhập",
       "owingCustomers": "khách đang nợ",
+      "offlineNotice": "Mất kết nối · Dữ liệu đang xem có thể chưa được cập nhật.",
       "attention": "Việc cần làm",
       "openPos": "Mở POS và tìm sản phẩm",
       "openPosHint": "Tìm kiếm nhanh, sẵn sàng nhập mã vạch",
