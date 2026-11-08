@@ -452,10 +452,10 @@ export function InventoryFilterDrawer({
             role="dialog"
             aria-modal="true"
             aria-labelledby="inventory-filter-title"
-            className="ml-auto flex h-full w-full max-w-[460px] flex-col bg-surface shadow-2xl"
+            className="ml-auto flex h-dvh w-full max-w-none flex-col bg-surface shadow-2xl lg:h-full lg:max-w-[460px]"
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <header className="flex items-start justify-between border-b border-border px-6 py-5">
+            <header className="flex shrink-0 items-start justify-between border-b border-border px-4 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] lg:px-6 lg:py-5">
               <div>
                 <h2 id="inventory-filter-title" className="text-xl font-bold">{title}</h2>
                 <p className="mt-1 text-sm text-slate-500">{active} điều kiện đang chọn</p>
@@ -465,7 +465,7 @@ export function InventoryFilterDrawer({
               </button>
             </header>
 
-            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-canvas px-3 py-3 pb-6 lg:space-y-6 lg:bg-surface lg:px-6 lg:py-5 [&>section]:rounded-2xl [&>section]:border [&>section]:border-border [&>section]:bg-surface [&>section]:p-3 lg:[&>section]:rounded-none lg:[&>section]:border-0 lg:[&>section]:bg-transparent lg:[&>section]:p-0>
               {isPurchaseFilter && (
                 <section>
                   <h3 className="mb-3 font-bold">Tìm theo</h3>
@@ -547,9 +547,9 @@ export function InventoryFilterDrawer({
               )}
             </div>
 
-            <footer className="flex gap-3 border-t border-border px-6 py-4">
-              <button type="button" onClick={reset} className="min-h-11 flex-1 rounded-lg border border-primary-600 font-bold text-primary-700 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0">Xóa lọc</button>
-              <button type="button" disabled={Boolean(customDateError)} onClick={apply} className="min-h-11 flex-1 rounded-lg bg-primary-600 font-bold text-white disabled:opacity-50 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0">
+            <footer className="flex shrink-0 gap-2 border-t border-border bg-surface px-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] pt-3 lg:gap-3 lg:px-6 lg:py-4">
+              <button type="button" onClick={reset} className="min-h-14 min-w-11 shrink-0 rounded-[18px] border border-primary-600 px-4 text-sm font-bold text-primary-700 lg:min-h-11 lg:flex-1 lg:rounded-lg lg:px-0">Xóa lọc</button>
+              <button type="button" disabled={Boolean(customDateError)} onClick={apply} className="min-h-14 min-w-0 flex-1 rounded-[18px] bg-primary-600 px-2 text-center text-sm font-bold text-white disabled:opacity-50 lg:min-h-11 lg:min-w-11 lg:rounded-lg">
                 Xem {resultCount == null ? "danh sách" : `${resultCount.toLocaleString("vi-VN")} ${resultLabel}`}
               </button>
             </footer>

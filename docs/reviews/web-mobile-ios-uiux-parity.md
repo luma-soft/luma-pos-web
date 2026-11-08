@@ -210,3 +210,9 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - Mobile product create/edit modal and full-screen editor expose **Cancel, centered title, Save** in the header like `NativeProductFormTabsShell`. Submits continue through existing React Hook Form/Zod and the original save intent.
 - The three-button mobile footer is replaced by a collapsed `Save options` disclosure containing **Direct sale** and **Save & create another / similar / variant**; both actions remain available. The checkbox changes the existing registered form value without registering it twice.
 - Original Desktop modal X, header `FormActions`, footer `FormActions`, spacing and save behavior stay under the same `lg:` breakpoint. UI confirmation in browser is still needed.
+
+## Inventory filter full-screen native mobile presentation
+
+- The shared Inventory filter now opens as a full-viewport sheet below the `lg` breakpoint, matching the iOS product filter screen instead of a narrow 460px slide-over. Desktop remains the original 460px side drawer at `lg`.
+- Mobile sections use separate card surfaces, the scroll region remains independent from fixed title/footer, the title accounts for the top safe area, and footer Apply/Clear controls have 56px touch height plus bottom safe-area padding.
+- Filter fields, preview count calculations, draft reset/apply URL parameters, network calls and nested picker behavior are unchanged. Visual/browser comparison remains outstanding.
