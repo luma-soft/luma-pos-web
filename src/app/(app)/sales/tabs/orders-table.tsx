@@ -200,13 +200,12 @@ export function OrderMobileRow({
 }) {
   const remaining = Number(order.total) - Number(order.amountPaid);
   const selectable = order.status !== "cancelled" && order.status !== "merged";
+  const customerTitle = order.customerName ?? labels.walkIn;
   return (
-    <div
-      className={cn(
-        "flex min-w-0 items-stretch",
-        selected && "bg-primary-50/50 dark:bg-primary-950/20",
-      )}
-    >
+    <div className={cn(
+      "flex min-w-0 items-stretch",
+      selected && "bg-primary-50/50 dark:bg-primary-950/20",
+    )}>
       <div className="shrink-0 p-3 pr-0 pt-3">
         <OrderSelectionCheckbox
           checked={selected}
@@ -215,43 +214,39 @@ export function OrderMobileRow({
           label={order.code}
         />
       </div>
-      <div className="relative min-h-11 min-w-0 flex-1 p-3 text-left">
+      <div className="relative min-h-[104px] min-w-0 flex-1 p-3 text-left">
+        {/* The transparent button covers the whole row, not just its title. */}
         <button
           type="button"
           onClick={onOpen}
-          aria-label={order.code}
+          aria-label={`${customerTitle} · ${order.code}`}
           className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
         />
         <div className="pointer-events-none relative flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="font-semibold text-primary-600">{order.code}</div>
-            <div className="break-words text-xs text-slate-400">
-              {formatDate(order.createdAt)} ·{" "}
-              <PartnerDetailLink
-                kind="customer"
-                partnerId={order.customerId}
-                name={order.customerName ?? labels.walkIn}
-                openInCurrentTab
-                className="pointer-events-auto relative max-w-full whitespace-normal break-words"
-              /> ·{" "}
-              {channelLabel(order.sourceMode)}
-            </div>
+          <div className="min-w-0 flex-1">
+            <PartnerDetailLink
+              kind="customer"
+              partnerId={order.customerId}
+              name={customerTitle}
+              openInCurrentTab
+              className="pointer-events-auto relative block truncate text-[15px] font-semibold text-foreground"
+            />
           </div>
-          <OrderStatusBadge status={order.status} />
-        </div>
-        <div className="pointer-events-none relative mt-2 flex items-center justify-between gap-3 text-sm">
-          <span className="font-semibold tabular-nums">
+          <span className="min-w-0 max-w-[48%] shrink-0 text-right text-[15px] font-semibold tabular-nums [overflow-wrap:anywhere]">
             {formatCurrency(Number(order.total))}
           </span>
-          {order.status === "cancelled" || order.status === "merged" ? (
-            <span className="text-slate-400">—</span>
-          ) : remaining > 0 ? (
-            <span className="text-right font-semibold tabular-nums text-er">
+        </div>
+        <div className="pointer-events-none relative mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+          <OrderStatusBadge status={order.status} />
+          <PaymentStatusBadge status={order.paymentStatus} />
+          {selectable && remaining > 0 && (
+            <span className="font-medium tabular-nums text-er">
               {labels.remaining}: {formatCurrency(remaining)}
             </span>
-          ) : (
-            <PaymentStatusBadge status={order.paymentStatus} />
           )}
+        </div>
+        <div className="pointer-events-none relative mt-2 truncate text-[11px] text-slate-500 dark:text-slate-400">
+          {formatDate(order.createdAt)} · {order.code} · {channelLabel(order.sourceMode)}
         </div>
       </div>
     </div>

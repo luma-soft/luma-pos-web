@@ -16,11 +16,11 @@
 | --- | --- | --- | --- |
 | Main navigation | 5 tabs; house, cart, shippingbox, document, ellipsis; technician More-only | Previously 5 tabs with different icons and unconditional visibility | Updated icon mapping, active states on nested routes, technician menu visibility, safe area |
 | Inventory navigation | 56pt scrollable underline tabs | Previously 40–44px navigation tabs | Mobile-specific 56px / 3px indicator; desktop rules retained |
-| Invoice/other group tabs | 56pt scrollable underline tab bar | Previously 44px small-text tabs | Mobile-only height, font and indicator alignment |
+| Invoice section tabs | 56pt scrollable underline bar, no additional title block | Invoice-only 56px / 3px indicator; unrelated web group tabs restored to their earlier mobile style | Partially implemented |
 | Dashboard | Store header, selected-range summary, quick actions, low stock, activity, receivables/payables | Selected-range summary/profit, low-stock list, recent orders added; store header and chart still differ | Partially implemented |
 | POS | Multiple open orders, product selectors, totals, quote confirmation | Mobile quote catalog CTA now reads Confirm; moves to existing cart details with VAT/discount before final Save Quote | Partially implemented |
-| Inventory screen details | Product list/edit, filters, document workflows, offline provider | Existing web implementations | Not yet changed |
-| Invoices | Sales/returns/quotes/bookings, filters, details, merge/print | Existing web implementations | Not yet changed |
+| Inventory screen details | Native scrollable tabs plus product list/edit, filters, workflows | Removed duplicate mobile page title; existing catalog and workflows kept | Partially implemented |
+| Invoices | Customer and amount first, status/detail metadata below | Order-list mobile row restructured; selection/open/cancellation/print unchanged; other document rows remain | Partially implemented |
 | More | Grouped actions, search, account/preferences | Added mobile-only accent-insensitive quick search, filtered by existing role/features; grouped actions remain | Partially implemented |
 | Offline/PWA | Native local catalog cache | Web IndexedDB/Service Worker preserved | No sync logic changed; regression test pending |
 | Desktop | Not applicable | Existing desktop layout is the baseline | Code changes are mobile-scoped; visual regression testing pending |
@@ -64,3 +64,10 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - Mobile catalog CTA for quote drafts now says `Xác nhận` / `Confirm`, matching the first-stage navigation action rather than incorrectly implying an immediate save.
 - The CTA still opens the existing cart/settlement panel containing discount, VAT, shipping, customer and final `Lưu báo giá` action. No write, money calculation, tax preference, draft storage, or desktop action was changed.
 - The full native quotation workflow still requires a simulator comparison and full payment/form regression testing.
+
+## Invoice + Inventory navigation and order row alignment
+
+- Sales and Inventory now omit the redundant mobile-only screen title header, retaining the existing desktop header from the `lg` breakpoint.
+- The 56px iOS-like group tab treatment is opt-in (`nativeMobileStyle`) for Sales only; unrelated web group screens keep their existing compact mobile appearance.
+- Mobile order list shows customer and amount on the first row, followed by status/payment/remaining, then date/code/channel. The full-row detail button, separately operable partner link, and multi-select checkbox are preserved.
+- Added source-level Bun regression assertions for these invariants. Actual visual regression screenshots and typecheck/build remain pending.
