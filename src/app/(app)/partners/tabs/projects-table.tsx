@@ -106,6 +106,7 @@ export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; custome
           )}
         />
       )}
+      clientSideDetailNavigation
       renderDetail={(row) => (
         <div className="space-y-4 bg-surface px-4 py-4">
           <div className="grid gap-4 md:grid-cols-4">

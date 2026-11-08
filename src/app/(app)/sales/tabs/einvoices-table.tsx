@@ -70,6 +70,7 @@ export function EInvoicesTable({ rows }: { rows: EInvoiceRow[] }) {
           <p className="text-xs text-slate-500">{row.issuedAt ? formatDate(row.issuedAt) : "—"} · VAT {formatCurrency(Number(row.vatAmount))} ({Number(row.vatRate)}%)</p>
         </div>
       )}
+      clientSideDetailNavigation
       renderDetail={(row) => (
         <div className="grid gap-4 bg-surface px-4 py-4 md:grid-cols-4">
           <Info label={t("einvoice.cols.number")} value={row.number ? `${row.serial ? `${row.serial} · ` : ""}${row.number}` : "-"} />

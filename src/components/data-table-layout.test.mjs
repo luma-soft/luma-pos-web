@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { createElement } from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
 mock.module("next/navigation", () => ({
@@ -58,6 +59,14 @@ describe("data table scroll reset key", () => {
     const expanded = dataTableResultSetKey(new URLSearchParams("tab=returns&page=2&expandedReturn=return-1&detailOrderId=invoice-1"), "expandedReturn");
     expect(expanded).toBe(base);
   });
+});
+
+test("client-owned detail panels open without Next.js navigation, while server-loaded details keep it", () => {
+  const source = readFileSync(new URL("./data-table.tsx", import.meta.url), "utf8");
+  expect(source).toContain("clientSideDetailNavigation = false");
+  expect(source).toContain("if (clientSideDetailNavigation)");
+  expect(source).toContain("updateModalUrlQuery({ [expandedParam]: nextId })");
+  expect(source).toContain("router.replace(`${pathname}?${sp.toString()}`");
 });
 
 describe("data table utility column", () => {

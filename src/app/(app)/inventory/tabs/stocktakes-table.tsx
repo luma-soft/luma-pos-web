@@ -122,6 +122,7 @@ export function StocktakesTable({
           )}
         />
       )}
+      clientSideDetailNavigation
       renderDetail={(row) => (
         <StocktakeDetail stocktakeId={row.id} status={row.status} />
       )}

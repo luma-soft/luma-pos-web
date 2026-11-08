@@ -92,6 +92,7 @@ export function StockTable({ rows }: { rows: StockRow[]; stock?: StockFilter }) 
           </div>
         );
       }}
+      clientSideDetailNavigation
       renderDetail={(row) => <ExpandedStock row={row} />}
       detailPanelClassName="h-auto max-h-[min(720px,calc(100dvh-3rem))] sm:max-w-6xl"
       detailBodyClassName="p-0"

@@ -183,6 +183,7 @@ export function DataTableShell<T>({
   renderExpanded,
   renderFollowingRows,
   renderDetail,
+  clientSideDetailNavigation = false,
   detailTitle,
   detailSubtitle,
   detailFooter,
@@ -223,6 +224,8 @@ export function DataTableShell<T>({
   renderFollowingRows?: (row: T, columns: DataTableColumn<T>[]) => ReactNode;
   /** Nội dung xem chi tiết của dòng; luôn hiển thị trong modal. */
   renderDetail?: (row: T) => ReactNode;
+  /** Use for panels rendered from client-visible rows or fetching their own detail via API. */
+  clientSideDetailNavigation?: boolean;
   detailTitle?: (row: T) => ReactNode;
   detailSubtitle?: (row: T) => ReactNode;
   detailFooter?: (row: T) => ReactNode;
@@ -392,6 +395,11 @@ export function DataTableShell<T>({
       // Close immediately, including server-provided default detail content.
       setDismissedInitialId(initialExpandedId ?? null);
       updateModalUrlQuery({ [expandedParam]: null });
+      return;
+    }
+    if (clientSideDetailNavigation) {
+      // Existing row data (or a client-side detail fetch) does not require RSC navigation.
+      updateModalUrlQuery({ [expandedParam]: nextId });
       return;
     }
     const sp = new URLSearchParams(params.toString());

@@ -89,6 +89,7 @@ export function CashbookTable({ rows }: { rows: CashbookRow[] }) {
         </div>
       )}
       minWidth="940px"
+      clientSideDetailNavigation
       renderDetail={(row) => (
         <div className="grid gap-4 bg-surface px-4 py-4 md:grid-cols-4">
           <Info label={t("cashbook.cols.code")} value={row.code} />

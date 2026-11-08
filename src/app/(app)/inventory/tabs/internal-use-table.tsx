@@ -105,6 +105,7 @@ export function InternalUseTable({ rows, capabilities }: { rows: InternalUseRow[
             </div>
           </div>
         )}
+        clientSideDetailNavigation
         renderDetail={(row) => <ExpandedIssue row={row} />}
         detailSize="full"
         detailFooter={(row) => <InventoryDocumentActions kind="internal-use" id={row.id} code={row.code} status={row.status} capabilities={capabilities} inFooter />}

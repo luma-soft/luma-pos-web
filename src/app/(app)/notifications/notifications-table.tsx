@@ -216,6 +216,7 @@ export function NotificationsTable({ rows }: { rows: AuditRow[] }) {
       getRowId={(row) => row.id}
       minWidth="1080px"
       renderMobileRow={({ row, expanded, toggle }) => <NotificationMobileRow row={row} expanded={expanded} toggle={toggle} />}
+      clientSideDetailNavigation
       renderDetail={(row) => <ExpandedAudit row={row} />}
       detailTitle={(row) => titleFor(row, t)}
       detailSubtitle={() => t("notifications.activity.detailSubtitle")}
