@@ -3787,6 +3787,7 @@
       "customTitle": "Choose date range",
       "customDescription": "The report includes all data from the start date through the end date.",
       "options": {
+        "week": "This week",
         "today": "Today",
         "7d": "7 days",
         "30d": "Last 30 days",

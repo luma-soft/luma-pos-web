@@ -3787,6 +3787,7 @@
       "customTitle": "Chọn khoảng ngày",
       "customDescription": "Báo cáo sẽ bao gồm toàn bộ dữ liệu từ ngày bắt đầu đến hết ngày kết thúc.",
       "options": {
+        "week": "Tuần này",
         "today": "Hôm nay",
         "7d": "7 ngày",
         "30d": "30 ngày gần nhất",

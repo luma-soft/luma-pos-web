@@ -178,3 +178,9 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 
 - Cashbook Mobile rows now align with `NativeCashbookTransactionRow`: separate incoming/outgoing icons, counterparty, signed amount, category+note, timestamp/code/fund and cancelled state. The row expands the existing detail and authorized cancel/print controls.
 - No change to desktop financial table, ledger data, cancellation permissions, or totals.
+
+## Reports native current-week period
+
+- Mobile report period presets now offer Today / This Week / This Month / Custom, matching the week-based iOS report range; Monday-start week uses the same existing report queries with bounded start/end dates.
+- Legacy 7d/30d/90d/last-month/year custom choices remain in the **unchanged Desktop period dropdown**. Mobile is a separate presentation of the same `ReportPeriod` state.
+- No new aggregate query or report schema changes.

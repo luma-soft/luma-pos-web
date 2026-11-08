@@ -19,7 +19,7 @@ interface PageProps {
   }>;
 }
 
-const REPORT_PERIODS: readonly ReportPeriod[] = ["today", "7d", "30d", "90d", "this_month", "last_month", "this_year", "custom"];
+const REPORT_PERIODS: readonly ReportPeriod[] = ["today", "week", "7d", "30d", "90d", "this_month", "last_month", "this_year", "custom"];
 const REPORT_TABS = [
   { tab: "overview", labelKey: "reports.overview" },
   { tab: "invoices", labelKey: "reports.invoices" },
@@ -98,6 +98,7 @@ function resolveDateRange(period: ReportPeriod, fromParam?: string, toParam?: st
   let from = new Date(today.getFullYear(), today.getMonth(), 1);
   let toExclusive = tomorrow;
   if (period === "today") from = today;
+  else if (period === "week") from = addDays(today, -((today.getDay() + 6) % 7));
   else if (period === "7d") from = addDays(today, -6);
   else if (period === "30d") from = addDays(today, -29);
   else if (period === "90d") from = addDays(today, -89);

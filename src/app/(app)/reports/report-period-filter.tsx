@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 const PERIODS = [
   "today",
+  "week",
   "7d",
   "30d",
   "90d",
@@ -135,7 +136,7 @@ export function ReportPeriodChips({
   onSelect: (value: string) => void;
 }) {
   const t = useTranslations();
-  const periods = ["today", "7d", "this_month", "custom"] as const;
+  const periods = ["today", "week", "this_month", "custom"] as const;
 
   return (
     <div role="group" aria-label={t("reports.period.label")} className="grid grid-cols-4 gap-2 lg:hidden">
@@ -182,7 +183,7 @@ function ReportPeriodSelect({
         className,
         "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
       )}
-      options={PERIODS.map((value) => ({
+      options={PERIODS.filter((value) => value !== "week").map((value) => ({
         value,
         label: t(`reports.period.options.${value}` as never),
       }))}
