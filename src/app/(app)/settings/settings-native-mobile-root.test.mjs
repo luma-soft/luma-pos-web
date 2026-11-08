@@ -7,11 +7,11 @@ test("native settings root uses existing menu definitions and one settings form 
  expect(src).toContain("group.items.map((item)");
  expect(src).toContain("onClick={() => pick(item.id)}");
  expect(src).toContain("md:hidden");
- expect(src).toContain('"hidden md:flex"');
+ expect(src).toContain('"hidden lg:flex"');
  expect(src).toContain("setMobileSectionSelected(false)");
 });
 test("desktop settings layout and all existing forms remain available",()=>{
- expect(src).toContain("hidden md:flex flex-col");
+ expect(src).toContain("hidden lg:flex flex-col");
  expect(src).toContain("active === \"store\" && <StoreSection");
  expect(src).toContain("active === \"payments\" && <PaymentsSection");
  expect(src).toContain("active === \"tax\" && <TaxSection");
@@ -20,4 +20,12 @@ test("desktop settings layout and all existing forms remain available",()=>{
 
 test("last Mobile settings row remains above the fixed application tab bar",()=>{
  expect(src).toContain("pb-[calc(5rem+env(safe-area-inset-bottom))]");
+});
+
+test("iPad widths below 1024px use Mobile settings navigation rather than Desktop sidebar", () => {
+ expect(src).toContain("bg-canvas lg:hidden");
+ expect(src).toContain('<MobileTopBar\n          className="lg:hidden"');
+ expect(src).toContain('"hidden lg:flex"');
+ expect(src).toContain('"hidden lg:block"');
+ expect(src).toContain("lg:px-7");
 });

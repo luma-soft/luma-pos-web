@@ -342,7 +342,7 @@ export function SettingsClient({
   return (
     <div className="flex h-dvh overflow-hidden">
       {/* settings nav */}
-      <nav className="w-55 shrink-0 bg-surface border-r border-border overflow-y-auto hidden md:flex flex-col">
+      <nav className="w-55 shrink-0 bg-surface border-r border-border overflow-y-auto hidden lg:flex flex-col">
         <div className="px-4 py-3.5 border-b border-border">
           <div className="text-sm font-extrabold">{settingsTextByFlag(L, "legacy.55a9ce6867eb")}</div>
           <div className="text-[10px] italic text-slate-400 mt-0.5">{settingsTextByFlag(L, "legacy.4511c97881b0")}</div>
@@ -373,7 +373,7 @@ export function SettingsClient({
       {/* Native iPhone settings root is a grouped, full-width navigation list.
           The selected settings form remains one shared component tree below. */}
       {!mobileSectionSelected && (
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-canvas md:hidden">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-canvas lg:hidden">
           <MobileTopBar title={tSettings("breadcrumb.settings")} />
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-4 pb-[calc(5rem+env(safe-area-inset-bottom))]">
             {visibleNav.map((group) => (
@@ -404,9 +404,9 @@ export function SettingsClient({
       )}
 
       {/* content — original desktop layout and same settings form instances */}
-      <div className={cn("min-w-0 flex-1 flex-col overflow-hidden", mobileSectionSelected ? "flex" : "hidden md:flex")}>
+      <div className={cn("min-w-0 flex-1 flex-col overflow-hidden", mobileSectionSelected ? "flex" : "hidden lg:flex")}>
         <MobileTopBar
-          className="md:hidden"
+          className="lg:hidden"
           leading={
             <button
               type="button"
@@ -421,10 +421,10 @@ export function SettingsClient({
           subtitle={settingsTextByFlag(L, `ui.sections.${active}.subtitle`)}
         />
         <div className={cn(
-          "flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:px-7",
-          active === "tax" ? "pt-3 md:pt-0 md:pb-6" : "py-3 md:py-6",
+          "flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] lg:px-7",
+          active === "tax" ? "pt-3 lg:pt-0 lg:pb-6" : "py-3 lg:py-6",
         )}>
-        <div className={cn("hidden md:block", active === "tax" && "md:pt-4")}>
+        <div className={cn("hidden lg:block", active === "tax" && "lg:pt-4")}>
           <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.07em] text-primary-600">
             {tSettings("breadcrumb.settings")} · {tSettings(`breadcrumb.${active}`)}
           </div>

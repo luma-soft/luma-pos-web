@@ -314,3 +314,7 @@ The GitHub connector exposes repository contents but not an authenticated browse
 
 - Camera quotation package selector and quantity now wrap instead of forcing a wide single row on 360–390px phones. Material lines stack their selection across a full row, followed by quantity and a 44px remove button. At `lg`, the previous three-column material grid and small action controls remain.
 - Price calculations, material-unit conversion, camera/quantity state, SKU association and offline catalog source stay unchanged; the change is responsive presentation only.
+
+## Settings iPad breakpoint correction
+
+- The Settings navigation now switches at `lg` (1024px), matching the Web Mobile bottom tab bar. iPad widths 768–1023px use the grouped Settings flow rather than displaying Desktop sidebar alongside the Mobile bottom tabs. Desktop 1024px and wider retain the original sidebar and form layout.
