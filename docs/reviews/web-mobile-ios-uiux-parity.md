@@ -189,3 +189,7 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 
 - On mobile, the POS order-note and optional project-name text fields now use 16px fonts (Safari does not zoom on focus) and 44px minimum hit heights. Desktop retains its previous fonts, padding and sizes.
 - Both inputs keep their existing state setters and document business logic intact.
+
+## Expanded CI for Finance, Reports and POS edit fields
+
+- Mobile parity CI now also runs Bun assertions on Cashbook native-style rows, current-week report filtering and POS note/project inputs, alongside earlier screens and PWA.
