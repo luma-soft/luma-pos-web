@@ -36,3 +36,19 @@ test("mobile document row renders safely without optional details", () => {
   expect(html).toContain("Khách lẻ");
   expect(html).toContain("DH-000");
 });
+
+test("refund amount can use danger tone while preserving row navigation", () => {
+  const html = renderToStaticMarkup(createElement(MobileDocumentRow, {
+    customerName: "Khách trả",
+    customer: createElement("span", null, "Khách trả"),
+    amount: "200.000đ",
+    amountTone: "danger",
+    code: "TH-002",
+    createdAt: "08/11/2026",
+    onOpen: () => {},
+  }));
+  expect(html).toContain("text-er");
+  expect(html).toContain("200.000đ");
+  expect(html).toContain("Khách trả");
+  expect(html).toContain('aria-label="Khách trả · TH-002"');
+});

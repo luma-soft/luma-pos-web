@@ -10,6 +10,7 @@ export function MobileDocumentRow({
   customerName,
   customer,
   amount,
+  amountTone = "default",
   code,
   createdAt,
   details,
@@ -18,6 +19,7 @@ export function MobileDocumentRow({
   customerName: string;
   customer: ReactNode;
   amount: string;
+  amountTone?: "default" | "danger";
   code: string;
   createdAt: string;
   details?: ReactNode;
@@ -35,7 +37,7 @@ export function MobileDocumentRow({
         <div className="min-w-0 flex-1 text-[15px] font-semibold">
           {customer}
         </div>
-        <span className="min-w-0 max-w-[48%] shrink-0 text-right text-[15px] font-semibold tabular-nums [overflow-wrap:anywhere]">
+        <span className={`min-w-0 max-w-[48%] shrink-0 text-right text-[15px] font-semibold tabular-nums [overflow-wrap:anywhere] ${amountTone === "danger" ? "text-er" : ""}`}>
           {amount}
         </span>
       </div>

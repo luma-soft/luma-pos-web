@@ -38,7 +38,7 @@
 - Dashboard: store-name header, year/week/month range parity and chart, separate activity feed, offline states. Current range values are constrained by the existing web backend.
 - POS: line editor/unit switching, multiple-order tabs, search/filter/pickers, quote confirmation including VAT and discount, payment sheets.
 - Inventory: grouped products, native list/filter/detail/edit workflows, stocktake, purchase, returns, internal use.
-- Invoices and More: full native group/row parity, filters, swipe/menus, form details and hidden features. Mobile More quick-search is implemented.
+- Invoices and More: native filters, swipe/menus, form details and hidden features still pending. List summary rows and Mobile More search are implemented.
 - Verify touch targets, scrolling, responsive at 360/375/390/402/430px, iPad landscape/portrait; Safari, Chrome and installed PWA.
 - Run lint, typecheck, unit tests, build, and desktop before/after screenshot comparisons in a full checkout with dependencies.
 
@@ -77,3 +77,9 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - Added `MobileDocumentRow` for quote/booking rows. Both now present customer + amount first and keep the whole-row open action, customer link, and document metadata; the desktop data table columns are unmodified.
 - Added Bun render assertions covering the common mobile row component and its optional fields.
 - The Inventory Products/Categories switcher uses a mobile-only pill segmented style like `LumaSegmentedControl`. Desktop switcher colors, spacing and border remain behind `lg:` overrides.
+
+## Returns document row
+
+- Mobile return rows reuse `MobileDocumentRow` with red refund amounts. Status, reason, refund method, source invoice navigation, customer navigation, and whole-row expand action remain available.
+- Desktop table, expanded footer, source order details and return data queries are unchanged.
+- Added a render-level Bun assertion for return amount styling and accessible row label.

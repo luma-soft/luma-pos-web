@@ -9,6 +9,7 @@ import { PartnerDetailLink } from "@/components/partner-detail-link";
 import type { ReturnListRow } from "@/lib/data/returns";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { SalesTableEmptyState } from "./sales-table-empty-state";
+import { MobileDocumentRow } from "./mobile-document-row";
 
 export function ReturnsTable({
   rows,
@@ -111,34 +112,44 @@ export function ReturnsTable({
         />
       )}
       renderMobileRow={({ row, toggle }) => (
-        <div className="relative space-y-2 p-3">
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label={row.code}
-            className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
-          >
-          </button>
-          <div className="pointer-events-none flex min-h-11 items-start justify-between gap-3">
-            <span>
-              <span className="block font-semibold text-primary-600">{row.code}</span>
-              <span className="mt-1 block text-xs text-slate-500">{formatDate(row.createdAt)}</span>
-            </span>
-            <span className="shrink-0 font-semibold tabular-nums text-er">{formatCurrency(Number(row.totalRefund))}</span>
-          </div>
-          {row.orderId && row.orderCode && (
-            <OrderDetailLink
-              orderId={row.orderId}
-              className="pointer-events-auto relative z-10 inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-primary-600 hover:underline"
-            >
-              {row.orderCode}
-            </OrderDetailLink>
+        <MobileDocumentRow
+          code={row.code}
+          customerName={row.customerName ?? t("orders.walkIn")}
+          customer={(
+            <PartnerDetailLink
+              kind="customer"
+              partnerId={row.customerId}
+              name={row.customerName ?? t("orders.walkIn")}
+              openInCurrentTab
+              className="pointer-events-auto relative z-10 block truncate"
+            />
           )}
-          <p className="pointer-events-none text-sm font-medium"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} openInCurrentTab className="pointer-events-auto relative z-10 whitespace-normal break-words" /></p>
-          <p className="pointer-events-none text-xs text-slate-500">
-            {row.reason ? t(`returns.reasons.${row.reason}` as never) : "—"} · {t(`returns.refundMethods.${row.refundMethod}`)}
-          </p>
-        </div>
+          amount={formatCurrency(Number(row.totalRefund))}
+          amountTone="danger"
+          createdAt={formatDate(row.createdAt)}
+          onOpen={toggle}
+          details={(
+            <>
+              <span className="block text-xs">
+                <span className={row.status === "cancelled" ? "font-semibold text-er" : "font-semibold text-ok"}>
+                  {t(`returns.status.${row.status}` as never)}
+                </span>
+                {" · "}
+                {row.reason ? t(`returns.reasons.${row.reason}` as never) : "—"}
+                {" · "}
+                {t(`returns.refundMethods.${row.refundMethod}`)}
+              </span>
+              {row.orderId && row.orderCode && (
+                <OrderDetailLink
+                  orderId={row.orderId}
+                  className="pointer-events-auto relative z-10 inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-primary-600 hover:underline"
+                >
+                  {t("returns.sourceOrder")}: {row.orderCode}
+                </OrderDetailLink>
+              )}
+            </>
+          )}
+        />
       )}
       renderDetail={(row) => (
         expandedId === row.id && expandedContent
