@@ -805,6 +805,24 @@ function ColumnVisibilityMenu<T>({
   );
 }
 
+/** Ignore Escape for an underlying dialog when a child sheet is on top. */
+export function shouldCloseRowPreviewOnEscape(
+  event: Pick<KeyboardEvent, "key" | "defaultPrevented">,
+  dialog: Element | null,
+  openDialogs: readonly Element[],
+) {
+  return event.key === "Escape" &&
+    !event.defaultPrevented &&
+    dialog !== null &&
+    openDialogs[openDialogs.length - 1] === dialog;
+}
+
+function rowPreviewFocusableElements(dialog: HTMLElement) {
+  return Array.from(dialog.querySelectorAll<HTMLElement>(
+    'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  )).filter((element) => element.getClientRects().length > 0);
+}
+
 export function RowPreviewModal({
   title,
   subtitle,
@@ -829,31 +847,66 @@ export function RowPreviewModal({
   panelClassName?: string;
 }) {
   const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
+    const dialog = dialogRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialog?.focus({ preventScroll: true });
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[aria-modal="true"]'));
+      if (shouldCloseRowPreviewOnEscape(event, dialog, dialogs)) {
+        event.preventDefault();
+        event.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || event.defaultPrevented || dialogs[dialogs.length - 1] !== dialog || !dialog) return;
+
+      const elements = rowPreviewFocusableElements(dialog);
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (!first || !last) {
+        event.preventDefault();
+        dialog.focus({ preventScroll: true });
+      } else if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+        event.preventDefault();
+        last.focus({ preventScroll: true });
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+      }
     }
 
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose, open]);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown, true);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, [open]);
 
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" onMouseDown={onClose}>
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         className={cn(
           "flex w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:rounded-card",
-          size === "md" && "max-h-[92dvh] sm:max-w-lg",
-          size === "lg" && "max-h-[92dvh] sm:max-w-2xl",
-          size === "xl" && "max-h-[92dvh] sm:max-w-4xl",
-          size === "full" && "h-full max-h-[900px] sm:max-w-[1600px]",
+          size === "md" && "max-h-[calc(100dvh-env(safe-area-inset-top))] sm:max-h-[92dvh] sm:max-w-lg",
+          size === "lg" && "max-h-[calc(100dvh-env(safe-area-inset-top))] sm:max-h-[92dvh] sm:max-w-2xl",
+          size === "xl" && "max-h-[calc(100dvh-env(safe-area-inset-top))] sm:max-h-[92dvh] sm:max-w-4xl",
+          size === "full" && "h-[calc(100dvh-env(safe-area-inset-top))] max-h-[calc(100dvh-env(safe-area-inset-top))] sm:h-full sm:max-h-[900px] sm:max-w-[1600px]",
           panelClassName,
         )}
         onMouseDown={(event) => event.stopPropagation()}

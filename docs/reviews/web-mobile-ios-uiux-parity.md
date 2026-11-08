@@ -193,3 +193,9 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 ## Expanded CI for Finance, Reports and POS edit fields
 
 - Mobile parity CI now also runs Bun assertions on Cashbook native-style rows, current-week report filtering and POS note/project inputs, alongside earlier screens and PWA.
+
+## Detail sheets — focus and iPhone safe areas
+
+- `RowPreviewModal` is now keyboard-scoped to the topmost `aria-modal` sheet, so Escape does not accidentally close a background document sheet. Tab/Shift+Tab stays within the active dialog, focus is restored on dismissal, and background page scrolling is locked during its lifetime.
+- Phone-sized modal bounds account for `safe-area-inset-top`; existing small/tablet/desktop modal widths and max-heights at `sm:` and above are retained. Existing footer still pads the iPhone bottom safe area.
+- Added a render + pure Escape-policy regression test. Authenticated visual tests on mobile and desktop still required.
