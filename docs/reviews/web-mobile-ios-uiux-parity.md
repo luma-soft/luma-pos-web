@@ -112,3 +112,8 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 
 - `DashboardRecentActivityView.swift` shows at most **two** recent invoice cards when order data is available, falling back to raw activity rows only when invoice cards are absent. An additional duplicated activity list is **not** needed.
 - Web Mobile now shows the same two-order summary with customer name, amount, document code/date and status/payment; native card opens the invoice from the customer label. Existing backend still queries five, and desktop continues to render all original rows.
+
+## CI coverage added
+
+- A scoped GitHub Actions workflow `.github/workflows/mobile-parity-checks.yml` is configured to run Bun lockfile install, Next type generation, TypeScript, full ESLint and targeted Mobile parity tests on main changes.
+- This is configuration only; **do not mark tests passed** until a real workflow run is checked. Vercel checks remain separate.
