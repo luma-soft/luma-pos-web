@@ -244,3 +244,9 @@ The GitHub connector exposes repository contents but not an authenticated browse
 - Both partner-creation dialogs now use 100dvh full-screen Mobile/iPad sheets with safe-area top/bottom padding, independently scrolling forms and sticky title bar. The previous Desktop 760px maximum height, 672px width, padding and rounded card are preserved behind `lg:`.
 - Save, Cancel, Zod/React Hook Form, address picker, create action and `onCreated` callback are unchanged. Close action now has localized accessible name.
 - Native toolbar Save/Cancel arrangement and actual software-keyboard geometry remain to compare on a real phone.
+
+## Customer and supplier native filter sheets
+
+- Both partner list filters now use full screen on phones and retain the 460px drawer from `lg` desktop breakpoint; top and bottom safe areas are respected.
+- Customer filter has the correct dialog role/title and its date/money controls use 16px on phones. Supplier debt selection retains its staged Apply/Reset action and independently scrolling content.
+- Filter queries and business rules remain unchanged. Touch/keyboard screenshots are still outstanding.

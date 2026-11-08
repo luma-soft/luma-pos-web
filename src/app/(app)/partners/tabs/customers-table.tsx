@@ -114,14 +114,18 @@ export function CustomersTable({
       {filterOpen && (
         <div
           className="fixed inset-0 z-[80] bg-slate-950/40"
+          role="presentation"
           onMouseDown={() => setFilterOpen(false)}
         >
           <div
-            className="ml-auto flex h-full w-full max-w-md flex-col overflow-auto bg-surface p-4 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="customers-filter-title"
+            className="ml-auto flex h-[100dvh] w-full max-w-none flex-col overflow-auto bg-surface p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl lg:h-full lg:max-w-md lg:py-4"
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-bold">
+              <h2 id="customers-filter-title" className="text-base font-bold">
                 {t("customers.filters.title")}
               </h2>
               <button
@@ -1379,14 +1383,14 @@ function DateRangeFilter({
             type="date"
             name={fromName}
             defaultValue={fromValue ?? ""}
-            className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
+            className="h-10 rounded-lg border border-border bg-surface px-3 text-base min-h-11 lg:min-h-0 lg:text-sm min-w-11 lg:min-w-0"
             aria-label={t("customers.filters.from")}
           />
           <DateInput
             type="date"
             name={toName}
             defaultValue={toValue ?? ""}
-            className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
+            className="h-10 rounded-lg border border-border bg-surface px-3 text-base min-h-11 lg:min-h-0 lg:text-sm min-w-11 lg:min-w-0"
             aria-label={t("customers.filters.to")}
           />
         </div>
@@ -1418,14 +1422,14 @@ function MoneyRangeFilter({
           min={-Number.MAX_SAFE_INTEGER}
           defaultValue={fromValue ?? ""}
           placeholder={t("customers.filters.fromValue")}
-          className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
+          className="h-10 rounded-lg border border-border bg-surface px-3 text-base min-h-11 lg:min-h-0 lg:text-sm min-w-11 lg:min-w-0"
         />
         <MoneyInput
           name={toName}
           min={-Number.MAX_SAFE_INTEGER}
           defaultValue={toValue ?? ""}
           placeholder={t("customers.filters.toValue")}
-          className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
+          className="h-10 rounded-lg border border-border bg-surface px-3 text-base min-h-11 lg:min-h-0 lg:text-sm min-w-11 lg:min-w-0"
         />
       </div>
     </div>

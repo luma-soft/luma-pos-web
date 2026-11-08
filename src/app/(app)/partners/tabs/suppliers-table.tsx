@@ -379,10 +379,10 @@ export function SuppliersTable({
             role="dialog"
             aria-modal="true"
             aria-labelledby="supplier-filter-title"
-            className="ml-auto flex h-full w-full max-w-md flex-col bg-surface shadow-2xl"
+            className="ml-auto flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-surface shadow-2xl lg:h-full lg:max-w-md lg:overflow-visible"
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <div className="flex items-start border-b border-border px-6 py-5">
+            <div className="flex shrink-0 items-start border-b border-border px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-4 lg:px-6 lg:py-5">
               <div className="min-w-0 flex-1">
                 <h2
                   id="supplier-filter-title"
@@ -404,7 +404,7 @@ export function SuppliersTable({
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-6">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 lg:px-6 lg:py-6">
               <h3 className="mb-3 text-sm font-bold text-slate-800 dark:text-slate-100">
                 {t("suppliers.filter.debtStatus")}
               </h3>
@@ -432,7 +432,7 @@ export function SuppliersTable({
               </div>
             </div>
 
-            <div className="flex gap-2 border-t border-border px-6 py-4">
+            <div className="flex shrink-0 gap-2 border-t border-border px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] lg:px-6 lg:py-4 lg:pb-4">
               <button
                 type="button"
                 onClick={() => setDraftDebtFilter("")}
