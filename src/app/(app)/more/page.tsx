@@ -26,6 +26,7 @@ import { getRole, requireUser } from "@/lib/actions/common";
 import { getStoreSettings } from "@/lib/data/settings";
 import { Routes } from "@/lib/routes";
 import { MobileSectionLabel, MobileSettingsRow, MobileTopBar } from "@/components/mobile-ui";
+import { MobileMoreQuickSearch, type MobileMoreSearchEntry } from "@/components/mobile-more-quick-search";
 import { ModeSwitcher } from "@/components/mode-switcher";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -49,6 +50,35 @@ export default async function MorePage() {
   const manager = role === "owner" || role === "manager";
   const stock = manager || role === "warehouse";
   const sales = manager || role === "cashier";
+  const searchEntries: MobileMoreSearchEntry[] = [
+    { href: Routes.Notifications, label: t("nav.notifications"), subtitle: t("mobile.more.notificationsHint") },
+    ...(manager ? [{ href: Routes.Reports, label: t("nav.reports"), subtitle: t("mobile.more.reportsHint") }] : []),
+    ...(sales ? [
+      { href: Routes.Customers, label: t("nav.customers"), subtitle: t("mobile.more.customersHint") },
+      { href: Routes.Projects, label: t("nav.projects"), subtitle: t("mobile.more.projectsHint") },
+    ] : []),
+    ...(stock ? [
+      { href: Routes.Suppliers, label: t("nav.suppliers"), subtitle: t("mobile.more.suppliersHint") },
+      { href: `${Routes.Inventory}?tab=products`, label: t("nav.products"), subtitle: t("mobile.more.productsHint") },
+      { href: `${Routes.Inventory}?tab=purchases`, label: t("nav.purchases"), subtitle: t("mobile.more.purchasesHint") },
+      { href: `${Routes.Inventory}?tab=stock`, label: t("nav.stocktakes"), subtitle: t("mobile.more.stocktakesHint") },
+    ] : []),
+    { href: Routes.Library, label: t("nav.library"), subtitle: t("mobile.more.libraryHint") },
+    ...(sales && context.features.camera_quote_builder ? [{ href: Routes.CameraQuote, label: t("mobile.more.cameraQuote"), subtitle: t("mobile.more.cameraQuoteHint"), external: true }] : []),
+    ...(sales && context.features.hunonic_price_list ? [{ href: Routes.HunonicPriceList, label: t("mobile.more.hunonicPriceList"), subtitle: t("mobile.more.hunonicPriceListHint"), external: true }] : []),
+    ...(sales && context.features.rang_dong_price_list ? [{ href: Routes.RangDongSmartPriceList, label: t("mobile.more.rangDongPriceList"), subtitle: t("mobile.more.rangDongPriceListHint"), external: true }] : []),
+    ...(manager ? [{ href: Routes.Finance, label: t("nav.groups.finance"), subtitle: t("mobile.more.financeHint") }] : []),
+    ...(sales ? [{ href: `${Routes.Sales}?tab=returns`, label: t("nav.returns"), subtitle: t("mobile.more.returnsHint") }] : []),
+    ...(sales && SHIFT_MANAGEMENT_UI_ENABLED ? [{ href: `${Routes.Finance}?tab=shifts`, label: t("nav.shifts"), subtitle: t("mobile.more.shiftHint") }] : []),
+    ...(context.features.ai_assistant && store.prefs.ai.openaiApiKeySet ? [{ href: "/ai", label: t("nav.ai"), subtitle: t("mobile.more.aiHint") }] : []),
+    { href: Routes.Tools, label: t("nav.tools"), subtitle: t("mobile.more.toolsHint") },
+    ...(manager ? [
+      { href: Routes.Settings, label: t("nav.settings"), subtitle: t("mobile.more.settingsHint") },
+      { href: Routes.PrintSettings, label: t("mobile.more.printTemplates"), subtitle: t("mobile.more.printTemplatesHint") },
+    ] : []),
+    ...(sales ? [{ href: Routes.POS, label: t("nav.pos"), subtitle: t("mobile.more.posHint") }] : []),
+  ];
+
 
   return (
     <div className="min-h-full bg-canvas lg:p-6">
@@ -66,6 +96,13 @@ export default async function MorePage() {
             </div>
           </div>
         </section>
+
+        <MobileMoreQuickSearch
+          entries={searchEntries}
+          searchLabel={t("common.search")}
+          emptyLabel={t("common.noResults")}
+          clearLabel={t("common.clear")}
+        />
 
         <MoreSection title={t("nav.groups.overview")}>
           <MobileSettingsRow href={Routes.Notifications} icon={Bell} label={t("nav.notifications")} subtitle={t("mobile.more.notificationsHint")} tone="orange" />

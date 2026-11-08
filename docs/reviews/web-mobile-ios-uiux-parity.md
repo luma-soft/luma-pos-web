@@ -21,7 +21,7 @@
 | POS | Multiple open orders, product selectors, totals, quote confirmation | Significant separate web flow | Not yet changed |
 | Inventory screen details | Product list/edit, filters, document workflows, offline provider | Existing web implementations | Not yet changed |
 | Invoices | Sales/returns/quotes/bookings, filters, details, merge/print | Existing web implementations | Not yet changed |
-| More | Grouped actions, search, account/preferences | Existing web grouped actions, search parity pending | Not yet changed |
+| More | Grouped actions, search, account/preferences | Added mobile-only accent-insensitive quick search, filtered by existing role/features; grouped actions remain | Partially implemented |
 | Offline/PWA | Native local catalog cache | Web IndexedDB/Service Worker preserved | No sync logic changed; regression test pending |
 | Desktop | Not applicable | Existing desktop layout is the baseline | Code changes are mobile-scoped; visual regression testing pending |
 
@@ -38,7 +38,7 @@
 - Dashboard: store-name header, year/week/month range parity and chart, separate activity feed, offline states. Current range values are constrained by the existing web backend.
 - POS: line editor/unit switching, multiple-order tabs, search/filter/pickers, quote confirmation including VAT and discount, payment sheets.
 - Inventory: grouped products, native list/filter/detail/edit workflows, stocktake, purchase, returns, internal use.
-- Invoices and More: native grouping, search, filters, swipe/menus, form details and hidden features.
+- Invoices and More: full native group/row parity, filters, swipe/menus, form details and hidden features. Mobile More quick-search is implemented.
 - Verify touch targets, scrolling, responsive at 360/375/390/402/430px, iPad landscape/portrait; Safari, Chrome and installed PWA.
 - Run lint, typecheck, unit tests, build, and desktop before/after screenshot comparisons in a full checkout with dependencies.
 
@@ -52,3 +52,9 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - Added gross profit and margin, low-stock product links, and recent orders with statuses in the mobile-only tree.
 - The desktop dashboard component tree is unchanged; no backend business calculations were altered.
 - Full visual/build regression remains unverified in this connector-only environment.
+
+## More search addition
+
+- A mobile-only search field is inserted above the existing More menu and matches Vietnamese text without accents, English text, labels, and helper descriptions.
+- Results only include routes already exposed by the existing role/feature checks; links preserve external-target behavior.
+- The old More groups, desktop markup, backend calls, and feature-gated entries remain in place.
