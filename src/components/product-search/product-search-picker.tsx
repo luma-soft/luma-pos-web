@@ -237,7 +237,7 @@ export function ProductSearchPicker<T>({
         placeholder={placeholder}
         className={cn(
           controlHeightClassName,
-          "w-full rounded-xl border border-border bg-surface py-2 pl-10 pr-10 text-sm outline-none transition-colors placeholder:text-slate-400 focus:border-primary-600",
+          "w-full rounded-xl border border-border bg-surface py-2 pl-10 pr-11 text-base outline-none transition-colors placeholder:text-slate-400 focus:border-primary-600 lg:pr-10 lg:text-sm",
           inputClassName,
         )}
       />
@@ -247,7 +247,7 @@ export function ProductSearchPicker<T>({
           onClick={() => close()}
           title={closeLabel}
           aria-label={closeLabel}
-          className="absolute right-2 top-1/2 z-10 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-surface-2 hover:text-slate-600"
+          className="absolute right-0 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-surface-2 hover:text-slate-600 lg:right-2 lg:h-7 lg:w-7"
         >
           <X className="h-4 w-4" />
         </button>

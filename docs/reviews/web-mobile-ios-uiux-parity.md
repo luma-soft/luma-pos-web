@@ -304,3 +304,8 @@ The GitHub connector exposes repository contents but not an authenticated browse
 
 - The Web-specific camera quotation product picker now uses a full-screen Mobile/iPad surface with safe-area header/list content and independently scrolling camera cards. At `lg`, the existing centered 860px-high, 1280px-wide dialog and border-radius are restored.
 - Existing search/filtering, selected quantity badges, image handling, price display and `onSelect/onClose` actions are unchanged; no extra catalog copies or fetches were introduced.
+
+## Shared product picker — iPhone focus and touch target
+
+- The unified `ProductSearchPicker` search input now uses 16px on phones (14px at `lg`) to prevent Safari focus zoom during large offline catalog searches. The clear/search-close control is a 44×44px phone hit target and retains its original Desktop 28px size.
+- Existing debounce, result ranking/pagination, accessibility combobox semantics, selection callbacks and catalog/offline data provider remain unchanged; no new network fetches or duplicated search indexes.
