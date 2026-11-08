@@ -465,7 +465,7 @@ export function InventoryFilterDrawer({
               </button>
             </header>
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-canvas px-3 py-3 pb-6 lg:space-y-6 lg:bg-surface lg:px-6 lg:py-5 [&>section]:rounded-2xl [&>section]:border [&>section]:border-border [&>section]:bg-surface [&>section]:p-3 lg:[&>section]:rounded-none lg:[&>section]:border-0 lg:[&>section]:bg-transparent lg:[&>section]:p-0>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-canvas px-3 py-3 pb-6 lg:space-y-6 lg:bg-surface lg:px-6 lg:py-5 [&>section]:rounded-2xl [&>section]:border [&>section]:border-border [&>section]:bg-surface [&>section]:p-3 lg:[&>section]:rounded-none lg:[&>section]:border-0 lg:[&>section]:bg-transparent lg:[&>section]:p-0">
               {isPurchaseFilter && (
                 <section>
                   <h3 className="mb-3 font-bold">Tìm theo</h3>
