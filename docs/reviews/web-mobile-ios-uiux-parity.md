@@ -122,3 +122,8 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 
 - Added opt-in `mobileSegmented` GroupTabs for two-way Partners and Finance navigation, with desktop classes intact.
 - Customer (including walk-in) and supplier mobile card surfaces now open details from any empty area, not only by tapping a text link. Explicit links remain independently tappable, and desktop tables and actions are unchanged.
+
+## iPhone input focus zoom prevention
+
+- Search fields (`ListSearchInput`, searchable `Select`), shared textareas and read-only date fields use 16px font size on mobile to prevent Safari focus zoom; the prior 14px sizes are preserved from `lg` onwards.
+- Shared `Input`/Select triggers already use 16px on mobile and remain unchanged. No input value handling or validation was modified.

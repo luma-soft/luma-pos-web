@@ -141,7 +141,7 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
           value={committedValue}
           placeholder={placeholder ?? (dateTime ? "YYYY-MM-DDTHH:mm" : "YYYY-MM-DD")}
           autoComplete="off"
-          className={cn("h-11 w-full min-w-0 rounded-lg border border-border bg-surface px-3 pr-12 text-sm outline-none focus:border-primary-600 disabled:opacity-50", className, "pr-12")}
+          className={cn("h-11 w-full min-w-0 rounded-lg border border-border bg-surface px-3 pr-12 text-base outline-none focus:border-primary-600 disabled:opacity-50 lg:text-sm", className, "pr-12")}
           onClick={(event) => { onClick?.(event); if (!event.defaultPrevented && !readOnly) openCalendar(); }}
           onKeyDown={(event) => {
             onKeyDown?.(event);

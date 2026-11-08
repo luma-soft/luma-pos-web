@@ -34,7 +34,7 @@ export const ListSearchInput = forwardRef<HTMLInputElement, ListSearchInputProps
           placeholder={placeholder}
           className={cn(
             controlHeightClassName,
-            "min-h-11 w-full rounded-xl border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100",
+            "min-h-11 w-full rounded-xl border border-border bg-surface py-2 pl-9 pr-3 text-base outline-none transition focus:border-primary-500 lg:text-sm focus:ring-2 focus:ring-primary-100",
             className,
             "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-0 lg:min-w-0",
           )}
