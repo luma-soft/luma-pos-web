@@ -1,30 +1,39 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 
 export function OrderDetailDialog({
+  orderId,
   title,
   subtitle,
   children,
 }: {
+  orderId: string;
   title: string;
   subtitle: ReactNode;
   children: ReactNode;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
+  const isOpen = searchParams.get("detailOrderId") === orderId;
   const dialogRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => {
-    const next = new URLSearchParams(searchParams.toString());
-    next.delete("detailOrderId");
-    const query = next.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [pathname, router, searchParams]);
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("detailOrderId") !== orderId) return;
+
+    // URL-only change: do not navigate/re-fetch the server-rendered list on close.
+    // Next.js syncs native History API updates with useSearchParams.
+    url.searchParams.delete("detailOrderId");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  }, [orderId]);
 
   useEffect(() => {
+    if (!isOpen) return;
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
@@ -36,7 +45,10 @@ export function OrderDetailDialog({
     }
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [close]);
+  }, [close, isOpen]);
+
+  // The server-rendered parallel route can remain mounted after a shallow URL update.
+  if (!isOpen) return null;
 
   return (
     <div

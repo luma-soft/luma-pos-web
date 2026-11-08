@@ -19,6 +19,7 @@ export default async function OrderModalCatchAll({ searchParams }: Props) {
   if (!order) notFound();
   return (
     <OrderDetailDialog
+      orderId={order.id}
       title={order.code}
       subtitle={<PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? "Khách lẻ"} />}
     >
