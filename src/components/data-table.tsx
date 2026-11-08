@@ -52,6 +52,8 @@ export function dataTableResultSetKey(
 ) {
   const resultSetParams = new URLSearchParams(searchParams.toString());
   resultSetParams.delete(expandedParam);
+  // Opening/closing an invoice overlay must not reset the list behind it.
+  resultSetParams.delete("detailOrderId");
   return resultSetParams.toString();
 }
 
