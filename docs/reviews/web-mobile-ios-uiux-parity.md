@@ -127,3 +127,9 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 
 - Search fields (`ListSearchInput`, searchable `Select`), shared textareas and read-only date fields use 16px font size on mobile to prevent Safari focus zoom; the prior 14px sizes are preserved from `lg` onwards.
 - Shared `Input`/Select triggers already use 16px on mobile and remain unchanged. No input value handling or validation was modified.
+
+## Native invoice history date grouping
+
+- All four Web Mobile document tabs now show a localized day heading at each change of date within the existing result order, following `NativeInvoiceHistoryDayGroup` in iOS. Bookings use scheduled delivery date if present; other tabs use creation date.
+- Added a pure `mobileDocumentDayHeadings` helper; it only processes fetched/paginated rows and adds no queries, sorting or historical data to offline catalog.
+- Desktop table columns and row order are unchanged. This reproduces grouping within the current paginated page; cross-page/infinite scrolling parity remains future work.

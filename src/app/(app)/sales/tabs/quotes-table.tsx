@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { SalesTableEmptyState } from "./sales-table-empty-state";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { MobileDocumentRow } from "./mobile-document-row";
+import { mobileDocumentDayHeadings } from "./mobile-document-day";
 
 type QuoteRow = {
   id: string;
@@ -34,6 +35,7 @@ export function QuotesTable({
     next.set("detailOrderId", row.id);
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
   }
+  const dayHeadings = mobileDocumentDayHeadings(rows, (row) => row.createdAt);
   const columns: DataTableColumn<QuoteRow>[] = [
     { key: "code", label: t("quotes.cols.code"), required: true, width: "170px", render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, width: "170px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
@@ -53,6 +55,7 @@ export function QuotesTable({
       renderMobileRow={({ row }) => (
         <MobileDocumentRow
           code={row.code}
+          dayHeading={dayHeadings.get(row.id)}
           customerName={row.customerName ?? t("orders.walkIn")}
           customer={(
             <PartnerDetailLink

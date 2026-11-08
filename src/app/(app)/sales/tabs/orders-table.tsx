@@ -24,6 +24,7 @@ import { cancelOrders } from "@/lib/actions/orders";
 import { SalesTableEmptyState } from "./sales-table-empty-state";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { controlHeightClassName } from "@/components/ui/button-variants";
+import { mobileDocumentDayHeadings } from "./mobile-document-day";
 
 export function normalizeOrderBatchSelection(
   selectedIds: Set<string>,
@@ -188,6 +189,7 @@ export function OrderMobileRow({
   onToggle,
   onOpen,
   labels,
+  dayHeading,
 }: {
   order: OrderListRow;
   selected: boolean;
@@ -197,11 +199,18 @@ export function OrderMobileRow({
     walkIn: string;
     remaining: string;
   };
+  dayHeading?: string;
 }) {
   const remaining = Number(order.total) - Number(order.amountPaid);
   const selectable = order.status !== "cancelled" && order.status !== "merged";
   const customerTitle = order.customerName ?? labels.walkIn;
   return (
+    <div>
+      {dayHeading && (
+        <div className="border-b border-border-soft bg-surface-2/60 px-3 py-2 text-xs font-bold text-slate-600 dark:text-slate-300" role="heading" aria-level={3}>
+          {dayHeading}
+        </div>
+      )}
     <div className={cn(
       "flex min-w-0 items-stretch",
       selected && "bg-primary-50/50 dark:bg-primary-950/20",
@@ -250,6 +259,7 @@ export function OrderMobileRow({
         </div>
       </div>
     </div>
+    </div>
   );
 }
 
@@ -276,6 +286,7 @@ export function OrdersTable({
   );
   const selectedIds = selection?.selectedIds ?? internalSelectedIds;
   const setSelectedIds = selection?.onChange ?? setInternalSelectedIds;
+  const dayHeadings = mobileDocumentDayHeadings(rows, (order) => order.createdAt);
   const selectableIds = rows
     .filter((order) => order.status !== "cancelled" && order.status !== "merged")
     .map((order) => order.id);
@@ -496,6 +507,7 @@ export function OrdersTable({
         renderMobileRow={({ row: order }) => (
           <OrderMobileRow
             order={order}
+            dayHeading={dayHeadings.get(order.id)}
             selected={normalizedSelection.has(order.id)}
             onToggle={() => toggle(order.id)}
             onOpen={() => openOrder(order)}

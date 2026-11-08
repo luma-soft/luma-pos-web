@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { SalesTableEmptyState } from "./sales-table-empty-state";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { MobileDocumentRow } from "./mobile-document-row";
+import { mobileDocumentDayHeadings } from "./mobile-document-day";
 
 type BookingRow = {
   id: string;
@@ -35,6 +36,7 @@ export function BookingsTable({
     next.set("detailOrderId", row.id);
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
   }
+  const dayHeadings = mobileDocumentDayHeadings(rows, (row) => row.deliveryDate ?? row.createdAt);
   const columns: DataTableColumn<BookingRow>[] = [
     { key: "code", label: t("bookings.cols.code"), required: true, width: "170px", render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, width: "160px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
@@ -55,6 +57,7 @@ export function BookingsTable({
       renderMobileRow={({ row }) => (
         <MobileDocumentRow
           code={row.code}
+          dayHeading={dayHeadings.get(row.id)}
           customerName={row.customerName ?? t("orders.walkIn")}
           customer={(
             <PartnerDetailLink

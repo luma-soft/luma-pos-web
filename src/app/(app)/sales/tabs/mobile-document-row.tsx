@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 export function MobileDocumentRow({
   customerName,
   customer,
+  dayHeading,
   amount,
   amountTone = "default",
   code,
@@ -18,6 +19,7 @@ export function MobileDocumentRow({
 }: {
   customerName: string;
   customer: ReactNode;
+  dayHeading?: string;
   amount: string;
   amountTone?: "default" | "danger";
   code: string;
@@ -26,6 +28,12 @@ export function MobileDocumentRow({
   onOpen: () => void;
 }) {
   return (
+    <div>
+      {dayHeading && (
+        <div className="border-b border-border-soft bg-surface-2/60 px-3 py-2 text-xs font-bold text-slate-600 dark:text-slate-300" role="heading" aria-level={3}>
+          {dayHeading}
+        </div>
+      )}
     <div className="relative min-h-[104px] min-w-0 px-3 py-3">
       <button
         type="button"
@@ -49,6 +57,7 @@ export function MobileDocumentRow({
       <div className="pointer-events-none relative mt-2 truncate text-[11px] text-slate-500 dark:text-slate-400">
         {createdAt} · {code}
       </div>
+    </div>
     </div>
   );
 }

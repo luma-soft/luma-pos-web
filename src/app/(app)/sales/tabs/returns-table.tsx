@@ -10,6 +10,7 @@ import type { ReturnListRow } from "@/lib/data/returns";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { SalesTableEmptyState } from "./sales-table-empty-state";
 import { MobileDocumentRow } from "./mobile-document-row";
+import { mobileDocumentDayHeadings } from "./mobile-document-day";
 
 export function ReturnsTable({
   rows,
@@ -23,6 +24,7 @@ export function ReturnsTable({
   expandedFooter?: ReactNode;
 }) {
   const t = useTranslations();
+  const dayHeadings = mobileDocumentDayHeadings(rows, (row) => row.createdAt);
   const columns: DataTableColumn<ReturnListRow>[] = [
     {
       key: "code",
@@ -114,6 +116,7 @@ export function ReturnsTable({
       renderMobileRow={({ row, toggle }) => (
         <MobileDocumentRow
           code={row.code}
+          dayHeading={dayHeadings.get(row.id)}
           customerName={row.customerName ?? t("orders.walkIn")}
           customer={(
             <PartnerDetailLink
