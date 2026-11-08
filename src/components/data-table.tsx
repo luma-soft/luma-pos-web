@@ -6,6 +6,7 @@ import { Fragment, isValidElement, type ReactNode, type SyntheticEvent, useEffec
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Columns3, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { updateModalUrlQuery } from "@/lib/modal-url-query";
 
 type SortValue = string | number | Date | null | undefined;
 type SortDirection = "asc" | "desc";
@@ -52,8 +53,13 @@ export function dataTableResultSetKey(
 ) {
   const resultSetParams = new URLSearchParams(searchParams.toString());
   resultSetParams.delete(expandedParam);
-  // Opening/closing an invoice overlay must not reset the list behind it.
-  resultSetParams.delete("detailOrderId");
+  // Overlay-only URL fields are not result-set filters; keep the list's scroll.
+  for (const key of [
+    "detailOrderId", "detailPurchaseId", "detailCustomerId", "detailSupplierId",
+    "detailProductId", "detailTab",
+    "productModal", "productId", "copyFrom", "copyGroup", "sameTypeAs",
+    "productKind", "returnTo", "onlineListing", "onlineProductId", "shopeeProductId",
+  ]) resultSetParams.delete(key);
   return resultSetParams.toString();
 }
 
@@ -265,7 +271,8 @@ export function DataTableShell<T>({
   const [availableHeight, setAvailableHeight] = useState<number | null>(null);
   const storageKey = `luma:${tableId}:columns`;
   const queryExpanded = params.get(expandedParam);
-  const expandedId = queryExpanded ?? initialExpandedId ?? null;
+  const [dismissedInitialId, setDismissedInitialId] = useState<string | null>(null);
+  const expandedId = queryExpanded ?? (initialExpandedId === dismissedInitialId ? null : initialExpandedId ?? null);
   const [storedVisible, setStoredVisible] = useState<Set<string> | null>(null);
   const [activeSortColumn, setActiveSortColumn] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: string; direction: SortDirection } | null>(null);
@@ -381,11 +388,16 @@ export function DataTableShell<T>({
 
   function setExpanded(nextId: string | null) {
     if (!renderExpanded && !renderDetail) return;
+    if (!nextId) {
+      // Close immediately, including server-provided default detail content.
+      setDismissedInitialId(initialExpandedId ?? null);
+      updateModalUrlQuery({ [expandedParam]: null });
+      return;
+    }
     const sp = new URLSearchParams(params.toString());
-    if (nextId) sp.set(expandedParam, nextId);
-    else sp.delete(expandedParam);
-    const query = sp.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    sp.set(expandedParam, nextId);
+    // Some panels fetch their detail on the server (e.g. returns); keep that load.
+    router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
   }
 
   const columnVisibilityMenu = (

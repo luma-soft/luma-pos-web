@@ -36,6 +36,17 @@ describe("data table scroll reset key", () => {
     expect(closed).toBe(before);
   });
 
+  test("closing customer, supplier, purchase and product modals preserves the list position", () => {
+    const base = "tab=products&page=3&size=50&q=abc";
+    const before = dataTableResultSetKey(new URLSearchParams(base), "expanded");
+    for (const key of [
+      "detailCustomerId", "detailSupplierId", "detailPurchaseId",
+      "detailProductId", "productModal", "productId", "detailTab",
+    ]) {
+      expect(dataTableResultSetKey(new URLSearchParams(base + `&${key}=some-id`), "expanded")).toBe(before);
+    }
+  });
+
   test("changing a real list filter or page still resets scroll", () => {
     const base = dataTableResultSetKey(new URLSearchParams("tab=orders&page=3&q=abc"), "expanded");
     expect(dataTableResultSetKey(new URLSearchParams("tab=orders&page=4&q=abc"), "expanded")).not.toBe(base);

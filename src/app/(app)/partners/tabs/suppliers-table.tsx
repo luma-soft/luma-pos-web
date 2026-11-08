@@ -11,6 +11,7 @@ import { DataTableShell, RowPreviewModal, type DataTableColumn } from "@/compone
 import { FilterTriggerButton, ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { Routes } from "@/lib/routes";
+import { updateModalUrlQuery } from "@/lib/modal-url-query";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { getSuppliers } from "@/lib/data/partners";
 import { updateSupplier } from "@/lib/actions/partners";
@@ -130,7 +131,6 @@ export function SuppliersTable({
   query,
   owing,
   pageSize,
-  initialDetailId = null,
   initialDetailSupplier = null,
 }: {
   rows: SupplierRow[];
@@ -147,7 +147,7 @@ export function SuppliersTable({
   const searchParams = useSearchParams();
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftDebtFilter, setDraftDebtFilter] = useState<SupplierDebtFilter>(owing);
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(initialDetailId);
+  const selectedSupplierId = searchParams.get("detailSupplierId");
   const [detailTab, setDetailTab] = useState<SupplierDetailTab>("info");
   const selectedSupplier = rows.find((row) => row.id === selectedSupplierId)
     ?? (initialDetailSupplier?.id === selectedSupplierId ? initialDetailSupplier : null);
@@ -182,13 +182,12 @@ export function SuppliersTable({
     setFilterOpen(false);
   }
   function openSupplier(row: SupplierRow) {
-    setSelectedSupplierId(row.id);
     setDetailTab("info");
-    const next = new URLSearchParams(searchParams.toString());
-    next.set("tab", "suppliers");
-    next.set("detailSupplierId", row.id);
-    next.delete("detailCustomerId");
-    router.push(`${Routes.Partners}?${next.toString()}`, { scroll: false });
+    updateModalUrlQuery({
+      tab: "suppliers",
+      detailSupplierId: row.id,
+      detailCustomerId: null,
+    }, "push");
   }
   const columns: DataTableColumn<SupplierRow>[] = [
     {
@@ -230,13 +229,8 @@ export function SuppliersTable({
   ];
 
   function closeSupplier() {
-    setSelectedSupplierId(null);
     setDetailTab("info");
-    if (searchParams.has("detailSupplierId")) {
-      const next = new URLSearchParams(searchParams.toString());
-      next.delete("detailSupplierId");
-      router.replace(`${Routes.Partners}?${next.toString()}`, { scroll: false });
-    }
+    updateModalUrlQuery({ detailSupplierId: null });
     setDraft(null);
     setEditing(false);
     setSaving(false);

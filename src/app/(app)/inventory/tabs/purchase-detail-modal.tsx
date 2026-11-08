@@ -4,7 +4,7 @@ import { productLineDisplayName } from "@/lib/products/variant-presentation";
 
 import { type ReactNode, useCallback } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Copy, FilePenLine, ReceiptText } from "lucide-react";
 import { PurchaseCancelButton } from "../../purchases/purchase-cancel-button";
@@ -13,6 +13,7 @@ import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { modalActionSizeClassName } from "@/components/ui/button-variants";
 import { Routes } from "@/lib/routes";
+import { updateModalUrlQuery } from "@/lib/modal-url-query";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { getPurchase, getPurchases } from "@/lib/data/inventory";
 import type { PrintTemplate } from "@/lib/print/template-shared";
@@ -71,19 +72,13 @@ function RouteAwarePurchaseDetailModal({
   purchase: PurchaseRow | null;
   printTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
 }) {
-  const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const close = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("detailPurchaseId");
-    const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [pathname, router, searchParams]);
+  const close = useCallback(() => updateModalUrlQuery({ detailPurchaseId: null }), []);
+  const visiblePurchase = searchParams.get("detailPurchaseId") === purchase?.id ? purchase : null;
 
   return (
     <PurchaseDetailModalContent
-      purchase={purchase}
+      purchase={visiblePurchase}
       printTemplates={printTemplates}
       onClose={close}
     />

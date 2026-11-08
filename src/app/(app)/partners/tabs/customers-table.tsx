@@ -39,6 +39,7 @@ import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { CustomerCreateDialog } from "@/components/partners/customer-create-dialog";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Routes } from "@/lib/routes";
+import { updateModalUrlQuery } from "@/lib/modal-url-query";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { setCustomerActive } from "@/lib/actions/partners";
 import type { CustomerFilters, CustomerListResult } from "@/lib/data/partners";
@@ -77,7 +78,6 @@ export function CustomersTable({
   filters,
   returnPrintTemplates,
   aiPreview = false,
-  initialDetailId = null,
   initialDetailCustomer = null,
 }: {
   data: CustomerListResult;
@@ -97,7 +97,6 @@ export function CustomersTable({
           filters={filters}
           returnPrintTemplates={returnPrintTemplates}
           aiPreview={aiPreview}
-          initialDetailId={initialDetailId}
           initialDetailCustomer={initialDetailCustomer}
           onOpenFilters={() => setFilterOpen(true)}
         />
@@ -187,7 +186,6 @@ function CustomerRows({
   returnPrintTemplates,
   aiPreview,
   onOpenFilters,
-  initialDetailId,
   initialDetailCustomer,
 }: {
   data: CustomerListResult;
@@ -195,7 +193,6 @@ function CustomerRows({
   returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
   aiPreview: boolean;
   onOpenFilters: () => void;
-  initialDetailId: string | null;
   initialDetailCustomer: CustomerRow | null;
 }) {
   const t = useTranslations();
@@ -203,9 +200,9 @@ function CustomerRows({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [createOpen, setCreateOpen] = useState(aiPreview);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
-    initialDetailId,
-  );
+  const [walkInSelected, setWalkInSelected] = useState(false);
+  const selectedCustomerId = searchParams.get("detailCustomerId")
+    ?? (walkInSelected ? WALK_IN_ROW_ID : null);
   const [detailTab, setDetailTab] = useState<CustomerExpandTab>("info");
   const selectedCustomer =
     data.rows.find((customer) => customer.id === selectedCustomerId) ??
@@ -226,27 +223,21 @@ function CustomerRows({
     : null;
   const tableRows = walkInRow ? [walkInRow, ...data.rows] : data.rows;
   function closeCustomer() {
-    setSelectedCustomerId(null);
-    if (searchParams.has("detailCustomerId")) {
-      const next = new URLSearchParams(searchParams.toString());
-      next.delete("detailCustomerId");
-      router.replace(`${Routes.Partners}?${next.toString()}`, {
-        scroll: false,
-      });
-    }
+    setWalkInSelected(false);
+    updateModalUrlQuery({ detailCustomerId: null });
   }
   function openCustomer(customer: CustomerRow) {
     if (customer.id === WALK_IN_ROW_ID) {
-      setSelectedCustomerId(WALK_IN_ROW_ID);
+      setWalkInSelected(true);
       return;
     }
-    setSelectedCustomerId(customer.id);
+    setWalkInSelected(false);
     setDetailTab("info");
-    const next = new URLSearchParams(searchParams.toString());
-    next.set("tab", "customers");
-    next.set("detailCustomerId", customer.id);
-    next.delete("detailSupplierId");
-    router.push(`${Routes.Partners}?${next.toString()}`, { scroll: false });
+    updateModalUrlQuery({
+      tab: "customers",
+      detailCustomerId: customer.id,
+      detailSupplierId: null,
+    }, "push");
   }
   const columns: DataTableColumn<CustomerRow>[] = [
     {
