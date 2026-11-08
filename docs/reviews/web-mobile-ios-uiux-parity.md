@@ -250,3 +250,8 @@ The GitHub connector exposes repository contents but not an authenticated browse
 - Both partner list filters now use full screen on phones and retain the 460px drawer from `lg` desktop breakpoint; top and bottom safe areas are respected.
 - Customer filter has the correct dialog role/title and its date/money controls use 16px on phones. Supplier debt selection retains its staged Apply/Reset action and independently scrolling content.
 - Filter queries and business rules remain unchanged. Touch/keyboard screenshots are still outstanding.
+
+## Product detail native summary — three visible metrics
+
+- Mobile product information now shows the iOS-style three-column strip for price, cost and current stock. The former fourth minimum-stock tile is moved into the Mobile information list, preserving it while matching native hierarchy.
+- Desktop price/cost/stock/minimum stock rows and product calculations remain unchanged. Metric amounts wrap on small screens to avoid clipping.

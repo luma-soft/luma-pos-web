@@ -1055,7 +1055,7 @@ function ProductInfoPanel({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 lg:hidden">
+        <div className="grid grid-cols-3 divide-x divide-border-soft overflow-hidden rounded-xl border border-border-soft bg-surface lg:hidden">
           <ProductMetric
             label={t("products.pricing.retailPrice")}
             value={formatCurrency(Number(product.retailPrice))}
@@ -1076,19 +1076,15 @@ function ProductInfoPanel({
                 : "success"
             }
           />
-          <ProductMetric
-            label={t("products.stock.min")}
-            value={
-              isProductStockManaged(product.categoryName, product.productKind) &&
-              Number(product.minLevel) > 0
-                ? formatNumber(Number(product.minLevel))
-                : "—"
-            }
-          />
         </div>
 
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-x-8 lg:gap-y-3">
           <InfoItem label={t("products.fields.sku")} value={product.sku} />
+          <InfoItem className="lg:hidden"
+            label={t("products.stock.min")}
+            value={isProductStockManaged(product.categoryName, product.productKind) && Number(product.minLevel) > 0
+              ? formatNumber(Number(product.minLevel)) : "—"}
+          />
           <InfoItem
             label={t("products.fields.barcode")}
             value={product.barcode}
@@ -2308,13 +2304,13 @@ function ProductMetric({
   tone?: "neutral" | "primary" | "success" | "warning";
 }) {
   return (
-    <div className="min-w-0 rounded-xl border border-border-soft bg-surface px-3 py-3 shadow-sm">
-      <div className="truncate text-[10px] font-semibold text-slate-400">
+    <div className="min-w-0 bg-surface px-2 py-3 text-center">
+      <div className="text-[10px] font-semibold leading-4 text-slate-500">
         {label}
       </div>
       <div
         className={cn(
-          "mt-1 truncate font-mono text-sm font-black tabular-nums text-slate-800 dark:text-slate-100",
+          "mt-1 break-words text-[12px] font-extrabold leading-5 tabular-nums text-slate-800 dark:text-slate-100 [overflow-wrap:anywhere] min-[390px]:text-[13px]",
           tone === "primary" && "text-primary-700 dark:text-primary-300",
           tone === "success" && "text-ok",
           tone === "warning" && "text-warn",
