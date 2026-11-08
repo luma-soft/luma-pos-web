@@ -25,3 +25,13 @@ test("creation actions, validation and cancellation remain connected",()=>{
     expect(source).toContain('tx="common.cancel"');
   }
 });
+
+test("mobile partner creation keeps submission controls visible on long forms",()=>{
+  for(const source of [customer,supplier]){
+    expect(source).toContain("mobileDialogActions = false");
+    expect(source).toContain("sticky bottom-0 z-10");
+    expect(source).toContain("lg:static lg:mx-0");
+    expect(source).toContain("mobileDialogActions");
+    expect(source).toContain('type="submit" loading={form.formState.isSubmitting}');
+  }
+});

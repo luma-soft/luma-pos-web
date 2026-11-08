@@ -78,12 +78,14 @@ export function CustomerCreateForm({
   onCancel,
   onCreated,
   className,
+  mobileDialogActions = false,
 }: {
   aiPreview?: boolean;
   createAction?: CreateCustomerAction;
   onCancel: () => void;
   onCreated: (customer: CustomerCreateResult) => void;
   className?: string;
+  mobileDialogActions?: boolean;
 }) {
   const t = useTranslations();
   const storageScope = useTenantClientScope();
@@ -189,7 +191,10 @@ export function CustomerCreateForm({
         <p className="text-sm text-er">{t(form.formState.errors.root.message ?? "errors.serverError")}</p>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
+      <div className={cn(
+        "flex justify-end gap-2 pt-2",
+        mobileDialogActions && "sticky bottom-0 z-10 -mx-4 border-t border-border-soft bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] lg:static lg:mx-0 lg:border-t-0 lg:bg-transparent lg:px-0 lg:pb-0",
+      )}>
         <Button type="button" variant="outline" onClick={onCancel} tx="common.cancel" />
         <Button type="submit" loading={form.formState.isSubmitting} tx="common.save" />
       </div>
@@ -232,6 +237,7 @@ export function CustomerCreateDialog({
           createAction={createAction}
           onCancel={() => onOpenChange(false)}
           onCreated={onCreated}
+          mobileDialogActions
         />
       </div>
     </div>

@@ -261,3 +261,8 @@ The GitHub connector exposes repository contents but not an authenticated browse
 - The POS price/discount editor now opens as an iPhone bottom sheet with independent scrolling, bottom safe-area padding, and a 48px `Done` button. The same existing price book, unit price, discount, free-item and computed sell-price controls are reused; **price updates still follow the existing immediate-change handler** and Done only dismisses the sheet.
 - Prevent automatic keyboard opening when the mobile sheet appears, while preserving desktop focus-on-open via a desktop-only media check. Desktop retains the centered 400px modal, padding, and styling behind `lg:`.
 - Requires a real iPhone keyboard/Viewport visual test; code and Bun source assertions alone cannot establish keyboard-free occlusion.
+
+## Partner creation — sticky mobile actions
+
+- Customer and supplier creation forms now support opt-in sticky bottom Save/Cancel controls in full-screen mobile dialogs. Long forms keep submission and cancellation accessible without scrolling all the way down.
+- When embedded elsewhere, the option defaults off; the original Desktop button arrangement remains via `lg:`. RHF validation, consent, address, and create semantics stay unchanged.
