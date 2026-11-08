@@ -6,6 +6,8 @@ on:
     paths:
       - "src/**"
       - "messages/**"
+      - "public/sw.js"
+      - "public/offline.html"
       - ".github/workflows/mobile-parity-checks.yml"
   workflow_dispatch:
 
@@ -41,4 +43,8 @@ jobs:
             'src/app/(app)/sales/tabs/orders-mobile-parity.test.mjs' \
             'src/app/(app)/sales/tabs/mobile-document-row.test.mjs' \
             'src/components/mobile-more-quick-search.test.mjs' \
-            'src/app/(pos)/pos/pos-native-draft-picker.test.mjs'
+            'src/app/(pos)/pos/pos-native-draft-picker.test.mjs' \
+            'src/app/(app)/partners/tabs/partners-mobile-hit-area.test.mjs' \
+            'src/components/ui/mobile-input-zoom.test.mjs' \
+            'src/app/(app)/sales/tabs/mobile-document-day.test.mjs' \
+            'src/lib/offline/sw-private-html-safety.test.mjs'

@@ -142,3 +142,7 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - Online navigation is network-first; when offline, it shows a public recovery shell. Existing **already open** POS screens still retain their user/store-scoped local catalog and pending orders; those modules were not changed.
 - **Known limitation:** Offline **cold launch** of a fully functional POS can no longer rely on cached private HTML. The safe recovery shell does not reconstruct the POS UI. A separate authenticated-independent offline app-shell boot mechanism would be required for full cold-launch parity. This task cannot be marked fully done until that is implemented and tested on device.
 - No tenant/user/order data is embedded in the static fallback. Manifest start URL remains unchanged.
+
+## CI coverage extension
+
+- The GitHub Actions parity workflow also watches the public PWA shell/worker and runs all newly added partner, input-zoom, document-day, and Service Worker regression checks.
