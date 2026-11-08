@@ -78,19 +78,38 @@ export function PurchaseReturnsTable({ rows, capabilities }: { rows: PurchaseRet
         </div>
       )}
       renderMobileRow={({ row, toggle }) => (
-        <div className="relative w-full p-3 text-left">
-          <button type="button" onClick={toggle} aria-label={row.code} className="absolute inset-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" />
-          <div className="pointer-events-none flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="font-semibold text-primary-600">{row.code}</div>
-              <div className="text-xs text-slate-400">{formatDate(row.createdAt)} · <PartnerDetailLink kind="supplier" partnerId={row.supplierId} name={row.supplierName} openInCurrentTab className="pointer-events-auto relative z-10 max-w-full whitespace-normal break-words" /></div>
-            </div>
+        <div className="relative min-h-[120px] p-3">
+          <button type="button" onClick={toggle} aria-label={row.code}
+            className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500" />
+          <div className="pointer-events-none relative flex items-start justify-between gap-3">
+            <PartnerDetailLink
+              kind="supplier"
+              partnerId={row.supplierId}
+              name={row.supplierName}
+              openInCurrentTab
+              className="pointer-events-auto relative z-10 min-w-0 flex-1 truncate text-[15px] font-semibold"
+            />
+            <span className="max-w-[48%] shrink-0 text-right text-sm font-bold tabular-nums text-er [overflow-wrap:anywhere]">
+              {formatCurrency(Number(row.totalRefund))}
+            </span>
+          </div>
+          <div className="pointer-events-none relative mt-1.5 truncate text-[11px] text-slate-500">
+            {formatDate(row.createdAt)} · {row.code}
+          </div>
+          <div className="pointer-events-none relative mt-2 text-xs text-slate-500">
+            {t("purchaseReturns.cols.productName")}: {row.items.length}
+          </div>
+          <div className="pointer-events-none relative mt-1.5 flex flex-wrap items-center justify-between gap-2">
             <StatusBadge status={row.status} />
+            <span className={cn("text-xs font-semibold", settlementClass(row.settlementStatus))}>
+              {t(`purchaseReturns.settlement.${row.settlementStatus}` as never)}
+            </span>
           </div>
-          <div className="pointer-events-none mt-2 flex items-center justify-between text-sm">
-            <span className="font-semibold tabular-nums">{formatCurrency(Number(row.totalRefund))}</span>
-            <span className={cn("text-xs font-semibold", settlementClass(row.settlementStatus))}>{t(`purchaseReturns.settlement.${row.settlementStatus}` as never)}</span>
-          </div>
+          {Number(row.debtAmount) > 0 && (
+            <div className="pointer-events-none relative mt-1.5 text-right text-xs font-semibold tabular-nums text-slate-500">
+              {t("purchaseReturns.debtAmount")}: {formatCurrency(Number(row.debtAmount))}
+            </div>
+          )}
         </div>
       )}
     />

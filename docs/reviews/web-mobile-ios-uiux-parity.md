@@ -157,3 +157,9 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 
 - Internal-use issues now have a native-style compact Mobile row showing document code, reason, total cost, status, time and recipient. Whole-row tap opens the existing detail panel with item list and authorized document actions.
 - Stock tab uses a dedicated Mobile row with product name/SKU, stock severity, quantity, minimum stock and value. Whole-row tap opens the pre-existing product detail route. Both desktop tables, business queries and status/cost rules are unmodified.
+
+## Receiving and supplier returns — native Mobile summaries
+
+- Purchase receipt rows show supplier and status first, then date/code, item count, total and any outstanding balance, matching `NativePurchaseReceiptRowView`.
+- Purchase return rows show supplier and refund amount first, then date/code, item count, status and supplier settlement, matching `NativePurchaseReturnRowView`.
+- Existing row detail/authorized actions and desktop table definitions are unchanged, with no new data requests.
