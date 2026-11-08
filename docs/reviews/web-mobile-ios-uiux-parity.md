@@ -184,3 +184,8 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - Mobile report period presets now offer Today / This Week / This Month / Custom, matching the week-based iOS report range; Monday-start week uses the same existing report queries with bounded start/end dates.
 - Legacy 7d/30d/90d/last-month/year custom choices remain in the **unchanged Desktop period dropdown**. Mobile is a separate presentation of the same `ReportPeriod` state.
 - No new aggregate query or report schema changes.
+
+## POS iPhone native editable notes and project fields
+
+- On mobile, the POS order-note and optional project-name text fields now use 16px fonts (Safari does not zoom on focus) and 44px minimum hit heights. Desktop retains its previous fonts, padding and sizes.
+- Both inputs keep their existing state setters and document business logic intact.

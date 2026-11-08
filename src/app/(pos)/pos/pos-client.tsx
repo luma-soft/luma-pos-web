@@ -2921,7 +2921,7 @@ export function PosClient({
           value={orderNote ?? ""}
           onChange={(e) => setOrderNote(e.target.value)}
           placeholder={t("pos.orderNotePlaceholder")}
-          className="w-full px-2 py-1.5 text-sm rounded-md border border-border bg-surface outline-none placeholder:text-slate-400"
+          className="min-h-11 w-full rounded-md border border-border bg-surface px-3 py-2 text-base outline-none placeholder:text-slate-400 lg:min-h-0 lg:px-2 lg:py-1.5 lg:text-sm"
         />
       </div>
     </div>
@@ -3316,7 +3316,7 @@ export function PosClient({
                 value={projectName}
                 onChange={(e) => { setProjectName(e.target.value); setProjectId(""); }}
                 placeholder={t("pos.projectPlaceholder")}
-                className="min-h-11 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+                className="min-h-11 min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-base lg:text-sm"
               />
             </div>
           )}
