@@ -66,4 +66,5 @@ jobs:
             'src/app/(app)/reports/report-mobile-range-sheet.test.mjs' \
             'src/app/(app)/sales/tabs/filter-native-mobile-layout.test.mjs' \
             'src/app/(app)/partners/tabs/partners-native-filter-layout.test.mjs' \
-            'src/app/(pos)/pos/pos-line-price-native-sheet.test.mjs'
+            'src/app/(pos)/pos/pos-line-price-native-sheet.test.mjs' \
+            'src/app/(pos)/pos/pos-mobile-checkout-responsive.test.mjs'

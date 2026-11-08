@@ -270,3 +270,9 @@ The GitHub connector exposes repository contents but not an authenticated browse
 ## POS line-item note — iPhone keyboard/typography
 
 - The mobile-only cart line note now uses 16px readable type, a 44px minimum touch area, and generous inline padding. It keeps the existing draft note `setLineNote` handler and automatic row-height measurement; the Desktop note field is a separate unchanged `lg:flex` tree.
+
+## POS mobile checkout footer responsiveness
+
+- The POS cart action row now uses a two-column mobile grid: Hold/Print are compact secondary actions, while the primary Save/Confirm/Pay CTA spans the full width. At `lg` the original single-row flex arrangement is restored.
+- The primary total/label remains visible (rather than hiding monetary information), has a 48px minimum phone hit target and allows wrapping when the amount is long. Print, Hold and submit handlers, draft guards, price calculations, and desktop behavior remain unchanged.
+- Requires an iPhone 360/375px real screenshot and keyboard-visible state to complete visual verification.

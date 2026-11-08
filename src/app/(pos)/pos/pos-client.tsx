@@ -3493,7 +3493,7 @@ export function PosClient({
             </button>
           )}
 
-          <div className="flex gap-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 lg:flex">
             {!initialSourceInvoice && !initialContext && (
               <button
                 type="button"
@@ -3519,7 +3519,7 @@ export function PosClient({
             <button
               disabled={(isReturnDraft ? !hasReturnQuantity : cart.length === 0) || submitting || refreshingPricing || pricingRoutePending || !data.warehouse || !!sepayCheckout || sepayCheckoutLoading}
               onClick={submitActiveDraft}
-              className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
+              className="col-span-2 flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-primary-600 px-2 py-3 text-center text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 lg:col-span-1 lg:min-h-0 lg:px-0 lg:text-base"
             >
               {submittingMode !== null && <Loader2 className="w-4 h-4 animate-spin" />}
                 {primaryActionLabel} · {formatCurrency(total)}
