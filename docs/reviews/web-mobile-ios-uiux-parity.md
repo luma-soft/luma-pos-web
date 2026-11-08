@@ -204,3 +204,9 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 
 - The native `POSCheckoutPricingSection.swift` distinguishes `Chi tiết báo giá` from `Chi tiết thanh toán`. Web Mobile now uses the same localized summary heading for quote drafts, including camera quotes, and the payment-specific heading for other draft types.
 - Only a small `lg:hidden` heading was added to the existing settlement panel. Discount/VAT/shipping inputs, quote save action, document calculations and desktop layout stay unchanged.
+
+## Native product editor toolbar and preserved web-only save actions
+
+- Mobile product create/edit modal and full-screen editor expose **Cancel, centered title, Save** in the header like `NativeProductFormTabsShell`. Submits continue through existing React Hook Form/Zod and the original save intent.
+- The three-button mobile footer is replaced by a collapsed `Save options` disclosure containing **Direct sale** and **Save & create another / similar / variant**; both actions remain available. The checkbox changes the existing registered form value without registering it twice.
+- Original Desktop modal X, header `FormActions`, footer `FormActions`, spacing and save behavior stay under the same `lg:` breakpoint. UI confirmation in browser is still needed.

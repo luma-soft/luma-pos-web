@@ -14,6 +14,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
 import {
   ArrowLeft,
+  ChevronDown,
   ImagePlus,
   Info,
   Link2,
@@ -595,57 +596,52 @@ export function NewProductForm({
           : "min-h-dvh bg-slate-50 dark:bg-slate-950",
       )}
     >
-      <header
-        className={cn(
-          "z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex items-center justify-between gap-3",
-          !isModal && "sticky top-0",
-        )}
-      >
-        <div className="flex items-center gap-3">
+      <header className={cn(
+        "z-10 flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 sm:px-6 lg:gap-3",
+        !isModal && "sticky top-0",
+      )}>
+        <div className="flex min-w-0 flex-1 items-center gap-2 lg:flex-none lg:gap-3">
+          <Button type="button" variant="ghost" onClick={close} tx="common.cancel"
+            className="min-h-11 shrink-0 px-1.5 text-sm lg:hidden" />
           {!isModal && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="iconSm"
-              onClick={close}
-              aria-label={t("common.back")}
-              className="h-11 w-11 shrink-0 rounded-xl lg:h-9 lg:w-9"
-            >
-              <ArrowLeft className="h-5 w-5 lg:h-4 lg:w-4" />
+            <Button type="button" variant="ghost" size="iconSm" onClick={close}
+              aria-label={t("common.back")} className="hidden h-9 w-9 shrink-0 rounded-xl lg:inline-flex">
+              <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
           <Heading
             id={isModal ? "product-editor-title" : undefined}
-            as="h1"
-            size="lg"
+            as="h1" size="lg"
+            className="min-w-0 flex-1 truncate text-center text-[15px] lg:text-left lg:text-lg"
             text={groupEditing ? (groupAdding ? "Thêm hàng hóa cùng loại" : "Sửa nhóm biến thể") : t(
-              isEdit
-                ? `products.kind.editTitles.${productKind}`
-                : `products.kind.createTitles.${productKind}`,
+              isEdit ? `products.kind.editTitles.${productKind}` : `products.kind.createTitles.${productKind}`,
             )}
           />
         </div>
+        <Button type="submit"
+          loading={form.formState.isSubmitting && submitIntent === "save"}
+          loadingMode="replace"
+          disabled={form.formState.isSubmitting && submitIntent !== "save"}
+          onClick={() => setSubmitIntent("save")} tx="common.save"
+          className="min-h-11 shrink-0 lg:hidden" />
         {isModal ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="iconSm"
-            onClick={close}
-            aria-label={t("common.close")}
-          >
-            <X className="w-4 h-4" />
-          </Button>
+          <div className="hidden lg:block">
+            <Button type="button" variant="ghost" size="iconSm"
+              onClick={close} aria-label={t("common.close")}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         ) : (
-          <FormActions
-            loading={form.formState.isSubmitting}
-            submitIntent={submitIntent}
-            showDirectSale={!groupManaging && (!hasVariants || groupAdding)}
-            registerDirectSale={form.register("directSale")}
-            onCancel={close}
-            onIntent={setSubmitIntent}
-            isEdit={isEdit}
-            createVariantAfterSave={isEdit && productKind === "product"}
-          />
+          <div className="hidden lg:contents">
+            <FormActions
+              loading={form.formState.isSubmitting}
+              submitIntent={submitIntent}
+              showDirectSale={!groupManaging && (!hasVariants || groupAdding)}
+              registerDirectSale={form.register("directSale")}
+              onCancel={close} onIntent={setSubmitIntent} isEdit={isEdit}
+              createVariantAfterSave={isEdit && productKind === "product"}
+            />
+          </div>
         )}
       </header>
 
@@ -722,25 +718,71 @@ export function NewProductForm({
         {hasVariants && !groupEditing && tab === "info" && <p className="text-sm text-slate-500">Giá chung dùng cho SKU mới. Nhập giá và tồn từng biến thể tại tab Đơn vị & thuộc tính.</p>}
       </div>
 
-      {isModal && (
-        <footer className="shrink-0 border-t border-border bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:pb-3">
+      <footer className={cn(
+        "shrink-0 border-t border-border bg-surface px-4 py-2 pb-[calc(.5rem+env(safe-area-inset-bottom))] sm:px-6",
+        !isModal && "lg:hidden",
+        isModal && "lg:py-3 lg:pb-3",
+      )}>
+        <MobileProductSaveOptions
+          loading={form.formState.isSubmitting} submitIntent={submitIntent}
+          showDirectSale={!groupManaging && (!hasVariants || groupAdding)}
+          directSale={Boolean(form.watch("directSale"))}
+          onDirectSaleChange={(checked) => form.setValue("directSale", checked, { shouldDirty: true })}
+          onIntent={setSubmitIntent} isEdit={isEdit}
+          createVariantAfterSave={isEdit && productKind === "product"}
+        />
+        {isModal && <div className="hidden lg:block">
           <FormActions
-            loading={form.formState.isSubmitting}
-            submitIntent={submitIntent}
+            loading={form.formState.isSubmitting} submitIntent={submitIntent}
             showDirectSale={!groupManaging && (!hasVariants || groupAdding)}
             registerDirectSale={form.register("directSale")}
-            onCancel={close}
-            onIntent={setSubmitIntent}
-            isEdit={isEdit}
+            onCancel={close} onIntent={setSubmitIntent} isEdit={isEdit}
             createVariantAfterSave={isEdit && productKind === "product"}
             align="footer"
           />
-        </footer>
-      )}
+        </div>}
+      </footer>
       {pendingPriceEdit && <UnitPriceConfirmation name={pendingPriceEdit.name} before={initialPricing.current} draft={pendingPriceEdit} books={reviewBooks}
         siblingScope={pendingPriceEdit.applyToSiblings.enabled ? { count: siblingCount, pricing: pendingPriceEdit.applyToSiblings.fields.includes("pricing"), units: pendingPriceEdit.applyToSiblings.fields.includes("units") } : undefined}
         onCancel={cancelPriceEdit} onConfirm={resolvePriceEdit} />}
     </Form>
+  );
+}
+
+/** Native-style mobile save toolbar; web-only advanced actions are kept available. */
+function MobileProductSaveOptions({
+  loading, submitIntent, showDirectSale, directSale, onDirectSaleChange, onIntent,
+  isEdit, createVariantAfterSave,
+}: {
+  loading: boolean;
+  submitIntent: "save" | "sameType";
+  showDirectSale: boolean;
+  directSale: boolean;
+  onDirectSaleChange: (checked: boolean) => void;
+  onIntent: (intent: "save" | "sameType") => void;
+  isEdit: boolean;
+  createVariantAfterSave: boolean;
+}) {
+  const t = useTranslations();
+  return (
+    <details className="group lg:hidden">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 [&::-webkit-details-marker]:hidden">
+        <span>{t("products.moreSaveOptions")}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+      </summary>
+      <div className="space-y-3 pb-2 pt-1">
+        {showDirectSale && <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+          <Checkbox checked={directSale} onChange={(event) => onDirectSaleChange(event.target.checked)} />
+          <span>{t("products.directSale")}</span>
+        </label>}
+        <Button type="submit" variant="secondary"
+          loading={loading && submitIntent === "sameType"} loadingMode="replace"
+          disabled={loading && submitIntent !== "sameType"}
+          onClick={() => onIntent("sameType")}
+          tx={createVariantAfterSave ? "products.saveAndCreateVariant" : isEdit ? "products.saveAndCreateSameType" : "products.saveAndCreate"}
+          className="min-h-11 w-full" />
+      </div>
+    </details>
   );
 }
 
