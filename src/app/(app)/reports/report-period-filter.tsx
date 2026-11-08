@@ -2,6 +2,7 @@
 
 import { DateInput } from "@/components/ui/date-input";
 import { useState } from "react";
+import { Check, SlidersHorizontal } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { RowPreviewModal } from "@/components/data-table";
@@ -40,6 +41,8 @@ export function ReportPeriodFilter({
   const [customFrom, setCustomFrom] = useState(from);
   const [customTo, setCustomTo] = useState(to);
   const [dateModalOpen, setDateModalOpen] = useState(false);
+  const [rangeModalOpen, setRangeModalOpen] = useState(false);
+  const [draftPeriod, setDraftPeriod] = useState<ReportPeriod>(period);
 
   function navigate(nextPeriod: string, nextFrom?: string, nextTo?: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -66,6 +69,19 @@ export function ReportPeriodFilter({
     navigate(value);
   }
 
+  function openMobileRangePicker() {
+    setDraftPeriod(period);
+    setCustomFrom(from);
+    setCustomTo(to);
+    setRangeModalOpen(true);
+  }
+
+  function applyMobileRange() {
+    if (draftPeriod === "custom" && (!customFrom || !customTo || customFrom > customTo)) return;
+    setRangeModalOpen(false);
+    navigate(draftPeriod, customFrom, customTo);
+  }
+
   function applyCustomPeriod() {
     if (!customFrom || !customTo || customFrom > customTo) return;
     setDateModalOpen(false);
@@ -74,10 +90,79 @@ export function ReportPeriodFilter({
 
   return (
     <>
-      <ReportPeriodChips period={period} onSelect={selectPeriod} />
+      <button
+        type="button"
+        onClick={openMobileRangePicker}
+        aria-haspopup="dialog"
+        aria-label={t("reports.period.label")}
+        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 text-sm font-semibold text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:hidden"
+      >
+        <span className="inline-flex min-w-0 items-center gap-2">
+          <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="truncate">{t(`reports.period.options.${period}` as never)}</span>
+        </span>
+        <span className="text-xs text-slate-500">{t("reports.period.label")}</span>
+      </button>
       <div className="hidden lg:block">
         <ReportPeriodSelect period={period} onSelect={selectPeriod} className="h-9" />
       </div>
+
+      <RowPreviewModal
+        open={rangeModalOpen}
+        onClose={() => setRangeModalOpen(false)}
+        title={t("reports.period.label")}
+        size="full"
+        closeLabel={t("common.close")}
+        panelClassName="lg:hidden"
+        footer={(
+          <div className="flex items-center gap-3">
+            <Button type="button" variant="outline" className="min-h-12 flex-1" onClick={() => setRangeModalOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="button" className="min-h-12 flex-1"
+              disabled={draftPeriod === "custom" && (!customFrom || !customTo || customFrom > customTo)}
+              onClick={applyMobileRange}>
+              {t("reports.period.apply")}
+            </Button>
+          </div>
+        )}
+      >
+        <div className="space-y-3">
+          {PERIODS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={draftPeriod === option}
+              onClick={() => setDraftPeriod(option)}
+              className={cn(
+                "flex min-h-12 w-full items-center justify-between rounded-xl border px-4 text-left text-base font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                draftPeriod === option
+                  ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-950/30 dark:text-primary-300"
+                  : "border-border bg-surface text-slate-700 dark:text-slate-200",
+              )}
+            >
+              {t(`reports.period.options.${option}` as never)}
+              {draftPeriod === option && <Check className="h-5 w-5 shrink-0" aria-hidden="true" />}
+            </button>
+          ))}
+          {draftPeriod === "custom" && (
+            <div className="grid gap-3 rounded-xl border border-border bg-canvas p-3">
+              <label className="space-y-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                <span className="block">{t("reports.period.from")}</span>
+                <DateInput type="date" value={customFrom} max={customTo}
+                  onChange={(event) => setCustomFrom(event.target.value)}
+                  className="h-12 w-full text-base lg:text-sm" />
+              </label>
+              <label className="space-y-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                <span className="block">{t("reports.period.to")}</span>
+                <DateInput type="date" value={customTo} min={customFrom}
+                  onChange={(event) => setCustomTo(event.target.value)}
+                  className="h-12 w-full text-base lg:text-sm" />
+              </label>
+            </div>
+          )}
+        </div>
+      </RowPreviewModal>
 
       <RowPreviewModal
         open={dateModalOpen}

@@ -226,3 +226,9 @@ The GitHub connector exposes repository contents but not an authenticated browse
 
 - Web Mobile now shows a native-style information notice if the device loses network access **while an already rendered dashboard is on screen**. It listens to browser online/offline events and cleans up both listeners; no refetch, polling, cache write, or duplicate provider was introduced.
 - The label explicitly says existing displayed data **may be stale**. Unlike iOS's cached snapshot, this does not enable server-rendered dashboard cold launch offline. Desktop remains unchanged; offline PWA cold launch is still a documented limitation.
+
+## Reports — native-style Mobile range filter sheet
+
+- Mobile reports now expose a single accessible full-screen date-range selector, matching the native `NativeReportFilterView`: Today / Week / 7, 30, 90 days / This Month / Last Month / This Year / Custom. The active value remains visible in the trigger. The previously cramped four-chip row is removed from the Mobile page.
+- Selecting a range is **draft-only** until Apply; Cancel does not change URLs, data or current report. Custom dates are validated before Apply. The selector uses the existing Next navigation and report period resolver, without additional data providers or background polling.
+- Desktop still uses the existing drop-down (and original custom-date modal); mobile-only overlay uses the existing focus-trapping, safe-area-aware `RowPreviewModal`.
