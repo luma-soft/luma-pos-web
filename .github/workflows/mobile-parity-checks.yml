@@ -63,6 +63,7 @@ jobs:
             'src/components/mobile-dashboard-offline-notice.test.mjs' \
             'src/components/partners/mobile-partner-create-dialog.test.mjs' \
             'src/app/(app)/inventory/tabs/product-detail-native-stats.test.mjs' \
+            'src/components/pos/pos-amount-mobile-input-font.test.mjs' \
             'src/app/(app)/reports/report-mobile-range-sheet.test.mjs' \
             'src/app/(app)/sales/tabs/filter-native-mobile-layout.test.mjs' \
             'src/app/(app)/partners/tabs/partners-native-filter-layout.test.mjs' \

@@ -3437,7 +3437,7 @@ export function PosClient({
                   <MoneyInput
                     value={paidInput ?? total}
                     onChange={(v) => setPaidInput(v ?? 0)}
-                    className="no-spinner w-36 px-2 py-1 text-right text-sm rounded-md border border-border bg-surface"
+                    className="no-spinner min-h-11 w-36 rounded-md border border-border bg-surface px-2 py-1 text-right text-base lg:min-h-0 lg:text-sm"
                   />
                 ) : (
                   <span className="w-36 px-2 py-1 text-right text-sm font-semibold text-warn tabular-nums border border-transparent">
@@ -4150,7 +4150,7 @@ function LinePriceEditor({
             onChange={setPrice}
             aria-invalid={belowPurchasePrice}
             className={cn(
-              "no-spinner min-h-11 w-40 rounded-md border bg-surface px-2 py-1.5 text-right",
+              "no-spinner min-h-11 w-40 rounded-md border bg-surface px-2 py-1.5 text-right text-base lg:text-sm",
               belowPurchasePrice ? "border-er bg-red-50 text-er focus:border-er dark:bg-red-950/20" : "border-border",
             )}
           />
