@@ -681,63 +681,73 @@ export function ProductMobileRow({
         projected.retailPrice,
       )
     : formatCurrency(projected.retailPrice);
+  const stockDisplay = group
+    ? group.totalStock === null ? t("products.variants.multipleUnits") : `${formatNumber(Number(group.totalStock))} ${product.baseUnit}`
+    : productStockDisplay(
+        { ...product, totalStock: projected.totalStock, baseUnit: projected.unitName },
+        stockNotTrackedLabel,
+      );
 
   return (
-    <div className={cn("flex min-w-0 items-stretch", variantRow && "border-t border-border-soft", selected && "bg-primary-50/50 dark:bg-primary-950/20")}>
+    <div className={cn(
+      "flex min-w-0 items-stretch border-b border-border-soft",
+      variantRow && "border-t border-border-soft",
+      selected && "bg-primary-50/50 dark:bg-primary-950/20",
+    )}>
       {selectionEnabled && (
-        <div className="shrink-0 p-3 pr-0 pt-4">
-          <SelectionCheckbox
-            checked={selected}
-            onChange={onToggle}
-            label={selectLabel}
-          />
+        <div className="shrink-0 pl-3 pr-1 pt-4">
+          <SelectionCheckbox checked={selected} onChange={onToggle} label={selectLabel} />
         </div>
       )}
-      <div className="min-w-0 flex-1">
-        <button type="button" onClick={onOpen} className="min-h-11 min-w-11 w-full p-3 text-left">
-          <div className="grid min-w-0 gap-2">
-            <div className="flex min-w-0 items-center gap-3">
-              <ProductThumbnail product={product} />
-              <div className="min-w-0 flex-1">
-                <div className="break-words text-sm font-semibold text-slate-950 dark:text-white">{productDisplayName(product)}</div>
-                <div className="mt-0.5 break-words text-xs text-slate-400">
-                  {product.sku}{!variantRow && product.categoryName ? ` · ${product.categoryName}` : ""}
-                </div>
+      <div className="relative min-h-[94px] min-w-0 flex-1 px-3 py-[13px]">
+        {/* One hit target for the row; the unit selector takes precedence. */}
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={productDisplayName(product)}
+          className="absolute inset-0 rounded-md focus-visible:outline-2 focus-visible:outline-primary-500"
+        />
+        <div className="pointer-events-none relative flex min-w-0 items-start gap-3">
+          <ProductThumbnail product={product} largeOnMobile />
+          <div className="min-w-0 flex-1">
+            <div className="line-clamp-2 break-words text-sm font-semibold text-slate-950 dark:text-white">
+              {productDisplayName(product)}
+            </div>
+            <div className="mt-1 truncate text-xs text-slate-500">{product.sku || "—"}</div>
+            {!variantRow && product.categoryName && (
+              <div className="mt-0.5 truncate text-xs text-slate-500">{product.categoryName}</div>
+            )}
+            {variantRow && (
+              <div className="mt-1 truncate text-xs text-slate-500">
+                {t("products.list.colCost")}: {formatCurrency(projected.costPrice)}
               </div>
-            </div>
-            {variantRow ? <>
-              <dl className="grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-slate-500">{t("products.list.colCost")}</dt><dd className="mt-1 tabular-nums">{formatCurrency(projected.costPrice)}</dd></div><div><dt className="text-xs text-slate-500">{t("products.list.colSalePrice")}</dt><dd className="mt-1 font-semibold tabular-nums">{retailDisplay}</dd></div></dl>
-              <p className={cn("text-right text-xs font-semibold", projected.totalStock <= 0 ? "text-warn" : "text-primary-700 dark:text-primary-300")}>{t("products.variants.stock", { stock: productStockDisplay({ ...product, totalStock: projected.totalStock, baseUnit: projected.unitName }, stockNotTrackedLabel) })}</p>
-            </> : <>
-            <div className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-2 sm:items-center">
-              <p className="min-w-0 break-words text-sm font-bold tabular-nums text-primary-700 dark:text-primary-300 sm:col-start-2 sm:row-start-1 sm:text-right">
-                {retailDisplay}
-              </p>
-              <span className="inline-flex min-w-0 max-w-full justify-self-start break-words rounded-md bg-primary-50 px-2 py-1 text-[11px] font-semibold tabular-nums text-primary-700 dark:bg-primary-950/60 dark:text-primary-300 sm:col-start-1 sm:row-start-1">
-                {group ? (group.totalStock === null ? "Khác đơn vị" : `Tổng tồn ${formatNumber(Number(group.totalStock))} ${product.baseUnit}`) : productStockDisplay(
-                  {
-                    ...product,
-                    totalStock: projected.totalStock,
-                    baseUnit: projected.unitName,
-                  },
-                  stockNotTrackedLabel,
-                )}
-              </span>
-            </div>
-            </>}
+            )}
           </div>
-        </button>
-        {!group && unitOptions.length > 1 && (
-          <div className="px-3 pb-3">
-            <ProductUnitSelector
-              productName={productDisplayName(product)}
-              baseUnit={product.baseUnit}
-              units={product.unitDefinitions}
-              value={projected.unitName}
-              onChange={onUnitChange}
-            />
+          <div className="flex min-w-[90px] max-w-[43%] shrink-0 flex-col items-end gap-1.5 text-right">
+            <div className="max-w-full break-words text-sm font-semibold tabular-nums text-slate-950 dark:text-white">
+              {retailDisplay}
+            </div>
+            {!group && unitOptions.length > 1 ? (
+              <div className="pointer-events-auto relative z-10 max-w-full">
+                <ProductUnitSelector
+                  productName={productDisplayName(product)}
+                  baseUnit={product.baseUnit}
+                  units={product.unitDefinitions}
+                  value={projected.unitName}
+                  onChange={onUnitChange}
+                />
+              </div>
+            ) : (
+              <span className="truncate text-xs text-slate-500">{projected.unitName}</span>
+            )}
+            <span className={cn(
+              "max-w-full break-words text-xs font-semibold",
+              projected.totalStock <= 0 ? "text-warn" : "text-primary-700 dark:text-primary-300",
+            )}>
+              {stockDisplay}
+            </span>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -772,18 +782,21 @@ export function SelectionCheckbox({
   );
 }
 
-function ProductThumbnail({ product }: { product: ProductRow }) {
+function ProductThumbnail({ product, largeOnMobile = false }: { product: ProductRow; largeOnMobile?: boolean }) {
   const image = Array.isArray(product.imageUrls) && typeof product.imageUrls[0] === "string"
     ? product.imageUrls[0]
     : null;
   return (
-    <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-border-soft bg-white dark:bg-slate-900">
+    <div className={cn(
+      "relative shrink-0 overflow-hidden rounded-lg border border-border-soft bg-white dark:bg-slate-900",
+      largeOnMobile ? "h-16 w-16 lg:h-11 lg:w-11" : "h-11 w-11",
+    )}>
       {image ? (
         <Image
           src={image}
           alt={productDisplayName(product)}
           fill
-          sizes="44px"
+          sizes={largeOnMobile ? "(max-width: 1023px) 64px, 44px" : "44px"}
           className="object-contain p-1"
           unoptimized
         />

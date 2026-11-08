@@ -100,3 +100,10 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - Store name from authenticated context with LumaPOS fallback; no additional DB query.
 - Week starts Monday, year begins January 1. Old desktop presets and data semantics are retained.
 - Annual mobile chart groups existing response into months; desktop markup unchanged and no duplicate request.
+
+## Inventory native product list row
+
+- Mobile-only product rows now position 64px image / product name+SKU+category / selling price+unit+stock in one horizontal row, following `NativeProductRow` from iOS. Long product names and prices wrap instead of overflowing.
+- Unit selection is an independent touch target above the full-row detail button; product selection and variant cost presentation remain functional.
+- Thumbnail default stays 44px for existing uses, with a 64px opt-in only for mobile row. Desktop column definitions, catalog provider, pagination, unit projection and stock logic are unchanged.
+- Added Bun source assertions for separate unit/action hit targets; no device visual test in the connector environment.
