@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowRight, Check, ChevronDown, Copy, ExternalLink, KeyRound, Loader2, MessageCircle, Pencil, Plus, Power, Printer, Save, Star, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, Copy, ExternalLink, KeyRound, Loader2, MessageCircle, Pencil, Plus, Power, Printer, Save, Star, Trash2, X } from "lucide-react";
 import { SearchableSelect } from "@/components/combobox";
 import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
@@ -318,6 +318,7 @@ export function SettingsClient({
     ? initialTab as SectionId
     : null;
   const [active, setActive] = useState<SectionId>(normalizedInitialTab ?? "store");
+  const [mobileSectionSelected, setMobileSectionSelected] = useState(Boolean(normalizedInitialTab));
   const visibleNav = useMemo(() => NAV
     .map((group) => ({ ...group, items: group.items.filter((item) => isVisibleSection(item.id)) }))
     .filter((group) => group.items.length > 0), []);
@@ -333,7 +334,11 @@ export function SettingsClient({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client sync of persisted section (SSR-safe)
     if (saved && SEC_META[saved] && isVisibleSection(saved)) setActive(saved);
   }, [normalizedInitialTab]);
-  const pick = (id: SectionId) => { setActive(id); localStorage.setItem("lp-settings-active", id); };
+  const pick = (id: SectionId) => {
+    setActive(id);
+    setMobileSectionSelected(true);
+    localStorage.setItem("lp-settings-active", id);
+  };
   return (
     <div className="flex h-dvh overflow-hidden">
       {/* settings nav */}
@@ -365,21 +370,55 @@ export function SettingsClient({
         ))}
       </nav>
 
-      {/* content */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      {/* Native iPhone settings root is a grouped, full-width navigation list.
+          The selected settings form remains one shared component tree below. */}
+      {!mobileSectionSelected && (
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-canvas md:hidden">
+          <MobileTopBar title={tSettings("breadcrumb.settings")} />
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            {visibleNav.map((group) => (
+              <section key={group.groupKey} className="space-y-2">
+                <h2 className="px-1 text-xs font-bold text-slate-500">
+                  {settingsTextByFlag(L, `ui.nav.groups.${group.groupKey}`)}
+                </h2>
+                <div className="divide-y divide-border-soft overflow-hidden rounded-2xl border border-border bg-surface">
+                  {group.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => pick(item.id)}
+                      className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+                    >
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary-50 text-xl dark:bg-primary-950/30" aria-hidden="true">{item.ico}</span>
+                      <span className="min-w-0 flex-1 text-sm font-semibold">
+                        {settingsTextByFlag(L, `ui.nav.items.${item.labelKey}`)}
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* content — original desktop layout and same settings form instances */}
+      <div className={cn("min-w-0 flex-1 flex-col overflow-hidden", mobileSectionSelected ? "flex" : "hidden md:flex")}>
         <MobileTopBar
           className="md:hidden"
+          leading={
+            <button
+              type="button"
+              onClick={() => setMobileSectionSelected(false)}
+              aria-label={tSettings("breadcrumb.settings")}
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+            </button>
+          }
           title={settingsTextByFlag(L, `ui.sections.${active}.title`)}
           subtitle={settingsTextByFlag(L, `ui.sections.${active}.subtitle`)}
-          bottom={
-            <Select
-              value={active}
-              onChange={(e) => pick(e.target.value as SectionId)}
-              options={visibleNav.flatMap((g) => g.items).map((it) => ({ value: it.id, label: settingsTextByFlag(L, `ui.nav.items.${it.labelKey}`) }))}
-              aria-label={settingsTextByFlag(L, "legacy.21fca9114fb3")}
-              className="min-h-11"
-            />
-          }
         />
         <div className={cn(
           "flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:px-7",

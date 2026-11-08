@@ -286,3 +286,9 @@ The GitHub connector exposes repository contents but not an authenticated browse
 - Full-height product create/edit/detail modal frames now respect the iPhone's top safe inset; tablet/desktop `sm:` geometry remains unchanged.
 - Full-screen product-image previews offset Close from the Dynamic Island/status area and the image caption from the bottom home indicator. Original `sm:` offsets remain for larger screens.
 - The data source and image navigation behaviors are unchanged; visual PWA/Safari verification is still required.
+
+## Settings — native grouped navigation for iPhone
+
+- The Mobile Settings root now shows all existing Web settings grouped in a native-style list of 56px+ rows with leading icons and chevrons. Tapping an item opens its existing settings form; a back button returns to the grouped list, matching `NativeSettingsRootView` in iOS while preserving Web-only sections.
+- Existing settings forms, permissions, default sort logic, lazy data queries, save handlers, and state management were not duplicated. The Desktop (from `md`) retains its exact prior sidebar and settings content; `initialTab` deep links open the requested section directly.
+- Browser back swipe and authenticated iPhone screenshots still require manual verification. No extra catalog provider or API call was added.
