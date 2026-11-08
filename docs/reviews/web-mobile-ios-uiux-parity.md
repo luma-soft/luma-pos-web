@@ -27,7 +27,7 @@
 
 ## Safety boundaries
 
-1. No backend, schema, catalog, IndexedDB, offline queue or service-worker modifications.
+1. No backend, schema, catalog, IndexedDB or offline queue modifications; Service Worker security fix is separately documented below.
 2. Do not render duplicate layout/provider trees simply to hide them via CSS.
 3. The tab's visibility is not authorization. Server-side permissions remain mandatory.
 4. Only add mobile variants of layout classes (`lg:` restores previous desktop styles). Desktop still needs screenshot verification at 1024/1280/1440.
@@ -44,7 +44,7 @@
 
 ## Verification limitations in this environment
 
-The GitHub connector exposes repository contents but not a checked-out dependency tree or an authenticated browser session. A full Next.js lint/typecheck/build and authenticated responsive screenshots cannot be claimed here. Source-level invariants were checked for this navigation change. Further changes require the complete test matrix before declaring done.
+The GitHub connector exposes repository contents but not an authenticated browser session. GitHub Actions now runs Next route type generation, TypeScript, ESLint and scoped Bun regression tests on main; their status must be checked per commit. Production build, authenticated screen captures and 360–1440px responsive comparison have not been performed in this environment. Full browser/device testing remains mandatory before declaring parity complete.
 
 ## Dashboard follow-up implementation
 
@@ -216,3 +216,8 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - The shared Inventory filter now opens as a full-viewport sheet below the `lg` breakpoint, matching the iOS product filter screen instead of a narrow 460px slide-over. Desktop remains the original 460px side drawer at `lg`.
 - Mobile sections use separate card surfaces, the scroll region remains independent from fixed title/footer, the title accounts for the top safe area, and footer Apply/Clear controls have 56px touch height plus bottom safe-area padding.
 - Filter fields, preview count calculations, draft reset/apply URL parameters, network calls and nested picker behavior are unchanged. Visual/browser comparison remains outstanding.
+
+## Product detail tabs and expanded verification
+
+- Web Mobile product detail tabs now match `NativeProductDetailView.swift` `LumaScrollableTabBar` dimensions: **46px** high, **22px** spacing and a **3px** selected underline. All five native-equivalent tab destinations remain, with the previous Web Desktop 2px underline and gap retained under `lg:`.
+- The GitHub Actions workflow now executes the new modal, quote, product editor, inventory filter and product detail regression tests in addition to existing TypeScript/ESLint.

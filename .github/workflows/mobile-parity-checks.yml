@@ -54,4 +54,9 @@ jobs:
             'src/app/(app)/inventory/tabs/products-loading.test.mjs' \
             'src/app/(app)/finance/tabs/cashbook-mobile-native.test.mjs' \
             'src/app/(app)/reports/report-week-native.test.mjs' \
-            'src/app/(pos)/pos/pos-mobile-form-inputs.test.mjs'
+            'src/app/(pos)/pos/pos-mobile-form-inputs.test.mjs' \
+            'src/components/row-preview-mobile-modal.test.mjs' \
+            'src/app/(pos)/pos/pos-mobile-quote-pricing.test.mjs' \
+            'src/app/(app)/products/new/product-form-native-actions.test.mjs' \
+            'src/app/(app)/inventory/tabs/inventory-filter-native-sheet.test.mjs' \
+            'src/app/(app)/inventory/tabs/product-detail-native-tabs.test.mjs'

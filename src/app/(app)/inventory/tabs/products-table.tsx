@@ -892,7 +892,7 @@ export function ProductDetailView({
         </div>
         {needsVariant && <p className="mt-2 text-xs text-slate-500">{t("products.variants.chooseHint")}</p>}
       </div>}
-      <div className="-mx-3 flex shrink-0 snap-x snap-mandatory items-center gap-5 overflow-x-auto border-b border-border-soft bg-surface px-3 text-sm font-semibold text-slate-500 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-4 sm:px-4 lg:mx-0 lg:gap-6 lg:px-0">
+      <div className="-mx-3 flex shrink-0 snap-x snap-mandatory items-center gap-[22px] overflow-x-auto border-b border-border-soft bg-surface px-4 text-sm font-semibold text-slate-500 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-4 sm:px-4 lg:mx-0 lg:gap-6 lg:px-0">
         {PRODUCT_EXPAND_TABS.map((key) => (
           <button
             key={key}
@@ -900,7 +900,7 @@ export function ProductDetailView({
             onClick={() => setTab(key)}
             disabled={needsVariant && (key === "stock" || key === "stockCard")}
             className={cn(
-              "min-h-11 shrink-0 snap-start border-b-2 px-1 pt-2 transition-colors disabled:cursor-not-allowed disabled:opacity-40 lg:min-h-0 lg:px-0 lg:pb-2 lg:pt-0 min-w-11 lg:min-w-0",
+              "min-h-[46px] min-w-11 shrink-0 snap-start border-b-[3px] px-1 pt-2 transition-colors disabled:cursor-not-allowed disabled:opacity-40 lg:min-h-0 lg:min-w-0 lg:border-b-2 lg:px-0 lg:pb-2 lg:pt-0",
               tab === key
                 ? "border-primary-600 text-primary-600"
                 : "border-transparent hover:text-slate-800 dark:hover:text-slate-200",
