@@ -19,7 +19,7 @@
 | Invoice section tabs | 56pt scrollable underline bar, no additional title block | Invoice-only 56px / 3px indicator; unrelated web group tabs restored to their earlier mobile style | Partially implemented |
 | Dashboard | Store header, selected-range summary, quick actions, low stock, activity, receivables/payables | Selected-range summary/profit, low-stock list, recent orders added; store header and chart still differ | Partially implemented |
 | POS | Multiple open orders, product selectors, totals, quote confirmation | Mobile quote catalog CTA now reads Confirm; moves to existing cart details with VAT/discount before final Save Quote | Partially implemented |
-| Inventory screen details | Native scrollable tabs plus product list/edit, filters, workflows | Removed duplicate mobile page title; existing catalog and workflows kept | Partially implemented |
+| Inventory screen details | Native scrollable tabs plus product list/edit, filters, workflows | Removed duplicate mobile title and matched two-choice Products/Categories segmented control; workflows untouched | Partially implemented |
 | Invoices | Customer and amount first, status/detail metadata below | Order-list mobile row restructured; selection/open/cancellation/print unchanged; other document rows remain | Partially implemented |
 | More | Grouped actions, search, account/preferences | Added mobile-only accent-insensitive quick search, filtered by existing role/features; grouped actions remain | Partially implemented |
 | Offline/PWA | Native local catalog cache | Web IndexedDB/Service Worker preserved | No sync logic changed; regression test pending |
@@ -71,3 +71,9 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - The 56px iOS-like group tab treatment is opt-in (`nativeMobileStyle`) for Sales only; unrelated web group screens keep their existing compact mobile appearance.
 - Mobile order list shows customer and amount on the first row, followed by status/payment/remaining, then date/code/channel. The full-row detail button, separately operable partner link, and multi-select checkbox are preserved.
 - Added source-level Bun regression assertions for these invariants. Actual visual regression screenshots and typecheck/build remain pending.
+
+## Quote, booking and inventory catalog presentation
+
+- Added `MobileDocumentRow` for quote/booking rows. Both now present customer + amount first and keep the whole-row open action, customer link, and document metadata; the desktop data table columns are unmodified.
+- Added Bun render assertions covering the common mobile row component and its optional fields.
+- The Inventory Products/Categories switcher uses a mobile-only pill segmented style like `LumaSegmentedControl`. Desktop switcher colors, spacing and border remain behind `lg:` overrides.

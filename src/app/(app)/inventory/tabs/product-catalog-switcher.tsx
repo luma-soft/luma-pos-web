@@ -34,7 +34,7 @@ export function ProductCatalogSwitcher({
   return (
     <nav
       aria-label={t("nav.products")}
-      className="mb-4 grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-surface"
+      className="mb-4 grid grid-cols-2 gap-1 overflow-hidden rounded-full bg-primary-50/75 p-[3px] dark:bg-primary-950/30 lg:gap-0 lg:rounded-xl lg:border lg:border-border lg:bg-surface lg:p-0"
     >
       {options.map((option) => (
         <Link
@@ -42,9 +42,9 @@ export function ProductCatalogSwitcher({
           href={`${Routes.Inventory}?tab=products&catalog=${option.id}`}
           aria-current={activeView === option.id ? "page" : undefined}
           className={cn(
-            "inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-semibold transition-colors",
+            "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-2 text-sm font-semibold transition-colors lg:gap-2 lg:rounded-none lg:px-4",
             activeView === option.id
-              ? "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
+              ? "bg-primary-600 text-white shadow-sm lg:bg-primary-50 lg:text-primary-700 lg:shadow-none lg:dark:bg-primary-950/40 lg:dark:text-primary-300"
               : "text-slate-500 hover:bg-surface-2 hover:text-slate-900",
             "min-w-11 lg:min-w-0",
           )}

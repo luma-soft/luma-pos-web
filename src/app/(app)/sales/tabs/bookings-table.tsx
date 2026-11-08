@@ -7,6 +7,7 @@ import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { SalesTableEmptyState } from "./sales-table-empty-state";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
+import { MobileDocumentRow } from "./mobile-document-row";
 
 type BookingRow = {
   id: string;
@@ -52,26 +53,32 @@ export function BookingsTable({
       onRowClick={openOrder}
       rowClickMode="row"
       renderMobileRow={({ row }) => (
-        <div className="relative p-3">
-          <button
-            type="button"
-            onClick={() => openOrder(row)}
-            aria-label={row.code}
-            className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
-          />
-          <div className="pointer-events-none space-y-1">
-            <span className="block font-semibold text-primary-600">{row.code}</span>
-            <span className="block text-slate-500">{formatDate(row.createdAt)}</span>
-            <span className="block text-slate-600">{row.deliveryDate ? formatDate(row.deliveryDate) : "—"}</span>
+        <MobileDocumentRow
+          code={row.code}
+          customerName={row.customerName ?? t("orders.walkIn")}
+          customer={(
             <PartnerDetailLink
               kind="customer"
               partnerId={row.customerId}
               name={row.customerName ?? t("orders.walkIn")}
               openInCurrentTab
-              className="pointer-events-auto relative z-10 whitespace-normal break-words"
+              className="pointer-events-auto relative z-10 block truncate"
             />
-          </div>
-        </div>
+          )}
+          amount={formatCurrency(Number(row.total))}
+          createdAt={formatDate(row.createdAt)}
+          details={(
+            <>
+              <span className="block truncate">
+                {t("bookings.cols.deliveryDate")}: {row.deliveryDate ? formatDate(row.deliveryDate) : "—"}
+              </span>
+              {row.projectName && (
+                <span className="mt-0.5 block truncate">{t("orders.cols.project")}: {row.projectName}</span>
+              )}
+            </>
+          )}
+          onOpen={() => openOrder(row)}
+        />
       )}
       empty={(
         <SalesTableEmptyState
