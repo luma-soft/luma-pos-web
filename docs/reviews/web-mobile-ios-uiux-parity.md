@@ -292,3 +292,5 @@ The GitHub connector exposes repository contents but not an authenticated browse
 - The Mobile Settings root now shows all existing Web settings grouped in a native-style list of 56px+ rows with leading icons and chevrons. Tapping an item opens its existing settings form; a back button returns to the grouped list, matching `NativeSettingsRootView` in iOS while preserving Web-only sections.
 - Existing settings forms, permissions, default sort logic, lazy data queries, save handlers, and state management were not duplicated. The Desktop (from `md`) retains its exact prior sidebar and settings content; `initialTab` deep links open the requested section directly.
 - Browser back swipe and authenticated iPhone screenshots still require manual verification. No extra catalog provider or API call was added.
+
+- Settings root list reserves the fixed Mobile app tab-bar height in its bottom padding, including the home-indicator safe area, so the last settings option remains tappable.

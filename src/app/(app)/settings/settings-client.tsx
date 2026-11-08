@@ -375,7 +375,7 @@ export function SettingsClient({
       {!mobileSectionSelected && (
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-canvas md:hidden">
           <MobileTopBar title={tSettings("breadcrumb.settings")} />
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-4 pb-[calc(5rem+env(safe-area-inset-bottom))]">
             {visibleNav.map((group) => (
               <section key={group.groupKey} className="space-y-2">
                 <h2 className="px-1 text-xs font-bold text-slate-500">

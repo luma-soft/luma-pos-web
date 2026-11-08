@@ -17,3 +17,7 @@ test("desktop settings layout and all existing forms remain available",()=>{
  expect(src).toContain("active === \"tax\" && <TaxSection");
  expect(src).toContain('Boolean(normalizedInitialTab)');
 });
+
+test("last Mobile settings row remains above the fixed application tab bar",()=>{
+ expect(src).toContain("pb-[calc(5rem+env(safe-area-inset-bottom))]");
+});
