@@ -2902,7 +2902,7 @@ export function PosClient({
           className={cn("fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 flex h-12 items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 font-semibold text-white shadow-e2 disabled:bg-primary-200 disabled:text-primary-700/60 disabled:shadow-none lg:hidden", keyboardInset > 0 && "hidden")}
         >
           <ShoppingCart className="h-4 w-4" />
-          {primaryActionLabel} ({cart.reduce((sum, line) => sum + line.quantity, 0)}) · {formatCurrency(total)}
+          {isQuoteDraft ? t("common.confirm") : primaryActionLabel} ({cart.reduce((sum, line) => sum + line.quantity, 0)}) · {formatCurrency(total)}
         </button>
         <div className="mb-3 space-y-2">
           {invoiceTabs}

@@ -18,7 +18,7 @@
 | Inventory navigation | 56pt scrollable underline tabs | Previously 40–44px navigation tabs | Mobile-specific 56px / 3px indicator; desktop rules retained |
 | Invoice/other group tabs | 56pt scrollable underline tab bar | Previously 44px small-text tabs | Mobile-only height, font and indicator alignment |
 | Dashboard | Store header, selected-range summary, quick actions, low stock, activity, receivables/payables | Selected-range summary/profit, low-stock list, recent orders added; store header and chart still differ | Partially implemented |
-| POS | Multiple open orders, product selectors, totals, quote confirmation | Significant separate web flow | Not yet changed |
+| POS | Multiple open orders, product selectors, totals, quote confirmation | Mobile quote catalog CTA now reads Confirm; moves to existing cart details with VAT/discount before final Save Quote | Partially implemented |
 | Inventory screen details | Product list/edit, filters, document workflows, offline provider | Existing web implementations | Not yet changed |
 | Invoices | Sales/returns/quotes/bookings, filters, details, merge/print | Existing web implementations | Not yet changed |
 | More | Grouped actions, search, account/preferences | Added mobile-only accent-insensitive quick search, filtered by existing role/features; grouped actions remain | Partially implemented |
@@ -58,3 +58,9 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - A mobile-only search field is inserted above the existing More menu and matches Vietnamese text without accents, English text, labels, and helper descriptions.
 - Results only include routes already exposed by the existing role/feature checks; links preserve external-target behavior.
 - The old More groups, desktop markup, backend calls, and feature-gated entries remain in place.
+
+## POS quotation confirmation (mobile only)
+
+- Mobile catalog CTA for quote drafts now says `Xác nhận` / `Confirm`, matching the first-stage navigation action rather than incorrectly implying an immediate save.
+- The CTA still opens the existing cart/settlement panel containing discount, VAT, shipping, customer and final `Lưu báo giá` action. No write, money calculation, tax preference, draft storage, or desktop action was changed.
+- The full native quotation workflow still requires a simulator comparison and full payment/form regression testing.
