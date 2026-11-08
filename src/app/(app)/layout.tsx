@@ -90,7 +90,7 @@ export default async function AppLayout({
 
       <main className="min-w-0 flex-1 overflow-x-hidden">
         <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</div>
-        <MobileTabBar />
+        <MobileTabBar role={role} />
         {context.features.ai_assistant && store.prefs.ai.openaiApiKeySet && store.prefs.ai.showFloatingLauncher && <AiAssistantLauncher />}
       </main>
       {orderModal}
