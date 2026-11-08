@@ -33,8 +33,16 @@ export function PosQuickLineDialog({ onClose, onAdd }: PosQuickLineDialogProps) 
   const [price, setPrice] = useState<number | null>(null);
   const [invalid, setInvalid] = useState(false);
   const onCloseRef = useRef(onClose);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  // Let the native-style phone sheet settle before opening the keyboard.
+  // Preserve auto-focus on desktop devices.
+  useEffect(() => {
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+      nameInputRef.current?.focus({ preventScroll: true });
+    }
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -61,7 +69,7 @@ export function PosQuickLineDialog({ onClose, onAdd }: PosQuickLineDialogProps) 
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/40 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/40 p-0 lg:items-center lg:p-4"
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -70,7 +78,7 @@ export function PosQuickLineDialog({ onClose, onAdd }: PosQuickLineDialogProps) 
         role="dialog"
         aria-modal="true"
         aria-labelledby="pos-quick-line-title"
-        className="max-h-[calc(100dvh-1rem)] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-border bg-surface px-4 py-5 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
+        className="max-h-[calc(100dvh-env(safe-area-inset-top))] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-2xl border border-border bg-surface px-4 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl lg:max-h-[calc(100dvh-2rem)] lg:rounded-2xl lg:py-5"
       >
         <div className="mb-4">
           <h2 id="pos-quick-line-title" className="text-lg font-semibold">{t("title")}</h2>
@@ -83,7 +91,7 @@ export function PosQuickLineDialog({ onClose, onAdd }: PosQuickLineDialogProps) 
           </label>
           <label className="block space-y-1.5 text-sm font-medium">
             <span>{t("name")}</span>
-            <Input autoFocus value={name} onChange={(event) => { setName(event.target.value); setInvalid(false); }} autoComplete="off" />
+            <Input ref={nameInputRef} value={name} onChange={(event) => { setName(event.target.value); setInvalid(false); }} autoComplete="off" />
           </label>
           <label className="block space-y-1.5 text-sm font-medium">
             <span>{t("unit")}</span>

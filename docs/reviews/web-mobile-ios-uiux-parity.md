@@ -294,3 +294,8 @@ The GitHub connector exposes repository contents but not an authenticated browse
 - Browser back swipe and authenticated iPhone screenshots still require manual verification. No extra catalog provider or API call was added.
 
 - Settings root list reserves the fixed Mobile app tab-bar height in its bottom padding, including the home-indicator safe area, so the last settings option remains tappable.
+
+## POS web-only quick sale line — safe mobile sheet
+
+- The Web-only quick-line creator keeps its existing name/SKU/unit/price form and validation but now uses a mobile bottom sheet up to the `lg` breakpoint, with iPhone safe-area padding and independent scrolling. Desktop retains its previous centered 512px dialog.
+- Auto focus remains on Desktop only, preventing premature mobile Safari keyboard occlusion on opening. SKU generation, add callbacks, error handling and submit rules are unchanged.
