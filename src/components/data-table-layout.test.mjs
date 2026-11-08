@@ -8,7 +8,7 @@ mock.module("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-const { DataTableShell } = await import("./data-table.tsx");
+const { DataTableShell, dataTableResultSetKey } = await import("./data-table.tsx");
 const rows = [{ id: "p1", name: "Ấm siêu tốc", price: 300000 }];
 const columns = [
   { key: "product", label: "Sản phẩm", required: true, render: (row) => row.name },
@@ -25,6 +25,29 @@ function renderShell(props = {}) {
 function renderTable(props = {}) {
   return renderShell(props).match(/<table\b[^>]*>[\s\S]*?<\/table>/)[0];
 }
+
+describe("data table scroll reset key", () => {
+  test("opening and closing an invoice modal keeps the same list result set", () => {
+    const list = "tab=orders&page=3&size=50&q=abc";
+    const before = dataTableResultSetKey(new URLSearchParams(list), "expanded");
+    const opened = dataTableResultSetKey(new URLSearchParams(list + "&detailOrderId=invoice-1"), "expanded");
+    const closed = dataTableResultSetKey(new URLSearchParams(list), "expanded");
+    expect(opened).toBe(before);
+    expect(closed).toBe(before);
+  });
+
+  test("changing a real list filter or page still resets scroll", () => {
+    const base = dataTableResultSetKey(new URLSearchParams("tab=orders&page=3&q=abc"), "expanded");
+    expect(dataTableResultSetKey(new URLSearchParams("tab=orders&page=4&q=abc"), "expanded")).not.toBe(base);
+    expect(dataTableResultSetKey(new URLSearchParams("tab=orders&page=3&q=xyz"), "expanded")).not.toBe(base);
+  });
+
+  test("expanding an unrelated row does not reset the underlying table", () => {
+    const base = dataTableResultSetKey(new URLSearchParams("tab=returns&page=2"), "expandedReturn");
+    const expanded = dataTableResultSetKey(new URLSearchParams("tab=returns&page=2&expandedReturn=return-1&detailOrderId=invoice-1"), "expandedReturn");
+    expect(expanded).toBe(base);
+  });
+});
 
 describe("data table utility column", () => {
   test("keeps the column action outside the table without reserving body cells", () => {
