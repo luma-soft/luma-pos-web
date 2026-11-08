@@ -266,3 +266,7 @@ The GitHub connector exposes repository contents but not an authenticated browse
 
 - Customer and supplier creation forms now support opt-in sticky bottom Save/Cancel controls in full-screen mobile dialogs. Long forms keep submission and cancellation accessible without scrolling all the way down.
 - When embedded elsewhere, the option defaults off; the original Desktop button arrangement remains via `lg:`. RHF validation, consent, address, and create semantics stay unchanged.
+
+## POS line-item note — iPhone keyboard/typography
+
+- The mobile-only cart line note now uses 16px readable type, a 44px minimum touch area, and generous inline padding. It keeps the existing draft note `setLineNote` handler and automatic row-height measurement; the Desktop note field is a separate unchanged `lg:flex` tree.
