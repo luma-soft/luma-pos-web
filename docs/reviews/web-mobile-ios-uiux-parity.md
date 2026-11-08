@@ -163,3 +163,9 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - Purchase receipt rows show supplier and status first, then date/code, item count, total and any outstanding balance, matching `NativePurchaseReceiptRowView`.
 - Purchase return rows show supplier and refund amount first, then date/code, item count, status and supplier settlement, matching `NativePurchaseReturnRowView`.
 - Existing row detail/authorized actions and desktop table definitions are unchanged, with no new data requests.
+
+## Inventory skeleton consistency (streaming + offline cache)
+
+- Product tab server Suspense, inner KeepPreviousContent and shared catalog's IndexedDB-loading state now show the **same** lightweight `MobileInventoryCatalogSkeleton`, so transitioning between server streaming and local cache hydration does not create visibly different consecutive skeleton layouts.
+- Skeleton matches 64px mobile thumbnails and 94px rows; desktop continues to show the original `TableSkeleton` at `lg`. Existing server async boundary, cached product provider and error fallback remain intact.
+- No extra provider, data request, product data copy or delayed polling was introduced.

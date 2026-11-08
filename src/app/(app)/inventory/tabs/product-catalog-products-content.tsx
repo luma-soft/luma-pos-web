@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { ListSearchFilterBar } from "@/components/list-search-filter";
 import { Pagination } from "@/components/pagination";
-import { TableSkeleton } from "@/components/table-skeleton";
+import { MobileInventoryCatalogSkeleton } from "@/components/mobile-inventory-catalog-skeleton";
 import { parsePageSize } from "@/lib/pagination";
 import { parsePriceComparisonParams } from "@/lib/pricing/price-comparison";
 import { parseProductListSort } from "@/lib/inventory/product-list-policy";
@@ -123,7 +123,7 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
   ), [canonicalProducts, catalog.snapshot?.warehouses]);
 
   if (!catalog.snapshot) {
-    if (catalog.status === "loading") return <TableSkeleton cols={8} rows={10} />;
+    if (catalog.status === "loading") return <MobileInventoryCatalogSkeleton />;
     return (
       <div className="rounded-xl border border-dashed border-border bg-surface p-8 text-center">
         <p className="font-semibold">Không có danh mục sản phẩm ngoại tuyến</p>
