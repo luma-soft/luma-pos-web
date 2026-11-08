@@ -47,9 +47,9 @@ export function CameraPickerModal({ open, cameras, selectedCameras = {}, onClose
   }
 
   return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/40 p-4" role="presentation" onMouseDown={close}>
-      <div className="flex h-[min(860px,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl" role="dialog" aria-modal="true" aria-label={t("pos.cameraQuote.pickerTitle")} onMouseDown={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
+    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/40 p-0 lg:p-4" role="presentation" onMouseDown={close}>
+      <div className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden border border-border bg-surface shadow-2xl lg:h-[min(860px,calc(100dvh-2rem))] lg:max-h-[calc(100dvh-2rem)] lg:max-w-7xl lg:rounded-2xl" role="dialog" aria-modal="true" aria-label={t("pos.cameraQuote.pickerTitle")} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 pt-[calc(.75rem+env(safe-area-inset-top))] pb-3 lg:py-3 lg:px-5">
           <div>
             <h2 className="text-base font-bold sm:text-lg">{t("pos.cameraQuote.pickerTitle")}</h2>
             <p className="mt-0.5 text-xs text-slate-500">{t("pos.cameraQuote.pickerDescription")}</p>
@@ -60,7 +60,7 @@ export function CameraPickerModal({ open, cameras, selectedCameras = {}, onClose
           <Input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("pos.cameraQuote.pickerSearchCamera")} leftIcon={<Search />} />
           <div className="mt-3 text-xs font-semibold text-slate-500">{t("pos.cameraQuote.cameraCount", { count: cameras.length })}</div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:p-5">
           {filtered.length === 0 ? (
             <div className="grid min-h-40 place-items-center text-sm text-slate-500">{t("pos.cameraQuote.pickerEmpty")}</div>
           ) : (

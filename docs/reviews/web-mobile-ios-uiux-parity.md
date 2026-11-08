@@ -299,3 +299,8 @@ The GitHub connector exposes repository contents but not an authenticated browse
 
 - The Web-only quick-line creator keeps its existing name/SKU/unit/price form and validation but now uses a mobile bottom sheet up to the `lg` breakpoint, with iPhone safe-area padding and independent scrolling. Desktop retains its previous centered 512px dialog.
 - Auto focus remains on Desktop only, preventing premature mobile Safari keyboard occlusion on opening. SKU generation, add callbacks, error handling and submit rules are unchanged.
+
+## Camera quotation — full-screen Mobile camera picker
+
+- The Web-specific camera quotation product picker now uses a full-screen Mobile/iPad surface with safe-area header/list content and independently scrolling camera cards. At `lg`, the existing centered 860px-high, 1280px-wide dialog and border-radius are restored.
+- Existing search/filtering, selected quantity badges, image handling, price display and `onSelect/onClose` actions are unchanged; no extra catalog copies or fetches were introduced.
