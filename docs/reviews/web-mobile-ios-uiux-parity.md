@@ -238,3 +238,9 @@ The GitHub connector exposes repository contents but not an authenticated browse
 - Orders, quotations, reservations, and returns now use a full-viewport mobile filtering sheet with an independent scroll region, keyboard-focus handling, safe-area header, and persistent action footer. This matches the native invoice filter presentation more closely while retaining the original 460px slide-over at `lg` desktop widths.
 - All existing filter fields, date presets, entity pickers, debounced result-count queries, Cancel/Clear/Apply behavior, validation, and URL navigation remain untouched. The shared popup's search field uses 16px on iPhone to prevent Safari focus zoom; desktop retains 14px.
 - Production screenshot comparisons (including a visible keyboard) are still required.
+
+## Full-screen native customer and supplier creation on mobile
+
+- Both partner-creation dialogs now use 100dvh full-screen Mobile/iPad sheets with safe-area top/bottom padding, independently scrolling forms and sticky title bar. The previous Desktop 760px maximum height, 672px width, padding and rounded card are preserved behind `lg:`.
+- Save, Cancel, Zod/React Hook Form, address picker, create action and `onCreated` callback are unchanged. Close action now has localized accessible name.
+- Native toolbar Save/Cancel arrangement and actual software-keyboard geometry remain to compare on a real phone.

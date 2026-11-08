@@ -107,19 +107,20 @@ export function SupplierCreateDialog({
   onOpenChange: (open: boolean) => void;
   onCreated: (supplier: SupplierCreateResult) => void;
 }) {
+  const t = useTranslations();
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" role="presentation">
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-0 lg:items-center lg:p-4" role="presentation">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="supplier-create-dialog-title"
-        className="max-h-[min(92dvh,760px)] w-full overflow-auto rounded-t-2xl border border-border bg-surface p-4 shadow-e2 sm:max-w-2xl sm:rounded-card sm:p-6"
+        className="h-dvh w-full overflow-y-auto overscroll-contain border border-border bg-surface px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-[calc(1rem+env(safe-area-inset-top))] shadow-e2 lg:h-auto lg:max-h-[min(92dvh,760px)] lg:max-w-2xl lg:rounded-card lg:p-6"
       >
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="sticky top-0 z-10 mb-4 flex items-center justify-between gap-3 border-b border-border-soft bg-surface py-2 lg:static lg:border-b-0 lg:py-0">
           <Heading id="supplier-create-dialog-title" as="h2" size="base" tx="suppliers.createNew" />
-          <Button type="button" variant="ghost" size="iconSm" onClick={() => onOpenChange(false)} title="Close">
+          <Button type="button" variant="ghost" size="iconSm" onClick={() => onOpenChange(false)} aria-label={t("common.close")}>
             <X className="h-4 w-4" />
           </Button>
         </div>
