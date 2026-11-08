@@ -54,12 +54,18 @@ export function dataTableResultSetKey(
   const resultSetParams = new URLSearchParams(searchParams.toString());
   resultSetParams.delete(expandedParam);
   // Overlay-only URL fields are not result-set filters; keep the list's scroll.
+  // productId/productKind may also be genuine list filters (for example order search).
+  const isProductEditor = resultSetParams.has("productModal");
   for (const key of [
     "detailOrderId", "detailPurchaseId", "detailCustomerId", "detailSupplierId",
     "detailProductId", "detailTab",
-    "productModal", "productId", "copyFrom", "copyGroup", "sameTypeAs",
-    "productKind", "returnTo", "onlineListing", "onlineProductId", "shopeeProductId",
+    "productModal", "copyFrom", "copyGroup", "sameTypeAs",
+    "returnTo", "onlineListing", "onlineProductId", "shopeeProductId",
   ]) resultSetParams.delete(key);
+  if (isProductEditor) {
+    resultSetParams.delete("productId");
+    resultSetParams.delete("productKind");
+  }
   return resultSetParams.toString();
 }
 

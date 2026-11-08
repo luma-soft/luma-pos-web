@@ -42,16 +42,19 @@ describe("data table scroll reset key", () => {
     const before = dataTableResultSetKey(new URLSearchParams(base), "expanded");
     for (const key of [
       "detailCustomerId", "detailSupplierId", "detailPurchaseId",
-      "detailProductId", "productModal", "productId", "detailTab",
+      "detailProductId", "productModal", "detailTab",
     ]) {
       expect(dataTableResultSetKey(new URLSearchParams(base + `&${key}=some-id`), "expanded")).toBe(before);
     }
+    expect(dataTableResultSetKey(new URLSearchParams(base + "&productModal=edit&productId=abc&productKind=product"), "expanded")).toBe(before);
   });
 
   test("changing a real list filter or page still resets scroll", () => {
     const base = dataTableResultSetKey(new URLSearchParams("tab=orders&page=3&q=abc"), "expanded");
     expect(dataTableResultSetKey(new URLSearchParams("tab=orders&page=4&q=abc"), "expanded")).not.toBe(base);
     expect(dataTableResultSetKey(new URLSearchParams("tab=orders&page=3&q=xyz"), "expanded")).not.toBe(base);
+    expect(dataTableResultSetKey(new URLSearchParams("tab=orders&page=3&q=abc&productId=a"), "expanded"))
+      .not.toBe(dataTableResultSetKey(new URLSearchParams("tab=orders&page=3&q=abc&productId=b"), "expanded"));
   });
 
   test("expanding an unrelated row does not reset the underlying table", () => {
