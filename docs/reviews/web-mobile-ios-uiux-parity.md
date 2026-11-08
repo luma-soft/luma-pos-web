@@ -255,3 +255,9 @@ The GitHub connector exposes repository contents but not an authenticated browse
 
 - Mobile product information now shows the iOS-style three-column strip for price, cost and current stock. The former fourth minimum-stock tile is moved into the Mobile information list, preserving it while matching native hierarchy.
 - Desktop price/cost/stock/minimum stock rows and product calculations remain unchanged. Metric amounts wrap on small screens to avoid clipping.
+
+## POS — mobile line price editor bottom sheet
+
+- The POS price/discount editor now opens as an iPhone bottom sheet with independent scrolling, bottom safe-area padding, and a 48px `Done` button. The same existing price book, unit price, discount, free-item and computed sell-price controls are reused; **price updates still follow the existing immediate-change handler** and Done only dismisses the sheet.
+- Prevent automatic keyboard opening when the mobile sheet appears, while preserving desktop focus-on-open via a desktop-only media check. Desktop retains the centered 400px modal, padding, and styling behind `lg:`.
+- Requires a real iPhone keyboard/Viewport visual test; code and Bun source assertions alone cannot establish keyboard-free occlusion.

@@ -4015,6 +4015,14 @@ function LinePriceEditor({
     };
   });
   const [priceError, setPriceError] = useState("");
+  const priceInputRef = useRef<HTMLInputElement>(null);
+  // Native iOS presents the editor sheet before raising the keyboard.
+  // Keep desktop's existing focus-on-open behavior; on iPhone wait for a tap.
+  useEffect(() => {
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+      priceInputRef.current?.focus({ preventScroll: true });
+    }
+  }, []);
   const changedRef = useRef(false);
   const onChangeRef = useRef(onChange);
   useEffect(() => {
@@ -4102,10 +4110,22 @@ function LinePriceEditor({
         role="dialog"
         aria-modal="true"
         aria-labelledby="pos-price-editor-title"
-        className="fixed left-1/2 top-1/2 z-60 w-100 max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 space-y-3 rounded-xl border border-border bg-surface p-4 text-sm shadow-e2"
+        className="fixed inset-x-0 bottom-0 z-60 max-h-[calc(100dvh-env(safe-area-inset-top))] w-full space-y-3 overflow-y-auto overscroll-contain rounded-t-2xl border border-border bg-surface px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-sm shadow-e2 lg:inset-x-auto lg:bottom-auto lg:left-1/2 lg:top-1/2 lg:w-100 lg:max-w-[calc(100vw-32px)] lg:max-h-none lg:-translate-x-1/2 lg:-translate-y-1/2 lg:overflow-visible lg:rounded-xl lg:p-4"
       >
         {priceError && <p role="alert" className="text-sm text-red-600">{priceError}</p>}
-        <div id="pos-price-editor-title" className="mb-1 text-base font-semibold">{productDisplayName(line.product)}</div>
+        <div className="flex items-start justify-between gap-3 lg:block">
+          <div id="pos-price-editor-title" className="mb-1 min-w-0 flex-1 break-words text-base font-semibold">
+            {productDisplayName(line.product)}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("common.close")}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-border text-slate-500 lg:hidden"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
         <div className="flex items-center justify-between gap-2">
           <span className="text-slate-500 shrink-0">{t("pos.priceBook.title")}</span>
           <Select
@@ -4125,7 +4145,8 @@ function LinePriceEditor({
         <div className="flex items-center justify-between gap-2">
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.unitPrice")}</span>
           <MoneyInput
-            value={editor.price} autoFocus
+            ref={priceInputRef}
+            value={editor.price}
             onChange={setPrice}
             aria-invalid={belowPurchasePrice}
             className={cn(
@@ -4159,6 +4180,13 @@ function LinePriceEditor({
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.sellPrice")}</span>
           <span className={cn("font-bold tabular-nums", belowPurchasePrice ? "text-er" : "text-primary-600")}>{formatCurrency(resolved.sellPrice)}</span>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex min-h-12 w-full items-center justify-center rounded-xl bg-primary-600 px-4 text-base font-bold text-white lg:hidden"
+        >
+          {t("common.done")}
+        </button>
       </div>
     </>
   );
