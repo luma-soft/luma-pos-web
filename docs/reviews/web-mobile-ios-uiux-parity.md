@@ -146,3 +146,9 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 ## CI coverage extension
 
 - The GitHub Actions parity workflow also watches the public PWA shell/worker and runs all newly added partner, input-zoom, document-day, and Service Worker regression checks.
+
+## Native product form tab strip and validation
+
+- `NewProductForm` now mirrors `NativeProductFormTabsShell` on iPhone with three equal-width short tabs (48px touch targets), while desktop retains existing tab widths and spacing.
+- Description tab uses the existing localized `products.tabs.description` translation instead of a Vietnamese-only hardcoded string.
+- Invalid submission from either the Units/Variants **or Description** step now navigates back to Info when required Info fields are invalid. Existing form state, validation schema, save handlers and desktop layout are unchanged.

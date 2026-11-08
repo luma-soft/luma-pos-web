@@ -552,7 +552,7 @@ export function NewProductForm({
       form={form}
       onSubmit={onSubmit}
       onInvalidSubmit={(errors) => {
-        if (tab !== "variants") return;
+        if (tab === "info") return;
         const infoFields = [
           "productKind",
           "sku",
@@ -650,20 +650,22 @@ export function NewProductForm({
       </header>
 
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6">
-        <div className="flex gap-6 overflow-x-auto">
+        <div className="flex items-end gap-0 lg:gap-6 overflow-x-auto">
           {(["info", ...(productKind === "product" ? ["variants" as const] : []), "description"] as Tab[]).map((tk) => (
             <button
               key={tk}
               type="button"
               onClick={() => setTab(tk)}
+              aria-current={tab === tk ? "step" : undefined}
+              title={t(`products.tabs.${tk}`)}
               className={cn(
-                "py-3 text-sm font-medium border-b-2 transition-colors min-h-11 min-w-11",
+                "min-h-12 min-w-0 flex-1 border-b-2 px-1 py-2 text-center text-[13px] font-semibold transition-colors min-[390px]:text-sm lg:min-h-11 lg:min-w-11 lg:flex-none lg:py-3 lg:text-sm lg:font-medium",
                 tab === tk
                   ? "border-primary-600 text-primary-600"
                   : "border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400",
               )}
             >
-              {tk === "description" ? "Mô tả, ghi chú" : t(`products.tabs.${tk}`)}
+              {t(`products.tabs.${tk}`)}
             </button>
           ))}
         </div>
