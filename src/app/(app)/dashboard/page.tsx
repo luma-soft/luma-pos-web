@@ -248,12 +248,19 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             <div className="divide-y divide-border-soft overflow-hidden rounded-2xl border border-border bg-surface px-3 shadow-e1">
               {data.recentOrders.length === 0 ? (
                 <p className="py-5 text-center text-sm text-slate-500">{t("orders.empty")}</p>
-              ) : data.recentOrders.slice(0, 5).map((order) => (
-                <div key={order.id} className="flex min-h-[72px] items-center gap-3 py-2.5">
+              ) : data.recentOrders.slice(0, 2).map((order) => (
+                <div key={order.id} className="flex min-h-[82px] items-center gap-3 py-3">
                   <div className="min-w-0 flex-1">
-                    <OrderDetailLink orderId={order.id} className="block truncate text-sm font-semibold text-primary-600">{order.code}</OrderDetailLink>
-                    <span className="block truncate text-xs text-slate-500">{order.customerName ?? t("orders.walkIn")}</span>
-                    <span className="mt-1 inline-flex flex-wrap gap-1.5">
+                    <OrderDetailLink
+                      orderId={order.id}
+                      className="block truncate text-sm font-semibold text-primary-600"
+                    >
+                      {order.customerName || t("orders.walkIn")}
+                    </OrderDetailLink>
+                    <span className="mt-1 block truncate text-xs text-slate-500">
+                      {order.code} · {formatDate(order.createdAt)}
+                    </span>
+                    <span className="mt-1.5 inline-flex flex-wrap gap-1.5">
                       <OrderStatusBadge status={order.status} />
                       <PaymentStatusBadge status={order.paymentStatus} />
                     </span>

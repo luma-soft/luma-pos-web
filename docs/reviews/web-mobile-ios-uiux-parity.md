@@ -107,3 +107,8 @@ The GitHub connector exposes repository contents but not a checked-out dependenc
 - Unit selection is an independent touch target above the full-row detail button; product selection and variant cost presentation remain functional.
 - Thumbnail default stays 44px for existing uses, with a 64px opt-in only for mobile row. Desktop column definitions, catalog provider, pagination, unit projection and stock logic are unchanged.
 - Added Bun source assertions for separate unit/action hit targets; no device visual test in the connector environment.
+
+## Dashboard recent orders reference correction
+
+- `DashboardRecentActivityView.swift` shows at most **two** recent invoice cards when order data is available, falling back to raw activity rows only when invoice cards are absent. An additional duplicated activity list is **not** needed.
+- Web Mobile now shows the same two-order summary with customer name, amount, document code/date and status/payment; native card opens the invoice from the customer label. Existing backend still queries five, and desktop continues to render all original rows.
