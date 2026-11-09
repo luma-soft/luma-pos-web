@@ -41,10 +41,10 @@ export function productVariantValues(product: Pick<VariantSummary, "variantName"
   return values;
 }
 
-export function productDisplayName(product: Pick<VariantSummary, "name" | "variantName" | "specs">) {
+export function productDisplayName(product: Pick<VariantSummary, "name" | "variantName" | "specs">, separator = " · ") {
   const name = product.name.trim();
   const lower = name.toLocaleLowerCase();
-  return [name, ...productVariantValues(product).filter((value) => !lower.includes(value.toLocaleLowerCase()))].join(" · ");
+  return [name, ...productVariantValues(product).filter((value) => !lower.includes(value.toLocaleLowerCase()))].join(separator);
 }
 
 /** Labels are presentation only. SKU identity always comes from the product ID. */
