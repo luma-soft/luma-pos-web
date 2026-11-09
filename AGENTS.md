@@ -17,6 +17,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Sau khi hoàn tất một task thay đổi code, mặc định commit các thay đổi thuộc task và push trực tiếp lên `origin/main`, trừ khi người dùng nói rõ không push.
 - Không chờ người dùng nhắc lại việc commit/push; luôn kiểm tra `git status`, không đưa file tạm hoặc thay đổi ngoài phạm vi task vào commit.
 
+## GitHub Actions workflows
+
+- Chỉ được giữ workflow `.github/workflows/keep-supabase-alive.yml` để giữ Supabase hoạt động.
+- Tuyệt đối không tự ý tạo mới, khôi phục hoặc bổ sung GitHub Actions workflow khác khi chưa được người dùng phê duyệt rõ ràng, kể cả CI, lint, typecheck, build, test hay parity checks.
+- Khi cần kiểm tra code, ưu tiên chạy thủ công trong môi trường phát triển; không thiết lập workflow tự động trên GitHub.
+- Không sửa/xóa workflow keep-alive Supabase khi không có yêu cầu cụ thể từ người dùng.
+
 ## Picker và dropdown hiển thị cho người dùng
 
 - Không dùng `<select>` hoặc `<datalist>` native làm bề mặt tương tác hiển thị
