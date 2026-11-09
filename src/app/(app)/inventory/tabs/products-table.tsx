@@ -455,7 +455,7 @@ export function ProductsTable({
       required: true,
       wrap: true,
       cellClassName: "!whitespace-normal",
-      render: (product) => <div className="space-y-1"><div className="break-words font-medium text-slate-900 dark:text-slate-100">{groupOf(product)?.name ?? productDisplayName(product)}</div>{!groupOf(product) && <ProductKindBadge kind={product.productKind} />}</div>,
+      render: (product) => <div className="space-y-1"><div className="break-words font-medium text-slate-900 dark:text-slate-100">{groupOf(product)?.name ?? productDisplayName(product, " - ")}</div>{!groupOf(product) && <ProductKindBadge kind={product.productKind} />}</div>,
     },
     { key: "category", label: t("products.list.colCategory"), defaultVisible: false, width: "130px", render: (product) => <span className="text-slate-500">{product.categoryName ?? "—"}</span> },
     ...buildProductUnitColumns({
@@ -516,8 +516,7 @@ export function ProductsTable({
                 {visibleColumns.map((column) => <td key={column.key} className={cn("px-3 py-3 align-middle", column.align === "right" && "text-right tabular-nums", column.align === "center" && "text-center", typeof column.cellClassName === "function" ? column.cellClassName(child) : column.cellClassName)}>
                   {column.key === "sku" ? <Link href={Routes.productDetail(child.id)} scroll={false} onClick={stopRowToggle} className="flex min-h-14 items-center gap-2.5 text-sm font-medium hover:text-primary-600"><ProductThumbnail product={child} /><span className="min-w-0 break-words">{child.sku}</span></Link>
                     : column.key === "product" ? <Link href={Routes.productDetail(child.id)} scroll={false} onClick={stopRowToggle} className="block whitespace-normal font-medium hover:text-primary-600">
-                      <span className="block break-words">{child.name}</span>
-                      {productVariantLabel(child) !== child.name && <span className="mt-1 block text-xs font-normal text-slate-500">{t("products.variants.version")}: {productVariantLabel(child)}</span>}
+                      <span className="block break-words">{productDisplayName(child, " - ")}</span>
                       <span className="mt-1 block"><ProductKindBadge kind={child.productKind} /></span>
                     </Link>
                     : column.render(child)}
@@ -540,7 +539,7 @@ export function ProductsTable({
             </div>
             {isExpanded(product) && <>
               <div className="ml-3 border-l border-border">
-                {membersFor(product).members.map((member) => <ProductMobileRow key={member.id} product={{ ...member, name: query.trim() ? member.name : productVariantLabel(member), variantGroup: undefined }} variantRow selectionEnabled={selectionEnabled} selected={selectedIds.has(member.id)} selectLabel={t("products.bulk.selectProduct", { name: member.name })} stockNotTrackedLabel={t("products.stock.notTracked")} selectedUnitName={selectedUnitName(member)} onUnitChange={(unitName) => changeUnit(member.id, unitName)} onToggle={() => toggle(member.id)} onOpen={() => openProduct(member)} />)}
+                {membersFor(product).members.map((member) => <ProductMobileRow key={member.id} product={{ ...member, variantGroup: undefined }} variantRow selectionEnabled={selectionEnabled} selected={selectedIds.has(member.id)} selectLabel={t("products.bulk.selectProduct", { name: member.name })} stockNotTrackedLabel={t("products.stock.notTracked")} selectedUnitName={selectedUnitName(member)} onUnitChange={(unitName) => changeUnit(member.id, unitName)} onToggle={() => toggle(member.id)} onOpen={() => openProduct(member)} />)}
               </div>
               <div className="border-t border-border-soft">{groupControls(product)}</div>
             </>}
@@ -666,6 +665,7 @@ export function ProductMobileRow({
   variantRow?: boolean;
 }) {
   const t = useTranslations();
+  const displayName = productDisplayName(product, " - ");
   const projected = unitProjection(product, selectedUnitName);
   const unitOptions = buildProductUnitOptions(product.baseUnit, product.unitDefinitions);
   const selectedUnit = selectedUnitDefinition(product, selectedUnitName);
@@ -704,14 +704,14 @@ export function ProductMobileRow({
         <button
           type="button"
           onClick={onOpen}
-          aria-label={productDisplayName(product)}
+          aria-label={displayName}
           className="absolute inset-0 rounded-md focus-visible:outline-2 focus-visible:outline-primary-500"
         />
         <div className="pointer-events-none relative flex min-w-0 items-start gap-3">
           <ProductThumbnail product={product} largeOnMobile />
           <div className="min-w-0 flex-1">
             <div className="line-clamp-2 break-words text-sm font-semibold text-slate-950 dark:text-white">
-              {productDisplayName(product)}
+              {displayName}
             </div>
             <div className="mt-1 truncate text-xs text-slate-500">{product.sku || "—"}</div>
             {!variantRow && product.categoryName && (
@@ -730,7 +730,7 @@ export function ProductMobileRow({
             {!group && unitOptions.length > 1 ? (
               <div className="pointer-events-auto relative z-10 max-w-full">
                 <ProductUnitSelector
-                  productName={productDisplayName(product)}
+                  productName={displayName}
                   baseUnit={product.baseUnit}
                   units={product.unitDefinitions}
                   value={projected.unitName}
