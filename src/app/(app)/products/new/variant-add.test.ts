@@ -168,7 +168,7 @@ test("compact group addition reuses existing attribute values for a new combinat
 test("compact group addition rejects a combination already assigned to a SKU", () => {
   assert.throws(
     () => prepareVariantAddition({ ...base, variantAddValues: { "00000000-0000-4000-8000-000000000005": " 10122 " } }),
-    /products\.variants\.invalidCombination/,
+    /duplicateValue/,
   );
 });
 
