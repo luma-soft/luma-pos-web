@@ -88,6 +88,53 @@ test("variant metadata migrations preserve all imported product fields", async (
   assert.equal((await pg.query<{ stock: string }>("select sum(quantity)::text stock from stock_levels")).rows[0].stock, "2.0000");
 });
 
+test("same-type addition repairs missing legacy identity without overwriting saved SKU data", async () => {
+  // The migration may leave a membership key missing even when the product
+  // still has an unambiguous attribute value in its saved specifications.
+  const [{ attributes, revision }] = (await pg.query<{
+    attributes: {
+      attributeId: string; name: string; values: string[]; valueIds: string[]; createsVariants: true;
+    }[];
+    revision: number;
+  }>("select attributes, revision from product_variant_groups where id=$1", [importedRoot])).rows;
+  const combinations = buildVariantCombinations(attributes);
+  assert.equal(combinations.length, 2);
+  await pg.query("update product_variant_members set combination_key=null, option_value_ids='[]'::jsonb where product_id=$1", [importedChild]);
+
+  const beforeProducts = (await pg.query(
+    "select id,sku,name,variant_name,barcode,cost_price,retail_price,specs,is_active,lifecycle_status from products where id in ($1,$2) order by id",
+    [importedRoot, importedChild],
+  )).rows;
+  const beforeStock = (await pg.query("select row_to_json(s) value from stock_levels s where product_id=$1", [importedChild])).rows;
+  const draft = makeInput({
+    variantGroupId: importedRoot, variantOperation: "add", variantRevision: revision,
+    attributes,
+    variantChildren: combinations.map((combination, index) => ({
+      ...combination, productId: index === 0 ? importedRoot : importedChild,
+      sku: index === 0 ? "IMPORTED-E" : "IMPORTED-F",
+      // Stale copied values must not rewrite the stored records during an add.
+      costPrice: 1, retailPrice: 1, initialStock: 0, baseUnit: "cái", directSale: false,
+    })),
+    variantExistingCombinationKeys: combinations.map((combo) => combo.combinationKey),
+    variantAddValues: { [attributes[0].attributeId]: "38364.5" },
+    excludedCombinationKeys: [],
+  });
+  const addition = prepareVariantAddition(draft);
+  assert.equal(addition.variantChildren.length, 3);
+  const saved = await save(addition);
+  assert.equal(saved.createdIds.length, 1);
+  assert.deepEqual((await pg.query(
+    "select id,sku,name,variant_name,barcode,cost_price,retail_price,specs,is_active,lifecycle_status from products where id in ($1,$2) order by id",
+    [importedRoot, importedChild],
+  )).rows, beforeProducts);
+  assert.deepEqual((await pg.query("select row_to_json(s) value from stock_levels s where product_id=$1", [importedChild])).rows, beforeStock);
+  const members = (await pg.query<{ product_id: string; combination_key: string | null }>(
+    "select product_id,combination_key from product_variant_members where group_id=$1", [importedRoot],
+  )).rows;
+  assert.equal(members.length, 3);
+  assert.ok(members.every((member) => member.combination_key));
+});
+
 test("creating E/F stores prices and 0/2 stock, then an identical retry creates nothing", async () => {
   const input = makeInput();
   const result = await save(input);
