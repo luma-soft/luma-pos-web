@@ -126,7 +126,11 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
   const submittedIds = new Set(children.flatMap((row) => row.productId ? [row.productId] : []));
   if (children.some((child) => child.productId && !existingById.has(child.productId))) fail("products.variants.invalidGroup");
   if (v.variantOperation !== "add" && existing.some((row) => !submittedIds.has(row.id))) fail("products.variants.keepExisting");
-  if (!stored && existing.some((row) => !submittedIds.has(row.id))) fail("products.variants.assignExisting");
+  // Legacy related groups may predate the metadata tables. An addition can
+  // preserve their existing SKUs without assigning guessed identities.
+  if (!stored && v.variantOperation !== "add" && existing.some((row) => !submittedIds.has(row.id))) {
+    fail("products.variants.assignExisting");
+  }
   // Do not silently remap an existing SKU when an axis/value disappears.
   for (const child of children) {
     if (!child.productId) continue;
