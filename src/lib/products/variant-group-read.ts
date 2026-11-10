@@ -55,12 +55,16 @@ export function projectVariantGroup<T extends VariantReadMember>(input: {
     const specs = visibleSpecs[index];
     const selections: [string, string][] = [];
     for (const axis of attributes) {
-      const spec = specs.find((entry) => entry.catalog?.id === axis.attributeId || variantNameKey(entry.name) === variantNameKey(axis.name));
-      const valueIndex = spec?.values.length === 1 ? axis.values.indexOf(spec.values[0].trim()) : -1;
+      // Descriptive/technical specifications are not variant axes. Imported
+      // products can carry extra specs without losing their SKU identity.
+      const matches = specs.filter((entry) => entry.catalog?.id === axis.attributeId || variantNameKey(entry.name) === variantNameKey(axis.name));
+      if (matches.length !== 1 || matches[0].values.length !== 1) continue;
+      const valueIndex = axis.values.findIndex((value) =>
+        variantNameKey(value) === variantNameKey(matches[0].values[0]));
       if (valueIndex < 0) continue;
       selections.push([axis.attributeId, axis.valueIds[valueIndex]]);
     }
-    const valid = attributes.length > 0 && selections.length === attributes.length && specs.length === attributes.length;
+    const valid = attributes.length > 0 && selections.length === attributes.length;
     const combinationKey = valid ? variantCombinationKey(selections) : undefined;
     const stored = identities.get(member.id);
     if (!valid || (combinationKey && usedKeys.has(combinationKey)) || (stored?.combinationKey && stored.combinationKey !== combinationKey)) requiresReview = true;
@@ -69,11 +73,15 @@ export function projectVariantGroup<T extends VariantReadMember>(input: {
   });
   let excludedCombinationKeys = input.stored?.excludedCombinationKeys ?? [];
   try {
-    // Sparse imported groups retain only their existing SKUs when first edited.
-    excludedCombinationKeys = [...new Set([...excludedCombinationKeys, ...buildVariantCombinations(attributes, {
-      maxCombinations: variantCombinationBudget(input.members.length, excludedCombinationKeys.length),
-    })
-      .filter((combo) => !usedKeys.has(combo.combinationKey)).map((combo) => combo.combinationKey)])];
+    // Sparse groups with fully identified members can exclude unused cross
+    // combinations. An unresolved legacy SKU might own any missing option:
+    // never infer exclusions from missing keys in a group awaiting review.
+    if (members.every((member) => member.combinationKey)) {
+      excludedCombinationKeys = [...new Set([...excludedCombinationKeys, ...buildVariantCombinations(attributes, {
+        maxCombinations: variantCombinationBudget(input.members.length, excludedCombinationKeys.length),
+      })
+        .filter((combo) => !usedKeys.has(combo.combinationKey)).map((combo) => combo.combinationKey)])];
+    }
   } catch { requiresReview = true; }
   const sameUnit = new Set(members.map((member) => member.baseUnit.trim().toLowerCase())).size <= 1;
   const prices = (key: "costPrice" | "retailPrice") => members.map((member) => Number(member[key]));
