@@ -121,6 +121,22 @@ test("same-type addition repairs missing legacy identity without overwriting sav
   });
   const addition = prepareVariantAddition(draft);
   assert.equal(addition.variantChildren.length, 3);
+  const [savedE, savedF, newG] = addition.variantChildren;
+  // A missing historical key does not authorize changing which option the
+  // existing SKU represents. The recorded product specs remain authoritative.
+  const forged = {
+    ...addition,
+    variantChildren: [
+      savedE,
+      { ...newG, productId: importedChild, sku: "IMPORTED-F", baseUnit: savedF.baseUnit },
+      { ...savedF, productId: undefined, sku: `NEW-${randomUUID().slice(0, 8)}` },
+    ],
+  };
+  await assert.rejects(save(forged), /assignExisting/);
+  assert.equal((await pg.query<{ combination_key: string | null }>(
+    "select combination_key from product_variant_members where product_id=$1", [importedChild],
+  )).rows[0].combination_key, null);
+
   const saved = await save(addition);
   assert.equal(saved.createdIds.length, 1);
   assert.deepEqual((await pg.query(
