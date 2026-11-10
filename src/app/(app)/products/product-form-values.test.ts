@@ -65,10 +65,24 @@ test("same-type action targets the existing group instead of making another pare
   const draft = productToFormInitialValues(grouped, "sameType");
   assert.equal(draft.variantOperation, "add");
   assert.equal(draft.variantGroupId, "parent");
-  assert.deepEqual(draft.variantChildren?.map((child) => child.productId), ["e", "f"]);
-  assert.ok(draft.variantChildren?.every((child) => child.combinationKey && child.initialStock === 0));
-  assert.deepEqual(draft.variantChildren?.map((child) => child.costPrice), [1280000, 990000]);
+  // Old SKUs are loaded and validated by the writer, not sent as edits.
+  assert.deepEqual(draft.variantChildren, []);
   assert.deepEqual(draft.variantExistingCombinationKeys?.length, 2);
+});
+
+test("same-type add does not send incomplete historic SKU identities from a grouped product", () => {
+  const legacy = { ...grouped, variantGroup: {
+    ...grouped.variantGroup!,
+    members: [{ ...e, combinationKey: undefined, specs: { "Phiên bản": ["E"], "Độ dày": ["2 mm"] } }, f],
+    requiresReview: true,
+  } } as unknown as ProductDetail;
+  const draft = productToFormInitialValues(legacy, "sameType");
+  assert.equal(draft.variantOperation, "add");
+  assert.deepEqual(draft.variantChildren, []);
+  assert.deepEqual(draft.variantExistingCombinationKeys, [
+    JSON.stringify([["version", "e-option"]]),
+    JSON.stringify([["version", "f-option"]]),
+  ]);
 });
 
 test("same-type action can start a group from a standalone SKU with legacy specs", () => {
