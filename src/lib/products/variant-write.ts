@@ -60,7 +60,23 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
     ? variantCombinationBudget(existing.length, stored?.excluded_combination_keys.length ?? 0)
     : MAX_VARIANT_COMBINATIONS;
   let axes = normalizeVariantAttributes(v.variantContractVersion === 2 ? v.attributes : v.attributes.map((a) => ({ ...a, createsVariants: true })));
-  const originalRows = validateVariantSubmission({ attributes: axes, children: v.variantChildren, excludedCombinationKeys: v.excludedCombinationKeys, allowPartial: v.variantOperation === "add", maxCombinations });
+  // Existing group members are authoritative in the locked transaction. Ignore
+  // copied old SKU drafts during an addition; an incomplete legacy projection
+  // must never prevent a new, distinct variant from being created.
+  const submittedChildren = v.variantOperation === "add" && stored
+    ? v.variantChildren.filter((child) => !child.productId)
+    : v.variantChildren;
+  if (v.variantOperation === "add" && stored?.attributes?.length) {
+    const persistedAxes = normalizeVariantAttributes(stored.attributes);
+    if (persistedAxes.length !== axes.length || persistedAxes.some((saved) => {
+      const current = axes.find((axis) => axis.attributeId === saved.attributeId);
+      return !current || saved.valueIds.some((id, index) => {
+        const currentIndex = current.valueIds.indexOf(id);
+        return currentIndex < 0 || variantNameKey(current.values[currentIndex]) !== variantNameKey(saved.values[index]);
+      });
+    })) fail("products.variants.keepIdentity");
+  }
+  const originalRows = validateVariantSubmission({ attributes: axes, children: submittedChildren, excludedCombinationKeys: v.excludedCombinationKeys, allowPartial: v.variantOperation === "add", maxCombinations });
   if (!axes.length || !originalRows.length) fail("products.variants.emptyGroup");
   if (originalRows.filter((row) => !row.productId).length > MAX_VARIANT_COMBINATIONS) fail("products.variants.tooMany");
   const catalog = await tx.execute<{ id: string; name: string; name_key: string }>(sql`
