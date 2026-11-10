@@ -145,19 +145,19 @@ export const createProductSchema = z.object({
     } else {
       try {
         validateVariantSubmission({
-        attributes: value.variantContractVersion === 2 ? value.attributes : value.attributes.map((a) => ({ ...a, createsVariants: true })),
-        children: value.variantChildren,
-        excludedCombinationKeys: value.excludedCombinationKeys,
-        allowPartial: value.variantOperation === "add",
-        // Preliminary shape validation accepts claimed existing identities so
-        // large groups can reach the writer. The writer still derives the
-        // authoritative budget from locked, persisted membership.
-        maxCombinations: value.variantGroupId
-          ? variantCombinationBudget(Math.max(
-              new Set(value.variantChildren.flatMap((child) => child.productId ? [child.productId] : [])).size,
-              value.variantOperation === "add" ? new Set(value.variantExistingCombinationKeys).size : 0,
-            ), value.excludedCombinationKeys.length)
-          : undefined,
+          attributes: value.variantContractVersion === 2 ? value.attributes : value.attributes.map((a) => ({ ...a, createsVariants: true })),
+          children: value.variantChildren,
+          excludedCombinationKeys: value.excludedCombinationKeys,
+          allowPartial: value.variantOperation === "add",
+          // Preliminary shape validation accepts claimed existing identities so
+          // large groups can reach the writer. The writer still derives the
+          // authoritative budget from locked, persisted membership.
+          maxCombinations: value.variantGroupId
+            ? variantCombinationBudget(Math.max(
+                new Set(value.variantChildren.flatMap((child) => child.productId ? [child.productId] : [])).size,
+                value.variantOperation === "add" ? new Set(value.variantExistingCombinationKeys).size : 0,
+              ), value.excludedCombinationKeys.length)
+            : undefined,
         });
       } catch (error) {
         ctx.addIssue({ code: "custom", path: ["variantChildren"], message: error instanceof VariantValidationError ? error.code : "errors.invalidData" });
