@@ -122,9 +122,11 @@ export function productToFormInitialValues(
       const entries = Object.entries(visibleSpecs);
       return combinations.find((combo) => {
         const axes = Object.entries(combo.specs);
-        return entries.length === axes.length && axes.every(([name, values]) => {
-          const actual = entries.find(([entryName]) => variantNameKey(entryName) === variantNameKey(name))?.[1];
-          return actual?.length === 1 && actual[0].trim() === values[0];
+        return axes.every(([name, values]) => {
+          const matches = entries.filter(([entryName]) => variantNameKey(entryName) === variantNameKey(name));
+          const actual = matches[0]?.[1];
+          return matches.length === 1 && actual?.length === 1
+            && variantNameKey(actual[0]) === variantNameKey(values[0]);
         });
       });
     });
