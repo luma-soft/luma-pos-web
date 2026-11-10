@@ -262,7 +262,15 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
     const current = child.productId ? existingById.get(child.productId) : undefined;
     const id = current?.id ?? (!v.variantGroupId && kind === "related" ? groupId : randomUUID());
     const sku = child.sku?.trim() || current?.sku || (kind === "related" && !v.variantGroupId ? rootSku : `${rootSku}-${randomUUID().slice(0, 6).toUpperCase()}`);
-    const specs = { ...(current ? Object.fromEntries(Object.entries(current.specs ?? {}).filter(([key]) => key.startsWith("__"))) : common.specs), ...child.specs };
+    // Group identity fields are rewritten from the validated combination,
+    // but non-identity specifications (e.g. thickness, material, notes) of
+    // an existing SKU must survive group edits and same-type additions.
+    const preservedSpecs = current
+      ? Object.fromEntries(Object.entries(current.specs ?? {}).filter(([name]) =>
+          name.startsWith("__") || !axes.some((axis) => catalog.rows.some((alias) =>
+            alias.id === axis.attributeId && alias.name_key === variantNameKey(name)))))
+      : common.specs;
+    const specs = { ...preservedSpecs, ...child.specs };
     const optionalPrice = (key: "wholesalePrice" | "contractorPrice" | "agentPrice") =>
       child[key] !== undefined ? numberText(child[key]) : current ? current[key] : numberText(v[key]);
     const commercial = { sku, barcode: child.barcode?.trim() || null, variantName: child.variantName,
