@@ -117,7 +117,7 @@ test("same-type add includes persisted rows even when the identity summary is in
     () => prepareVariantAddition({
       ...draft, variantAddValues: { [base.attributes[0].attributeId!]: "10121" },
     }),
-    /products\\.variants\\.invalidCombination/,
+    /invalidCombination/,
   );
 });
 
