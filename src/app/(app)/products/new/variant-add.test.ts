@@ -90,6 +90,37 @@ test("first same-type addition keeps the standalone SKU while adding one new siz
   assert.deepEqual(result.excludedCombinationKeys, []);
 });
 
+test("same-type add includes persisted rows even when the identity summary is incomplete", () => {
+  const existing = buildVariantCombinations(base.attributes)[0];
+  const productId = "00000000-0000-4000-8000-000000000099";
+  const draft = createProductSchema.parse({
+    ...base,
+    variantChildren: [{
+      ...existing, productId, sku: "EXISTING-10121",
+      baseUnit: "m2", costPrice: 125000, retailPrice: 150000,
+      initialStock: 0, directSale: true,
+    }],
+    variantExistingCombinationKeys: [],
+  });
+  const added = prepareVariantAddition(draft);
+  assert.equal(added.variantChildren.length, 2);
+  assert.equal(added.variantChildren[0].productId, productId);
+  assert.equal(added.variantChildren[0].costPrice, 125000);
+  assert.equal(added.variantChildren[1].variantName, "10124");
+  assert.deepEqual(added.excludedCombinationKeys, [
+    buildVariantCombinations(base.attributes)[1].combinationKey,
+  ]);
+  const parsed = createProductSchema.safeParse(added);
+  assert.equal(parsed.success, true, parsed.success ? undefined : parsed.error.issues[0]?.message);
+
+  assert.throws(
+    () => prepareVariantAddition({
+      ...draft, variantAddValues: { [base.attributes[0].attributeId!]: "10121" },
+    }),
+    /products\\.variants\\.invalidCombination/,
+  );
+});
+
 test("compact group addition reuses existing attribute values for a new combination", () => {
   const sizeId = "00000000-0000-4000-8000-000000000010";
   const size140Id = "00000000-0000-4000-8000-000000000011";
