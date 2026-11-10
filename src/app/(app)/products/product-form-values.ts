@@ -154,7 +154,9 @@ export function productToFormInitialValues(
       };
     });
     const variantAddition = mode === "groupAdd" || mode === "sameType";
-    const addingOne = Boolean(group) && variantAddition;
+    // Keep existing SKU identities in the add payload, including imported groups
+    // whose persisted membership keys still need repair. The writer must not
+    // modify those SKUs' commercial data during an add operation.
     const templateVariantName = product.variantName
       ?? children.find((child) => child.productId === product.id)?.variantName;
     return {
@@ -165,7 +167,7 @@ export function productToFormInitialValues(
       variantOperation: isCopy ? "create" : variantAddition ? "add" : "edit",
       ...(!isCopy ? { variantGroupId: group?.id ?? product.id, variantRevision: group?.revision ?? 0 } : {}),
       attributes,
-      variantChildren: addingOne ? [] : children,
+      variantChildren: children,
       excludedCombinationKeys: group?.excludedCombinationKeys ?? combinations.filter((combo) => !children.some((child) => child.combinationKey === combo.combinationKey)).map((combo) => combo.combinationKey),
       sku: clearsIdentity ? "" : product.sku,
       barcode: clearsIdentity ? "" : product.barcode ?? "",
