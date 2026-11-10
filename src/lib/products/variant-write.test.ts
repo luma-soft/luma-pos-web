@@ -132,7 +132,7 @@ test("same-type addition repairs missing legacy identity without overwriting sav
       { ...savedF, productId: undefined, sku: `NEW-${randomUUID().slice(0, 8)}` },
     ],
   };
-  await assert.rejects(save(forged), /assignExisting/);
+  await assert.rejects(save(forged), /duplicateValue/);
   assert.equal((await pg.query<{ combination_key: string | null }>(
     "select combination_key from product_variant_members where product_id=$1", [importedChild],
   )).rows[0].combination_key, null);
@@ -149,6 +149,52 @@ test("same-type addition repairs missing legacy identity without overwriting sav
   )).rows;
   assert.equal(members.length, 3);
   assert.ok(members.every((member) => member.combination_key));
+});
+
+test("same-type addition preserves an unidentifiable legacy SKU without editing stock or product data", async () => {
+  const groupId = randomUUID(), legacyId = randomUUID();
+  const attributes = [{
+    attributeId, name: "Phiên bản", createsVariants: true,
+    values: ["E", "F"], valueIds: ["value-e", "value-f"],
+  }];
+  const [e] = buildVariantCombinations(attributes);
+  await pg.query(
+    "insert into products(id,store_id,sku,name,category_id,specs,cost_price,retail_price) values ($1,$2,$3,'Legacy root',$4,$5,100000,150000)",
+    [groupId, store, `LEGACY-ROOT-${groupId.slice(0, 8)}`, category, JSON.stringify({ "Phiên bản": ["E"] })],
+  );
+  await pg.query(
+    "insert into products(id,store_id,sku,name,category_id,related_product_id,specs,cost_price,retail_price) values ($1,$2,$3,'Legacy without identifying specs',$4,$5,$6,120000,180000)",
+    [legacyId, store, `LEGACY-OLD-${legacyId.slice(0, 8)}`, category, groupId, JSON.stringify({ "Độ dày": ["2 mm"] })],
+  );
+  await pg.query("insert into product_variant_groups(store_id,id,kind,attributes,requires_review) values ($1,$2,'related',$3::jsonb,true)", [
+    store, groupId, JSON.stringify(attributes),
+  ]);
+  await pg.query("insert into product_variant_members(store_id,group_id,product_id,combination_key,option_value_ids) values ($1,$2,$3,$4,$5::jsonb),($1,$2,$6,null,'[]'::jsonb)", [
+    store, groupId, groupId, e.combinationKey, JSON.stringify(e.optionValueIds), legacyId,
+  ]);
+  await pg.query("insert into stock_levels(store_id,product_id,warehouse_id,quantity,min_level) select $1,$2,id,8,0 from warehouses where store_id=$1 and is_default", [store, legacyId]);
+  const oldProduct = (await pg.query("select row_to_json(p) item from products p where id=$1", [legacyId])).rows;
+  const oldStock = (await pg.query("select row_to_json(s) item from stock_levels s where product_id=$1", [legacyId])).rows;
+  const draft = makeInput({
+    variantGroupId: groupId, variantOperation: "add", variantRevision: 0,
+    attributes, variantChildren: [], variantAddValues: { [attributeId]: "G" },
+    variantExistingCombinationKeys: [e.combinationKey], excludedCombinationKeys: [],
+  });
+  const prepared = prepareVariantAddition(draft);
+  assert.equal(prepared.variantChildren.length, 1);
+  const result = await save(prepared);
+  assert.equal(result.createdIds.length, 1);
+  assert.deepEqual((await pg.query("select row_to_json(p) item from products p where id=$1", [legacyId])).rows, oldProduct);
+  assert.deepEqual((await pg.query("select row_to_json(s) item from stock_levels s where product_id=$1", [legacyId])).rows, oldStock);
+  const stored = (await pg.query<{ requires_review: boolean }>(
+    "select requires_review from product_variant_groups where id=$1", [groupId],
+  )).rows[0];
+  assert.equal(stored.requires_review, true);
+  const members = (await pg.query<{ product_id: string; combination_key: string | null }>(
+    "select product_id,combination_key from product_variant_members where group_id=$1", [groupId],
+  )).rows;
+  assert.equal(members.length, 3);
+  assert.equal(members.find((member) => member.product_id === legacyId)?.combination_key, null);
 });
 
 test("creating E/F stores prices and 0/2 stock, then an identical retry creates nothing", async () => {
