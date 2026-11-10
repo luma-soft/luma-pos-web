@@ -158,7 +158,8 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
   const validKeys = new Set(canonicalCombos.map((row) => row.combinationKey));
   const retained = existing.filter((row) => !submittedIds.has(row.id));
   const retainedKeys = retained.map((row) => identityByProduct.get(row.id)).filter((key): key is string => Boolean(key));
-  if (retainedKeys.some((key) => submittedKeys.has(key) || !validKeys.has(key))) {
+  if (retainedKeys.some((key) => submittedKeys.has(key)
+    || (v.variantOperation !== "add" && !validKeys.has(key)))) {
     fail("products.variants.invalidCombination");
   }
 
@@ -168,10 +169,11 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
   const repairedKeys = new Map<string, string>();
   const occupiedKeys = new Set([...submittedKeys, ...retainedKeys]);
   // Do not silently dismiss an earlier manual-review flag during a SKU add.
-  let pendingReview = Boolean(stored?.requires_review);
+  let pendingReview = Boolean(stored?.requires_review)
+    || (v.variantOperation === "add" && retainedKeys.some((key) => !validKeys.has(key)));
   if (v.variantOperation === "add") {
     for (const row of retained) {
-      if (identityByProduct.get(row.id)) continue;
+      const oldKey = identityByProduct.get(row.id);
       const visible = Object.entries(row.specs ?? {}).filter(([name]) => !name.startsWith("__"));
       const selections: [string, string][] = [];
       for (const axis of axes) {
@@ -193,6 +195,10 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
         ));
       if ((inferredKey && submittedKeys.has(inferredKey)) || duplicateLabel) {
         fail("products.variants.duplicateValue");
+      }
+      if (oldKey) {
+        if (inferredKey && inferredKey !== oldKey) pendingReview = true;
+        continue;
       }
       if (inferredKey && !occupiedKeys.has(inferredKey)) {
         repairedKeys.set(row.id, inferredKey);
