@@ -138,7 +138,11 @@ export const createProductSchema = z.object({
 }).superRefine((value, ctx) => {
   const hasVariants = value.variantChildren.length > 0 || value.variantGroupId || value.attributes.some((a) => value.variantContractVersion === 2 ? a.createsVariants : a.values.length > 1);
   if (hasVariants) {
-    try {
+    const unresolvedExistingSku = value.variantOperation === "add"
+      && value.variantChildren.some((child) => child.productId && !child.combinationKey);
+    if (unresolvedExistingSku) {
+      ctx.addIssue({ code: "custom", path: ["variantChildren"], message: "products.variants.assignExisting" });
+    } else try {
       validateVariantSubmission({
         attributes: value.variantContractVersion === 2 ? value.attributes : value.attributes.map((a) => ({ ...a, createsVariants: true })),
         children: value.variantChildren,
