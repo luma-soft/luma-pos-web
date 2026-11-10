@@ -138,10 +138,15 @@ export const createProductSchema = z.object({
 }).superRefine((value, ctx) => {
   const hasVariants = value.variantChildren.length > 0 || value.variantGroupId || value.attributes.some((a) => value.variantContractVersion === 2 ? a.createsVariants : a.values.length > 1);
   if (hasVariants) {
+    // A versioned addition cannot depend on client copies of saved SKUs.
+    // The transaction independently reads and locks their true identities.
+    const checkedChildren = value.variantOperation === "add" && value.variantGroupId && value.variantContractVersion === 2
+      ? value.variantChildren.filter((child) => !child.productId)
+      : value.variantChildren;
     try {
       validateVariantSubmission({
           attributes: value.variantContractVersion === 2 ? value.attributes : value.attributes.map((a) => ({ ...a, createsVariants: true })),
-          children: value.variantChildren,
+          children: checkedChildren,
           excludedCombinationKeys: value.excludedCombinationKeys,
           allowPartial: value.variantOperation === "add",
           // Preliminary shape validation accepts claimed existing identities so
