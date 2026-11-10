@@ -335,9 +335,28 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
   }
   revision++;
   await tx.execute(sql`insert into product_variant_groups(store_id,id,kind,attributes,excluded_combination_keys,requires_review,revision)
-    values(${storeId}::uuid,${groupId}::uuid,${kind},${json(axes)}::jsonb,${json(exclusions)}::jsonb,false,${revision})
+    values(${storeId}::uuid,${groupId}::uuid,${kind},${json(axes)}::jsonb,${json(appliedExclusions)}::jsonb,${pendingReview},${revision})
     on conflict(store_id,id) do update set attributes=excluded.attributes, excluded_combination_keys=excluded.excluded_combination_keys,
-      requires_review=false, revision=excluded.revision`);
+      requires_review=excluded.requires_review, revision=excluded.revision`);
+  // Preserve every historic member. Repair only keys uniquely corroborated
+  // by stored specs, leaving ambiguous identities null and reviewable.
+  if (v.variantOperation === "add") {
+    for (const row of retained) {
+      const inferred = repairedKeys.get(row.id);
+      if (inferred) {
+        const ids = (JSON.parse(inferred) as [string, string][]).map((pair) => pair[1]);
+        await tx.execute(sql`insert into product_variant_members(store_id,group_id,product_id,combination_key,option_value_ids)
+          values(${storeId}::uuid,${groupId}::uuid,${row.id}::uuid,${inferred},${json(ids)}::jsonb)
+          on conflict(store_id,product_id) do update set combination_key=excluded.combination_key,
+            option_value_ids=excluded.option_value_ids
+          where product_variant_members.combination_key is null`);
+      } else if (!identityByProduct.has(row.id)) {
+        await tx.execute(sql`insert into product_variant_members(store_id,group_id,product_id)
+          values(${storeId}::uuid,${groupId}::uuid,${row.id}::uuid)
+          on conflict(store_id,product_id) do nothing`);
+      }
+    }
+  }
   for (const member of nextMembers) await tx.execute(sql`insert into product_variant_members(store_id,group_id,product_id,combination_key,option_value_ids)
     values(${storeId}::uuid,${groupId}::uuid,${member.id}::uuid,${member.combinationKey},${json(member.optionValueIds)}::jsonb)
     on conflict(store_id,product_id) do update set combination_key=excluded.combination_key, option_value_ids=excluded.option_value_ids`);
