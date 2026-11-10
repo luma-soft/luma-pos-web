@@ -167,7 +167,10 @@ export function productToFormInitialValues(
       variantOperation: isCopy ? "create" : variantAddition ? "add" : "edit",
       ...(!isCopy ? { variantGroupId: group?.id ?? product.id, variantRevision: group?.revision ?? 0 } : {}),
       attributes,
-      variantChildren: children,
+      // Adding to a persisted group is an additive operation: the writer
+      // resolves all existing members from locked DB rows, not the form draft.
+      // Standalone SKUs still include their original row for first adoption.
+      variantChildren: variantAddition && group ? [] : children,
       excludedCombinationKeys: group?.excludedCombinationKeys ?? combinations.filter((combo) => !children.some((child) => child.combinationKey === combo.combinationKey)).map((combo) => combo.combinationKey),
       sku: clearsIdentity ? "" : product.sku,
       barcode: clearsIdentity ? "" : product.barcode ?? "",
