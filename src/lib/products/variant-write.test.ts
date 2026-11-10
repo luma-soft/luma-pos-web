@@ -197,6 +197,36 @@ test("same-type addition preserves an unidentifiable legacy SKU without editing 
   assert.equal(members.find((member) => member.product_id === legacyId)?.combination_key, null);
 });
 
+test("same-type addition adopts an imported related group that has no group metadata yet", async () => {
+  const groupId = randomUUID(), oldChildId = randomUUID();
+  const attributes = [{
+    attributeId, name: "Phiên bản", createsVariants: true,
+    values: ["E", "F"], valueIds: ["legacy-e", "legacy-f"],
+  }];
+  for (const [id, value, relativeId] of [[groupId, "E", null], [oldChildId, "F", groupId]] as const) {
+    await database.insert(schema.products).values({
+      id, storeId: store, categoryId: category, sku: `OLD-${id.slice(0, 8)}`,
+      name: `Imported - ${value}`, relatedProductId: relativeId,
+      specs: { "Phiên bản": [value], "Độ dày": ["2 mm"] },
+      baseUnit: "cái", costPrice: "100000", retailPrice: "150000",
+    });
+  }
+  const original = (await pg.query("select row_to_json(p) item from products p where id in ($1,$2) order by id", [groupId, oldChildId])).rows;
+  const draft = makeInput({
+    variantGroupId: groupId, variantOperation: "add", variantRevision: 0,
+    variantChildren: [], attributes, variantExistingCombinationKeys: [],
+    variantAddValues: { [attributeId]: "G" }, excludedCombinationKeys: [],
+  });
+  const result = await save(prepareVariantAddition(draft));
+  assert.equal(result.createdIds.length, 1);
+  assert.deepEqual((await pg.query("select row_to_json(p) item from products p where id in ($1,$2) order by id", [groupId, oldChildId])).rows, original);
+  const persisted = (await pg.query<{ combination_key: string | null }>(
+    "select combination_key from product_variant_members where group_id=$1", [groupId],
+  )).rows;
+  assert.equal(persisted.length, 3);
+  assert.ok(persisted.every((row) => row.combination_key));
+});
+
 test("creating E/F stores prices and 0/2 stock, then an identical retry creates nothing", async () => {
   const input = makeInput();
   const result = await save(input);
