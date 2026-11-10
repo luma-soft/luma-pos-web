@@ -84,12 +84,16 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
   const originalCombos = buildVariantCombinations(originalAxes, { maxCombinations });
   const originalToCanonical = new Map(originalCombos.map((combo, index) => [combo.combinationKey, canonicalCombos[index]]));
   const children = originalRows.map((row) => ({ ...row, ...originalToCanonical.get(row.combinationKey)! }));
-  const barcodes = children.map((row) => row.barcode?.trim()).filter((value): value is string => Boolean(value));
+  // Existing SKU barcodes are immutable during an add. Check only barcodes
+  // being assigned to new SKUs; old product/unit barcode overlaps are not
+  // a reason to reject an unrelated new variant.
+  const barcodeRows = v.variantOperation === "add" ? children.filter((row) => !row.productId) : children;
+  const barcodes = barcodeRows.map((row) => row.barcode?.trim()).filter((value): value is string => Boolean(value));
   if (new Set(barcodes).size !== barcodes.length) fail("products.variants.barcodeExists");
   if (barcodes.length) {
     const existingCodes = await tx.select({ id: products.id, barcode: products.barcode }).from(products)
       .where(and(eq(products.storeId, storeId), inArray(products.barcode, barcodes)));
-    if (existingCodes.some((row) => !children.some((child) => child.productId === row.id && child.barcode?.trim() === row.barcode))) fail("products.variants.barcodeExists");
+    if (existingCodes.some((row) => !barcodeRows.some((child) => child.productId === row.id && child.barcode?.trim() === row.barcode))) fail("products.variants.barcodeExists");
     const unitCodes = await tx.select({ productId: productUnits.productId }).from(productUnits)
       .where(and(eq(productUnits.storeId, storeId), inArray(productUnits.barcode, barcodes)));
     if (unitCodes.length) fail("products.variants.barcodeExists");
