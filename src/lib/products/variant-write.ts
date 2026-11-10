@@ -5,7 +5,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "@/db/schema";
 import { brands, categories, products, productSuppliers, productUnits, stockLevels, stockMovements, suppliers, warehouses, profiles, priceBooks, productPrices } from "@/db/schema";
 import type { CreateProductOutput } from "@/app/(app)/products/new/schema";
-import { buildVariantCombinations, MAX_VARIANT_COMBINATIONS, normalizeVariantAttributes, validateVariantSubmission, variantCombinationBudget, VariantValidationError, variantNameKey, type NormalizedVariantAttribute } from "./variant-model";
+import { buildVariantCombinations, MAX_VARIANT_COMBINATIONS, normalizeVariantAttributes, validateVariantSubmission, variantCombinationBudget, variantCombinationKey, VariantValidationError, variantNameKey, type NormalizedVariantAttribute } from "./variant-model";
 
 type Tx = Parameters<Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]>[0];
 export type SavedVariantGroup = { id: string; replayed: boolean; createdIds: string[]; memberIds: string[]; revision: number };
@@ -151,12 +151,67 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
     }
   }
   const submittedKeys = new Set(children.map((child) => child.combinationKey));
-  const retainedKeys = existing.filter((row) => !submittedIds.has(row.id)).map((row) => identityByProduct.get(row.id));
   const validKeys = new Set(canonicalCombos.map((row) => row.combinationKey));
-  if (retainedKeys.some((key) => !key || submittedKeys.has(key) || !validKeys.has(key))) fail("products.variants.invalidCombination");
-  if (exclusions.some((key) => retainedKeys.includes(key))) fail("products.variants.keepExisting");
-  const covered = new Set([...submittedKeys, ...retainedKeys, ...exclusions]);
-  if (canonicalCombos.some((combo) => !covered.has(combo.combinationKey))) fail("products.variants.missingCombinations");
+  const retained = existing.filter((row) => !submittedIds.has(row.id));
+  const retainedKeys = retained.map((row) => identityByProduct.get(row.id)).filter((key): key is string => Boolean(key));
+  if (retainedKeys.some((key) => submittedKeys.has(key) || !validKeys.has(key))) {
+    fail("products.variants.invalidCombination");
+  }
+
+  // Resolve identities from the actual, locked SKU specs where possible.
+  // Extra descriptive specs do not participate; unknown or conflicting
+  // historical identities remain null and are flagged for later review.
+  const repairedKeys = new Map<string, string>();
+  const occupiedKeys = new Set([...submittedKeys, ...retainedKeys]);
+  let pendingReview = false;
+  if (v.variantOperation === "add") {
+    for (const row of retained) {
+      if (identityByProduct.get(row.id)) continue;
+      const visible = Object.entries(row.specs ?? {}).filter(([name]) => !name.startsWith("__"));
+      const selections: [string, string][] = [];
+      for (const axis of axes) {
+        const matches = visible.filter(([name]) => catalog.rows.some((alias) =>
+          alias.id === axis.attributeId && alias.name_key === variantNameKey(name)));
+        const values = matches[0]?.[1];
+        if (matches.length !== 1 || !Array.isArray(values) || values.length !== 1 || typeof values[0] !== "string") break;
+        const optionIndex = axis.values.findIndex((value) => variantNameKey(value) === variantNameKey(values[0]));
+        if (optionIndex < 0) break;
+        selections.push([axis.attributeId, axis.valueIds[optionIndex]]);
+      }
+      const inferredKey = selections.length === axes.length ? variantCombinationKey(selections) : null;
+      // When specs are incomplete, an exact stored variant label is still
+      // enough to reject an obvious duplicate (but never to assign an ID).
+      const duplicateLabel = canonicalCombos.some((combo) =>
+        submittedKeys.has(combo.combinationKey) && (
+          variantNameKey(row.variantName ?? "") === variantNameKey(combo.variantName)
+          || variantNameKey(row.name).endsWith(` - ${variantNameKey(combo.variantName)}`)
+        ));
+      if ((inferredKey && submittedKeys.has(inferredKey)) || duplicateLabel) {
+        fail("products.variants.duplicateValue");
+      }
+      if (inferredKey && !occupiedKeys.has(inferredKey)) {
+        repairedKeys.set(row.id, inferredKey);
+        occupiedKeys.add(inferredKey);
+      } else {
+        pendingReview = true;
+      }
+    }
+  } else if (retained.length !== retainedKeys.length) {
+    fail("products.variants.invalidCombination");
+  }
+  const protectedKeys = new Set([...retainedKeys, ...repairedKeys.values()]);
+  if (v.variantOperation !== "add" && exclusions.some((key) => protectedKeys.has(key))) {
+    fail("products.variants.keepExisting");
+  }
+  // A historical member must not be marked excluded while a different SKU is
+  // being appended. Sparse groups may still have unresolved empty keys.
+  const appliedExclusions = v.variantOperation === "add"
+    ? exclusions.filter((key) => !protectedKeys.has(key))
+    : exclusions;
+  const covered = new Set([...submittedKeys, ...protectedKeys, ...appliedExclusions]);
+  if (v.variantOperation !== "add" && canonicalCombos.some((combo) => !covered.has(combo.combinationKey))) {
+    fail("products.variants.missingCombinations");
+  }
 
   const weight = v.weight === undefined
     ? existingGroupRoot?.weight == null ? null : String(existingGroupRoot.weight)
