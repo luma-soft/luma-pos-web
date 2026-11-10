@@ -121,6 +121,22 @@ test("same-type add includes persisted rows even when the identity summary is in
   );
 });
 
+test("same-type form identifies legacy SKUs that need attribute assignment", () => {
+  const invalid = createProductSchema.safeParse({
+    ...base,
+    variantChildren: [{
+      productId: "00000000-0000-4000-8000-000000000099",
+      variantName: "Unassigned",
+      specs: {},
+      baseUnit: "m2",
+    }],
+  });
+  assert.equal(invalid.success, false);
+  if (!invalid.success) {
+    assert.equal(invalid.error.issues[0]?.message, "products.variants.assignExisting");
+  }
+});
+
 test("compact group addition reuses existing attribute values for a new combination", () => {
   const sizeId = "00000000-0000-4000-8000-000000000010";
   const size140Id = "00000000-0000-4000-8000-000000000011";
