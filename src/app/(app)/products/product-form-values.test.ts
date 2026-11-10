@@ -65,7 +65,9 @@ test("same-type action targets the existing group instead of making another pare
   const draft = productToFormInitialValues(grouped, "sameType");
   assert.equal(draft.variantOperation, "add");
   assert.equal(draft.variantGroupId, "parent");
-  assert.deepEqual(draft.variantChildren, []);
+  assert.deepEqual(draft.variantChildren?.map((child) => child.productId), ["e", "f"]);
+  assert.ok(draft.variantChildren?.every((child) => child.combinationKey && child.initialStock === 0));
+  assert.deepEqual(draft.variantChildren?.map((child) => child.costPrice), [1280000, 990000]);
   assert.deepEqual(draft.variantExistingCombinationKeys?.length, 2);
 });
 
