@@ -126,8 +126,10 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
         const expected = child.specs[axis.name];
         const matches = savedSpecs.filter(([name]) => catalog.rows.some((alias) =>
           alias.id === axis.attributeId && alias.name_key === variantNameKey(name)));
+        const savedValues = matches[0]?.[1];
         return expected?.length === 1 && matches.length === 1
-          && matches[0][1].length === 1 && matches[0][1][0].trim() === expected[0].trim();
+          && Array.isArray(savedValues) && savedValues.length === 1
+          && typeof savedValues[0] === "string" && savedValues[0].trim() === expected[0].trim();
       });
       if (!matchesPersistedIdentity) fail("products.variants.assignExisting");
     }
