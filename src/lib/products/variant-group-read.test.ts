@@ -34,6 +34,45 @@ describe("variant group read model", () => {
     assert.equal(next.requiresReview, false);
   });
 
+  it("recognizes variant attributes even when imported SKUs also have technical specifications", () => {
+    const original = projectVariantGroup({
+      id: "root", name: "Gạch", kind: "related", catalog,
+      members: [
+        { ...member("e", "E"), specs: { "Phiên bản": [" E "], "Độ dày": ["2 mm"] } },
+        { ...member("f", "F"), specs: { Model: ["f"], "Ghi chú": ["Thùng"] } },
+      ],
+      stored: {
+        id: "root", kind: "related", revision: 3, requiresReview: false,
+        excludedCombinationKeys: [],
+        attributes: [{
+          attributeId: "version", name: "Phiên bản", values: ["E", "F"],
+          valueIds: ["value-e", "value-f"], createsVariants: true,
+        }],
+      },
+    });
+    assert.equal(original.requiresReview, false);
+    assert.equal(original.members[0].combinationKey, JSON.stringify([["version", "value-e"]]));
+    assert.equal(original.members[1].combinationKey, JSON.stringify([["version", "value-f"]]));
+  });
+
+  it("does not invent excluded combinations when an old SKU lacks an identifying attribute", () => {
+    const group = projectVariantGroup({
+      id: "root", name: "Imported", kind: "related", catalog,
+      members: [member("e", "E"), { ...member("unknown", "F"), specs: { "Độ dày": ["2 mm"] } }],
+      stored: {
+        id: "root", kind: "related", revision: 0, requiresReview: true,
+        excludedCombinationKeys: [],
+        attributes: [{
+          attributeId: "version", name: "Phiên bản", values: ["E", "F"],
+          valueIds: ["value-e", "value-f"], createsVariants: true,
+        }],
+      },
+    });
+    assert.equal(group.requiresReview, true);
+    assert.equal(group.members[1].combinationKey, undefined);
+    assert.deepEqual(group.excludedCombinationKeys, []);
+  });
+
   it("flags missing, multivalued and duplicate selections while retaining their products", () => {
     for (const other of [{ ...member("b", "E"), specs: {} }, { ...member("b", "E"), specs: { "Phiên bản": ["E", "F"] } }, member("b", "E")]) {
       const group = projectVariantGroup({ id: "root", name: "RAP", kind: "native", catalog, members: [member("a", "E"), other] });
