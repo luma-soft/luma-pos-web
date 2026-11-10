@@ -116,6 +116,21 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
     if (!child.productId) continue;
     const oldKey = identityByProduct.get(child.productId);
     if (oldKey && oldKey !== child.combinationKey) fail("products.variants.keepIdentity");
+    // An incomplete imported group can be repaired during a same-type add,
+    // but only if the saved SKU specifications prove the claimed selection.
+    // Never trust a draft to assign an arbitrary identity to an old product.
+    if (v.variantOperation === "add" && stored && !oldKey) {
+      const persisted = existingById.get(child.productId)!;
+      const savedSpecs = Object.entries(persisted.specs ?? {}).filter(([name]) => !name.startsWith("__"));
+      const matchesPersistedIdentity = axes.every((axis) => {
+        const expected = child.specs[axis.name];
+        const matches = savedSpecs.filter(([name]) => catalog.rows.some((alias) =>
+          alias.id === axis.attributeId && alias.name_key === variantNameKey(name)));
+        return expected?.length === 1 && matches.length === 1
+          && matches[0][1].length === 1 && matches[0][1][0].trim() === expected[0].trim();
+      });
+      if (!matchesPersistedIdentity) fail("products.variants.assignExisting");
+    }
   }
   const submittedKeys = new Set(children.map((child) => child.combinationKey));
   const retainedKeys = existing.filter((row) => !submittedIds.has(row.id)).map((row) => identityByProduct.get(row.id));
