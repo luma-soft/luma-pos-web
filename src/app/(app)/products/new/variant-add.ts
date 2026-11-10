@@ -42,7 +42,7 @@ export function prepareVariantAddition(values: CreateProductOutput): CreateProdu
     ...values.variantChildren.filter((child) => child.productId).flatMap((child) =>
       child.combinationKey ? [child.combinationKey] : []),
   ]);
-  if (existing.has(added.combinationKey)) throw new VariantValidationError("products.variants.invalidCombination");
+  if (existing.has(added.combinationKey)) throw new VariantValidationError("products.variants.duplicateValue");
   return {
     ...values,
     attributes: expanded,
