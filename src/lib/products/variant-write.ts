@@ -163,7 +163,8 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
   // historical identities remain null and are flagged for later review.
   const repairedKeys = new Map<string, string>();
   const occupiedKeys = new Set([...submittedKeys, ...retainedKeys]);
-  let pendingReview = false;
+  // Do not silently dismiss an earlier manual-review flag during a SKU add.
+  let pendingReview = Boolean(stored?.requires_review);
   if (v.variantOperation === "add") {
     for (const row of retained) {
       if (identityByProduct.get(row.id)) continue;
