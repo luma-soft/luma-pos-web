@@ -175,12 +175,17 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
       lifecycleStatus: current && current.isActive === child.directSale ? current.lifecycleStatus : child.directSale ? "active" : "archived" };
     if (current) {
       if (child.baseUnit !== current.baseUnit) fail("products.variants.keepUnit");
+      // Add only establishes missing legacy membership metadata for old SKUs.
+      // Never reapply their prices, name, status or cost history from a copied
+      // form draft; those fields may have changed since the form was opened.
+      if (v.variantOperation !== "add") {
       await recordManualInventoryCost(tx, storeId, id, child.costPrice);
       const name = current.variantName && current.name.endsWith(` - ${current.variantName}`)
         ? `${current.name.slice(0, -(` - ${current.variantName}`).length)} - ${child.variantName}` : current.name;
       await tx.update(products).set({ ...(id === groupId && v.variantOperation === "edit" ? commonEdit : {}), ...commercial,
         name: id === groupId && v.variantOperation === "edit" ? v.name.trim() : name,
         updatedAt: sql`now()` }).where(and(eq(products.storeId, storeId), eq(products.id, id)));
+      }
     } else {
       await tx.insert(products).values({ ...common, ...commercial, id,
         name: child.name?.trim() || `${v.name.trim()} - ${child.variantName}`, baseUnit: child.baseUnit || v.baseUnit,
