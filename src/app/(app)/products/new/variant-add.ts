@@ -77,6 +77,9 @@ export function prepareVariantAddition(values: CreateProductOutput): CreateProdu
 function combinationsBudget(values: CreateProductOutput) {
   return Math.max(
     200,
-    values.variantExistingCombinationKeys.length + values.excludedCombinationKeys.length + 200,
+    Math.max(
+      values.variantExistingCombinationKeys.length,
+      new Set(values.variantChildren.flatMap((child) => child.productId ? [child.productId] : [])).size,
+    ) + values.excludedCombinationKeys.length + 200,
   );
 }
