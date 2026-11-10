@@ -142,8 +142,9 @@ export const createProductSchema = z.object({
       && value.variantChildren.some((child) => child.productId && !child.combinationKey);
     if (unresolvedExistingSku) {
       ctx.addIssue({ code: "custom", path: ["variantChildren"], message: "products.variants.assignExisting" });
-    } else try {
-      validateVariantSubmission({
+    } else {
+      try {
+        validateVariantSubmission({
         attributes: value.variantContractVersion === 2 ? value.attributes : value.attributes.map((a) => ({ ...a, createsVariants: true })),
         children: value.variantChildren,
         excludedCombinationKeys: value.excludedCombinationKeys,
@@ -157,9 +158,10 @@ export const createProductSchema = z.object({
               value.variantOperation === "add" ? new Set(value.variantExistingCombinationKeys).size : 0,
             ), value.excludedCombinationKeys.length)
           : undefined,
-      });
-    } catch (error) {
-      ctx.addIssue({ code: "custom", path: ["variantChildren"], message: error instanceof VariantValidationError ? error.code : "errors.invalidData" });
+        });
+      } catch (error) {
+        ctx.addIssue({ code: "custom", path: ["variantChildren"], message: error instanceof VariantValidationError ? error.code : "errors.invalidData" });
+      }
     }
   }
   if (value.variantContractVersion === 2 && hasVariants && !value.requestId) {
