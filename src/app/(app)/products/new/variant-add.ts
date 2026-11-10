@@ -37,7 +37,11 @@ export function prepareVariantAddition(values: CreateProductOutput): CreateProdu
   const added = combinations.find((combination) => combination.combinationKey === addedKey);
   if (!added) throw new VariantValidationError("products.variants.invalidCombination");
 
-  const existing = new Set(values.variantExistingCombinationKeys);
+  const existing = new Set([
+    ...values.variantExistingCombinationKeys,
+    ...values.variantChildren.filter((child) => child.productId).flatMap((child) =>
+      child.combinationKey ? [child.combinationKey] : []),
+  ]);
   if (existing.has(added.combinationKey)) throw new VariantValidationError("products.variants.invalidCombination");
   return {
     ...values,
