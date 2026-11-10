@@ -76,7 +76,7 @@ export function projectVariantGroup<T extends VariantReadMember>(input: {
     // Sparse groups with fully identified members can exclude unused cross
     // combinations. An unresolved legacy SKU might own any missing option:
     // never infer exclusions from missing keys in a group awaiting review.
-    if (members.every((member) => member.combinationKey)) {
+    if (!requiresReview && usedKeys.size === members.length && members.every((member) => member.combinationKey)) {
       excludedCombinationKeys = [...new Set([...excludedCombinationKeys, ...buildVariantCombinations(attributes, {
         maxCombinations: variantCombinationBudget(input.members.length, excludedCombinationKeys.length),
       })
