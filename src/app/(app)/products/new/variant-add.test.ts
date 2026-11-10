@@ -107,9 +107,8 @@ test("same-type add includes persisted rows even when the identity summary is in
   assert.equal(added.variantChildren[0].productId, productId);
   assert.equal(added.variantChildren[0].costPrice, 125000);
   assert.equal(added.variantChildren[1].variantName, "10124");
-  assert.deepEqual(added.excludedCombinationKeys, [
-    buildVariantCombinations(base.attributes)[1].combinationKey,
-  ]);
+  // The missing legacy combination must not be marked excluded implicitly.
+  assert.deepEqual(added.excludedCombinationKeys, []);
   const parsed = createProductSchema.safeParse(added);
   assert.equal(parsed.success, true, parsed.success ? undefined : parsed.error.issues[0]?.message);
 
@@ -121,19 +120,13 @@ test("same-type add includes persisted rows even when the identity summary is in
   );
 });
 
-test("same-type form identifies legacy SKUs that need attribute assignment", () => {
-  const invalid = createProductSchema.safeParse({
-    ...base,
-    variantChildren: [{
-      productId: "00000000-0000-4000-8000-000000000099",
-      variantName: "Unassigned",
-      specs: {},
-      baseUnit: "m2",
-    }],
-  });
-  assert.equal(invalid.success, false);
-  if (!invalid.success) {
-    assert.equal(invalid.error.issues[0]?.message, "products.variants.assignExisting");
+test("same-type form accepts one new SKU without loading old group rows", () => {
+  const parsed = createProductSchema.safeParse({ ...base, variantChildren: [] });
+  assert.equal(parsed.success, true, parsed.success ? undefined : parsed.error.issues[0]?.message);
+  if (parsed.success) {
+    const added = prepareVariantAddition(parsed.data);
+    assert.equal(added.variantChildren.length, 1);
+    assert.equal(added.variantChildren[0].variantName, "10124");
   }
 });
 
@@ -166,6 +159,9 @@ test("compact group addition reuses existing attribute values for a new combinat
     variantExistingCombinationKeys: [
       JSON.stringify([[sizeId, size140Id], [pipeTypeId, pipeC3Id]]),
       JSON.stringify([[sizeId, size150Id], [pipeTypeId, pipeC2Id]]),
+    ],
+    excludedCombinationKeys: [
+      JSON.stringify([[sizeId, size150Id], [pipeTypeId, pipeC3Id]]),
     ],
   });
 
