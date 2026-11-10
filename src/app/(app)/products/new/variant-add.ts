@@ -43,6 +43,9 @@ export function prepareVariantAddition(values: CreateProductOutput): CreateProdu
       child.combinationKey ? [child.combinationKey] : []),
   ]);
   if (existing.has(added.combinationKey)) throw new VariantValidationError("products.variants.duplicateValue");
+  const newOptionIds = new Set(additions.flatMap((addition, index) =>
+    axes[index].valueIds.includes(addition.id) ? [] : [addition.id]));
+  const previouslyExcluded = new Set(values.excludedCombinationKeys);
   return {
     ...values,
     attributes: expanded,
@@ -68,8 +71,11 @@ export function prepareVariantAddition(values: CreateProductOutput): CreateProdu
         directSale: values.directSale,
       },
     ],
+    // Leave unknown legacy combinations unassigned. Only explicit old
+    // exclusions and new, unselected cross-combinations should be excluded.
     excludedCombinationKeys: combinations
-      .filter((combination) => combination.combinationKey !== added.combinationKey && !existing.has(combination.combinationKey))
+      .filter((combination) => combination.combinationKey !== added.combinationKey && !existing.has(combination.combinationKey)
+        && (previouslyExcluded.has(combination.combinationKey) || combination.optionValueIds.some((id) => newOptionIds.has(id))))
       .map((combination) => combination.combinationKey),
   };
 }
