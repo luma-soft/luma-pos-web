@@ -1,4 +1,4 @@
-import { and, count, desc, eq, getTableColumns, gte, inArray, isNull, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, gte, inArray, isNull, lte, ne, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { orderItemGrossProfitSql } from "@/lib/data/order-profit";
 import {
@@ -833,6 +833,7 @@ export async function getSupplierPurchases(storeId: string, id: string) {
     .where(and(
       eq(purchaseOrders.supplierId, id),
       eq(purchaseOrders.storeId, storeId),
+      ne(purchaseOrders.status, "cancelled"),
     ))
     .orderBy(desc(purchaseOrders.createdAt))
     .limit(50);
@@ -859,6 +860,7 @@ export async function getSupplierPurchaseReturns(storeId: string, id: string) {
     .where(and(
       eq(purchaseReturns.supplierId, id),
       eq(purchaseReturns.storeId, storeId),
+      ne(purchaseReturns.status, "cancelled"),
     ))
     .orderBy(desc(purchaseReturns.createdAt))
     .limit(50);
