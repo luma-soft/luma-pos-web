@@ -49,7 +49,7 @@ export async function GET(
     .select({
       id: stocktakeItems.id,
       productId: stocktakeItems.productId,
-      productName: products.name,
+      productName: sql<string>`case when ${products.lifecycleStatus} = 'deleted' then ${products.name} || ' {DEL}' else ${products.name} end`,
       sku: products.sku,
       baseUnit: products.baseUnit,
       costPrice: canViewValues ? products.costPrice : sql<string | null>`null`,
