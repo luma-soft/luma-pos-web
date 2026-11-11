@@ -14,6 +14,7 @@ import { CreateInvoiceFromDraftButton, OrderActions, PaymentForm, SendOrderZaloB
 import { SharePrintDocButton } from "./share-print-doc-button";
 import { buttonVariants, modalActionSizeClassName } from "@/components/ui/button-variants";
 import { OrderDetailActionGroup } from "@/components/order-detail-action-group";
+import { DisabledEditTooltip } from "@/components/disabled-edit-tooltip";
 import { ProfitVisibility } from "@/components/profit-visibility";
 import { OrderProductLink } from "@/components/order-product-link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
@@ -376,16 +377,25 @@ export async function OrderDetailPanel({
             label={t("print.printBtn")}
             className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}
           />
-          {(order.status === "completed" || order.status === "quote" || order.status === "confirmed" || editableDraft) && order.returns.length === 0 && (
-            <Link href={posSourceHref(editableDraft ? "draft_edit" : "edit")} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName, "bg-white dark:bg-surface")}>
-              {isQuote
-                ? t("quotes.edit")
-                : isBooking
-                  ? t("bookings.edit")
-                  : editableDraft
-                    ? t("orderEdit.editDraftAction")
-                    : t("orderEdit.action")}
-            </Link>
+          {(order.status === "completed" || order.status === "quote" || order.status === "confirmed" || (order.status === "returned" && order.returns.length > 0) || editableDraft) && (
+            order.returns.length > 0 ? (
+              <DisabledEditTooltip
+                reason={t("orderEdit.errors.hasReturns")}
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName, "bg-white dark:bg-surface")}
+              >
+                {isBooking ? t("bookings.edit") : t("orderEdit.action")}
+              </DisabledEditTooltip>
+            ) : (
+              <Link href={posSourceHref(editableDraft ? "draft_edit" : "edit")} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName, "bg-white dark:bg-surface")}>
+                {isQuote
+                  ? t("quotes.edit")
+                  : isBooking
+                    ? t("bookings.edit")
+                    : editableDraft
+                      ? t("orderEdit.editDraftAction")
+                      : t("orderEdit.action")}
+              </Link>
+            )
           )}
           {!cancelled && (
             <Link href={posSourceHref("copy")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}>
