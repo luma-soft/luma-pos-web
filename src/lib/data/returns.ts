@@ -233,6 +233,7 @@ export async function getReturn(storeId: string, id: string) {
 
   const items = await db.select({
     ...getTableColumns(returnItems),
+    productName: sql<string>`case when ${products.lifecycleStatus} = 'deleted' then ${returnItems.productName} || ' {DEL}' else ${returnItems.productName} end`,
     sourceQuantity: orderItems.quantity,
     sourceUnitPrice: orderItems.unitPrice,
     sourceTotal: orderItems.total,

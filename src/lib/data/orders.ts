@@ -406,6 +406,8 @@ export async function getOrder(storeId: string, id: string) {
     db
       .select({
         ...getTableColumns(orderItems),
+        // Presentation-only marker: the stored invoice productName remains immutable.
+        productName: sql<string>`case when ${products.lifecycleStatus} = 'deleted' then ${orderItems.productName} || ' {DEL}' else ${orderItems.productName} end`,
         productImageUrls: products.imageUrls,
         productImageUpdatedAt: products.imageUpdatedAt,
         productVariantName: products.variantName,

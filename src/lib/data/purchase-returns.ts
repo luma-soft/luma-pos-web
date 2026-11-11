@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, inArray, lte, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
   categories,
@@ -75,7 +75,7 @@ export async function getPurchaseReturns(storeId: string, filters: { q?: string;
           purchaseReturnId: purchaseReturnItems.purchaseReturnId,
           purchaseOrderItemId: purchaseReturnItems.purchaseOrderItemId,
           productId: purchaseReturnItems.productId,
-          productName: purchaseReturnItems.productName,
+          productName: sql<string>`case when ${products.lifecycleStatus} = 'deleted' then ${purchaseReturnItems.productName} || ' {DEL}' else ${purchaseReturnItems.productName} end`,
           productVariantName: products.variantName, productSpecs: products.specs,
           sku: purchaseReturnItems.sku,
           unitName: purchaseReturnItems.unitName,
@@ -156,7 +156,7 @@ export async function getPurchaseReturn(storeId: string, id: string) {
       purchaseReturnId: purchaseReturnItems.purchaseReturnId,
       purchaseOrderItemId: purchaseReturnItems.purchaseOrderItemId,
       productId: purchaseReturnItems.productId,
-      productName: purchaseReturnItems.productName,
+      productName: sql<string>`case when ${products.lifecycleStatus} = 'deleted' then ${purchaseReturnItems.productName} || ' {DEL}' else ${purchaseReturnItems.productName} end`,
           productVariantName: products.variantName, productSpecs: products.specs,
       sku: purchaseReturnItems.sku,
       unitName: purchaseReturnItems.unitName,
