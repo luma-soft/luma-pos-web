@@ -321,7 +321,10 @@ export function exploreProductCatalog(
     const key = groupKey(product);
     const group = key ? groups.get(key.id) : groups.get(product.id);
     if (!group) return row;
-    const members = group.members.map((member) => makeProductRow(member, byId, warehouseById));
+    // Use the matching SKU set for group counts, rows, summaries and selection.
+    const members = group.members
+      .filter((member) => matched.has(member.id))
+      .map((member) => makeProductRow(member, byId, warehouseById));
     const units = new Set(members.map((member) => member.baseUnit.trim().toLocaleLowerCase("vi")));
     const costs = members.map((member) => Number(member.costPrice));
     const retailPrices = members.map((member) => Number(member.retailPrice));
