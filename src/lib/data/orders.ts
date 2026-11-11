@@ -106,6 +106,13 @@ export async function getOrders(storeId: string, filters: OrderListFilters = {})
     (documentType !== "sale" && filters.status === "all");
   if (filters.status !== "cancelled" && !includeCancelled) {
     conditions.push(ne(orders.status, "cancelled"));
+    if (documentType === "sale") {
+      // Merged source invoices are replaced by their consolidated invoice.
+      // Exclude both legacy 'merged' rows and replaced sources whose status
+      // was not backfilled yet. Explicit cancelled filters still allow auditing.
+      conditions.push(ne(orders.status, "merged"));
+      conditions.push(isNull(orders.replacedByOrderId));
+    }
   }
 
   if (filters.q?.trim()) {
