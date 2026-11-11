@@ -2356,7 +2356,8 @@
       "deleteDescription": "Xóa {count} sản phẩm đã chọn khỏi danh mục? Chứng từ cũ vẫn giữ nguyên; tên sản phẩm đã xóa sẽ có nhãn DEL. Sản phẩm còn tồn kho hoặc số lượng giữ sẽ không được xóa.",
       "deleteResultTitle": "Kết quả xóa hàng hóa",
       "deleteSuccess": "Đã xóa thành công {count} hàng hóa.",
-      "deletePartial": "Đã xóa {deleted} sản phẩm. Có {failed} sản phẩm chưa xóa được (ví dụ còn tồn kho hoặc số lượng giữ)."
+      "deletePartial": "Đã xóa {deleted} sản phẩm. Có {failed} sản phẩm chưa xóa được (ví dụ còn tồn kho hoặc số lượng giữ).",
+      "deleteMoreFailures": "Và {count} sản phẩm khác chưa xóa được."
     },
     "confirm": {
       "delete": "Xóa sản phẩm khỏi danh mục? Hóa đơn, phiếu nhập và lịch sử kho vẫn được giữ; tên sản phẩm đã xóa sẽ có nhãn DEL. Cần xử lý hết tồn kho và số lượng giữ trước khi xóa.",
@@ -2446,6 +2447,7 @@
       "cannotDeleteInCombo": "Sản phẩm đang là thành phần của một bộ/combo còn sử dụng. Hãy gỡ hoặc thay sản phẩm trong combo trước khi xóa.",
       "cannotDeleteWithStock": "Không thể xóa sản phẩm còn tồn hoặc đang giữ hàng. Hãy xử lý tồn kho bằng chứng từ trước khi xóa.",
       "cannotDeleteReferenced": "Không thể xóa do có dữ liệu liên quan chưa được hỗ trợ. Vui lòng kiểm tra lại liên kết của sản phẩm.",
+      "deleteMigrationRequired": "Cơ sở dữ liệu chưa cho phép trạng thái xóa mềm. Cần chạy migration 0152_product_soft_delete_lifecycle.sql trước khi xóa.",
       "kindImmutable": "Không thể đổi loại hàng hóa sau khi đã tạo.",
       "stockChanged": "Tồn kho đã thay đổi trong lúc chỉnh sửa. Vui lòng tải lại sản phẩm và kiểm tra số lượng trước khi lưu.",
       "stockAdjustmentNeedsInventory": "Hàng có nhiều kho, quản lý lô hoặc nhóm biến thể cần điều chỉnh tại màn hình Kiểm kho.",
