@@ -51,6 +51,8 @@ export async function GET(
       unitName: item.unitName,
       unitMultiplier: Number(item.unitMultiplier),
       quantity: Number(item.quantity),
+      remainingReturnQuantity: Number(item.remainingReturnQuantity),
+      remainingReturnBaseQuantity: Number(item.remainingReturnBaseQuantity),
       unitCost: Number(item.unitCost),
       discount: Number(item.discount),
       discountMode: item.discountMode,
