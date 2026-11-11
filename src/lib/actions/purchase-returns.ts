@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   auditLogs,
@@ -28,6 +28,7 @@ import { publishCommittedNotification } from "@/lib/notifications/outbox";
 import { reverseDocumentStockLots } from "@/lib/inventory/reverse-document-stock-lots";
 import { randomUUID } from "node:crypto";
 import { recordActivity } from "@/lib/audit/activity-log";
+import { validateLinkedPurchaseReturn } from "@/lib/purchases/return-quantity";
 
 export async function searchPurchaseReturnProducts(q: string, warehouseId: string): Promise<PurchaseReturnProductRow[]> {
   const gate = await requireStockAccess();
@@ -92,21 +93,39 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
         const [purchase] = await tx.select({ id: purchaseOrders.id }).from(purchaseOrders).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, v.purchaseOrderId), eq(purchaseOrders.supplierId, v.supplierId))).limit(1).for("update");
         if (!purchase) throw new Error("PRODUCT_NOT_FOUND");
       }
-      const linkedPurchaseItemIds = [...new Set(v.items.map((item) => item.purchaseOrderItemId).filter((id): id is string => Boolean(id)))];
-      if (linkedPurchaseItemIds.length > 0) {
-        if (!v.purchaseOrderId) throw new Error("PRODUCT_NOT_FOUND");
-        const sourceItems = await tx.select({ id: purchaseOrderItems.id, productId: purchaseOrderItems.productId })
-          .from(purchaseOrderItems)
-          .where(and(
-            eq(purchaseOrderItems.storeId, gate.storeId),
-            eq(purchaseOrderItems.purchaseOrderId, v.purchaseOrderId),
-            inArray(purchaseOrderItems.id, linkedPurchaseItemIds),
-          ));
-        const sourceById = new Map(sourceItems.map((item) => [item.id, item]));
-        if (sourceById.size !== linkedPurchaseItemIds.length || v.items.some((item) => {
-          const source = item.purchaseOrderItemId ? sourceById.get(item.purchaseOrderItemId) : null;
-          return item.purchaseOrderItemId != null && source?.productId !== item.productId;
-        })) throw new Error("PRODUCT_NOT_FOUND");
+      // The source purchase row is locked above; concurrent returns cannot both
+      // consume the same remaining quantity. The check includes all completed
+      // earlier returns, including legacy rows with missing source-item links.
+      let normalizedSourceIds = v.items.map((item) => item.purchaseOrderItemId ?? null);
+      if (v.purchaseOrderId) {
+        const sourceItems = await tx.select({
+          id: purchaseOrderItems.id,
+          productId: purchaseOrderItems.productId,
+          quantity: purchaseOrderItems.quantity,
+          unitMultiplier: purchaseOrderItems.unitMultiplier,
+        }).from(purchaseOrderItems).where(and(
+          eq(purchaseOrderItems.storeId, gate.storeId),
+          eq(purchaseOrderItems.purchaseOrderId, v.purchaseOrderId),
+        ));
+        const earlierReturns = await tx.select({
+          purchaseOrderItemId: purchaseReturnItems.purchaseOrderItemId,
+          productId: purchaseReturnItems.productId,
+          quantity: purchaseReturnItems.quantity,
+          unitMultiplier: purchaseReturnItems.unitMultiplier,
+        }).from(purchaseReturnItems).innerJoin(purchaseReturns, and(
+          eq(purchaseReturnItems.purchaseReturnId, purchaseReturns.id),
+          eq(purchaseReturnItems.storeId, purchaseReturns.storeId),
+        )).where(and(
+          eq(purchaseReturns.storeId, gate.storeId),
+          eq(purchaseReturns.purchaseOrderId, v.purchaseOrderId),
+          eq(purchaseReturns.status, "completed"),
+          ...(id ? [ne(purchaseReturns.id, id)] : []),
+        ));
+        const check = validateLinkedPurchaseReturn(sourceItems, earlierReturns, v.items);
+        if (!check.ok) throw new Error(check.error);
+        normalizedSourceIds = check.normalized.map((item) => item.purchaseOrderItemId ?? null);
+      } else if (v.items.some((item) => item.purchaseOrderItemId)) {
+        throw new Error("PRODUCT_NOT_FOUND");
       }
       const previous = id ? await reversePurchaseReturn(tx, gate.storeId, id, profileId, currentShift?.id ?? null) : null;
       const originalItems = previous ? await tx.select().from(purchaseReturnItems).where(and(eq(purchaseReturnItems.storeId, gate.storeId), eq(purchaseReturnItems.purchaseReturnId, previous.id))) : [];
@@ -174,7 +193,7 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
           storeId: gate.storeId,
           purchaseReturnId: ret.id,
           lineOrder,
-          purchaseOrderItemId: item.purchaseOrderItemId ?? null,
+          purchaseOrderItemId: normalizedSourceIds[lineOrder],
           productId: item.productId,
           productName: product.name,
           sku: product.sku,
@@ -281,6 +300,7 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
       RETURN_NOT_FOUND: "errors.notFound",
       INVALID_STATE: "errors.invalidData",
       PRODUCT_NOT_FOUND: "errors.invalidData",
+      RETURN_QTY_EXCEEDS: "purchaseReturns.errors.qtyExceedsSource",
       INSUFFICIENT_STOCK: "purchaseReturns.errors.insufficientStock",
       INSUFFICIENT_BATCH_STOCK: "purchaseReturns.errors.insufficientStock",
     };
