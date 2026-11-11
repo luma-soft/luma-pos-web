@@ -213,6 +213,11 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
         ));
   }
 
+  function remainingFromSource(line: Line) {
+    if (!initialPurchase || !line.purchaseOrderItemId) return 0;
+    return Math.max(0, (remainingBySourceLine.get(line.purchaseOrderItemId) ?? 0) / line.unitMultiplier);
+  }
+
   function totalStock(line: Line) {
     // Return quantities are recorded in their selected unit; inventory is in base units.
     const restored = initial?.status === "completed" ? initial.items.reduce((sum, item) =>
@@ -224,9 +229,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
     if (!initialPurchase) return stockLimit;
     // Even when the warehouse contains stock from other receipts, a linked
     // supplier return cannot exceed this receipt's unreturned source quantity.
-    const remainingBase = line.purchaseOrderItemId
-      ? (remainingBySourceLine.get(line.purchaseOrderItemId) ?? 0) : 0;
-    return Math.max(0, Math.min(stockLimit, remainingBase / line.unitMultiplier));
+    return Math.max(0, Math.min(stockLimit, remainingFromSource(line)));
   }
 
   async function submit() {
@@ -234,7 +237,11 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
     const invalid = lines.some((line) => !Number.isFinite(line.quantity) || line.quantity < 0)
       || selectedLines.some((line) => line.returnUnitCost < 0 || line.quantity > totalStock(line) + 1e-9);
     if (invalid) {
-      setError(t("purchaseReturns.errors.insufficientStock"));
+      const sourceExceeded = initialPurchase && lines.some((line) =>
+        line.quantity > remainingFromSource(line) + 1e-9);
+      setError(t(sourceExceeded
+        ? "purchaseReturns.errors.qtyExceedsSource"
+        : "purchaseReturns.errors.insufficientStock"));
       return;
     }
     submitInFlightRef.current = true;
@@ -412,7 +419,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                               className={cn("min-h-11", overStock && "border-er text-er")}
                               inputClassName={cn(overStock && "border-er text-er")}
                             />
-                            {overStock && <span className="block text-er">{t("purchaseReturns.errors.insufficientStock")}</span>}
+                            {overStock && <span className="block text-er">{t(initialPurchase && line.quantity > remainingFromSource(line) + 1e-9 ? "purchaseReturns.errors.qtyExceedsSource" : "purchaseReturns.errors.insufficientStock")}</span>}
                           </div>
                           <div className="space-y-1">
                             <div className="text-xs font-semibold text-slate-500">{t("purchaseReturns.cols.unitCost")}</div>
