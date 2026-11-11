@@ -4,7 +4,7 @@ import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-d
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  products, productSuppliers, purchaseOrders, purchaseOrderItems, stockLevels, stockLots, stockMovements, suppliers, warehouses,
+  products, productSuppliers, purchaseOrders, purchaseOrderItems, purchaseReturns, stockLevels, stockLots, stockMovements, suppliers, warehouses,
 } from "@/db/schema";
 import { createPurchaseSchema, type CreatePurchaseOutput, updatePurchaseSchema, type UpdatePurchaseOutput } from "@/lib/schemas/order";
 import { type ActionResult, requireStockAccess, requireManager, getProfileId, generateCode, toMoney, toQty } from "./common";
@@ -330,6 +330,18 @@ export async function updatePurchase(
       const [po] = await tx.select().from(purchaseOrders).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, v.id))).limit(1).for("update");
       if (!po) throw new Error("PURCHASE_NOT_FOUND");
       if (po.status !== "received" && po.status !== "draft") throw new Error("NOT_EDITABLE");
+      // A posted supplier return references the original receipt lines and its
+      // stock/debt history. Even a note-only edit must not mutate this receipt.
+      const [existingReturn] = await tx
+        .select({ id: purchaseReturns.id })
+        .from(purchaseReturns)
+        .where(and(
+          eq(purchaseReturns.storeId, gate.storeId),
+          eq(purchaseReturns.purchaseOrderId, po.id),
+          eq(purchaseReturns.status, "completed"),
+        ))
+        .limit(1);
+      if (existingReturn) throw new Error("HAS_RETURNS");
 
       const ids = v.items.map((i) => i.productId);
       const found = await tx.select({
@@ -635,6 +647,7 @@ export async function updatePurchase(
     const known: Record<string, string> = {
       PURCHASE_NOT_FOUND: "purchases.errors.notFound",
       NOT_EDITABLE: "purchases.errors.notEditable",
+      HAS_RETURNS: "purchases.errors.hasReturns",
       COST_HISTORY_LOCKED: "purchases.errors.costHistoryLocked",
       COST_LEDGER_MISMATCH: "purchases.errors.costLedgerMismatch",
       PRODUCT_NOT_FOUND: "errors.invalidData",
