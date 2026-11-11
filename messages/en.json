@@ -3585,6 +3585,8 @@
     "emptyLinesTitle": "Add returned products",
     "emptyLinesHint": "Search by product code or name to add items.",
     "availableStock": "Current stock {stock} {unit}",
+    "remainingToReturn": "Remaining to return: {stock} {unit}",
+    "fullyReturned": "This product has been fully returned.",
     "vatRefund": "VAT refund",
     "supplierNeedReturn": "Supplier should return",
     "refundAmount": "Supplier paid back",
@@ -3623,7 +3625,8 @@
     },
     "errors": {
       "emptyItems": "Add at least 1 returned product.",
-      "insufficientStock": "Return quantity exceeds current stock."
+      "insufficientStock": "Return quantity exceeds current stock.",
+      "qtyExceedsSource": "Return quantity exceeds the remaining amount from the source receipt."
     }
   },
   "inventory": {
