@@ -2356,7 +2356,8 @@
       "deleteDescription": "Remove {count} selected products from the catalog? Historical documents are preserved and deleted product names receive a DEL marker; products with stock or reservations cannot be deleted.",
       "deleteResultTitle": "Product deletion result",
       "deleteSuccess": "Successfully deleted {count} products.",
-      "deletePartial": "Deleted {deleted} products. {failed} products could not be deleted (for example, due to stock or reservations)."
+      "deletePartial": "Deleted {deleted} products. {failed} products could not be deleted (for example, due to stock or reservations).",
+      "deleteMoreFailures": "And {count} additional products could not be deleted."
     },
     "confirm": {
       "delete": "Remove this product from the catalog? Invoices, purchases and stock history are preserved and deleted product names receive a DEL marker. Stock and reservations must be cleared first.",
@@ -2446,6 +2447,7 @@
       "cannotDeleteInCombo": "This product is a component of an active bundle/combo. Remove or replace it in the combo before deleting.",
       "cannotDeleteWithStock": "Cannot delete a product with stock or reserved quantity. Clear the stock using an inventory document first.",
       "cannotDeleteReferenced": "Cannot delete this product because of an unsupported related data reference. Please review the product links.",
+      "deleteMigrationRequired": "The database does not yet allow soft deletion. Apply migration 0152_product_soft_delete_lifecycle.sql before deleting.",
       "kindImmutable": "Item type cannot be changed after creation.",
       "stockChanged": "Stock changed while you were editing. Reload the product and check the quantity before saving.",
       "stockAdjustmentNeedsInventory": "Items in multiple warehouses, batch-tracked items and variant groups must be adjusted in Stocktakes.",
