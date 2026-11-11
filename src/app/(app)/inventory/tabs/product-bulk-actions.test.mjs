@@ -30,6 +30,7 @@ test("bulk menu offers resume for inactive products and both actions for mixed s
   const actions = source("./product-selection.tsx");
   const catalog = source("./product-catalog-products-content.tsx");
   const mutations = source("../../../../lib/actions/products.ts");
+  const mobileRoute = source("../../../api/mobile/products/bulk/route.ts");
 
   expect(actions).toContain("activeSelectedIds.length > 0");
   expect(actions).toContain("inactiveSelectedIds.length > 0");
@@ -39,4 +40,6 @@ test("bulk menu offers resume for inactive products and both actions for mixed s
   expect(catalog).toContain("visibleProductSelections(result.rows");
   expect(mutations).toContain("row.isActive !== isActive");
   expect(mutations).toContain("export async function bulkResumeSellingProducts(");
+  expect(mobileRoute).toContain('z.enum(["stop", "resume", "delete"])');
+  expect(mobileRoute).toContain("bulkResumeSellingProducts(ids)");
 });
