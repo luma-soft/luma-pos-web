@@ -271,6 +271,7 @@ export async function getPurchases(storeId: string, filters: { q?: string; statu
           purchaseOrderId: purchaseOrderItems.purchaseOrderId,
           productId: purchaseOrderItems.productId,
           quantity: purchaseOrderItems.quantity,
+          unitMultiplier: purchaseOrderItems.unitMultiplier,
           unitCost: purchaseOrderItems.unitCost,
           discount: purchaseOrderItems.discount,
           total: purchaseOrderItems.total,
@@ -287,6 +288,28 @@ export async function getPurchases(storeId: string, filters: { q?: string; statu
         ))
         .orderBy(asc(purchaseOrderItems.lineOrder), asc(purchaseOrderItems.id))
     : [];
+  // One batched read per page, not one query per receipt or catalog SKU.
+  const previousReturnRows = ids.length ? await db.select({
+    purchaseOrderId: purchaseReturns.purchaseOrderId,
+    purchaseOrderItemId: purchaseReturnItems.purchaseOrderItemId,
+    productId: purchaseReturnItems.productId,
+    quantity: purchaseReturnItems.quantity,
+    unitMultiplier: purchaseReturnItems.unitMultiplier,
+  }).from(purchaseReturnItems).innerJoin(purchaseReturns, and(
+    eq(purchaseReturnItems.purchaseReturnId, purchaseReturns.id),
+    eq(purchaseReturnItems.storeId, purchaseReturns.storeId),
+  )).where(and(
+    eq(purchaseReturns.storeId, storeId),
+    inArray(purchaseReturns.purchaseOrderId, ids),
+    eq(purchaseReturns.status, "completed"),
+  )) : [];
+  const previousByPurchase = new Map<string, typeof previousReturnRows>();
+  for (const ret of previousReturnRows) {
+    if (!ret.purchaseOrderId) continue;
+    const grouped = previousByPurchase.get(ret.purchaseOrderId) ?? [];
+    grouped.push(ret);
+    previousByPurchase.set(ret.purchaseOrderId, grouped);
+  }
   const itemsByPurchase = new Map<string, typeof itemRows>();
   for (const item of itemRows) {
     const current = itemsByPurchase.get(item.purchaseOrderId) ?? [];
@@ -294,7 +317,14 @@ export async function getPurchases(storeId: string, filters: { q?: string; statu
     itemsByPurchase.set(item.purchaseOrderId, current);
   }
   return {
-    rows: rows.map((row) => ({ ...row, items: itemsByPurchase.get(row.id) ?? [] })),
+    rows: rows.map((row) => {
+      const items = itemsByPurchase.get(row.id) ?? [];
+      const remaining = remainingLinkedPurchaseQuantities(items, previousByPurchase.get(row.id) ?? []);
+      return {
+        ...row, items,
+        hasRemainingReturnQuantity: items.some((item) => (remaining[item.id] ?? 0) > 1e-8),
+      };
+    }),
     total,
     page,
     pageSize: size,
@@ -379,11 +409,14 @@ export async function getPurchase(storeId: string, id: string, options: { exclud
     ...(options.excludeReturnId ? [ne(purchaseReturns.id, options.excludeReturnId)] : []),
   )) : [];
   const remaining = remainingLinkedPurchaseQuantities(items, earlierReturns);
-  return { ...po, items: items.map((item) => ({
-    ...item,
-    remainingReturnQuantity: Math.max(0, (remaining[item.id] ?? 0) / Number(item.unitMultiplier || 1)),
-    remainingReturnBaseQuantity: remaining[item.id] ?? 0,
-  })) };
+  return { ...po,
+    hasRemainingReturnQuantity: items.some((item) => (remaining[item.id] ?? 0) > 1e-8),
+    items: items.map((item) => ({
+      ...item,
+      remainingReturnQuantity: Math.max(0, (remaining[item.id] ?? 0) / Number(item.unitMultiplier || 1)),
+      remainingReturnBaseQuantity: remaining[item.id] ?? 0,
+    })),
+  };
 }
 
 /** Options cho form tạo phiếu nhập. */
