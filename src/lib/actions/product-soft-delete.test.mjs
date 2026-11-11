@@ -54,3 +54,22 @@ test("new purchase lines store product snapshots and return stock cannot revive 
   expect(returns).toContain("assertRestockTargetsNotDeleted");
   expect(returns).toContain('DELETED_PRODUCT_CANNOT_RESTOCK: "returns.errors.deletedProductRestock"');
 });
+
+test("soft-delete migration, bulk diagnostics, and confirmation translations stay in sync", () => {
+  const migration = source("../../../drizzle/0152_product_soft_delete_lifecycle.sql");
+  expect(migration).toContain("products_lifecycle_status_check");
+  expect(migration).toContain("'deleted'");
+
+  const actions = source("./products.ts");
+  const selection = source("../../app/(app)/inventory/tabs/product-selection.tsx");
+  expect(actions).toContain("failures: Array<{ id: string; sku: string; name: string; error: string }>");
+  expect(selection).toContain("result.data.failures");
+
+  for (const locale of ["vi", "en"]) {
+    const translations = JSON.parse(source(`../../../messages/${locale}.json`));
+    expect(translations.products.bulk.deleteDescription).not.toContain("{DEL}");
+    expect(translations.products.confirm.delete).not.toContain("{DEL}");
+    expect(translations.products.errors.deleteMigrationRequired).toBeTruthy();
+    expect(translations.products.bulk.deleteMoreFailures).toBeTruthy();
+  }
+});
