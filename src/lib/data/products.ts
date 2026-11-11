@@ -120,6 +120,7 @@ function productFilterPredicate(
 ) {
   const field = (name: string) => sql.raw(`${alias}.${name}`);
   const conditions: SQL[] = [];
+  if (hasCompliance) conditions.push(sql`${field("lifecycle_status")} <> 'deleted'`);
   const status = filters.status ?? "active";
   if (status === "active") conditions.push(sql`${field("is_active")} = true`);
   else if (status === "inactive") conditions.push(sql`${field("is_active")} = false`);
@@ -198,7 +199,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
     ? sql<string[]>`case when ${thumbnailImageUrl} is null then '[]'::json else json_build_array(${thumbnailImageUrl}) end`
     : productCompatibilityImageUrls(storeId);
   const groupRelated = filters.groupRelated !== false;
-  const conditions: SQL[] = [eq(products.storeId, storeId)];
+  const conditions: SQL[] = [eq(products.storeId, storeId), sql`${products.lifecycleStatus} <> 'deleted'`];
   const exactProductId = filters.exactProductId;
   const relatedLink = hasRelatedProducts && groupRelated ? sql`member.related_product_id = ${products.id}` : sql`false`;
   const actualMember = sql`member.store_id = ${storeId} and member.is_variant_parent = false and (

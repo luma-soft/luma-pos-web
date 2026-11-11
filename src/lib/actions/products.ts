@@ -463,40 +463,73 @@ export type UpdateProductInput = z.input<typeof updateProductSchema>;
 
 const productIdSchema = z.uuid();
 
-/** Xóa hàng hóa nếu chưa phát sinh chứng từ/thẻ kho liên quan. */
-export async function deleteProduct(id: string): Promise<ActionResult> {
+/**
+ * Soft deletion keeps product IDs and all historical document/ledger references.
+ * Physical inventory must be settled before a product can be removed.
+ */
+async function deleteProductRecord(id: string, deferRefresh = false): Promise<ActionResult> {
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
   const parsed = productIdSchema.safeParse(id);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
-
   try {
-    await db.transaction(async (tx) => {
-      const [target] = await tx
-        .select({ id: products.id, name: products.name, sku: products.sku, isVariantParent: products.isVariantParent })
-        .from(products)
+    const changed = await db.transaction(async (tx) => {
+      const [target] = await tx.select({
+        id: products.id, name: products.name, sku: products.sku,
+        isVariantParent: products.isVariantParent, lifecycleStatus: products.lifecycleStatus,
+      }).from(products)
         .where(and(eq(products.storeId, gate.storeId), eq(products.id, parsed.data)))
         .limit(1).for("update");
-      if (!target) return;
+      if (!target || target.lifecycleStatus === "deleted") return false;
 
-      if (target.isVariantParent) {
-        await tx
-          .delete(products)
-          .where(and(eq(products.storeId, gate.storeId), eq(products.parentProductId, target.id)));
+      const members = target.isVariantParent
+        ? await tx.select({ id: products.id, lifecycleStatus: products.lifecycleStatus })
+            .from(products).where(and(eq(products.storeId, gate.storeId),
+              or(eq(products.id, target.id), eq(products.parentProductId, target.id))))
+            .for("update")
+        : [{ id: target.id, lifecycleStatus: target.lifecycleStatus }];
+      const affectedIds = members.filter((member) => member.lifecycleStatus !== "deleted").map((member) => member.id);
+      if (affectedIds.length === 0) return false;
+      const balances = await tx.select({
+        quantity: stockLevels.quantity, reserved: stockLevels.reserved,
+      }).from(stockLevels)
+        .where(and(eq(stockLevels.storeId, gate.storeId), inArray(stockLevels.productId, affectedIds)))
+        .for("update");
+      if (balances.some((balance) => Math.abs(Number(balance.quantity)) > 0.00001 ||
+          Math.abs(Number(balance.reserved)) > 0.00001)) {
+        throw new Error("PRODUCT_HAS_STOCK");
       }
-      await tx.delete(products).where(and(eq(products.storeId, gate.storeId), eq(products.id, target.id)));
-      await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "product.deleted", entityType: "product", entityId: target.id, before: { name: target.name, sku: target.sku }, metadata: { includesVariants: target.isVariantParent } });
+      await tx.update(products).set({
+        isActive: false, lifecycleStatus: "deleted", updatedAt: sql`now()`,
+      }).where(and(eq(products.storeId, gate.storeId), inArray(products.id, affectedIds)));
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "product.deleted",
+        entityType: "product", entityId: target.id,
+        before: { name: target.name, sku: target.sku },
+        after: { lifecycleStatus: "deleted", isActive: false },
+        metadata: { includesVariants: target.isVariantParent, affectedProductIds: affectedIds },
+      });
+      return true;
     });
-    revalidatePath(Routes.Products);
-    revalidatePath(Routes.Inventory);
-    revalidatePath(Routes.POS);
+    if (!changed) return { ok: false, error: "errors.notFound" };
+    if (!deferRefresh) {
+      revalidatePath(Routes.Products);
+      revalidatePath(Routes.Inventory);
+      revalidatePath(Routes.POS);
+    }
     return { ok: true, data: undefined };
   } catch (e) {
+    if (e instanceof Error && e.message === "PRODUCT_HAS_STOCK")
+      return { ok: false, error: "products.errors.cannotDeleteWithStock" };
     if (pgErrorCode(e) === "23503")
       return { ok: false, error: "products.errors.cannotDeleteReferenced" };
     console.error("deleteProduct failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
+}
+
+export async function deleteProduct(id: string): Promise<ActionResult> {
+  return deleteProductRecord(id);
 }
 
 const setProductActiveSchema = z.object({
@@ -522,12 +555,12 @@ export async function setProductActive(
   try {
     const updated = await db.transaction(async (tx) => {
       const [target] = await tx
-        .select({ id: products.id, name: products.name, sku: products.sku, isVariantParent: products.isVariantParent })
+        .select({ id: products.id, name: products.name, sku: products.sku, isVariantParent: products.isVariantParent, lifecycleStatus: products.lifecycleStatus })
         .from(products)
         .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.productId)))
         .limit(1);
-      if (!target) return false;
-      const condition = and(eq(products.storeId, gate.storeId), target.isVariantParent
+      if (!target || target.lifecycleStatus === "deleted") return false;
+      const condition = and(eq(products.storeId, gate.storeId), ne(products.lifecycleStatus, "deleted"), target.isVariantParent
         ? or(eq(products.id, target.id), eq(products.parentProductId, target.id))
         : eq(products.id, target.id));
       const before = await tx.select({ id: products.id, name: products.name, code: products.sku, isActive: products.isActive, lifecycleStatus: products.lifecycleStatus })
@@ -602,7 +635,8 @@ async function bulkSetSellingStatusProducts(
         .for("update");
       const nextLifecycleStatus = isActive ? "active" : "archived";
       const changes = before.filter((row) =>
-        row.isActive !== isActive || row.lifecycleStatus !== nextLifecycleStatus,
+        row.lifecycleStatus !== "deleted" &&
+        (row.isActive !== isActive || row.lifecycleStatus !== nextLifecycleStatus),
       );
       if (changes.length === 0) return [];
 
@@ -650,52 +684,26 @@ export async function bulkResumeSellingProducts(
   return bulkSetSellingStatusProducts(ids, true);
 }
 
-/**
- * Xóa nhiều hàng hóa theo best-effort. Hàng đã có chứng từ/thẻ kho được giữ lại
- * và trả về trong failedIds để UI báo chính xác cho người dùng.
- */
+/** Bulk soft-delete: independent transactions keep failures isolated. */
 export async function bulkDeleteProducts(
   ids: string[],
-): Promise<
-  ActionResult<{ deleted: number; failedIds: string[] }>
-> {
+): Promise<ActionResult<{ deleted: number; failedIds: string[] }>> {
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
   const parsed = bulkProductIdsSchema.safeParse(ids);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
-
   let deleted = 0;
   const failedIds: string[] = [];
   for (const id of parsed.data) {
-    try {
-      const removed = await db.transaction(async (tx) => {
-        const [target] = await tx
-          .select({ id: products.id, name: products.name, sku: products.sku, isVariantParent: products.isVariantParent })
-          .from(products)
-          .where(and(eq(products.storeId, gate.storeId), eq(products.id, id)))
-          .limit(1).for("update");
-        if (!target) return false;
-        if (target.isVariantParent) {
-          await tx.delete(products).where(and(eq(products.storeId, gate.storeId), eq(products.parentProductId, id)));
-        }
-        await tx.delete(products).where(and(eq(products.storeId, gate.storeId), eq(products.id, id)));
-        await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "product.deleted", entityType: "product", entityId: id, before: { name: target.name, sku: target.sku }, metadata: { bulk: true, includesVariants: target.isVariantParent } });
-        return true;
-      });
-      if (removed) deleted += 1;
-    } catch (e) {
-      if (pgErrorCode(e) === "23503") {
-        failedIds.push(id);
-        continue;
-      }
-      console.error(`bulkDeleteProducts failed for ${id}:`, e);
-      failedIds.push(id);
-    }
+    const result = await deleteProductRecord(id, true);
+    if (result.ok) deleted += 1;
+    else failedIds.push(id);
   }
-
-  revalidatePath(Routes.Products);
-  revalidatePath(Routes.Inventory);
-  revalidatePath(Routes.POS);
+  if (deleted > 0) {
+    revalidatePath(Routes.Products);
+    revalidatePath(Routes.Inventory);
+    revalidatePath(Routes.POS);
+  }
   return { ok: true, data: { deleted, failedIds } };
 }
 
@@ -829,12 +837,13 @@ export async function updateProduct(
           specs: products.specs,
           relatedProductId: products.relatedProductId,
           isVariantParent: products.isVariantParent,
+          lifecycleStatus: products.lifecycleStatus,
         })
         .from(products)
         .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.id)))
         .limit(1).for("update");
 
-      if (!current) throw new Error("PRODUCT_NOT_FOUND");
+      if (!current || current.lifecycleStatus === "deleted") throw new Error("PRODUCT_NOT_FOUND");
       const beforeActivity = await readProductActivitySnapshot(tx, gate.storeId, v.id);
       const hasGroup = current.parentProductId || current.relatedProductId || current.isVariantParent
         || (await tx.execute(sql`select 1 from product_variant_groups where store_id=${gate.storeId}::uuid and id=${v.id}::uuid limit 1`)).rows.length

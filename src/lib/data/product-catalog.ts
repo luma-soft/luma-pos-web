@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   brands,
@@ -334,6 +334,7 @@ async function buildProductCatalogSnapshot(
       .leftJoin(suppliers, eq(products.supplierId, suppliers.id))
       .where(and(
         eq(products.storeId, storeId),
+        ne(products.lifecycleStatus, "deleted"),
         options.includeInactive ? undefined : eq(products.isActive, true),
         options.productIds ? inArray(products.id, [...options.productIds]) : undefined,
       ))
