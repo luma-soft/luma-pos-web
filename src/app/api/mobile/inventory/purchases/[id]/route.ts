@@ -1,12 +1,13 @@
 import { productLineDisplayName } from "@/lib/products/variant-presentation";
 import { updatePurchase, savePurchaseDraft } from "@/lib/actions/purchases";
 import { getPurchase } from "@/lib/data/inventory";
+import { getPurchaseReturn } from "@/lib/data/purchase-returns";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import { isMobileEntityId } from "@/lib/mobile/exact-entity";
 import { mobileAction, mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const gate = await requireMobileStockAccess();
@@ -15,7 +16,15 @@ export async function GET(
     return mobileError("errors.notFound", 404);
   }
 
-  const purchase = await getPurchase(gate.storeId, id);
+  // When editing an existing linked supplier return, its own previously posted
+  // quantities are restored before applying the replacement lines.
+  const requestedExcludeId = new URL(request.url).searchParams.get("excludeReturnId");
+  let excludeReturnId: string | undefined;
+  if (requestedExcludeId && isMobileEntityId(requestedExcludeId)) {
+    const previous = await getPurchaseReturn(gate.storeId, requestedExcludeId);
+    if (previous?.purchaseOrderId === id) excludeReturnId = previous.id;
+  }
+  const purchase = await getPurchase(gate.storeId, id, { excludeReturnId });
   if (!purchase) return mobileError("errors.notFound", 404);
   return mobileOk({
     id: purchase.id,
