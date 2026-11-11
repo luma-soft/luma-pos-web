@@ -84,8 +84,8 @@ export default async function MorePage() {
     <div className="min-h-full bg-canvas lg:p-6">
       <MobileTopBar title={t("nav.more")} subtitle={store.name ?? t("common.appName")} />
 
-      <div className="mx-auto max-w-2xl space-y-5 px-3 py-4 lg:rounded-card lg:border lg:border-border lg:bg-surface lg:p-6">
-        <section className="rounded-2xl border border-border bg-surface p-3 shadow-e1">
+      <div className="mx-auto max-w-2xl space-y-4 px-4 py-4 lg:rounded-card lg:border lg:border-border lg:bg-surface lg:p-6">
+        <section className="rounded-2xl bg-surface p-4 shadow-e1">
           <div className="flex items-center gap-3">
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300">
               <Store className="h-6 w-6" />
@@ -142,7 +142,7 @@ export default async function MorePage() {
 
         <section className="space-y-2">
           <MobileSectionLabel>{t("mobile.more.preferences")}</MobileSectionLabel>
-          <div className="space-y-2 rounded-2xl border border-border bg-surface p-3 shadow-e1">
+          <div className="space-y-2 rounded-2xl bg-surface p-4 shadow-e1">
             <ModeSwitcher current={mode} />
             <ThemeSwitcher current={theme} />
             <LanguageSwitcher />
@@ -159,7 +159,7 @@ function MoreSection({ title, children }: { title: React.ReactNode; children: Re
   return (
     <section className="space-y-2">
       <MobileSectionLabel>{title}</MobileSectionLabel>
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface">{children}</div>
+      <div className="overflow-hidden rounded-2xl bg-surface shadow-e1">{children}</div>
     </section>
   );
 }

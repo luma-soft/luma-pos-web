@@ -28,11 +28,11 @@ type MobileFormLineCardProps = {
 
 export function MobileRecordCard({ title, subtitle, status, children, actions, className }: MobileRecordCardProps) {
   return (
-    <article className={cn("rounded-2xl border border-border bg-surface p-3 shadow-e1 lg:hidden", className)}>
+    <article className={cn("rounded-2xl bg-surface p-4 shadow-e1 lg:hidden", className)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-black">{title}</h3>
-          {subtitle != null && <p className="mt-0.5 truncate text-xs font-medium text-slate-400">{subtitle}</p>}
+          {subtitle != null && <p className="mt-1 truncate text-xs font-medium text-slate-500 dark:text-slate-400">{subtitle}</p>}
         </div>
         {status != null && <div className="shrink-0">{status}</div>}
       </div>
@@ -52,7 +52,7 @@ export function MobileRecordField({ label, value, tone = "neutral", className }:
 
   return (
     <div className={cn("min-w-0", className)}>
-      <dt className="text-[10px] font-extrabold uppercase tracking-[0.06em] text-slate-400">{label}</dt>
+      <dt className="text-[11px] font-bold uppercase tracking-[0.04em] text-slate-500 dark:text-slate-400">{label}</dt>
       <dd className={cn("mt-0.5 truncate text-sm font-black tabular-nums", valueTone)}>{value}</dd>
     </div>
   );
@@ -60,7 +60,7 @@ export function MobileRecordField({ label, value, tone = "neutral", className }:
 
 export function MobileFormLineCard({ title, subtitle, amount, children, actions }: MobileFormLineCardProps) {
   return (
-    <section className="rounded-2xl border border-border bg-surface p-3 shadow-e1 lg:hidden">
+    <section className="rounded-2xl bg-surface p-4 shadow-e1 lg:hidden">
       <div className="grid min-w-0 grid-cols-1 gap-2">
         <div className="min-w-0">
           <h3 className="truncate text-sm font-black">{title}</h3>
@@ -90,11 +90,11 @@ export function MobileTopBar({
   className?: string;
 }) {
   return (
-    <header className={cn("border-b border-border bg-surface px-4 pb-3 pt-3 lg:hidden", className)}>
+    <header className={cn("border-b border-border bg-canvas/95 px-4 pb-3 pt-3 backdrop-blur-sm lg:hidden", className)}>
       <div className="flex min-h-12 items-center gap-2.5">
         {leading}
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-black leading-tight tracking-[-0.01em]">{title}</h1>
+          <h1 className="truncate text-[23px] font-bold leading-tight tracking-[-0.02em]">{title}</h1>
           {subtitle && <p className="mt-0.5 text-xs font-semibold leading-4 text-slate-500 dark:text-slate-400">{subtitle}</p>}
         </div>
         {trailing && <div className="flex shrink-0 items-center gap-2">{trailing}</div>}
@@ -161,16 +161,44 @@ export function MobileMetricTile({
     info: "text-in",
   }[tone];
   return (
-    <div className="min-h-[92px] rounded-2xl border border-border bg-surface p-3 shadow-e1">
-      <div className="text-[10px] font-extrabold uppercase tracking-[0.06em] text-slate-400">{label}</div>
-      <div className="mt-1 truncate text-[21px] font-black leading-tight tracking-[-0.02em] tabular-nums">{value}</div>
-      <div className={cn("mt-1 text-[10px] font-bold", subtitleTone)}>{subtitle}</div>
+    <div className="flex min-h-[98px] flex-col justify-between rounded-2xl bg-surface p-4 shadow-e1">
+      <div className="text-xs font-semibold leading-4 text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="mt-1 min-w-0 text-[22px] font-bold leading-tight tracking-[-0.02em] tabular-nums">{value}</div>
+      <div className={cn("mt-1 text-xs font-medium", subtitleTone)}>{subtitle}</div>
     </div>
   );
 }
 
 export function MobileSectionLabel({ children }: { children: React.ReactNode }) {
-  return <h2 className="px-0.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-slate-400">{children}</h2>;
+  return <h2 className="px-0.5 text-[13px] font-semibold leading-5 text-slate-500 dark:text-slate-400">{children}</h2>;
+}
+
+export function MobileQuickActionGrid({
+  title,
+  items,
+}: {
+  title: React.ReactNode;
+  items: Array<{ href: string; icon: LucideIcon; label: React.ReactNode }>;
+}) {
+  return (
+    <section className="rounded-2xl bg-surface px-4 py-3 shadow-e1">
+      <h2 className="mb-3 text-base font-bold">{title}</h2>
+      <div className="grid grid-cols-4 gap-2">
+        {items.map(({ href, icon: Icon, label }) => (
+          <Link
+            key={href}
+            href={href}
+            className="flex min-h-[88px] min-w-11 flex-col items-center justify-start gap-2 rounded-xl px-1 py-1 text-center text-xs font-semibold leading-4 text-foreground transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:scale-[0.98]"
+          >
+            <span className="grid size-12 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300">
+              <Icon className="size-[22px]" strokeWidth={2} aria-hidden="true" />
+            </span>
+            <span className="line-clamp-2">{label}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 export function MobileActionRow({
@@ -199,7 +227,7 @@ export function MobileActionRow({
   }[tone];
   return (
     <Link href={href} target={target} rel={target ? "noopener noreferrer" : undefined} className={cn(
-      "flex min-h-[62px] min-w-11 items-center gap-3 rounded-2xl border border-border bg-surface px-3 py-2.5 shadow-e1 transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:scale-[0.99]",
+      "flex min-h-[68px] min-w-11 items-center gap-3 rounded-2xl bg-surface px-3 py-3 shadow-e1 transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:scale-[0.99]",
       className,
       "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
     )}>
@@ -207,8 +235,8 @@ export function MobileActionRow({
         <Icon className="h-[21px] w-[21px]" strokeWidth={2.1} aria-hidden="true" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-bold">{title}</span>
-        {subtitle && <span className="mt-0.5 block truncate text-[10px] font-medium text-slate-400">{subtitle}</span>}
+        <span className="block truncate text-sm font-semibold">{title}</span>
+        {subtitle && <span className="mt-0.5 block truncate text-xs font-medium text-slate-500 dark:text-slate-400">{subtitle}</span>}
       </span>
       <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" aria-hidden="true" />
     </Link>

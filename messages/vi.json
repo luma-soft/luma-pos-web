@@ -1080,6 +1080,8 @@
       "subtitle": "Nhịp vận hành hôm nay · POS-first",
       "rangeLabel": "Khoảng thời gian tổng quan",
       "todayOverview": "Tình hình vận hành hôm nay",
+      "businessStats": "Thống kê kinh doanh",
+      "quickActions": "Thao tác nhanh",
       "revenueTrend": "Xu hướng doanh thu",
       "selectedRange": "Theo khoảng đã chọn: {range}",
       "trendBarLabel": "Ngày {date}: doanh thu {revenue}",

@@ -39,7 +39,7 @@ export function MobileTabBar({ role }: { role: Role }) {
       Routes.Stocktakes, Routes.Pricing, "/internal-use",
     ].some(matches),
     invoices: [
-      Routes.Sales, Routes.Orders, Routes.Quotes, Routes.EInvoices, "/returns",
+      Routes.Sales, Routes.Orders, Routes.Quotes, Routes.EInvoices, "/returns", "/bookings", "/invoices",
     ].some(matches),
     more: false,
   };
@@ -61,7 +61,7 @@ export function MobileTabBar({ role }: { role: Role }) {
             href={tab.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "group flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-1 px-1 py-1 text-[10px] font-semibold leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 active:scale-[0.98]",
+              "group flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-1 px-1 py-1 text-[11px] font-semibold leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 active:scale-[0.98]",
               active ? "text-primary-700 dark:text-primary-300" : "text-slate-500 dark:text-slate-400",
             )}
           >

@@ -1080,6 +1080,8 @@
       "subtitle": "Today's operations · POS-first",
       "rangeLabel": "Dashboard date range",
       "todayOverview": "Today's operating snapshot",
+      "businessStats": "Business overview",
+      "quickActions": "Quick actions",
       "revenueTrend": "Revenue trend",
       "selectedRange": "Selected range: {range}",
       "trendBarLabel": "{date}: revenue {revenue}",

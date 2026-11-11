@@ -12,8 +12,9 @@ import { OrderStatusBadge, PaymentStatusBadge } from "../orders/status-badges";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Text } from "@/components/ui/text";
 import { OrderDetailLink } from "@/components/order-detail-link";
-import { Bell, FileText, Package, Search } from "lucide-react";
-import { MobileActionRow, MobileMetricTile, MobileSectionLabel, MobileTopBar } from "@/components/mobile-ui";
+import { Bell, ClipboardCheck, Package, ShoppingCart, Truck } from "lucide-react";
+import { MobileMetricTile, MobileQuickActionGrid, MobileSectionLabel, MobileTopBar } from "@/components/mobile-ui";
+import { MobileProfitMetricValue } from "@/components/mobile-profit-metric-value";
 import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
@@ -70,12 +71,12 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       <div className="min-h-full bg-canvas lg:hidden">
         <MobileTopBar
           title={context.storeName.trim() || "LumaPOS"}
-          subtitle={t("mobile.dashboard.subtitle")}
+          subtitle={t("dashboard.title")}
           trailing={(
             <Link
               href={Routes.Notifications}
               aria-label={t("nav.notifications")}
-              className="grid h-11 w-11 place-items-center rounded-xl text-primary-700 transition hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:scale-[0.98] dark:text-primary-300"
+              className="grid h-11 w-11 place-items-center rounded-full bg-surface text-slate-600 shadow-e1 transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:scale-[0.98] dark:text-slate-300"
             >
               <Bell className="h-6 w-6" />
             </Link>
@@ -83,7 +84,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           bottom={(
             <nav
               aria-label={t("mobile.dashboard.rangeLabel")}
-              className="grid grid-cols-4 gap-1 rounded-full bg-primary-50/75 p-1 dark:bg-primary-950/30"
+              className="grid grid-cols-4 gap-1 rounded-xl bg-surface-2 p-1"
             >
               {MOBILE_RANGES.map((r) => (
                 <Link
@@ -91,10 +92,10 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                   href={`${Routes.Dashboard}?range=${r}`}
                   aria-current={range === r ? "page" : undefined}
                   className={cn(
-                    "inline-flex min-h-11 min-w-0 items-center justify-center rounded-full px-1 text-center text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11",
+                    "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 text-center text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
                     range === r
-                      ? "bg-primary-600 text-white shadow-sm"
-                      : "text-slate-600 hover:bg-surface/70 dark:text-slate-300",
+                      ? "bg-surface text-foreground shadow-e1"
+                      : "text-slate-500 hover:text-foreground dark:text-slate-300",
                   )}
                 >
                   {t(`dashboard.range.${r}`)}
@@ -103,10 +104,10 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             </nav>
           )}
         />
-        <div className="space-y-4 px-3 py-3">
+        <div className="space-y-4 px-4 py-4">
           <section className="space-y-2">
-            <MobileSectionLabel>{t("nav.dashboard")} · {t(`dashboard.range.${range}`)}</MobileSectionLabel>
-            <div className="grid grid-cols-2 gap-2.5">
+            <MobileSectionLabel>{t("mobile.dashboard.businessStats")}</MobileSectionLabel>
+            <div className="grid grid-cols-2 gap-3">
               <MobileMetricTile
                 label={t("mobile.dashboard.revenue")}
                 value={formatCompactCurrency(data.revenue)}
@@ -114,16 +115,18 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                 tone="success"
               />
               <MobileMetricTile
-                label={t("mobile.dashboard.orders")}
-                value={data.orderCount}
-                subtitle={t("mobile.dashboard.recorded")}
-                tone="info"
-              />
-              <MobileMetricTile
                 label={t("dashboard.grossProfit")}
-                value={formatCompactCurrency(data.grossProfit)}
+                value={<MobileProfitMetricValue value={data.grossProfit} />}
                 subtitle={t("dashboard.marginPct", { pct: data.marginPct.toFixed(1) })}
                 tone={data.grossProfit >= 0 ? "success" : "warning"}
+              />
+              <MobileMetricTile
+                label={t("mobile.dashboard.orders")}
+                value={data.orderCount}
+                subtitle={data.orderCount > 0
+                  ? t("dashboard.avgPerOrder", { avg: formatCurrency(Math.round(data.avgOrder)) })
+                  : t(`dashboard.range.${range}`)}
+                tone="info"
               />
               <Link
                 href={`${Routes.Customers}?owing=1`}
@@ -131,27 +134,37 @@ export default async function DashboardPage({ searchParams }: PageProps) {
               >
                 <MobileMetricTile
                   label={t("mobile.dashboard.receivables")}
-                  value={data.debt.debtors}
-                  subtitle={t("mobile.dashboard.owingCustomers")}
+                  value={formatCompactCurrency(data.debt.total)}
+                  subtitle={t("dashboard.debtors", { count: data.debt.debtors })}
                   tone="neutral"
                 />
               </Link>
             </div>
           </section>
 
-          <section className="rounded-2xl border border-border bg-surface shadow-e1">
-            <div className="border-b border-border-soft px-3 py-3">
+          <MobileQuickActionGrid
+            title={t("mobile.dashboard.quickActions")}
+            items={[
+              { href: Routes.POS, icon: ShoppingCart, label: t("nav.mobileSales") },
+              { href: `${Routes.Inventory}?tab=products`, icon: Package, label: t("nav.products") },
+              { href: Routes.PurchaseNew, icon: Truck, label: t("nav.purchases") },
+              { href: `${Routes.Inventory}?tab=stock`, icon: ClipboardCheck, label: t("nav.stocktakes") },
+            ]}
+          />
+
+          <section className="rounded-2xl bg-surface shadow-e1">
+            <div className="border-b border-border-soft px-4 py-3.5">
               <h2 className="text-sm font-black">{t("mobile.dashboard.revenueTrend")}</h2>
               <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 {t("mobile.dashboard.selectedRange", { range: t(`dashboard.range.${range}`) })}
               </p>
             </div>
             {mobileRevenuePoints.length === 0 ? (
-              <p className="px-3 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+              <p className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                 {t("dashboard.noData")}
               </p>
             ) : (
-              <div className="overflow-x-auto overscroll-x-contain px-3 pb-3 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="overflow-x-auto overscroll-x-contain px-4 pb-4 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <div className="flex h-40 min-w-max items-end gap-2">
                   {mobileRevenuePoints.map((d) => {
                     const v = Number(d.revenue);
@@ -184,33 +197,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
               </div>
             )}
           </section>
-
-          <section className="space-y-2">
-            <MobileSectionLabel>{t("mobile.dashboard.attention")}</MobileSectionLabel>
-            <MobileActionRow
-              href={Routes.POS}
-              icon={Search}
-              title={t("mobile.dashboard.openPos")}
-              subtitle={t("mobile.dashboard.openPosHint")}
-            />
-            {data.lowStock.length > 0 && (
-              <MobileActionRow
-                href={`${Routes.Inventory}?low=1`}
-                icon={Package}
-                title={t("mobile.dashboard.lowStockAction", { count: data.lowStock.length })}
-                subtitle={t("mobile.dashboard.lowStockHint")}
-                tone="orange"
-              />
-            )}
-            <MobileActionRow
-              href={Routes.Sales}
-              icon={FileText}
-              title={t("mobile.dashboard.ordersAction", { count: data.orderCount })}
-              subtitle={t("mobile.dashboard.ordersHint")}
-              tone="blue"
-            />
-          </section>
-
 
           <section className="space-y-2">
             <div className="flex items-center justify-between gap-3">
