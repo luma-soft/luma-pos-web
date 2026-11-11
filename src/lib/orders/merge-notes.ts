@@ -5,7 +5,12 @@
  */
 export function separateMergeNotes(
   rawNote: string | null,
-  context: { mergedFromCodes?: readonly string[]; mergedIntoCode?: string | null } = {},
+  context: {
+    mergedFromCodes?: readonly string[];
+    mergedIntoCode?: string | null;
+    isMergedDocument?: boolean;
+    isMergedSource?: boolean;
+  } = {},
 ): { userNote: string | null; systemNote: string | null } {
   let userNote = rawNote?.trim() ?? "";
   let systemNote: string | null = null;
@@ -21,12 +26,25 @@ export function separateMergeNotes(
         userNote = "";
       }
     }
-  } else if (context.mergedIntoCode) {
-    systemNote = `Đã gộp vào ${context.mergedIntoCode}`;
-    if (userNote === systemNote) {
+  } else if (context.isMergedDocument) {
+    // Older data can lack backfilled source relationships. DHG- is the
+    // system-generated merged invoice code prefix, so only infer here.
+    if (/^Gộp từ:\s*([^\s,]+(?:,\s*[^\s,]+)+)$/u.test(userNote)) {
+      systemNote = userNote;
       userNote = "";
-    } else if (userNote.endsWith(` · ${systemNote}`)) {
-      userNote = userNote.slice(0, -(` · ${systemNote}`).length).trim();
+    }
+  }
+
+  if (!systemNote && (context.mergedIntoCode || context.isMergedSource)) {
+    const legacyDestination = /(?:^| · )Đã gộp vào (DHG-[\w-]+)$/u.exec(userNote)?.[1];
+    const destinationCode = context.mergedIntoCode ?? legacyDestination;
+    if (destinationCode) {
+      systemNote = `Đã gộp vào ${destinationCode}`;
+      if (userNote === systemNote) {
+        userNote = "";
+      } else if (userNote.endsWith(` · ${systemNote}`)) {
+        userNote = userNote.slice(0, -(` · ${systemNote}`).length).trim();
+      }
     }
   }
 

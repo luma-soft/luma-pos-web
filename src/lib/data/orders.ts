@@ -441,7 +441,12 @@ export async function getOrder(storeId: string, id: string) {
     && destination && (destination.sourceCount >= 2 || order.status === "merged")
     ? destination.code
     : null;
-  const { userNote, systemNote } = separateMergeNotes(order.note, { mergedFromCodes, mergedIntoCode });
+  const { userNote, systemNote } = separateMergeNotes(order.note, {
+    mergedFromCodes,
+    mergedIntoCode,
+    isMergedDocument: order.code.startsWith("DHG-") && order.documentType === "sale",
+    isMergedSource: order.status === "merged",
+  });
 
   const [items, paymentRows, returnRows, [profitRow], [returnedProfitRow]] = await Promise.all([
     db

@@ -30,6 +30,20 @@ test("legacy source invoice retains operator-entered text", () => {
   );
 });
 
+test("historical merged invoice without source links hides the generated note", () => {
+  assert.deepEqual(
+    separateMergeNotes("Gộp từ: DH-01, DH-02", { isMergedDocument: true }),
+    { userNote: null, systemNote: "Gộp từ: DH-01, DH-02" },
+  );
+});
+
+test("historical merged source without a destination link keeps user text", () => {
+  assert.deepEqual(
+    separateMergeNotes("Đã lấy hàng · Đã gộp vào DHG-2026-001", { isMergedSource: true }),
+    { userNote: "Đã lấy hàng", systemNote: "Đã gộp vào DHG-2026-001" },
+  );
+});
+
 test("unrelated invoices preserve notes that happen to mention merging", () => {
   assert.deepEqual(
     separateMergeNotes("Gộp từ: đơn ngoài hệ thống"),
