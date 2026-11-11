@@ -542,6 +542,16 @@ async function deleteProductRecord(id: string, deferRefresh = false): Promise<Ac
       return { ok: false, error: "products.errors.cannotDeleteInCombo" };
     if (pgErrorCode(e) === "23503")
       return { ok: false, error: "products.errors.cannotDeleteReferenced" };
+    // Existing databases may still have the pre-soft-delete lifecycle constraint.
+    const dbError = e as {
+      constraint?: string;
+      constraint_name?: string;
+      cause?: { constraint?: string; constraint_name?: string };
+    };
+    const constraint = dbError.cause?.constraint_name ?? dbError.cause?.constraint
+      ?? dbError.constraint_name ?? dbError.constraint;
+    if (pgErrorCode(e) === "23514" && constraint === "products_lifecycle_status_check")
+      return { ok: false, error: "products.errors.deleteMigrationRequired" };
     console.error("deleteProduct failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
@@ -707,24 +717,41 @@ export async function bulkResumeSellingProducts(
 /** Bulk soft-delete: independent transactions keep failures isolated. */
 export async function bulkDeleteProducts(
   ids: string[],
-): Promise<ActionResult<{ deleted: number; failedIds: string[] }>> {
+): Promise<ActionResult<{
+  deleted: number;
+  failedIds: string[];
+  failures: Array<{ id: string; sku: string; name: string; error: string }>;
+}>> {
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
   const parsed = bulkProductIdsSchema.safeParse(ids);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   let deleted = 0;
-  const failedIds: string[] = [];
+  const rejected: Array<{ id: string; error: string }> = [];
   for (const id of parsed.data) {
     const result = await deleteProductRecord(id, true);
     if (result.ok) deleted += 1;
-    else failedIds.push(id);
+    else rejected.push({ id, error: result.error });
   }
+  const failedIds = rejected.map(({ id }) => id);
+  const failedProducts = failedIds.length > 0
+    ? await db.select({ id: products.id, sku: products.sku, name: products.name })
+        .from(products)
+        .where(and(eq(products.storeId, gate.storeId), inArray(products.id, failedIds)))
+    : [];
+  const detailsById = new Map(failedProducts.map((product) => [product.id, product]));
+  const failures = rejected.map(({ id, error }) => ({
+    id,
+    sku: detailsById.get(id)?.sku ?? "",
+    name: detailsById.get(id)?.name ?? "",
+    error,
+  }));
   if (deleted > 0) {
     revalidatePath(Routes.Products);
     revalidatePath(Routes.Inventory);
     revalidatePath(Routes.POS);
   }
-  return { ok: true, data: { deleted, failedIds } };
+  return { ok: true, data: { deleted, failedIds, failures } };
 }
 
 /** Gắn hoặc bỏ sản phẩm khỏi danh sách vật tư dùng trong báo giá camera. */
