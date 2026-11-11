@@ -75,7 +75,8 @@ test("groups legacy related products locally and filters on matching members", (
   expect(result.total).toBe(1);
   expect(result.rows[0].id).toBe("root");
   expect(result.rows[0].variantGroup?.kind).toBe("related");
-  expect(result.rows[0].variantGroup?.members.map((row) => row.id)).toEqual(["member", "root"]);
+  expect(result.rows[0].variantGroup?.members.map((row) => row.id)).toEqual(["member"]);
+  expect(result.rows[0].variantGroup?.count).toBe(1);
 });
 
 test("ranks the complete local candidate set before pagination", () => {
@@ -157,4 +158,43 @@ test("reuses the Inventory searchable view while excluding variant parent placeh
 
   const noParents = [sku];
   expect(getInventorySearchableProducts(noParents)).toBe(noParents);
+});
+
+test("group SKU counts and expanded rows use active search and filters", () => {
+  const parent = product({ id: "parent", sku: "GROUP", isVariantParent: true });
+  const active = product({
+    id: "active", sku: "TILE-1", parentProductId: "parent",
+    categoryId: "tile", brandId: "brand-a",
+  });
+  const stopped = product({
+    id: "stopped", sku: "TILE-2", parentProductId: "parent",
+    isActive: false, lifecycleStatus: "archived", categoryId: "tile", brandId: "brand-a",
+  });
+  const otherBrand = product({
+    id: "other-brand", sku: "TILE-3", parentProductId: "parent",
+    categoryId: "tile", brandId: "brand-b",
+  });
+  const catalog = [parent, active, stopped, otherBrand];
+
+  const activeResult = exploreProductCatalog(catalog, [], {
+    status: "active", brandId: "brand-a", view: "grouped",
+  });
+  expect(activeResult.total).toBe(1);
+  expect(activeResult.rows[0].variantGroup?.count).toBe(1);
+  expect(activeResult.rows[0].variantGroup?.members.map((row) => row.id)).toEqual(["active"]);
+  expect(activeResult.rows[0].childCount).toBe(1);
+  expect(activeResult.rows[0].children.map((row) => row.id)).toEqual(["active"]);
+
+  const stoppedResult = exploreProductCatalog(catalog, [], {
+    status: "inactive", query: "TILE-2", view: "grouped",
+  });
+  expect(stoppedResult.total).toBe(1);
+  expect(stoppedResult.rows[0].variantGroup?.count).toBe(1);
+  expect(stoppedResult.rows[0].variantGroup?.members.map((row) => row.id)).toEqual(["stopped"]);
+
+  const flatResult = exploreProductCatalog(catalog, [], {
+    status: "active", brandId: "brand-a", view: "flat",
+  });
+  expect(flatResult.total).toBe(1);
+  expect(flatResult.rows.map((row) => row.id)).toEqual(["active"]);
 });
