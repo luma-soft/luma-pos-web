@@ -3587,6 +3587,7 @@
     "availableStock": "Current stock {stock} {unit}",
     "remainingToReturn": "Remaining to return: {stock} {unit}",
     "fullyReturned": "This product has been fully returned.",
+    "fullyReturnedHint": "All quantities in this receipt have already been returned.",
     "vatRefund": "VAT refund",
     "supplierNeedReturn": "Supplier should return",
     "refundAmount": "Supplier paid back",
