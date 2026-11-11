@@ -3585,6 +3585,8 @@
     "emptyLinesTitle": "Thêm sản phẩm trả hàng",
     "emptyLinesHint": "Tìm theo mã hoặc tên sản phẩm để thêm vào phiếu.",
     "availableStock": "Tồn hiện tại {stock} {unit}",
+    "remainingToReturn": "Còn được trả {stock} {unit}",
+    "fullyReturned": "Sản phẩm đã được trả hết.",
     "vatRefund": "VAT hoàn lại",
     "supplierNeedReturn": "Nhà cung cấp cần trả",
     "refundAmount": "Tiền nhà cung cấp trả",
@@ -3623,7 +3625,8 @@
     },
     "errors": {
       "emptyItems": "Phiếu trả hàng nhập cần ít nhất 1 sản phẩm.",
-      "insufficientStock": "Số lượng trả vượt quá tồn kho hiện tại."
+      "insufficientStock": "Số lượng trả vượt quá tồn kho hiện tại.",
+      "qtyExceedsSource": "Số lượng trả vượt quá phần còn lại của phiếu nhập gốc."
     }
   },
   "inventory": {
