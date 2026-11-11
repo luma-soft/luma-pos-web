@@ -25,3 +25,18 @@ test("bulk product actions route every selected product into purchase and POS dr
   expect(posPage).toContain("params.productIds");
   expect(posPage).toContain("bulkItems");
 });
+
+test("bulk menu offers resume for inactive products and both actions for mixed selection", () => {
+  const actions = source("./product-selection.tsx");
+  const catalog = source("./product-catalog-products-content.tsx");
+  const mutations = source("../../../../lib/actions/products.ts");
+
+  expect(actions).toContain("activeSelectedIds.length > 0");
+  expect(actions).toContain("inactiveSelectedIds.length > 0");
+  expect(actions).toContain("bulkResumeSellingProducts(targetIds)");
+  expect(actions).toContain("bulkStopSellingProducts(targetIds)");
+  expect(actions).toContain("await catalog.refresh()");
+  expect(catalog).toContain("visibleProductSelections(result.rows");
+  expect(mutations).toContain("row.isActive !== isActive");
+  expect(mutations).toContain("export async function bulkResumeSellingProducts(");
+});
