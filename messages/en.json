@@ -3544,6 +3544,7 @@
       "emptyItems": "Add at least 1 product.",
       "notFound": "Purchase receipt not found.",
       "notEditable": "This purchase receipt cannot be edited or cancelled.",
+      "hasReturns": "This purchase receipt has a completed supplier return and cannot be edited.",
       "alreadyCancelled": "This purchase receipt was already cancelled.",
       "costHistoryLocked": "This receipt is included in a closed historical cost balance. Only notes, invoice details and payments can be changed.",
       "costLedgerMismatch": "Stock does not match the cost ledger. Reconcile stock movements before saving this receipt."
