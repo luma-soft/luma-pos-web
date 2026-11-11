@@ -289,7 +289,13 @@ export async function getOrders(storeId: string, filters: OrderListFilters = {})
           and ${orderItems.storeId} = ${storeId}
       )`,
       productNames: sql<string>`coalesce((
-        select string_agg(${orderItems.productName}, ', ' order by ${orderItems.lineOrder}, ${orderItems.id})
+        select string_agg(case when exists (
+          select 1 from ${products} product_status
+          where product_status.id = ${orderItems.productId}
+            and product_status.store_id = ${storeId}::uuid
+            and product_status.lifecycle_status = 'deleted'
+        ) then ${orderItems.productName} || ' {DEL}' else ${orderItems.productName} end,
+        ', ' order by ${orderItems.lineOrder}, ${orderItems.id})
         from ${orderItems}
         where ${orderItems.orderId} = ${orders.id}
           and ${orderItems.storeId} = ${storeId}
