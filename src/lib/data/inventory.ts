@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, gte, inArray, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  categories, internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, stockMovements, suppliers, warehouses,
+  categories, internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, purchaseReturns, stockMovements, suppliers, warehouses,
 } from "@/db/schema";
 import { unstable_cache } from "next/cache";
 import { accentInsensitiveLike, catalogProductSearchCondition } from "@/lib/search";
@@ -15,6 +15,15 @@ import {
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 
 export const INVENTORY_PAGE_SIZE = 30;
+
+// A supplier return locks edits to the original receipt (partial and full
+// returns alike). The correlated EXISTS adds just one boolean per fetched row.
+const receiptHasCompletedReturn = sql<boolean>`exists (
+  select 1 from ${purchaseReturns}
+  where ${purchaseReturns.purchaseOrderId} = ${purchaseOrders.id}
+    and ${purchaseReturns.storeId} = ${purchaseOrders.storeId}
+    and ${purchaseReturns.status} = 'completed'
+)`;
 
 export type StockFilter =
   | "all"
@@ -227,6 +236,8 @@ export async function getPurchases(storeId: string, filters: { q?: string; statu
         supplierId: purchaseOrders.supplierId,
         warehouseId: purchaseOrders.warehouseId,
         status: purchaseOrders.status,
+      hasReturns: receiptHasCompletedReturn,
+        hasReturns: receiptHasCompletedReturn,
         subtotal: purchaseOrders.subtotal,
         discount: purchaseOrders.discount,
         vatRate: purchaseOrders.vatRate,
