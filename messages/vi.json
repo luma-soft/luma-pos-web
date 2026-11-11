@@ -2443,6 +2443,7 @@
     },
     "errors": {
       "skuExists": "SKU đã tồn tại — chọn mã khác.",
+      "cannotDeleteInCombo": "Sản phẩm đang là thành phần của một bộ/combo còn sử dụng. Hãy gỡ hoặc thay sản phẩm trong combo trước khi xóa.",
       "cannotDeleteWithStock": "Không thể xóa sản phẩm còn tồn hoặc đang giữ hàng. Hãy xử lý tồn kho bằng chứng từ trước khi xóa.",
       "cannotDeleteReferenced": "Không thể xóa do có dữ liệu liên quan chưa được hỗ trợ. Vui lòng kiểm tra lại liên kết của sản phẩm.",
       "kindImmutable": "Không thể đổi loại hàng hóa sau khi đã tạo.",
