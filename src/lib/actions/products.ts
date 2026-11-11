@@ -571,9 +571,10 @@ export async function setProductActive(
   }
 }
 
-/** Ngừng kinh doanh nhiều hàng hóa; nhóm biến thể áp dụng cho cả sản phẩm con. */
-export async function bulkStopSellingProducts(
+/** Thay đổi trạng thái kinh doanh theo lô, bao gồm các biến thể của nhóm được chọn. */
+async function bulkSetSellingStatusProducts(
   ids: string[],
+  isActive: boolean,
 ): Promise<ActionResult<{ updated: number }>> {
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
@@ -593,24 +594,36 @@ export async function bulkStopSellingProducts(
       if (parentIds.length > 0) {
         conditions.push(inArray(products.parentProductId, parentIds));
       }
-      const before = await tx.select({ id: products.id, name: products.name, code: products.sku, isActive: products.isActive, lifecycleStatus: products.lifecycleStatus })
-        .from(products).where(and(eq(products.storeId, gate.storeId), or(...conditions))).for("update");
-      const changes = before.filter((row) => row.isActive || row.lifecycleStatus !== "archived");
+      const before = await tx.select({
+        id: products.id, name: products.name, code: products.sku,
+        isActive: products.isActive, lifecycleStatus: products.lifecycleStatus,
+      }).from(products)
+        .where(and(eq(products.storeId, gate.storeId), or(...conditions)))
+        .for("update");
+      const nextLifecycleStatus = isActive ? "active" : "archived";
+      const changes = before.filter((row) =>
+        row.isActive !== isActive || row.lifecycleStatus !== nextLifecycleStatus,
+      );
+      if (changes.length === 0) return [];
+
       const updated = await tx
         .update(products)
         .set({
-          isActive: false,
-          lifecycleStatus: "archived",
+          isActive,
+          lifecycleStatus: nextLifecycleStatus,
           updatedAt: sql`now()`,
         })
-        .where(and(eq(products.storeId, gate.storeId), or(...conditions)))
+        .where(and(eq(products.storeId, gate.storeId), inArray(products.id, changes.map((row) => row.id))))
         .returning({ id: products.id });
-      if (changes.length) await recordActivity(tx, {
-        storeId: gate.storeId, actorId: gate.userId, action: "product.bulk.stopped", entityType: "product",
-        before: { products: changes }, after: { isActive: false, lifecycleStatus: "archived", changedCount: changes.length },
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId,
+        action: isActive ? "product.bulk.resumed" : "product.bulk.stopped",
+        entityType: "product",
+        before: { products: changes },
+        after: { isActive, lifecycleStatus: nextLifecycleStatus, changedCount: changes.length },
         affectedRecords: changes.map((row) => ({ type: "product", id: row.id, code: row.code, name: row.name })),
-    });
-    return updated;
+      });
+      return updated;
     });
 
     revalidatePath(Routes.Products);
@@ -618,9 +631,23 @@ export async function bulkStopSellingProducts(
     revalidatePath(Routes.POS);
     return { ok: true, data: { updated: updated.length } };
   } catch (e) {
-    console.error("bulkStopSellingProducts failed:", e);
+    console.error("bulkSetSellingStatusProducts failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
+}
+
+/** Ngừng kinh doanh nhiều hàng hóa. */
+export async function bulkStopSellingProducts(
+  ids: string[],
+): Promise<ActionResult<{ updated: number }>> {
+  return bulkSetSellingStatusProducts(ids, false);
+}
+
+/** Cho phép kinh doanh trở lại nhiều hàng hóa. */
+export async function bulkResumeSellingProducts(
+  ids: string[],
+): Promise<ActionResult<{ updated: number }>> {
+  return bulkSetSellingStatusProducts(ids, true);
 }
 
 /**
