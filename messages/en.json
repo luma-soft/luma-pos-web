@@ -2444,7 +2444,7 @@
     "errors": {
       "skuExists": "SKU already exists — choose another.",
       "cannotDeleteWithStock": "Cannot delete a product with stock or reserved quantity. Clear the stock using an inventory document first.",
-      "cannotDeleteReferenced": "Cannot delete a product with documents or stock movements. Stop selling it instead.",
+      "cannotDeleteReferenced": "Cannot delete this product because of an unsupported related data reference. Please review the product links.",
       "kindImmutable": "Item type cannot be changed after creation.",
       "stockChanged": "Stock changed while you were editing. Reload the product and check the quantity before saving.",
       "stockAdjustmentNeedsInventory": "Items in multiple warehouses, batch-tracked items and variant groups must be adjusted in Stocktakes.",
@@ -3896,6 +3896,7 @@
     "errors": {
       "emptyItems": "Select at least 1 item to return.",
       "qtyExceeds": "Return quantity exceeds purchased quantity.",
+      "deletedProductRestock": "Deleted products cannot be restocked during a return. Choose no restock, or resolve the product first.",
       "orderCancelled": "Order is cancelled — cannot return.",
       "debtNeedsCustomer": "Debt deduction requires a customer on the order.",
       "notFound": "Return not found.",
