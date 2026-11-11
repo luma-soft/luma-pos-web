@@ -28,14 +28,17 @@ import { Routes } from "@/lib/routes";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import {
   bulkDeleteProducts,
+  bulkResumeSellingProducts,
   bulkStopSellingProducts,
 } from "@/lib/actions/products";
 import { cn } from "@/lib/utils";
 import { controlHeightClassName } from "@/components/ui/button-variants";
+import { useProductCatalog } from "@/components/product-catalog-provider";
 
 type ProductSelectionContextValue = {
   selectedIds: Set<string>;
   selectedVisibleIds: string[];
+  activeIds: Set<string>;
   allSelected: boolean;
   toggle: (id: string) => void;
   toggleMany: (ids: string[]) => void;
@@ -47,14 +50,16 @@ const ProductSelectionContext =
   createContext<ProductSelectionContextValue | null>(null);
 
 export function ProductSelectionProvider({
-  visibleIds,
+  visibleProducts,
   children,
 }: {
-  visibleIds: string[];
+  visibleProducts: Array<{ id: string; isActive: boolean }>;
   children: ReactNode;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const visibleKey = visibleIds.join(",");
+  const visibleKey = visibleProducts.map((product) => product.id).join(",");
+  const activeKey = visibleProducts.filter((product) => product.isActive).map((product) => product.id).join(",");
+  const activeIds = useMemo(() => new Set(activeKey ? activeKey.split(",") : []), [activeKey]);
   const stableVisibleIds = useMemo(
     () => (visibleKey ? visibleKey.split(",") : []),
     [visibleKey],
@@ -107,6 +112,7 @@ export function ProductSelectionProvider({
       value={{
         selectedIds,
         selectedVisibleIds,
+        activeIds,
         allSelected,
         toggle,
         toggleMany,
@@ -133,7 +139,10 @@ export function ProductBulkActions() {
   const t = useTranslations();
   const router = useRouter();
   const dialog = useConfirmDialog();
-  const { selectedVisibleIds: ids, replace } = useProductSelection();
+  const { selectedVisibleIds: ids, activeIds, replace } = useProductSelection();
+  const activeSelectedIds = ids.filter((id) => activeIds.has(id));
+  const inactiveSelectedIds = ids.filter((id) => !activeIds.has(id));
+  const catalog = useProductCatalog();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -149,19 +158,24 @@ export function ProductBulkActions() {
 
   if (ids.length === 0) return null;
 
-  async function stopSelling() {
+  async function changeSellingStatus(isActive: boolean) {
     setOpen(false);
+    // Mixed selections expose both actions; only change products whose status needs updating.
+    const targetIds = isActive ? inactiveSelectedIds : activeSelectedIds;
+    if (targetIds.length === 0) return;
     const confirmed = await dialog.confirm({
-      title: t("products.bulk.stopTitle"),
-      description: t("products.bulk.stopDescription", {
-        count: ids.length,
+      title: t(isActive ? "products.bulk.resumeTitle" : "products.bulk.stopTitle"),
+      description: t(isActive ? "products.bulk.resumeDescription" : "products.bulk.stopDescription", {
+        count: targetIds.length,
       }),
-      confirmLabel: t("products.actions.stopSelling"),
-      variant: "warning",
+      confirmLabel: t(isActive ? "products.actions.resumeSelling" : "products.actions.stopSelling"),
+      variant: isActive ? "default" : "warning",
     });
     if (!confirmed) return;
     startTransition(async () => {
-      const result = await bulkStopSellingProducts(ids);
+      const result = isActive
+        ? await bulkResumeSellingProducts(targetIds)
+        : await bulkStopSellingProducts(targetIds);
       if (!result.ok) {
         await dialog.alert({
           description: t(result.error as never),
@@ -170,6 +184,7 @@ export function ProductBulkActions() {
         return;
       }
       replace(new Set());
+      await catalog.refresh();
       router.refresh();
     });
   }
@@ -307,14 +322,26 @@ export function ProductBulkActions() {
             {t("products.actions.printLabels")}
           </button>
           <div className="my-1 border-t border-border-soft" />
-          <button
-            type="button"
-            onClick={stopSelling}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
-          >
-            <Ban className="h-4 w-4 text-amber-600" />
-            {t("products.actions.stopSelling")}
-          </button>
+          {activeSelectedIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void changeSellingStatus(false)}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+            >
+              <Ban className="h-4 w-4 text-amber-600" />
+              {t("products.actions.stopSelling")}
+            </button>
+          )}
+          {inactiveSelectedIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void changeSellingStatus(true)}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+            >
+              <RotateCcw className="h-4 w-4 text-primary-600" />
+              {t("products.actions.resumeSelling")}
+            </button>
+          )}
           <button
             type="button"
             onClick={remove}
