@@ -271,6 +271,7 @@ export async function getOrders(storeId: string, filters: OrderListFilters = {})
       code: orders.code,
       documentType: orders.documentType,
       status: orders.status,
+      replacedByOrderId: orders.replacedByOrderId,
       paymentStatus: orders.paymentStatus,
       projectName: orders.projectName,
       deliveryAddress: orders.deliveryAddress,
