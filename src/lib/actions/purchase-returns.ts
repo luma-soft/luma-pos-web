@@ -54,6 +54,7 @@ function calcTotals(v: Pick<CreatePurchaseReturnOutput, "items" | "discount" | "
 function revalidatePurchaseReturnPaths(id?: string) {
   revalidatePath(Routes.Inventory);
   revalidatePath(Routes.PurchaseReturns);
+  revalidatePath(Routes.Purchases);
   revalidatePath(Routes.Products);
   revalidatePath(Routes.Suppliers);
   revalidatePath(Routes.Finance);
@@ -87,7 +88,8 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
       const [warehouseCheck] = await tx.select({ id: warehouses.id }).from(warehouses).where(and(eq(warehouses.storeId, gate.storeId), eq(warehouses.id, v.warehouseId))).limit(1);
       if (!supplierCheck || !warehouseCheck) throw new Error("PRODUCT_NOT_FOUND");
       if (v.purchaseOrderId) {
-        const [purchase] = await tx.select({ id: purchaseOrders.id }).from(purchaseOrders).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, v.purchaseOrderId), eq(purchaseOrders.supplierId, v.supplierId))).limit(1);
+        // Serialize supplier returns with edits to the original receipt.
+        const [purchase] = await tx.select({ id: purchaseOrders.id }).from(purchaseOrders).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, v.purchaseOrderId), eq(purchaseOrders.supplierId, v.supplierId))).limit(1).for("update");
         if (!purchase) throw new Error("PRODUCT_NOT_FOUND");
       }
       const linkedPurchaseItemIds = [...new Set(v.items.map((item) => item.purchaseOrderItemId).filter((id): id is string => Boolean(id)))];
