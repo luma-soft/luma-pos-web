@@ -3587,6 +3587,7 @@
     "availableStock": "Tồn hiện tại {stock} {unit}",
     "remainingToReturn": "Còn được trả {stock} {unit}",
     "fullyReturned": "Sản phẩm đã được trả hết.",
+    "fullyReturnedHint": "Phiếu nhập này đã được trả hết, không còn số lượng có thể trả tiếp.",
     "vatRefund": "VAT hoàn lại",
     "supplierNeedReturn": "Nhà cung cấp cần trả",
     "refundAmount": "Tiền nhà cung cấp trả",
