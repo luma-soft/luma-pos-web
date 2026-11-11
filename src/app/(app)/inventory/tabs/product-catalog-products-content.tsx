@@ -12,7 +12,7 @@ import { parsePageSize } from "@/lib/pagination";
 import { parsePriceComparisonParams } from "@/lib/pricing/price-comparison";
 import { parseProductListSort } from "@/lib/inventory/product-list-policy";
 import { Routes } from "@/lib/routes";
-import { exploreProductCatalog, productCatalogMatches, visibleProductIds } from "@/lib/product-catalog-explorer";
+import { exploreProductCatalog, productCatalogMatches, visibleProductSelections } from "@/lib/product-catalog-explorer";
 import { ProductCatalogSwitcher } from "./product-catalog-switcher";
 import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 import { InstantProductSearch } from "./instant-product-search";
@@ -128,11 +128,11 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
     );
   }
 
-  const selectionIds = visibleProductIds(result.rows, view === "grouped" && !cameraMaterials);
+  const visibleProducts = visibleProductSelections(result.rows, view === "grouped" && !cameraMaterials, status);
   const filterOptions = <T extends { id: string; name: string }>(items: T[]) => items.map((item) => ({ value: item.id, label: item.name }));
 
   return (
-    <ProductSelectionProvider visibleIds={selectionIds}>
+    <ProductSelectionProvider visibleProducts={visibleProducts}>
       {!cameraMaterials && <ProductCatalogSwitcher activeView="products" productCount={result.total} categoryCount={categories.length} />}
       {!cameraMaterials && (
         <div className="mb-3 lg:hidden">
