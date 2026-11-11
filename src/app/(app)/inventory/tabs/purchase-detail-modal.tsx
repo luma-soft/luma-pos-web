@@ -253,6 +253,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
 function PurchaseDetailFooter({ purchase, printTemplates }: { purchase: PurchaseRow; printTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[] }) {
   const t = useTranslations();
   const canChange = purchase.status === "received" || purchase.status === "draft";
+  const blockedByReturn = purchase.hasReturns || purchase.status === "returned";
   const printHref = `${Routes.purchase(purchase.id)}/print`;
 
   return (
@@ -273,7 +274,7 @@ function PurchaseDetailFooter({ purchase, printTemplates }: { purchase: Purchase
           </Link>
         )}
         <PrintTemplateMenu baseHref={printHref} templates={printTemplates} label={t("print.printBtn")} className={`${modalActionSizeClassName} min-w-11 rounded-lg border border-border px-3 text-xs font-semibold text-primary-600 hover:bg-surface-2 lg:min-w-0`} />
-        {(canChange || purchase.hasReturns) && (purchase.hasReturns ? (
+        {(canChange || blockedByReturn) && (blockedByReturn ? (
           <DisabledEditTooltip
             reason={t("purchases.errors.hasReturns")}
             className={`inline-flex ${modalActionSizeClassName} min-w-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white lg:min-w-0`}
