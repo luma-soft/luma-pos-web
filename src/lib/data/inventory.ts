@@ -289,6 +289,7 @@ export async function getPurchases(storeId: string, filters: { q?: string; statu
         .orderBy(asc(purchaseOrderItems.lineOrder), asc(purchaseOrderItems.id))
     : [];
   // One batched read per page, not one query per receipt or catalog SKU.
+  const purchaseByItemID = new Map(itemRows.map((item) => [item.id, item.purchaseOrderId]));
   const previousReturnRows = ids.length ? await db.select({
     purchaseOrderId: purchaseReturns.purchaseOrderId,
     purchaseOrderItemId: purchaseReturnItems.purchaseOrderItemId,
@@ -300,15 +301,21 @@ export async function getPurchases(storeId: string, filters: { q?: string; statu
     eq(purchaseReturnItems.storeId, purchaseReturns.storeId),
   )).where(and(
     eq(purchaseReturns.storeId, storeId),
-    inArray(purchaseReturns.purchaseOrderId, ids),
+    or(
+      inArray(purchaseReturns.purchaseOrderId, ids),
+      inArray(purchaseReturnItems.purchaseOrderItemId, itemRows.map((item) => item.id)),
+    ),
     eq(purchaseReturns.status, "completed"),
   )) : [];
   const previousByPurchase = new Map<string, typeof previousReturnRows>();
   for (const ret of previousReturnRows) {
-    if (!ret.purchaseOrderId) continue;
-    const grouped = previousByPurchase.get(ret.purchaseOrderId) ?? [];
+    const receiptID = ret.purchaseOrderItemId
+      ? (purchaseByItemID.get(ret.purchaseOrderItemId) ?? ret.purchaseOrderId)
+      : ret.purchaseOrderId;
+    if (!receiptID) continue;
+    const grouped = previousByPurchase.get(receiptID) ?? [];
     grouped.push(ret);
-    previousByPurchase.set(ret.purchaseOrderId, grouped);
+    previousByPurchase.set(receiptID, grouped);
   }
   const itemsByPurchase = new Map<string, typeof itemRows>();
   for (const item of itemRows) {
@@ -404,7 +411,10 @@ export async function getPurchase(storeId: string, id: string, options: { exclud
     eq(purchaseReturnItems.storeId, purchaseReturns.storeId),
   )).where(and(
     eq(purchaseReturns.storeId, storeId),
-    eq(purchaseReturns.purchaseOrderId, id),
+    or(
+      eq(purchaseReturns.purchaseOrderId, id),
+      inArray(purchaseReturnItems.purchaseOrderItemId, items.map((item) => item.id)),
+    ),
     eq(purchaseReturns.status, "completed"),
     ...(options.excludeReturnId ? [ne(purchaseReturns.id, options.excludeReturnId)] : []),
   )) : [];
