@@ -108,6 +108,7 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
       ...(showPriceComparison ? {
         priceCondition: draft.priceCondition as "lt" | "lte" | "eq" | "gte" | "gt" | undefined,
         priceAgainst: draft.priceAgainst as "cost" | "lastPurchase" | undefined,
+        priceBookId: draft.priceBookId || undefined,
       } : {}),
     },
   ), [cameraMaterials, cameraSkus, canonicalProducts, catalog.defaultSort, catalog.snapshot?.warehouses, showPriceComparison]);
@@ -137,7 +138,7 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
       {!cameraMaterials && (
         <div className="mb-3 lg:hidden">
           <h2 className="text-xl font-bold tracking-tight text-slate-950 dark:text-white">{t("products.title")}</h2>
-          <p className="mt-0.5 text-xs font-medium text-slate-500">{result.total.toLocaleString("vi-VN")} SKU</p>
+          <p className="mt-0.5 text-xs font-medium text-slate-500">{result.total.toLocaleString("vi-VN")} {t("products.unitLabel")}</p>
         </div>
       )}
       {cameraMaterials ? (
