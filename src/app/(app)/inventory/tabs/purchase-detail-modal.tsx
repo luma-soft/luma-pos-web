@@ -10,6 +10,7 @@ import { Copy, FilePenLine, ReceiptText } from "lucide-react";
 import { PurchaseCancelButton } from "../../purchases/purchase-cancel-button";
 import { RowPreviewModal } from "@/components/data-table";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
+import { DisabledEditTooltip } from "@/components/disabled-edit-tooltip";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { modalActionSizeClassName } from "@/components/ui/button-variants";
 import { Routes } from "@/lib/routes";
@@ -272,12 +273,20 @@ function PurchaseDetailFooter({ purchase, printTemplates }: { purchase: Purchase
           </Link>
         )}
         <PrintTemplateMenu baseHref={printHref} templates={printTemplates} label={t("print.printBtn")} className={`${modalActionSizeClassName} min-w-11 rounded-lg border border-border px-3 text-xs font-semibold text-primary-600 hover:bg-surface-2 lg:min-w-0`} />
-        {canChange && (
+        {(canChange || purchase.hasReturns) && (purchase.hasReturns ? (
+          <DisabledEditTooltip
+            reason={t("purchases.errors.hasReturns")}
+            className={`inline-flex ${modalActionSizeClassName} min-w-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white lg:min-w-0`}
+          >
+            <FilePenLine className="h-3.5 w-3.5" />
+            {t("purchases.edit")}
+          </DisabledEditTooltip>
+        ) : (
           <Link href={Routes.purchaseEdit(purchase.id)} target="_blank" rel="noreferrer" className={`inline-flex ${modalActionSizeClassName} min-w-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white hover:brightness-110 lg:min-w-0`}>
             <FilePenLine className="h-3.5 w-3.5" />
             {t("purchases.edit")}
           </Link>
-        )}
+        ))}
       </div>
     </div>
   );
