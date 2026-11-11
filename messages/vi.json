@@ -2350,6 +2350,8 @@
       "moreWithCount": "Thao tác với {count} hàng hóa đã chọn",
       "stopTitle": "Ngừng kinh doanh hàng loạt",
       "stopDescription": "Ngừng kinh doanh {count} hàng hóa đã chọn? Các hàng hóa này sẽ không còn xuất hiện để bán tại POS.",
+    "resumeTitle": "Kinh doanh lại hàng loạt",
+    "resumeDescription": "Cho phép kinh doanh lại {count} hàng hóa đã chọn? Các hàng hóa này sẽ xuất hiện trở lại để bán tại POS.",
       "deleteTitle": "Xóa hàng hóa đã chọn",
       "deleteDescription": "Xóa {count} hàng hóa đã chọn? Hàng hóa đã phát sinh chứng từ hoặc thẻ kho sẽ được giữ lại.",
       "deleteResultTitle": "Kết quả xóa hàng hóa",
