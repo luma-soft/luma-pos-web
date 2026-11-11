@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, gte, inArray, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  categories, internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, purchaseReturns, stockMovements, suppliers, warehouses,
+  categories, internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, purchaseReturns, purchaseReturnItems, stockMovements, suppliers, warehouses,
 } from "@/db/schema";
 import { unstable_cache } from "next/cache";
 import { accentInsensitiveLike, catalogProductSearchCondition } from "@/lib/search";
@@ -13,6 +13,7 @@ import {
   type PricingStockFilter,
 } from "@/lib/data/pricing-stock";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
+import { remainingLinkedPurchaseQuantities } from "@/lib/purchases/return-quantity";
 
 export const INVENTORY_PAGE_SIZE = 30;
 
@@ -302,7 +303,7 @@ export async function getPurchases(storeId: string, filters: { q?: string; statu
 }
 
 /** Chi tiết phiếu nhập (cho trang in). */
-export async function getPurchase(storeId: string, id: string) {
+export async function getPurchase(storeId: string, id: string, options: { excludeReturnId?: string } = {}) {
   const [po] = await db
     .select({
       id: purchaseOrders.id,
@@ -363,7 +364,26 @@ export async function getPurchase(storeId: string, id: string) {
     ))
     .orderBy(asc(purchaseOrderItems.lineOrder), asc(purchaseOrderItems.id));
 
-  return { ...po, items };
+  const earlierReturns = items.length > 0 ? await db.select({
+    purchaseOrderItemId: purchaseReturnItems.purchaseOrderItemId,
+    productId: purchaseReturnItems.productId,
+    quantity: purchaseReturnItems.quantity,
+    unitMultiplier: purchaseReturnItems.unitMultiplier,
+  }).from(purchaseReturnItems).innerJoin(purchaseReturns, and(
+    eq(purchaseReturnItems.purchaseReturnId, purchaseReturns.id),
+    eq(purchaseReturnItems.storeId, purchaseReturns.storeId),
+  )).where(and(
+    eq(purchaseReturns.storeId, storeId),
+    eq(purchaseReturns.purchaseOrderId, id),
+    eq(purchaseReturns.status, "completed"),
+    ...(options.excludeReturnId ? [ne(purchaseReturns.id, options.excludeReturnId)] : []),
+  )) : [];
+  const remaining = remainingLinkedPurchaseQuantities(items, earlierReturns);
+  return { ...po, items: items.map((item) => ({
+    ...item,
+    remainingReturnQuantity: Math.max(0, (remaining[item.id] ?? 0) / Number(item.unitMultiplier || 1)),
+    remainingReturnBaseQuantity: remaining[item.id] ?? 0,
+  })) };
 }
 
 /** Options cho form tạo phiếu nhập. */
