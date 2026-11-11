@@ -2350,6 +2350,8 @@
       "moreWithCount": "Actions for {count} selected products",
       "stopTitle": "Stop selling in bulk",
       "stopDescription": "Stop selling the {count} selected items? They will no longer be available for sale in POS.",
+    "resumeTitle": "Resume selling in bulk",
+    "resumeDescription": "Resume selling {count} selected products? They will be available for sale in POS again.",
       "deleteTitle": "Delete selected products",
       "deleteDescription": "Delete the {count} selected items? Products with documents or stock movements will be kept.",
       "deleteResultTitle": "Product deletion result",
