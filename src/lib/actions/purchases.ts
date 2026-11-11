@@ -4,7 +4,7 @@ import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-d
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  products, productSuppliers, purchaseOrders, purchaseOrderItems, purchaseReturns, stockLevels, stockLots, stockMovements, suppliers, warehouses,
+  products, catalogSyncState, productSuppliers, purchaseOrders, purchaseOrderItems, purchaseReturns, stockLevels, stockLots, stockMovements, suppliers, warehouses,
 } from "@/db/schema";
 import { createPurchaseSchema, type CreatePurchaseOutput, updatePurchaseSchema, type UpdatePurchaseOutput } from "@/lib/schemas/order";
 import { type ActionResult, requireStockAccess, requireManager, getProfileId, generateCode, toMoney, toQty } from "./common";
@@ -65,8 +65,12 @@ export async function savePurchaseDraft(
         .where(and(eq(warehouses.storeId, gate.storeId), eq(warehouses.id, v.warehouseId))).limit(1);
       if (!supplier || !warehouse) throw new Error("INVALID_REFERENCE");
       const ids = v.items.map((item) => item.productId);
+      // Match checkout lock ordering to prevent races with soft deletion.
+      await tx.select({ id: catalogSyncState.id }).from(catalogSyncState)
+        .where(and(eq(catalogSyncState.storeId, gate.storeId), eq(catalogSyncState.id, 1)))
+        .for("update");
       const found = await tx.select({ id: products.id, isVariantParent: products.isVariantParent, name: products.name, sku: products.sku, baseUnit: products.baseUnit, lifecycleStatus: products.lifecycleStatus })
-        .from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
+        .from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids))).for("update");
       if (found.length !== new Set(ids).size) throw new Error("INVALID_REFERENCE");
       if (found.some((product) => product.isVariantParent)) throw new Error("PRODUCT_VARIANT_PARENT");
       if (found.some((product) => product.lifecycleStatus === "deleted")) throw new Error("INVALID_REFERENCE");
@@ -141,6 +145,10 @@ export async function createPurchase(
     const result = await db.transaction(async (tx) => {
       // validate product ids tồn tại
       const ids = v.items.map((i) => i.productId);
+      // Match checkout lock ordering to prevent races with soft deletion.
+      await tx.select({ id: catalogSyncState.id }).from(catalogSyncState)
+        .where(and(eq(catalogSyncState.storeId, gate.storeId), eq(catalogSyncState.id, 1)))
+        .for("update");
       const found = await tx.select({
         id: products.id,
         name: products.name,
@@ -150,7 +158,7 @@ export async function createPurchase(
         shelfLifeDays: products.shelfLifeDays,
         baseUnit: products.baseUnit,
         lifecycleStatus: products.lifecycleStatus,
-      }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
+      }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids))).for("update");
       if (found.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
       if (found.some((product) => product.isVariantParent)) throw new Error("PRODUCT_VARIANT_PARENT");
       if (found.some((product) => product.lifecycleStatus === "deleted")) throw new Error("PRODUCT_NOT_FOUND");
@@ -358,6 +366,10 @@ export async function updatePurchase(
       if (existingReturn) throw new Error("HAS_RETURNS");
 
       const ids = v.items.map((i) => i.productId);
+      // Match checkout lock ordering to prevent races with soft deletion.
+      await tx.select({ id: catalogSyncState.id }).from(catalogSyncState)
+        .where(and(eq(catalogSyncState.storeId, gate.storeId), eq(catalogSyncState.id, 1)))
+        .for("update");
       const found = await tx.select({
         id: products.id,
         name: products.name,
@@ -367,7 +379,7 @@ export async function updatePurchase(
         shelfLifeDays: products.shelfLifeDays,
         baseUnit: products.baseUnit,
         lifecycleStatus: products.lifecycleStatus,
-      }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
+      }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids))).for("update");
       if (found.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
       if (found.some((product) => product.isVariantParent)) throw new Error("PRODUCT_VARIANT_PARENT");
       if (found.some((product) => product.lifecycleStatus === "deleted")) throw new Error("PRODUCT_NOT_FOUND");

@@ -11,6 +11,7 @@ import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   products,
+  catalogSyncState,
   productUnits,
   productComboItems,
   productSuppliers,
@@ -474,6 +475,10 @@ async function deleteProductRecord(id: string, deferRefresh = false): Promise<Ac
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   try {
     const changed = await db.transaction(async (tx) => {
+      // Checkout pricing takes the same lock before mutating stock.
+      await tx.select({ id: catalogSyncState.id }).from(catalogSyncState)
+        .where(and(eq(catalogSyncState.storeId, gate.storeId), eq(catalogSyncState.id, 1)))
+        .for("update");
       const [target] = await tx.select({
         id: products.id, name: products.name, sku: products.sku,
         isVariantParent: products.isVariantParent, lifecycleStatus: products.lifecycleStatus,
