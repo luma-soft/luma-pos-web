@@ -2353,13 +2353,13 @@
     "resumeTitle": "Kinh doanh lại hàng loạt",
     "resumeDescription": "Cho phép kinh doanh lại {count} hàng hóa đã chọn? Các hàng hóa này sẽ xuất hiện trở lại để bán tại POS.",
       "deleteTitle": "Xóa hàng hóa đã chọn",
-      "deleteDescription": "Xóa {count} sản phẩm đã chọn khỏi danh mục? Chứng từ cũ vẫn giữ nguyên và hiện {DEL}. Sản phẩm còn tồn kho sẽ không được xóa.",
+      "deleteDescription": "Xóa {count} sản phẩm đã chọn khỏi danh mục? Chứng từ cũ vẫn giữ nguyên; tên sản phẩm đã xóa sẽ có nhãn DEL. Sản phẩm còn tồn kho hoặc số lượng giữ sẽ không được xóa.",
       "deleteResultTitle": "Kết quả xóa hàng hóa",
       "deleteSuccess": "Đã xóa thành công {count} hàng hóa.",
       "deletePartial": "Đã xóa {deleted} sản phẩm. Có {failed} sản phẩm chưa xóa được (ví dụ còn tồn kho hoặc số lượng giữ)."
     },
     "confirm": {
-      "delete": "Xóa sản phẩm khỏi danh mục? Hóa đơn, phiếu nhập và lịch sử kho vẫn được giữ và hiển thị {DEL}. Sản phẩm cần hết tồn kho và số lượng giữ trước khi xóa.",
+      "delete": "Xóa sản phẩm khỏi danh mục? Hóa đơn, phiếu nhập và lịch sử kho vẫn được giữ; tên sản phẩm đã xóa sẽ có nhãn DEL. Cần xử lý hết tồn kho và số lượng giữ trước khi xóa.",
       "stopSelling": "Ngừng kinh doanh hàng hóa này?",
       "resumeSelling": "Kinh doanh lại hàng hóa này?"
     },
