@@ -105,9 +105,19 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   const [error, setError] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
 
+  const linkedProductIds = useMemo(
+    () => initialPurchase ? new Set(initialPurchase.items.map((item) => item.productId)) : null,
+    [initialPurchase],
+  );
+  const remainingBySourceLine = useMemo(
+    () => new Map(initialPurchase?.items.map((item) =>
+      [item.id, Number(item.remainingReturnBaseQuantity)] as const) ?? []),
+    [initialPurchase],
+  );
   const browseProducts = useMemo(
-    () => catalog.products.filter((product) => product.isStockManaged),
-    [catalog.products],
+    () => catalog.products.filter((product) =>
+      product.isStockManaged && (!linkedProductIds || linkedProductIds.has(product.id))),
+    [catalog.products, linkedProductIds],
   );
   const browseSearchResults = useMemo(
     () => expandProductSearchUnitResults(browseProducts),
@@ -117,8 +127,8 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
     return rankProductSearchUnitResults(expandProductSearchUnitResults(catalog.search(query, {
       stockManagedOnly: true,
       limit: catalog.products.length,
-    })), query, productDisplayName);
-  }, [catalog]);
+    }).filter((product) => !linkedProductIds || linkedProductIds.has(product.id))), query, productDisplayName);
+  }, [catalog, linkedProductIds]);
 
   const selectedLines = lines.filter((line) => line.quantity > 0);
   const subtotal = selectedLines.reduce((sum, line) => sum + line.quantity * line.returnUnitCost, 0);
@@ -130,7 +140,10 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   const unsettled = Math.max(0, totalRefund - clampedRefund - debtAmount);
 
   function addProduct(product: PurchaseReturnProductRow, unitName = product.baseUnit, multiplier = 1) {
-    const line = productToLine(product);
+    const sourceLine = initialPurchase?.items.find((item) =>
+      item.productId === product.id && Number(item.remainingReturnBaseQuantity) > 0);
+    if (initialPurchase && !sourceLine) return;
+    const line = { ...productToLine(product), purchaseOrderItemId: sourceLine?.id, quantity: initialPurchase ? 0 : 1 };
     setLines((current) => {
       const existing = current.find((item) => item.productId === product.id);
       if (existing) {
@@ -175,7 +188,11 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
       seen.add(product.id);
       const quantity = positiveQuantityOrDefault(item.quantity);
       const unitCost = Number(item.unitCost) || Number(product.costPrice) || 0;
-      nextLines.push({ ...productToLine(product), quantity, returnUnitCost: unitCost });
+      const sourceLine = initialPurchase?.items.find((line) =>
+        line.productId === product.id && Number(line.remainingReturnBaseQuantity) > 0);
+      if (initialPurchase && !sourceLine) continue;
+      nextLines.push({ ...productToLine(product), purchaseOrderItemId: sourceLine?.id,
+        quantity: initialPurchase ? 0 : quantity, returnUnitCost: unitCost });
     }
 
     if (nextLines.length) setLines((current) => applyMode === "replace" ? nextLines : [...nextLines, ...current]);
@@ -203,7 +220,13 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
     const otherLines = lines.reduce((sum, item) => item.productId === line.productId && item.key !== line.key
       ? sum + item.quantity * item.unitMultiplier : sum, 0);
     const currentStock = restored > 0 ? Math.max(0, line.stock) : line.stock;
-    return Math.max(0, (currentStock + restored - otherLines) / line.unitMultiplier);
+    const stockLimit = Math.max(0, (currentStock + restored - otherLines) / line.unitMultiplier);
+    if (!initialPurchase) return stockLimit;
+    // Even when the warehouse contains stock from other receipts, a linked
+    // supplier return cannot exceed this receipt's unreturned source quantity.
+    const remainingBase = line.purchaseOrderItemId
+      ? (remainingBySourceLine.get(line.purchaseOrderItemId) ?? 0) : 0;
+    return Math.max(0, Math.min(stockLimit, remainingBase / line.unitMultiplier));
   }
 
   async function submit() {
@@ -372,7 +395,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                       >
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
-                            <div className="text-xs font-semibold text-slate-500">{t("purchaseReturns.availableStock", { stock: formatNumber(totalStock(line)), unit: line.unitName })}</div>
+                            <div className="text-xs font-semibold text-slate-500">{t(initialPurchase ? "purchaseReturns.remainingToReturn" : "purchaseReturns.availableStock", { stock: formatNumber(totalStock(line)), unit: line.unitName })}</div>
                             <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{line.unitName}</div>
                           </div>
                           <div className="col-span-2 space-y-1 text-xs font-semibold text-slate-500">
@@ -446,7 +469,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                                             <td className="px-3 py-2">
                         <div className="truncate font-medium">{line.name}</div>
                         <div className={cn("text-xs", overStock ? "text-er" : "text-slate-400")}>
-                          {t("purchaseReturns.availableStock", { stock: formatNumber(totalStock(line)), unit: line.unitName })}
+                          {t(initialPurchase ? "purchaseReturns.remainingToReturn" : "purchaseReturns.availableStock", { stock: formatNumber(totalStock(line)), unit: line.unitName })}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-slate-500">{line.unitName}</td>
