@@ -65,10 +65,12 @@ export async function savePurchaseDraft(
         .where(and(eq(warehouses.storeId, gate.storeId), eq(warehouses.id, v.warehouseId))).limit(1);
       if (!supplier || !warehouse) throw new Error("INVALID_REFERENCE");
       const ids = v.items.map((item) => item.productId);
-      const found = await tx.select({ id: products.id, isVariantParent: products.isVariantParent })
+      const found = await tx.select({ id: products.id, isVariantParent: products.isVariantParent, name: products.name, sku: products.sku, baseUnit: products.baseUnit, lifecycleStatus: products.lifecycleStatus })
         .from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
       if (found.length !== new Set(ids).size) throw new Error("INVALID_REFERENCE");
       if (found.some((product) => product.isVariantParent)) throw new Error("PRODUCT_VARIANT_PARENT");
+      if (found.some((product) => product.lifecycleStatus === "deleted")) throw new Error("INVALID_REFERENCE");
+      const snapshotsById = new Map(found.map((product) => [product.id, product]));
       const values = {
         supplierId: v.supplierId, warehouseId: v.warehouseId, status: "draft",
         subtotal: toMoney(totals.subtotal), discount: toMoney(totals.discount),
@@ -87,6 +89,10 @@ export async function savePurchaseDraft(
         .where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
       await tx.insert(purchaseOrderItems).values(v.items.map((item, index) => ({
         storeId: gate.storeId, purchaseOrderId: po.id, lineOrder: index, productId: item.productId,
+        productName: snapshotsById.get(item.productId)!.name,
+        sku: snapshotsById.get(item.productId)!.sku,
+        unitName: snapshotsById.get(item.productId)!.baseUnit,
+        unitMultiplier: "1",
         quantity: toQty(item.quantity), unitCost: toMoney(item.unitCost), discount: toMoney(item.discount),
         discountMode: item.discountMode,
         discountInput: item.discountMode === "pct" ? toMoney(item.discountInput!) : null,
@@ -142,9 +148,13 @@ export async function createPurchase(
         isVariantParent: products.isVariantParent,
         trackBatches: products.trackBatches,
         shelfLifeDays: products.shelfLifeDays,
+        baseUnit: products.baseUnit,
+        lifecycleStatus: products.lifecycleStatus,
       }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
       if (found.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
       if (found.some((product) => product.isVariantParent)) throw new Error("PRODUCT_VARIANT_PARENT");
+      if (found.some((product) => product.lifecycleStatus === "deleted")) throw new Error("PRODUCT_NOT_FOUND");
+      const snapshotsById = new Map(found.map((product) => [product.id, product]));
       const batchValidation = validateReceiptBatchLines({ products: found, items: v.items });
       if (!batchValidation.ok) throw new Error(batchValidation.error);
       await ensureInventoryCostBaselines(tx, gate.storeId, ids);
@@ -175,6 +185,10 @@ export async function createPurchase(
           purchaseOrderId: po.id,
           lineOrder: index,
           productId: i.productId,
+          productName: snapshotsById.get(i.productId)!.name,
+          sku: snapshotsById.get(i.productId)!.sku,
+          unitName: snapshotsById.get(i.productId)!.baseUnit,
+          unitMultiplier: "1",
           quantity: toQty(i.quantity),
           unitCost: toMoney(i.unitCost),
           discount: toMoney(i.discount),
@@ -351,9 +365,13 @@ export async function updatePurchase(
         isVariantParent: products.isVariantParent,
         trackBatches: products.trackBatches,
         shelfLifeDays: products.shelfLifeDays,
+        baseUnit: products.baseUnit,
+        lifecycleStatus: products.lifecycleStatus,
       }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
       if (found.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
       if (found.some((product) => product.isVariantParent)) throw new Error("PRODUCT_VARIANT_PARENT");
+      if (found.some((product) => product.lifecycleStatus === "deleted")) throw new Error("PRODUCT_NOT_FOUND");
+      const snapshotsById = new Map(found.map((product) => [product.id, product]));
       const oldItems = await tx.select().from(purchaseOrderItems).where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
       // Receiving a draft establishes every company price. Editing an already
       // received document only updates SKUs whose gross unit cost changed, so a
@@ -432,6 +450,10 @@ export async function updatePurchase(
             purchaseOrderId: po.id,
             lineOrder: index,
             productId: i.productId,
+            productName: snapshotsById.get(i.productId)!.name,
+            sku: snapshotsById.get(i.productId)!.sku,
+            unitName: snapshotsById.get(i.productId)!.baseUnit,
+            unitMultiplier: "1",
             quantity: toQty(i.quantity),
             unitCost: toMoney(i.unitCost),
             discount: toMoney(i.discount),
