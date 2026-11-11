@@ -210,6 +210,11 @@ export function ProductBulkActions() {
         return;
       }
       const failed = new Set(result.data.failedIds);
+      const failureDetails = result.data.failures.slice(0, 5).map(({ id, sku, name, error }) => {
+        const label = [sku || id, name].filter(Boolean).join(" — ");
+        return `${label}: ${t(error as never)}`;
+      });
+      const remainingFailures = result.data.failures.length - failureDetails.length;
       replace(failed);
       await catalog.refresh();
       router.refresh();
@@ -217,10 +222,16 @@ export function ProductBulkActions() {
         title: t("products.bulk.deleteResultTitle"),
         description:
           failed.size > 0
-            ? t("products.bulk.deletePartial", {
-                deleted: result.data.deleted,
-                failed: failed.size,
-              })
+            ? [
+                t("products.bulk.deletePartial", {
+                  deleted: result.data.deleted,
+                  failed: failed.size,
+                }),
+                ...failureDetails,
+                ...(remainingFailures > 0
+                  ? [t("products.bulk.deleteMoreFailures", { count: remainingFailures })]
+                  : []),
+              ].join("\n")
             : t("products.bulk.deleteSuccess", {
                 count: result.data.deleted,
               }),
