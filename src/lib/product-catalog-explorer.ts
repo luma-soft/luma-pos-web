@@ -363,10 +363,37 @@ export function exploreProductCatalog(
   return { rows: pageRows, total, page, pageSize, pageCount };
 }
 
+/** The selection set must match the status-filtered rows, including members of grouped variants. */
+export function productMatchesSelectionStatus(
+  product: Pick<ProductListResult["rows"][number], "isActive" | "lifecycleStatus">,
+  status: ProductExplorerFilters["status"] = "all",
+) {
+  if (status === "active") return product.isActive;
+  if (status === "inactive") return !product.isActive;
+  if (status === "draft" || status === "archived") return product.lifecycleStatus === status;
+  return true;
+}
+
+export function visibleProductSelections(
+  rows: ProductListResult["rows"],
+  grouped: boolean,
+  status: ProductExplorerFilters["status"] = "all",
+): Array<{ id: string; isActive: boolean }> {
+  const seen = new Set<string>();
+  return rows
+    .flatMap((row) => grouped && row.variantGroup
+      ? row.variantGroup.members
+      : row.isVariantParent ? [] : [row])
+    .filter((member) => {
+      if (member.isVariantParent || !productMatchesSelectionStatus(member, status) || seen.has(member.id)) return false;
+      seen.add(member.id);
+      return true;
+    })
+    .map((member) => ({ id: member.id, isActive: member.isActive }));
+}
+
 export function visibleProductIds(rows: ProductListResult["rows"], grouped: boolean) {
-  return [...new Set(rows.flatMap((row) => grouped && row.variantGroup
-    ? row.variantGroup.members.filter((member) => !member.isVariantParent).map((member) => member.id)
-    : row.isVariantParent ? [] : [row.id]))];
+  return visibleProductSelections(rows, grouped).map((product) => product.id);
 }
 
 export function productCatalogMatches(
