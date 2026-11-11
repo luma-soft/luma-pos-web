@@ -164,7 +164,7 @@ export const getRecentMovements = unstable_cache(
       quantity: stockMovements.quantity,
       note: stockMovements.note,
       createdAt: stockMovements.createdAt,
-      productName: products.name,
+      productName: sql<string>`case when ${products.lifecycleStatus} = 'deleted' then ${products.name} || ' {DEL}' else ${products.name} end`,
       productVariantName: products.variantName, productSpecs: products.specs,
       baseUnit: products.baseUnit,
       warehouseName: warehouses.name,
