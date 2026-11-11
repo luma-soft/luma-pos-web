@@ -116,11 +116,6 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
   const categories = metadata?.categories ?? [];
   const brands = metadata?.brands ?? [];
   const suppliers = metadata?.suppliers ?? [];
-  const switcherCount = useMemo(() => productCatalogMatches(
-    canonicalProducts,
-    catalog.snapshot?.warehouses ?? [],
-    { status: "active", view: "grouped" },
-  ), [canonicalProducts, catalog.snapshot?.warehouses]);
 
   if (!catalog.snapshot) {
     if (catalog.status === "loading") return <MobileInventoryCatalogSkeleton />;
@@ -138,7 +133,7 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
 
   return (
     <ProductSelectionProvider visibleIds={selectionIds}>
-      {!cameraMaterials && <ProductCatalogSwitcher activeView="products" productCount={switcherCount} categoryCount={categories.length} />}
+      {!cameraMaterials && <ProductCatalogSwitcher activeView="products" productCount={result.total} categoryCount={categories.length} />}
       {!cameraMaterials && (
         <div className="mb-3 lg:hidden">
           <h2 className="text-xl font-bold tracking-tight text-slate-950 dark:text-white">{t("products.title")}</h2>
