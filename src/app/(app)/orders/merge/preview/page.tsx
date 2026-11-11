@@ -128,7 +128,7 @@ export default async function MergePrintPreviewPage({ searchParams }: Props) {
           inWordsLabel={t("print.inWords")}
           signatures={[t("print.buyerSign"), t("print.delivererSign"), t("print.sellerSign")]}
           signHint={t("print.signHint")}
-          note={`Gộp từ: ${sourceOrders.map((order) => order.code).join(", ")}`}
+          note={null}
           cols={{
             index: t("print.index"),
             product: t("orders.cols.product"),

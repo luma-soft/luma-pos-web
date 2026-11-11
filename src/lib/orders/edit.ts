@@ -237,7 +237,8 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
         shippingFee: toMoney(shippingFee),
         total: toMoney(total),
         amountPaid: toMoney(paid),
-        note: `Gộp từ: ${sources.map((o) => o.code).join(", ")}`,
+        // Source order links record merge provenance; user note stays independent.
+        note: null,
         createdBy: profileId,
       }).returning({ id: orders.id, code: orders.code });
 
@@ -275,7 +276,6 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
       await tx.update(orders).set({
         status: "cancelled",
         replacedByOrderId: merged.id,
-        note: sql`coalesce(${orders.note} || ' · ', '') || ${"Đã gộp vào " + merged.code}`,
         updatedAt: sql`now()`,
       }).where(and(eq(orders.storeId, storeId), inArray(orders.id, orderIds)));
 

@@ -1,0 +1,34 @@
+/**
+ * Keep operator-entered invoice notes separate from audit-only merge history.
+ * Legacy merged invoices used to persist their merge marker in orders.note.
+ * New merges derive the marker from replaced_by_order_id instead.
+ */
+export function separateMergeNotes(
+  rawNote: string | null,
+  context: { mergedFromCodes?: readonly string[]; mergedIntoCode?: string | null } = {},
+): { userNote: string | null; systemNote: string | null } {
+  let userNote = rawNote?.trim() ?? "";
+  let systemNote: string | null = null;
+
+  const sourceCodes = context.mergedFromCodes ?? [];
+  if (sourceCodes.length >= 2) {
+    systemNote = `Gộp từ: ${sourceCodes.join(", ")}`;
+    const legacySourceText = /^Gộp từ:\s*(.+)$/u.exec(userNote);
+    if (legacySourceText) {
+      const oldCodes = legacySourceText[1].split(",").map((code) => code.trim()).filter(Boolean).sort();
+      const linkedCodes = [...sourceCodes].sort();
+      if (oldCodes.length === linkedCodes.length && oldCodes.every((code, index) => code === linkedCodes[index])) {
+        userNote = "";
+      }
+    }
+  } else if (context.mergedIntoCode) {
+    systemNote = `Đã gộp vào ${context.mergedIntoCode}`;
+    if (userNote === systemNote) {
+      userNote = "";
+    } else if (userNote.endsWith(` · ${systemNote}`)) {
+      userNote = userNote.slice(0, -(` · ${systemNote}`).length).trim();
+    }
+  }
+
+  return { userNote: userNote || null, systemNote };
+}

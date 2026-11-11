@@ -48,7 +48,7 @@ export async function OrderDetailPanel({
   const isBooking = order.status === "confirmed";
   const cancelled = order.status === "cancelled" || order.status === "merged";
   const mergedSource = order.status === "merged"
-    || (cancelled && Boolean(order.replacedByOrderId) && Boolean(order.note?.includes("Đã gộp vào ")));
+    || (cancelled && Boolean(order.systemNote?.startsWith("Đã gộp vào ")));
   const editableDraft = order.status === "draft"
     && order.documentType === "sale"
     && Number(order.amountPaid) === 0
@@ -206,9 +206,18 @@ export async function OrderDetailPanel({
             </div>
           </div>
 
-          <div className="min-h-[120px] rounded-lg border border-border px-4 py-3 text-sm text-slate-400">
-            {order.note || "Ghi chú..."}
+          <div className="rounded-lg border border-border px-4 py-3 text-sm">
+            <div className="mb-1 font-semibold text-slate-700 dark:text-slate-200">Ghi chú người dùng</div>
+            <div className={order.note ? "whitespace-pre-wrap text-slate-700 dark:text-slate-200" : "text-slate-400"}>
+              {order.note || "Không có ghi chú"}
+            </div>
           </div>
+          {order.systemNote && (
+            <div className="rounded-lg border border-border px-4 py-3 text-sm">
+              <div className="mb-1 font-semibold text-slate-700 dark:text-slate-200">Thông tin hệ thống</div>
+              <div className="whitespace-pre-wrap text-slate-500">{order.systemNote}</div>
+            </div>
+          )}
 
           {!isQuote && order.payments.length > 0 && (
             <div className="overflow-hidden rounded-lg border border-border">

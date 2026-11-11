@@ -33,6 +33,7 @@ import {
   warehouses,
 } from "@/db/schema";
 import { accentInsensitiveLike } from "@/lib/search";
+import { separateMergeNotes } from "@/lib/orders/merge-notes";
 import { coercePageSize } from "@/lib/pagination";
 
 export const ORDERS_PAGE_SIZE = 20;
@@ -408,6 +409,40 @@ export async function getOrder(storeId: string, id: string) {
 
   if (!order) return null;
 
+  // Merge provenance is an internal relationship, not a customer-entered note.
+  // Read it separately so both legacy and new merged invoices print safely.
+  const [linkedSourceRows, replacementRows] = await Promise.all([
+    db.select({ code: orders.code })
+      .from(orders)
+      .where(and(
+        eq(orders.storeId, storeId),
+        eq(orders.replacedByOrderId, id),
+        inArray(orders.status, ["cancelled", "merged"]),
+      ))
+      .orderBy(asc(orders.createdAt), asc(orders.id)),
+    order.replacedByOrderId
+      ? db.select({
+          code: orders.code,
+          sourceCount: sql<number>`(
+            select count(*)::int from orders as merge_source
+            where merge_source.store_id = ${storeId}
+              and merge_source.replaced_by_order_id = ${orders.id}
+              and merge_source.status in ('cancelled', 'merged')
+          )`,
+        })
+        .from(orders)
+        .where(and(eq(orders.storeId, storeId), eq(orders.id, order.replacedByOrderId)))
+        .limit(1)
+      : Promise.resolve([] as { code: string; sourceCount: number }[]),
+  ]);
+  const mergedFromCodes = linkedSourceRows.length >= 2 ? linkedSourceRows.map((row) => row.code) : [];
+  const destination = replacementRows[0];
+  const mergedIntoCode = (order.status === "cancelled" || order.status === "merged")
+    && destination && (destination.sourceCount >= 2 || order.status === "merged")
+    ? destination.code
+    : null;
+  const { userNote, systemNote } = separateMergeNotes(order.note, { mergedFromCodes, mergedIntoCode });
+
   const [items, paymentRows, returnRows, [profitRow], [returnedProfitRow]] = await Promise.all([
     db
       .select({
@@ -501,6 +536,9 @@ export async function getOrder(storeId: string, id: string) {
 
   return {
     ...order,
+    note: userNote,
+    systemNote,
+    mergedFromCodes,
     items,
     payments: paymentRows,
     returns: returnRows,
