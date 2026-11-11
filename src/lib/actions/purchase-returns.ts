@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
-import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   auditLogs,
@@ -117,7 +117,10 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
           eq(purchaseReturnItems.storeId, purchaseReturns.storeId),
         )).where(and(
           eq(purchaseReturns.storeId, gate.storeId),
-          eq(purchaseReturns.purchaseOrderId, v.purchaseOrderId),
+          or(
+            eq(purchaseReturns.purchaseOrderId, v.purchaseOrderId),
+            inArray(purchaseReturnItems.purchaseOrderItemId, sourceItems.map((item) => item.id)),
+          ),
           eq(purchaseReturns.status, "completed"),
           ...(id ? [ne(purchaseReturns.id, id)] : []),
         ));
