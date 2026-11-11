@@ -211,6 +211,7 @@ export function ProductBulkActions() {
       }
       const failed = new Set(result.data.failedIds);
       replace(failed);
+      await catalog.refresh();
       router.refresh();
       await dialog.alert({
         title: t("products.bulk.deleteResultTitle"),
