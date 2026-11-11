@@ -269,9 +269,18 @@ function PurchaseDetailFooter({ purchase, printTemplates }: { purchase: Purchase
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {(purchase.status === "received" || purchase.status === "returned") && (
-          <Link href={`${Routes.PurchaseReturns}/new?purchaseOrderId=${encodeURIComponent(purchase.id)}`} target="_blank" rel="noreferrer" className={`inline-flex ${modalActionSizeClassName} min-w-11 items-center gap-1.5 rounded-lg border border-primary-200 px-3 text-xs font-semibold text-primary-600 hover:bg-primary-50 lg:min-w-0`}>
-            Trả hàng NCC
-          </Link>
+          purchase.hasRemainingReturnQuantity ? (
+            <Link href={`${Routes.PurchaseReturns}/new?purchaseOrderId=${encodeURIComponent(purchase.id)}`} target="_blank" rel="noreferrer" className={`inline-flex ${modalActionSizeClassName} min-w-11 items-center gap-1.5 rounded-lg border border-primary-200 px-3 text-xs font-semibold text-primary-600 hover:bg-primary-50 lg:min-w-0`}>
+              Trả hàng NCC
+            </Link>
+          ) : (
+            <DisabledEditTooltip
+              reason={t("purchaseReturns.fullyReturnedHint")}
+              className={`inline-flex ${modalActionSizeClassName} min-w-11 items-center gap-1.5 rounded-lg border border-primary-200 px-3 text-xs font-semibold text-primary-600 lg:min-w-0`}
+            >
+              Trả hàng NCC
+            </DisabledEditTooltip>
+          )
         )}
         <PrintTemplateMenu baseHref={printHref} templates={printTemplates} label={t("print.printBtn")} className={`${modalActionSizeClassName} min-w-11 rounded-lg border border-border px-3 text-xs font-semibold text-primary-600 hover:bg-surface-2 lg:min-w-0`} />
         {(canChange || blockedByReturn) && (blockedByReturn ? (
