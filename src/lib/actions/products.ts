@@ -7,7 +7,7 @@ import {
   revalidateAppDataPage as revalidateProductPage,
 } from "@/lib/sync/revalidate-app-data";
 import { z } from "zod";
-import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   products,
@@ -495,6 +495,18 @@ async function deleteProductRecord(id: string, deferRefresh = false): Promise<Ac
         : [{ id: target.id, lifecycleStatus: target.lifecycleStatus }];
       const affectedIds = members.filter((member) => member.lifecycleStatus !== "deleted").map((member) => member.id);
       if (affectedIds.length === 0) return false;
+      // Active combos must not silently sell a component that has been deleted.
+      // Remove/replace the component in the combo before deleting its SKU.
+      const [activeCombo] = await tx.select({ id: productComboItems.comboProductId })
+        .from(productComboItems)
+        .innerJoin(products, and(eq(products.id, productComboItems.comboProductId), eq(products.storeId, gate.storeId)))
+        .where(and(
+          eq(productComboItems.storeId, gate.storeId),
+          inArray(productComboItems.componentProductId, affectedIds),
+          notInArray(productComboItems.comboProductId, affectedIds),
+          ne(products.lifecycleStatus, "deleted"),
+        )).limit(1);
+      if (activeCombo) throw new Error("PRODUCT_USED_IN_COMBO");
       const balances = await tx.select({
         quantity: stockLevels.quantity, reserved: stockLevels.reserved,
       }).from(stockLevels)
@@ -526,6 +538,8 @@ async function deleteProductRecord(id: string, deferRefresh = false): Promise<Ac
   } catch (e) {
     if (e instanceof Error && e.message === "PRODUCT_HAS_STOCK")
       return { ok: false, error: "products.errors.cannotDeleteWithStock" };
+    if (e instanceof Error && e.message === "PRODUCT_USED_IN_COMBO")
+      return { ok: false, error: "products.errors.cannotDeleteInCombo" };
     if (pgErrorCode(e) === "23503")
       return { ok: false, error: "products.errors.cannotDeleteReferenced" };
     console.error("deleteProduct failed:", e);
