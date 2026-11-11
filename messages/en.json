@@ -2443,6 +2443,7 @@
     },
     "errors": {
       "skuExists": "SKU already exists — choose another.",
+      "cannotDeleteInCombo": "This product is a component of an active bundle/combo. Remove or replace it in the combo before deleting.",
       "cannotDeleteWithStock": "Cannot delete a product with stock or reserved quantity. Clear the stock using an inventory document first.",
       "cannotDeleteReferenced": "Cannot delete this product because of an unsupported related data reference. Please review the product links.",
       "kindImmutable": "Item type cannot be changed after creation.",
