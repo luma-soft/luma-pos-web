@@ -7,6 +7,7 @@ import {
   productVariantLabel,
   selectableProductIds,
 } from "@/lib/products/variant-presentation";
+import { productMatchesSelectionStatus } from "@/lib/product-catalog-explorer";
 import { legacyText } from "@/lib/i18n/catalog-text";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -335,9 +336,7 @@ export function ProductsTable({
   };
   function matchesStatus(member: ProductRow) {
     const status = params.get("status") || "active";
-    if (status === "active") return member.isActive;
-    if (status === "inactive") return !member.isActive;
-    return true;
+    return productMatchesSelectionStatus(member, status as "active" | "inactive" | "draft" | "archived" | "all");
   }
   const selectionIds = (product: ProductRow) => {
     const group = groupOf(product);
