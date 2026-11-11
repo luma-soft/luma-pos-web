@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { exploreProductCatalog, getInventorySearchableProducts } from "./product-catalog-explorer";
+import { exploreProductCatalog, getInventorySearchableProducts, visibleProductSelections } from "./product-catalog-explorer";
 
 function product(overrides = {}) {
   return {
@@ -197,4 +197,29 @@ test("group SKU counts and expanded rows use active search and filters", () => {
   });
   expect(flatResult.total).toBe(1);
   expect(flatResult.rows.map((row) => row.id)).toEqual(["active"]);
+});
+
+test("bulk selection respects active/inactive variants and skips parents and duplicates", () => {
+  const parent = product({ id: "parent", isVariantParent: true });
+  const active = product({ id: "active-child", parentProductId: "parent" });
+  const inactive = product({
+    id: "inactive-child", parentProductId: "parent",
+    isActive: false, lifecycleStatus: "archived",
+  });
+  const groupRow = { ...parent, variantGroup: { members: [parent, active, inactive, active] } };
+  const standalone = product({ id: "inactive-standalone", isActive: false, lifecycleStatus: "archived" });
+  const rows = [groupRow, standalone];
+
+  expect(visibleProductSelections(rows, true, "active")).toEqual([
+    { id: "active-child", isActive: true },
+  ]);
+  expect(visibleProductSelections(rows, true, "inactive")).toEqual([
+    { id: "inactive-child", isActive: false },
+    { id: "inactive-standalone", isActive: false },
+  ]);
+  expect(visibleProductSelections(rows, true, "all")).toEqual([
+    { id: "active-child", isActive: true },
+    { id: "inactive-child", isActive: false },
+    { id: "inactive-standalone", isActive: false },
+  ]);
 });
