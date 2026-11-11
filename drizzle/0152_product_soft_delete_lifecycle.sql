@@ -1,9 +1,7 @@
--- Preserve historical invoice/purchase/stock references while removing a product
--- from active catalogs. The original lifecycle check admitted only draft/active/archived.
--- This migration is safe to re-run manually, because the constraint is replaced atomically.
+-- Existing installations restrict product lifecycle to draft/active/archived.
+-- Soft deletion preserves historical document references by marking the row deleted.
+-- One ALTER TABLE statement replaces the check atomically; safe to re-run manually.
 ALTER TABLE "products"
-  DROP CONSTRAINT IF EXISTS "products_lifecycle_status_check";
-
-ALTER TABLE "products"
+  DROP CONSTRAINT IF EXISTS "products_lifecycle_status_check",
   ADD CONSTRAINT "products_lifecycle_status_check"
-  CHECK ("lifecycle_status" IN ('draft', 'active', 'archived', 'deleted'));
+    CHECK ("lifecycle_status" IN ('draft', 'active', 'archived', 'deleted'));
