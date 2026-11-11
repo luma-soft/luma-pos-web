@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { bulkDeleteProducts, bulkStopSellingProducts } from "@/lib/actions/products";
+import { bulkDeleteProducts, bulkResumeSellingProducts, bulkStopSellingProducts } from "@/lib/actions/products";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileError, mobileGate, readJson } from "@/lib/mobile/response";
-const schema = z.object({ action: z.enum(["stop", "delete"]), ids: z.array(z.uuid()).min(1).max(100) });
+const schema = z.object({ action: z.enum(["stop", "resume", "delete"]), ids: z.array(z.uuid()).min(1).max(100) });
 export async function POST(request: Request) {
   const gate = await requireMobileStockAccess();
   if (!gate.ok) return mobileGate(gate);
@@ -10,5 +10,6 @@ export async function POST(request: Request) {
   if (!parsed.success) return mobileError("errors.invalidData");
   const { action, ids } = parsed.data;
   if (action === "delete") return mobileAction(await bulkDeleteProducts(ids));
+  if (action === "resume") return mobileAction(await bulkResumeSellingProducts(ids));
   return mobileAction(await bulkStopSellingProducts(ids));
 }
