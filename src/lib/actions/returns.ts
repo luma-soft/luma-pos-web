@@ -4,7 +4,7 @@ import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-d
 import { and, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  cashTransactions, customers, orderItems, orders, paymentRefunds, payments, productComboItems, products, returnItems, returns, stockLevels, stockMovements,
+  cashTransactions, customers, orderItems, orders, paymentRefunds, payments, productComboItems, products, catalogSyncState, returnItems, returns, stockLevels, stockMovements,
 } from "@/db/schema";
 import {
   createPosReturnSchema,
@@ -57,6 +57,28 @@ const isGatewayRefundMethod = (value: string): value is GatewayProvider =>
   GATEWAY_REFUND_METHODS.has(value as GatewayProvider);
 
 type ReturnTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Prevent hidden stock from reappearing on a soft-deleted SKU after a refund. */
+async function assertRestockTargetsNotDeleted(
+  tx: ReturnTransaction,
+  storeId: string,
+  rows: readonly { productId: string; restock?: boolean | null }[],
+) {
+  const ids = [...new Set(rows.filter((row) => row.restock).map((row) => row.productId))];
+  if (ids.length === 0) return;
+  // Soft deletion and checkout use this lock before stock writes.
+  await tx.select({ id: catalogSyncState.id }).from(catalogSyncState)
+    .where(and(eq(catalogSyncState.storeId, storeId), eq(catalogSyncState.id, 1)))
+    .for("update");
+  const components = await tx.select({ productId: productComboItems.componentProductId })
+    .from(productComboItems)
+    .where(and(eq(productComboItems.storeId, storeId), inArray(productComboItems.comboProductId, ids)));
+  const affectedIds = [...new Set([...ids, ...components.map((item) => item.productId)])];
+  const deleted = await tx.select({ id: products.id }).from(products)
+    .where(and(eq(products.storeId, storeId), inArray(products.id, affectedIds), eq(products.lifecycleStatus, "deleted")))
+    .limit(1);
+  if (deleted.length > 0) throw new Error("DELETED_PRODUCT_CANNOT_RESTOCK");
+}
 
 async function revalueReturnStock(tx: ReturnTransaction, storeId: string, refIds: string[]) {
   const affected = await tx.selectDistinct({ productId: stockMovements.productId }).from(stockMovements)
@@ -286,6 +308,7 @@ export async function createExchangeForUser(
         });
       }
 
+      await assertRestockTargetsNotDeleted(tx, storeId, returnedRows);
       const replacementSubtotal = replacementItems.reduce((sum, item) => sum + item.total, 0);
       const settlement = calculateExchangeSettlement({
         returnTotal,
@@ -641,6 +664,7 @@ export async function createExchangeForUser(
       WAREHOUSE_REQUIRED: "returns.errors.warehouseRequired",
       ITEM_NOT_IN_ORDER: "errors.invalidData",
       QTY_EXCEEDS: "returns.errors.qtyExceeds",
+      DELETED_PRODUCT_CANNOT_RESTOCK: "returns.errors.deletedProductRestock",
       INSUFFICIENT_STOCK: "returns.errors.insufficientExchangeStock",
       INSUFFICIENT_BATCH_STOCK: "returns.errors.insufficientExchangeStock",
       DEBT_NEEDS_CUSTOMER: "returns.errors.debtNeedsCustomer",
@@ -746,6 +770,7 @@ export async function createReturnForUser(
         });
       }
 
+      await assertRestockTargetsNotDeleted(tx, storeId, rows);
       const gatewayPayment = isGatewayRefundMethod(v.refundMethod)
         ? await selectRefundableGatewayPayment(tx, storeId, order.id, v.refundMethod, totalRefund)
         : null;
@@ -941,6 +966,7 @@ export async function createReturnForUser(
       ORDER_CANCELLED: "returns.errors.orderCancelled",
       ITEM_NOT_IN_ORDER: "errors.invalidData",
       QTY_EXCEEDS: "returns.errors.qtyExceeds",
+      DELETED_PRODUCT_CANNOT_RESTOCK: "returns.errors.deletedProductRestock",
       DEBT_NEEDS_CUSTOMER: "returns.errors.debtNeedsCustomer",
       REFUND_SOURCE_NOT_FOUND: "payments.errors.refundSourceNotFound",
       REFUND_PROVIDER_NOT_CONFIGURED: "payments.errors.providerNotConfigured",
@@ -1230,6 +1256,7 @@ export async function createPosReturn(
         });
       }
 
+      await assertRestockTargetsNotDeleted(tx, gate.storeId, rows);
       const totalRefund = rows.reduce((sum, item) => sum + Number(item.total), 0);
       let debtDelta = 0;
       if (v.refundMethod === "debt_deduct") {
@@ -1399,6 +1426,7 @@ export async function createPosReturn(
       ORDER_NOT_FOUND: "errors.invalidData",
       ORDER_CANCELLED: "returns.errors.orderCancelled",
       QTY_EXCEEDS: "returns.errors.qtyExceeds",
+      DELETED_PRODUCT_CANNOT_RESTOCK: "returns.errors.deletedProductRestock",
       DEBT_NEEDS_CUSTOMER: "returns.errors.debtNeedsCustomer",
     };
     if (known[msg]) return { ok: false, error: known[msg] };
