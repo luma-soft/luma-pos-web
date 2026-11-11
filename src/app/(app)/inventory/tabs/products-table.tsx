@@ -837,6 +837,7 @@ export function ProductDetailView({
 }) {
   const t = useTranslations();
   const router = useRouter();
+  const catalog = useProductCatalog();
   const params = useSearchParams();
   const initialTab = params.get("detailTab") as ProductExpandTab;
   const variantPickerId = useId();
@@ -1963,8 +1964,10 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
     setError("");
     startTransition(async () => {
       const res = await deleteProduct(product.id);
-      if (res.ok) clearExpandedAndRefresh();
-      else setError(t(res.error as never));
+      if (res.ok) {
+        await catalog.refresh();
+        clearExpandedAndRefresh();
+      } else setError(t(res.error as never));
     });
   }
 
