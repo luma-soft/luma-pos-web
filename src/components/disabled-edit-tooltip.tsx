@@ -22,7 +22,7 @@ export function DisabledEditTooltip({
         type="button"
         disabled
         aria-disabled="true"
-        className={cn(className, "cursor-not-allowed opacity-50")}
+        className={cn(className, "pointer-events-none cursor-not-allowed opacity-50")}
       >
         {children}
       </button>
