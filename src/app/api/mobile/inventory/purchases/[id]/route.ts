@@ -21,7 +21,8 @@ export async function GET(
     id: purchase.id,
     code: purchase.code,
     status: purchase.status,
-    canEdit: purchase.status === "received" || purchase.status === "draft",
+    hasReturns: purchase.hasReturns,
+    canEdit: !purchase.hasReturns && (purchase.status === "received" || purchase.status === "draft"),
     canCancel: (purchase.status === "received" || purchase.status === "draft")
       && (gate.role === "owner" || gate.role === "manager"),
     createdAt: purchase.createdAt,
