@@ -2353,13 +2353,13 @@
     "resumeTitle": "Resume selling in bulk",
     "resumeDescription": "Resume selling {count} selected products? They will be available for sale in POS again.",
       "deleteTitle": "Delete selected products",
-      "deleteDescription": "Remove {count} selected products from the catalog? Historical documents remain with {DEL}; products with stock or reservations cannot be deleted.",
+      "deleteDescription": "Remove {count} selected products from the catalog? Historical documents are preserved and deleted product names receive a DEL marker; products with stock or reservations cannot be deleted.",
       "deleteResultTitle": "Product deletion result",
       "deleteSuccess": "Successfully deleted {count} products.",
       "deletePartial": "Deleted {deleted} products. {failed} products could not be deleted (for example, due to stock or reservations)."
     },
     "confirm": {
-      "delete": "Remove this product from the catalog? Invoices, purchases and stock history are preserved with {DEL}. Stock and reservations must be cleared first.",
+      "delete": "Remove this product from the catalog? Invoices, purchases and stock history are preserved and deleted product names receive a DEL marker. Stock and reservations must be cleared first.",
       "stopSelling": "Stop selling this product?",
       "resumeSelling": "Resume selling this product?"
     },
