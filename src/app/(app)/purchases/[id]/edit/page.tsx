@@ -10,7 +10,7 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
   const { id } = await params;
   const context = await requireStoreContext();
   const purchase = await getPurchase(context.storeId, id).catch(() => null);
-  if (!purchase || (purchase.status !== "received" && purchase.status !== "draft")) notFound();
+  if (!purchase || purchase.hasReturns || (purchase.status !== "received" && purchase.status !== "draft")) notFound();
 
   const [options, initialProducts] = await Promise.all([
     getPurchaseFormOptions(context.storeId),
