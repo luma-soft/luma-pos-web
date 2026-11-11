@@ -14,6 +14,8 @@ test("deleting a product retains its database identity and historical relations"
   expect(deleteBody).toContain("stockLevels.reserved");
   expect(deleteBody).toContain("stockLevels.quantity");
   expect(deleteBody).toContain("catalogSyncState.id");
+  expect(deleteBody).toContain("PRODUCT_USED_IN_COMBO");
+  expect(deleteBody).toContain("cannotDeleteWithStock");
   expect(deleteBody).toContain('action: "product.deleted"');
   expect(deleteBody).not.toContain("tx.delete(products)");
 
