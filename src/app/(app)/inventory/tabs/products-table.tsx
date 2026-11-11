@@ -837,7 +837,6 @@ export function ProductDetailView({
 }) {
   const t = useTranslations();
   const router = useRouter();
-  const catalog = useProductCatalog();
   const params = useSearchParams();
   const initialTab = params.get("detailTab") as ProductExpandTab;
   const variantPickerId = useId();
@@ -1839,6 +1838,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
+  const catalog = useProductCatalog();
   const pathname = usePathname();
   const params = useSearchParams();
   const dialog = useConfirmDialog();
