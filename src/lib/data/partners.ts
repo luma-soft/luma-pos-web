@@ -139,7 +139,6 @@ function buildCustomerConditions(storeId: string, filters: CustomerFilters, incl
 }
 
 const saleOrderStatus = sql`${orders.status} in ('completed', 'returned')`;
-const customerHistoryOrderStatus = sql`${orders.status} in ('completed', 'returned', 'cancelled')`;
 
 function hasActiveCustomerFilters(filters: CustomerFilters) {
   return Boolean(
@@ -355,7 +354,7 @@ export async function getCustomers(
         })
         .from(orders)
         .leftJoin(profiles, eq(orders.createdBy, profiles.id))
-        .where(and(inArray(orders.customerId, customerIds), customerHistoryOrderStatus))
+        .where(and(inArray(orders.customerId, customerIds), saleOrderStatus))
         .orderBy(desc(orders.createdAt))
         .limit(customerIds.length * 30),
       db
