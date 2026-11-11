@@ -3544,6 +3544,7 @@
       "emptyItems": "Phiếu nhập cần ít nhất 1 sản phẩm.",
       "notFound": "Không tìm thấy phiếu nhập.",
       "notEditable": "Phiếu nhập này không thể sửa hoặc hủy.",
+      "hasReturns": "Phiếu nhập đã phát sinh trả hàng nhà cung cấp, không thể sửa.",
       "alreadyCancelled": "Phiếu nhập đã hủy trước đó.",
       "costHistoryLocked": "Phiếu này đã dùng để chốt giá vốn cũ. Chỉ sửa được ghi chú, thông tin hóa đơn và thanh toán.",
       "costLedgerMismatch": "Tồn kho chưa khớp sổ tính giá vốn. Vui lòng đối soát biến động kho trước khi lưu phiếu."
