@@ -576,6 +576,7 @@ export async function setProductActive(
         })
         .where(and(
           eq(products.storeId, gate.storeId),
+          ne(products.lifecycleStatus, "deleted"),
           target.isVariantParent
             ? or(
                 eq(products.id, target.id),
