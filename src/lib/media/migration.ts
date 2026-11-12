@@ -1,10 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import type {
-  MediaProvider,
-  MediaVisibility,
-  ObjectStorage,
-} from "@/lib/media/types";
+import type { MediaVisibility, ObjectStorage } from "@/lib/media/types";
 import type { MediaPurpose } from "@/lib/media/schemas";
 
 const UUID_PATTERN =
@@ -12,7 +8,7 @@ const UUID_PATTERN =
 const DOMAIN_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RETENTION_MILLISECONDS = 30 * 24 * 60 * 60 * 1000;
 
-export type MediaMigrationSourceProvider = MediaProvider | "external";
+export type MediaMigrationSourceProvider = "supabase" | "r2" | "external";
 
 export type MediaMigrationStatus =
   | "inventoried"
@@ -32,9 +28,12 @@ export type MediaMigrationReference = {
     | "service-attachment"
     | "customer-request-attachment"
     | "handover-photo"
-    | "ai-attachment";
+    | "ai-attachment"
+    | "managed-media-object";
   recordId: string;
   index?: number;
+  sourceThumbnailKey?: string | null;
+  thumbnailSizeBytes?: number | null;
 };
 
 export type MediaMigrationItem = {
@@ -193,6 +192,7 @@ export function createMigrationTargetKey(input: {
   storeId: string;
   domain: string;
   mediaId: string;
+  variant?: "original" | "thumbnail";
 }): string {
   if (!UUID_PATTERN.test(input.storeId)) throw new Error("invalid_store_id");
   if (!UUID_PATTERN.test(input.mediaId)) throw new Error("invalid_media_id");
@@ -203,7 +203,7 @@ export function createMigrationTargetKey(input: {
     input.domain,
     "migration",
     input.mediaId.toLowerCase(),
-    "original",
+    input.variant ?? "original",
   ].join("/");
 }
 
@@ -249,7 +249,7 @@ async function verifyExistingTarget(input: {
 
 export function createMediaMigrationEngine(dependencies: {
   repository: MediaMigrationRepository;
-  sourceStorage: ObjectStorage;
+  sourceStorage: ObjectStorage | ((provider: "supabase" | "r2") => ObjectStorage);
   targetStorage: ObjectStorage;
   targetProvider?: "local" | "r2";
   targetBucket: string | ((visibility: MediaVisibility) => string);
@@ -260,10 +260,19 @@ export function createMediaMigrationEngine(dependencies: {
   const now = dependencies.now ?? (() => new Date());
   const targetProvider = dependencies.targetProvider ?? "r2";
 
+  function sourceStorageFor(provider: MediaMigrationSourceProvider) {
+    if (provider !== "supabase" && provider !== "r2") {
+      throw new Error("unsupported_migration_source");
+    }
+    return typeof dependencies.sourceStorage === "function"
+      ? dependencies.sourceStorage(provider)
+      : dependencies.sourceStorage;
+  }
+
   async function inventory(
     input: MediaMigrationInventoryInput,
   ): Promise<MediaMigrationItem> {
-    if (input.sourceProvider !== "supabase") {
+    if (input.sourceProvider !== "supabase" && input.sourceProvider !== "r2") {
       throw new Error("unsupported_migration_source");
     }
     if (!input.sourceBucket.trim() || !input.sourceKey.trim()) {
@@ -284,7 +293,9 @@ export function createMediaMigrationEngine(dependencies: {
         domain: input.domain,
         mediaId: id,
       }),
-      mediaObjectId: null,
+      mediaObjectId: input.references.find(
+        (reference) => reference.kind === "managed-media-object",
+      )?.recordId ?? null,
       status: "inventoried",
       sourceSizeBytes: null,
       sourceSha256: null,
@@ -336,11 +347,12 @@ export function createMediaMigrationEngine(dependencies: {
     }
 
     try {
-      const sourceHead = await dependencies.sourceStorage.head({
+      const sourceStorage = sourceStorageFor(item.sourceProvider);
+      const sourceHead = await sourceStorage.head({
         bucket: item.sourceBucket,
         key: item.sourceKey,
       });
-      const bytes = await dependencies.sourceStorage.get({
+      const bytes = await sourceStorage.get({
         bucket: item.sourceBucket,
         key: item.sourceKey,
       });
@@ -404,6 +416,76 @@ export function createMediaMigrationEngine(dependencies: {
           if (!reconciled) throw error;
         }
       }
+      const managedReference = item.references.find(
+        (reference) => reference.kind === "managed-media-object",
+      );
+      if (managedReference?.sourceThumbnailKey) {
+        const thumbnailSource = {
+          bucket: item.sourceBucket,
+          key: managedReference.sourceThumbnailKey,
+        };
+        const thumbnailHead = await sourceStorage.head(thumbnailSource);
+        const thumbnailBytes = await sourceStorage.get(thumbnailSource);
+        if (thumbnailHead && thumbnailHead.sizeBytes !== thumbnailBytes.byteLength) {
+          return dependencies.repository.transition({
+            id: item.id,
+            from: [item.status],
+            to: "quarantined",
+            patch: {
+              attempts: item.attempts + 1,
+              lastError: "source_thumbnail_size_mismatch",
+            },
+          });
+        }
+        const thumbnailKey = createMigrationTargetKey({
+          storeId: item.storeId,
+          domain: item.domain,
+          mediaId: item.id,
+          variant: "thumbnail",
+        });
+        const existingThumbnail = await dependencies.targetStorage.head({
+          bucket: item.targetBucket,
+          key: thumbnailKey,
+        });
+        if (existingThumbnail) {
+          const matches = await verifyExistingTarget({
+            storage: dependencies.targetStorage,
+            bucket: item.targetBucket,
+            key: thumbnailKey,
+            expectedBytes: thumbnailBytes,
+          });
+          if (!matches) {
+            return dependencies.repository.transition({
+              id: item.id,
+              from: [item.status],
+              to: "quarantined",
+              patch: {
+                attempts: item.attempts + 1,
+                lastError: "thumbnail_target_conflict",
+              },
+            });
+          }
+        } else {
+          try {
+            await dependencies.targetStorage.put({
+              bucket: item.targetBucket,
+              key: thumbnailKey,
+              body: thumbnailBytes,
+              contentType: thumbnailHead?.contentType?.split(";", 1)[0]?.trim().toLowerCase()
+                || item.mimeType,
+              ifNoneMatch: "*",
+            });
+          } catch (error) {
+            const reconciled = await verifyExistingTarget({
+              storage: dependencies.targetStorage,
+              bucket: item.targetBucket,
+              key: thumbnailKey,
+              expectedBytes: thumbnailBytes,
+            }).catch(() => false);
+            if (!reconciled) throw error;
+          }
+        }
+      }
       return dependencies.repository.transition({
         id: item.id,
         from: [item.status],
@@ -443,6 +525,7 @@ export function createMediaMigrationEngine(dependencies: {
     if (!item.targetBucket || !item.targetKey || !item.sourceSha256) {
       throw new Error("migration_target_missing");
     }
+    const sourceStorage = sourceStorageFor(item.sourceProvider);
     const head = await dependencies.targetStorage.head({
       bucket: item.targetBucket,
       key: item.targetKey,
@@ -486,6 +569,55 @@ export function createMediaMigrationEngine(dependencies: {
           lastError: "target_hash_mismatch",
         },
       });
+    }
+    const managedReference = item.references.find(
+      (reference) => reference.kind === "managed-media-object",
+    );
+    if (managedReference?.sourceThumbnailKey) {
+      const thumbnailKey = createMigrationTargetKey({
+        storeId: item.storeId,
+        domain: item.domain,
+        mediaId: item.id,
+        variant: "thumbnail",
+      });
+      const sourceThumbnail = {
+        bucket: item.sourceBucket,
+        key: managedReference.sourceThumbnailKey,
+      };
+      const sourceThumbnailHead = await sourceStorage.head(sourceThumbnail);
+      const sourceThumbnailBytes = await sourceStorage.get(sourceThumbnail);
+      const targetThumbnailHead = await dependencies.targetStorage.head({
+        bucket: item.targetBucket,
+        key: thumbnailKey,
+      });
+      if (
+        (sourceThumbnailHead && sourceThumbnailHead.sizeBytes !== sourceThumbnailBytes.byteLength)
+        || !targetThumbnailHead
+        || targetThumbnailHead.sizeBytes !== sourceThumbnailBytes.byteLength
+      ) {
+        return dependencies.repository.transition({
+          id: item.id,
+          from: ["copied"],
+          to: "quarantined",
+          patch: {
+            lastError: "thumbnail_size_mismatch",
+          },
+        });
+      }
+      const targetThumbnailBytes = await dependencies.targetStorage.get({
+        bucket: item.targetBucket,
+        key: thumbnailKey,
+      });
+      if (sha256Hex(targetThumbnailBytes) !== sha256Hex(sourceThumbnailBytes)) {
+        return dependencies.repository.transition({
+          id: item.id,
+          from: ["copied"],
+          to: "quarantined",
+          patch: {
+            lastError: "thumbnail_hash_mismatch",
+          },
+        });
+      }
     }
     return dependencies.repository.transition({
       id: item.id,
@@ -546,7 +678,17 @@ export function createMediaMigrationEngine(dependencies: {
       < gate.completedCutoverAt.getTime() + RETENTION_MILLISECONDS
     ) throw new Error("retention_window_not_elapsed");
 
-    await dependencies.sourceStorage.remove({
+    const sourceStorage = sourceStorageFor(item.sourceProvider);
+    const managedReference = item.references.find(
+      (reference) => reference.kind === "managed-media-object",
+    );
+    if (managedReference?.sourceThumbnailKey) {
+      await sourceStorage.remove({
+        bucket: item.sourceBucket,
+        key: managedReference.sourceThumbnailKey,
+      });
+    }
+    await sourceStorage.remove({
       bucket: item.sourceBucket,
       key: item.sourceKey,
     });

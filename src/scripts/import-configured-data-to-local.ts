@@ -104,7 +104,7 @@ type LegacyAuthIdentity = {
   profileId: string;
   email: string | null;
   passwordHash: string | null;
-  emailVerifiedAt: Date | null;
+  emailVerifiedAt: string | null;
 };
 
 type LegacyRelayEvent = {
@@ -303,7 +303,12 @@ try {
       p.id::text AS "profileId",
       u.email,
       u.encrypted_password AS "passwordHash",
-      u.email_confirmed_at AS "emailVerifiedAt"
+      CASE WHEN u.email_confirmed_at IS NULL THEN NULL
+        ELSE to_char(
+          u.email_confirmed_at AT TIME ZONE 'UTC',
+          'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+        )
+      END AS "emailVerifiedAt"
     FROM public.profiles p
     LEFT JOIN auth.users u ON u.id = p.id
     ORDER BY p.id
@@ -384,7 +389,7 @@ try {
           credential.emailNormalized,
           credential.passwordHash,
           credential.passwordHashType,
-          credential.emailVerifiedAt?.toISOString() ?? null,
+          credential.emailVerifiedAt,
           credential.mustResetPassword,
         ]);
       }

@@ -1,6 +1,76 @@
-# LumaPOS media migration to Cloudflare R2
+# LumaPOS media migration to Cloudflare R2 and local storage
 
 This runbook moves only Luma-owned Supabase media to the managed R2 buckets. External vendor/CDN URLs are inventoried as `skipped` and are never downloaded or rewritten.
+
+## Mac local filesystem migration
+
+The self-hosted target uses the same inventory/copy/verify/cutover state machine,
+with R2 or Supabase as the source and the Mac filesystem as the target. Managed
+`media_objects` keep their IDs and domain links; both original and thumbnail bytes
+are copied and SHA-256 checked before their provider and keys change in one DB
+transaction. This is the path for `lumapos_rehearsal`; the legacy commands below
+remain for the earlier Supabase-to-R2 migration.
+
+The local target is deliberately restricted to a named local database. Every
+stage must include `--local-database --target-provider=local` and use the same
+`LUMAPOS_LOCAL_DATABASE_NAME`. The script rejects `target-provider=local` when it
+would use `DATABASE_URL`, and rejects `--local-database` with an R2 target.
+
+Apply the schema to the rehearsal database only:
+
+```bash
+LUMAPOS_LOCAL_DATABASE_NAME=lumapos_rehearsal bun run db:migrate:local
+```
+
+Inventory one store per run because migration-run ownership is tenant-scoped.
+Review all `skipped` references and the host/bucket allowlist before copying.
+The dry-run is read-only:
+
+```bash
+LUMAPOS_LOCAL_DATABASE_NAME=lumapos_rehearsal \
+  bun --conditions=react-server run src/scripts/migrate-media-to-r2.ts inventory \
+  --local-database --target-provider=local --dry-run --store-id=<store-uuid>
+```
+
+Then persist an inventory using a new run UUID for each store and keep that UUID
+for every later stage:
+
+```bash
+LUMAPOS_LOCAL_DATABASE_NAME=lumapos_rehearsal \
+  bun --conditions=react-server run src/scripts/migrate-media-to-r2.ts inventory \
+  --local-database --target-provider=local --execute \
+  --run-id=<run-uuid> --store-id=<store-uuid>
+```
+
+Copy and verify bounded batches with the same database name and run UUID:
+
+```bash
+LUMAPOS_LOCAL_DATABASE_NAME=lumapos_rehearsal \
+  bun --conditions=react-server run src/scripts/migrate-media-to-r2.ts copy \
+  --local-database --target-provider=local --execute \
+  --run-id=<run-uuid> --batch-size=25
+
+LUMAPOS_LOCAL_DATABASE_NAME=lumapos_rehearsal \
+  bun --conditions=react-server run src/scripts/migrate-media-to-r2.ts verify \
+  --local-database --target-provider=local --execute \
+  --run-id=<run-uuid> --batch-size=25
+```
+
+The copy stage requires server-only R2 source credentials and
+`MEDIA_LOCAL_ROOT`, `MEDIA_LOCAL_SIGNING_SECRET`, and `LUMAPOS_PUBLIC_URL`. The
+Mac media root should be a durable path such as `/Users/Shared/LumaPOS/media`,
+outside the repository. The public origin must be the stable HTTPS host selected
+for the store; do not expose filesystem paths or signing secrets. A verified
+copy is not yet a cutover. Run the `cutover` stage only after the local Next.js
+runtime, file routes, backup/restore, and HTTPS origin have passed rehearsal.
+Keep R2 source objects during the rollback window; do not run `delete-source`
+for the local migration until the product owner approves its retention gate.
+
+**Current gate (2026-11-13):** rehearsal dry-run discovered 2,476 references,
+454 owned and 2,022 skipped under the current allowlist. The skipped list has
+not been approved as external media. The R2 readiness check reports
+`ready: false`; no files have been copied and no provider has changed. Do not
+cut over until R2 reachability and skipped-reference review are complete.
 
 ## Current production status
 

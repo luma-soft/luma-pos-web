@@ -64,10 +64,18 @@ cũng lệch 1,0 đơn vị. Snapshot này chưa được xác nhận là nguồ
 ảnh chụp của lần kiểm tra, không khẳng định trạng thái ở thời điểm sau đó.
 
 Trong cùng đợt, `lumapos_rehearsal` được tạo riêng, nhập từ database đang cấu
-hình và đối soát thành công 138 bảng cùng các tổng hợp tài chính; 3 hồ sơ có 3
-Auth credentials tương thích, không có tài khoản cần reset, receipt sync khớp. Đây
-chỉ là bản rehearsal; chưa bật Auth/backend mới, chưa chuyển media bytes sang
-filesystem local và chưa nhận ghi từ client.
+hình và đối soát thành công 140 bảng cùng các tổng hợp tài chính; 3 hồ sơ có 3
+Auth credentials tương thích, không có tài khoản cần reset, receipt sync khớp.
+Hai `email_verified_at` chỉ khác ở microsecond dưới độ chính xác millisecond.
+Rehearsal có thêm migration local `0166_media_migration_library_assets.sql`;
+`lumapos_local` và nguồn chưa áp dụng bước này.
+
+Preview media trên rehearsal phát hiện 2.476 tham chiếu: 454 owned theo host và
+bucket allowlist hiện tại, 2.022 `skipped` cần rà soát thủ công. Trong 469
+`media_objects` R2 có 454 `ready`, 15 `deleted`. Probe R2 hiện trả `ready: false`;
+chưa chép file hay đổi provider. Vì thế rehearsal vẫn giữ R2 làm provider cho
+các media hiện có và chưa bật Auth/backend mới hoặc nhận ghi từ client. Các số
+liệu là ảnh chụp ngày 2026-11-13, không khẳng định trạng thái sau thời điểm đó.
 
 ### Next.js và workers
 
@@ -120,10 +128,14 @@ Health check:
 - Khi chuyển lên VPS, giữ nguyên key và schema; chuyển thư mục media sang volume
   bền vững, đổi `MEDIA_LOCAL_ROOT`/`DATABASE_URL` và giữ nguyên hostname công
   khai nếu có thể. Không dùng ổ tạm hoặc filesystem container để lưu media.
-- `media:migrate` copy từ Supabase Storage qua các giai đoạn inventory, copy,
-  checksum verify, cutover và rollback, với `--target-provider=local` trên từng
-  lệnh. Chỉ xóa nguồn sau cửa sổ giữ lại đã duyệt. Các media bên ngoài mà
-  LumaPOS không sở hữu phải được đánh dấu riêng; không tải hoặc xóa chúng như
+- `media:migrate` inventory cả media object đã quản lý trên R2/Supabase Storage
+  lẫn tham chiếu legacy. Dùng `--local-database --target-provider=local` để chỉ
+  ghi vào DB local đã chọn qua `LUMAPOS_LOCAL_DATABASE_NAME`; script từ chối chạy
+  local target với `DATABASE_URL` cấu hình. Managed object giữ nguyên ID và link,
+  đồng thời chép/kiểm tra cả thumbnail. Xem
+  [`media-r2-migration-runbook.md`](media-r2-migration-runbook.md) để chạy một
+  migration riêng cho mỗi store. Chỉ xóa nguồn sau cửa sổ giữ lại đã duyệt.
+  Các media ngoài allowlist phải được rà soát; không tải hoặc xóa chúng như
   media của cửa hàng.
 - Backup local media cùng database; đặt backup ở volume/thư mục tách biệt. Đồng
   bộ thêm bản backup đã mã hóa tới vị trí offsite, giữ khóa mã hóa ở nơi khác.
@@ -131,8 +143,11 @@ Health check:
 ## iPhone ngoài mạng cửa hàng: Cloudflare Tunnel
 
 Cloudflare Tunnel đã được chọn. Tạo tunnel đặt tên riêng cho cửa hàng và trỏ
-hostname HTTPS đã duyệt tới `http://127.0.0.1:3000`. Mẫu không chứa tunnel
-credential ở [`ops/cloudflared/config.yml.example`](../ops/cloudflared/config.yml.example).
+hostname HTTPS đã duyệt tới `http://127.0.0.1:3000`. Khuyến nghị dùng
+`pos.lumapos.shop` làm origin chung cho web và API để cookie web cùng endpoint
+iPhone có một host ổn định. DNS/tunnel chưa được cấu hình và tên này chưa được
+xác nhận. Mẫu không chứa tunnel credential ở
+[`ops/cloudflared/config.yml.example`](../ops/cloudflared/config.yml.example).
 
 - Tunnel tạo kết nối outbound; router không mở cổng inbound tới Mac. Chỉ route
   hostname ứng dụng tới Next.js. Catch-all phải trả 404.
@@ -143,7 +158,7 @@ credential ở [`ops/cloudflared/config.yml.example`](../ops/cloudflared/config.
   origin từ build setting `LUMA_API_BASE_URL` trong
   [`Info.plist`](../../luma-pos-mobile/native-ios/LumaPOSNative/Info.plist); cấu
   hình mặc định hiện tại vẫn là Vercel. Chỉ phát hành build trỏ tới hostname
-  ổn định sau khi backend, tunnel và khôi phục đã được diễn tập.
+  đã xác nhận sau khi backend, tunnel và khôi phục đã được diễn tập.
 - Khi chuyển lên VPS, đưa tunnel connector sang VPS hoặc cập nhật origin phía
   tunnel; giữ hostname để web và iPhone không phải đổi endpoint. Nếu WAN hoặc
   tunnel mất kết nối, thiết bị giữ việc ở local và gửi lại khi có mạng. Truy cập

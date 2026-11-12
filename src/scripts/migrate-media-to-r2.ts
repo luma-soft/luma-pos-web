@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import { loadEnvConfig } from "@next/env";
 import postgres from "postgres";
 
 import {
@@ -17,6 +18,9 @@ import {
   type MediaMigrationStatus,
 } from "@/lib/media/migration";
 import { getObjectStorage, getSupabaseMigrationSourceStorage } from "@/lib/media/storage";
+import { getLocalPostgresTarget } from "./local-postgres-target";
+
+loadEnvConfig(process.cwd());
 
 const COMMANDS = new Set([
   "inventory",
@@ -52,6 +56,7 @@ type DiscoveredReference = {
   originalFileName: string;
   mimeType: string;
   reference: MediaMigrationReference;
+  sourceProvider?: "supabase" | "r2";
   url?: string;
   bucket?: string;
   key?: string;
@@ -242,13 +247,13 @@ class PostgresMigrationRepository implements MediaMigrationRepository {
     const [row] = await this.sql<MigrationRow[]>`
       insert into media_migration_items (
         id, store_id, run_id, source_provider, target_provider, source_bucket, source_key,
-        target_bucket, target_key, status, purpose, target_id, domain, visibility,
+        target_bucket, target_key, media_object_id, status, purpose, target_id, domain, visibility,
         original_file_name, mime_type, reference_documents,
         attempts, last_error, updated_at
       ) values (
         ${input.id}::uuid, ${input.storeId}::uuid, ${input.runId}::uuid,
         ${input.sourceProvider}, ${input.targetProvider}, ${input.sourceBucket}, ${input.sourceKey},
-        ${input.targetBucket}, ${input.targetKey}, ${input.status},
+        ${input.targetBucket}, ${input.targetKey}, ${input.mediaObjectId}::uuid, ${input.status},
         ${input.purpose}, ${input.targetId}::uuid, ${input.domain},
         ${input.visibility}, ${input.originalFileName},
         ${input.mimeType}, ${this.sql.json(input.references)},
@@ -274,6 +279,10 @@ class PostgresMigrationRepository implements MediaMigrationRepository {
           )
           else media_migration_items.reference_documents
         end,
+        media_object_id = coalesce(
+          media_migration_items.media_object_id,
+          excluded.media_object_id
+        ),
         status = case
           when (
             media_migration_items.target_provider <> excluded.target_provider
@@ -380,85 +389,121 @@ class PostgresMigrationRepository implements MediaMigrationRepository {
         || !locked.sourceSha256
       ) throw new Error("verified_coordinates_missing");
 
-      await tx`
-        insert into media_objects (
-          id, store_id, provider, visibility, domain, bucket, object_key,
-          original_file_name, mime_type, size_bytes, sha256, status,
-          purpose, target_id, upload_expires_at,
-          ready_at, verified_at, legacy_bucket, legacy_path
-        ) values (
-          ${locked.id}::uuid, ${locked.storeId}::uuid, ${locked.targetProvider},
-          ${locked.visibility}, ${locked.domain}, ${locked.targetBucket},
-          ${locked.targetKey}, ${locked.originalFileName}, ${locked.mimeType},
-          ${locked.sourceSizeBytes}, ${locked.sourceSha256}, 'ready',
-          ${locked.purpose}, ${locked.targetId}::uuid, now(),
-          now(), now(), ${locked.sourceBucket}, ${locked.sourceKey}
-        )
-        on conflict (id) do nothing
-      `;
-
-      for (const reference of locked.references) {
-        requireUuid("reference_record", reference.recordId);
-        const sortOrder = Math.max(0, reference.index ?? 0);
-        if (reference.kind === "product-image") {
-          await tx`
-            insert into product_media (
-              store_id, product_id, media_object_id, sort_order, is_primary
-            ) values (
-              ${locked.storeId}::uuid, ${reference.recordId}::uuid,
-              ${locked.id}::uuid, ${sortOrder}, ${sortOrder === 0}
-            )
-            on conflict (product_id, media_object_id) do update
-            set deleted_at = null,
-                sort_order = excluded.sort_order,
-                is_primary = excluded.is_primary
-          `;
-        } else if (reference.kind === "brand-logo") {
-          await tx`
-            update brands set logo_media_object_id = ${locked.id}::uuid
-            where store_id = ${locked.storeId}::uuid
-              and id = ${reference.recordId}::uuid
-          `;
-        } else if (reference.kind === "service-attachment") {
-          await tx`
-            update service_attachments set media_object_id = ${locked.id}::uuid
-            where store_id = ${locked.storeId}::uuid
-              and id = ${reference.recordId}::uuid
-          `;
-        } else if (reference.kind === "customer-request-attachment") {
-          await tx`
-            update service_customer_request_attachments
-            set media_object_id = ${locked.id}::uuid
-            where store_id = ${locked.storeId}::uuid
-              and id = ${reference.recordId}::uuid
-          `;
-        } else if (reference.kind === "handover-photo") {
-          await tx`
-            insert into service_handover_document_media (
-              store_id, document_id, media_object_id, sort_order
-            ) values (
-              ${locked.storeId}::uuid, ${reference.recordId}::uuid,
-              ${locked.id}::uuid, ${sortOrder}
-            )
-            on conflict (document_id, media_object_id) do update
-            set sort_order = excluded.sort_order
-          `;
-        } else if (reference.kind === "ai-attachment") {
-          const statement = buildAiAttachmentCutoverSql({
-            sortOrder,
-            mediaId: locked.id,
-            targetBucket: locked.targetBucket,
-            targetKey: locked.targetKey,
+      const managedReference = locked.references.find(
+        (reference) => reference.kind === "managed-media-object",
+      );
+      if (managedReference) {
+        requireUuid("managed_media_object", managedReference.recordId);
+        const targetThumbnailKey = managedReference.sourceThumbnailKey
+          ? createMigrationTargetKey({
             storeId: locked.storeId,
-            recordId: reference.recordId,
-          });
-          await tx.unsafe(statement.text, statement.parameters);
+            domain: locked.domain,
+            mediaId: locked.id,
+            variant: "thumbnail",
+          })
+          : null;
+        const [updatedObject] = await tx<{ id: string }[]>`
+          update media_objects
+          set provider = ${locked.targetProvider},
+              bucket = ${locked.targetBucket},
+              object_key = ${locked.targetKey},
+              thumbnail_object_key = ${targetThumbnailKey},
+              thumbnail_size_bytes = ${targetThumbnailKey
+                ? managedReference.thumbnailSizeBytes ?? null
+                : null},
+              verified_at = now()
+          where store_id = ${locked.storeId}::uuid
+            and id = ${managedReference.recordId}::uuid
+            and provider = ${locked.sourceProvider}
+            and bucket = ${locked.sourceBucket}
+            and object_key = ${locked.sourceKey}
+            and thumbnail_object_key is not distinct from ${managedReference.sourceThumbnailKey ?? null}
+            and status = 'ready'
+            and deleted_at is null
+          returning id::text
+        `;
+        if (!updatedObject) throw new Error("managed_media_source_changed");
+      } else {
+        await tx`
+          insert into media_objects (
+            id, store_id, provider, visibility, domain, bucket, object_key,
+            original_file_name, mime_type, size_bytes, sha256, status,
+            purpose, target_id, upload_expires_at,
+            ready_at, verified_at, legacy_bucket, legacy_path
+          ) values (
+            ${locked.id}::uuid, ${locked.storeId}::uuid, ${locked.targetProvider},
+            ${locked.visibility}, ${locked.domain}, ${locked.targetBucket},
+            ${locked.targetKey}, ${locked.originalFileName}, ${locked.mimeType},
+            ${locked.sourceSizeBytes}, ${locked.sourceSha256}, 'ready',
+            ${locked.purpose}, ${locked.targetId}::uuid, now(),
+            now(), now(), ${locked.sourceBucket}, ${locked.sourceKey}
+          )
+          on conflict (id) do nothing
+        `;
+
+        for (const reference of locked.references) {
+          requireUuid("reference_record", reference.recordId);
+          const sortOrder = Math.max(0, reference.index ?? 0);
+          if (reference.kind === "product-image") {
+            await tx`
+              insert into product_media (
+                store_id, product_id, media_object_id, sort_order, is_primary
+              ) values (
+                ${locked.storeId}::uuid, ${reference.recordId}::uuid,
+                ${locked.id}::uuid, ${sortOrder}, ${sortOrder === 0}
+              )
+              on conflict (product_id, media_object_id) do update
+              set deleted_at = null,
+                  sort_order = excluded.sort_order,
+                  is_primary = excluded.is_primary
+            `;
+          } else if (reference.kind === "brand-logo") {
+            await tx`
+              update brands set logo_media_object_id = ${locked.id}::uuid
+              where store_id = ${locked.storeId}::uuid
+                and id = ${reference.recordId}::uuid
+            `;
+          } else if (reference.kind === "service-attachment") {
+            await tx`
+              update service_attachments set media_object_id = ${locked.id}::uuid
+              where store_id = ${locked.storeId}::uuid
+                and id = ${reference.recordId}::uuid
+            `;
+          } else if (reference.kind === "customer-request-attachment") {
+            await tx`
+              update service_customer_request_attachments
+              set media_object_id = ${locked.id}::uuid
+              where store_id = ${locked.storeId}::uuid
+                and id = ${reference.recordId}::uuid
+            `;
+          } else if (reference.kind === "handover-photo") {
+            await tx`
+              insert into service_handover_document_media (
+                store_id, document_id, media_object_id, sort_order
+              ) values (
+                ${locked.storeId}::uuid, ${reference.recordId}::uuid,
+                ${locked.id}::uuid, ${sortOrder}
+              )
+              on conflict (document_id, media_object_id) do update
+              set sort_order = excluded.sort_order
+            `;
+          } else if (reference.kind === "ai-attachment") {
+            const statement = buildAiAttachmentCutoverSql({
+              sortOrder,
+              mediaId: locked.id,
+              targetBucket: locked.targetBucket,
+              targetKey: locked.targetKey,
+              storeId: locked.storeId,
+              recordId: reference.recordId,
+            });
+            await tx.unsafe(statement.text, statement.parameters);
+          }
         }
       }
 
       const [updated] = await tx<MigrationRow[]>`
         update media_migration_items
-        set media_object_id = ${locked.id}::uuid,
+        set media_object_id = ${managedReference?.recordId ?? locked.id}::uuid,
             status = 'cutover',
             cutover_at = now(),
             last_error = null,
@@ -483,8 +528,43 @@ class PostgresMigrationRepository implements MediaMigrationRepository {
       if (locked.status === "rolled_back") return locked;
       if (locked.status !== "cutover") throw new Error(`rollback_invalid_status:${locked.status}`);
 
+      const managedReference = locked.references.find(
+        (reference) => reference.kind === "managed-media-object",
+      );
       for (const reference of locked.references) {
         requireUuid("reference_record", reference.recordId);
+        if (reference.kind === "managed-media-object") {
+          const targetThumbnailKey = reference.sourceThumbnailKey
+            ? createMigrationTargetKey({
+              storeId: locked.storeId,
+              domain: locked.domain,
+              mediaId: locked.id,
+              variant: "thumbnail",
+            })
+            : null;
+          const [restoredObject] = await tx<{ id: string }[]>`
+            update media_objects
+            set provider = ${locked.sourceProvider},
+                bucket = ${locked.sourceBucket},
+                object_key = ${locked.sourceKey},
+                thumbnail_object_key = ${reference.sourceThumbnailKey ?? null},
+                thumbnail_size_bytes = ${reference.sourceThumbnailKey
+                  ? reference.thumbnailSizeBytes ?? null
+                  : null},
+                verified_at = now()
+            where store_id = ${locked.storeId}::uuid
+              and id = ${reference.recordId}::uuid
+              and provider = ${locked.targetProvider}
+              and bucket = ${locked.targetBucket}
+              and object_key = ${locked.targetKey}
+              and thumbnail_object_key is not distinct from ${targetThumbnailKey}
+              and status = 'ready'
+              and deleted_at is null
+            returning id::text
+          `;
+          if (!restoredObject) throw new Error("managed_media_target_changed");
+          continue;
+        }
         const sortOrder = Math.max(0, reference.index ?? 0);
         if (reference.kind === "product-image") {
           await tx`
@@ -534,11 +614,13 @@ class PostgresMigrationRepository implements MediaMigrationRepository {
         }
       }
 
-      await tx`
-        update media_objects
-        set status = 'deleted', deleted_at = now()
-        where store_id = ${locked.storeId}::uuid and id = ${locked.id}::uuid
-      `;
+      if (!managedReference) {
+        await tx`
+          update media_objects
+          set status = 'deleted', deleted_at = now()
+          where store_id = ${locked.storeId}::uuid and id = ${locked.id}::uuid
+        `;
+      }
       const [updated] = await tx<MigrationRow[]>`
         update media_migration_items
         set status = 'rolled_back', updated_at = now()
@@ -855,6 +937,52 @@ async function discoverLegacyReferences(
     });
   }
 
+  const managedRows = await sql<{
+    store_id: string;
+    record_id: string;
+    provider: "supabase" | "r2";
+    bucket: string;
+    object_key: string;
+    thumbnail_object_key: string | null;
+    thumbnail_size_bytes: number | null;
+    purpose: MediaMigrationItem["purpose"];
+    target_id: string;
+    domain: string;
+    visibility: "public" | "private";
+    original_file_name: string;
+    mime_type: string;
+  }[]>`
+    select store_id::text, id::text as record_id, provider, bucket,
+      object_key, thumbnail_object_key, thumbnail_size_bytes, purpose,
+      target_id::text, domain, visibility, original_file_name, mime_type
+    from media_objects
+    where provider in ('r2', 'supabase')
+      and status = 'ready'
+      and deleted_at is null
+      and (${storeId}::uuid is null or store_id = ${storeId}::uuid)
+  `;
+  for (const row of managedRows) {
+    discovered.push({
+      runId,
+      storeId: row.store_id,
+      purpose: row.purpose,
+      targetId: row.target_id,
+      domain: row.domain,
+      visibility: row.visibility,
+      originalFileName: row.original_file_name,
+      mimeType: row.mime_type,
+      reference: {
+        kind: "managed-media-object",
+        recordId: row.record_id,
+        sourceThumbnailKey: row.thumbnail_object_key,
+        thumbnailSizeBytes: row.thumbnail_size_bytes,
+      },
+      sourceProvider: row.provider,
+      bucket: row.bucket,
+      key: row.object_key,
+    });
+  }
+
   return discovered;
 }
 
@@ -863,6 +991,16 @@ function classifyDiscovered(
   hosts: ReadonlySet<string>,
   buckets: ReadonlySet<string>,
 ) {
+  if (reference.sourceProvider && reference.bucket && reference.key) {
+    return {
+      kind: "owned" as const,
+      coordinates: {
+        provider: reference.sourceProvider,
+        bucket: reference.bucket,
+        key: reference.key,
+      },
+    };
+  }
   if (reference.bucket && reference.key && buckets.has(reference.bucket)) {
     return {
       kind: "owned" as const,
@@ -918,6 +1056,10 @@ async function run() {
     throw new Error("target_provider_must_be_local_or_r2");
   }
   const targetProvider = targetProviderValue as TargetProvider;
+  const useLocalDatabase = process.argv.includes("--local-database");
+  if ((targetProvider === "local") !== useLocalDatabase) {
+    throw new Error("local_media_migration_requires_local_database_and_target");
+  }
   if (execute && process.argv.includes("--dry-run")) {
     throw new Error("execute_and_dry_run_are_mutually_exclusive");
   }
@@ -935,7 +1077,9 @@ async function run() {
     throw new Error("invalid_confirmed_after");
   }
 
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = useLocalDatabase
+    ? getLocalPostgresTarget().url.toString()
+    : process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error("DATABASE_URL_not_set");
   const sql = postgres(databaseUrl, { max: 1, prepare: false });
   try {
@@ -959,7 +1103,9 @@ async function run() {
       await repository.ensureRun({ runId, storeId: storeId! });
       const engine = createMediaMigrationEngine({
         repository,
-        sourceStorage: getSupabaseMigrationSourceStorage(),
+        sourceStorage: (provider) => provider === "r2"
+          ? getObjectStorage("r2")
+          : getSupabaseMigrationSourceStorage(),
         targetStorage: target.storage,
         targetProvider,
         targetBucket: target.bucket,
@@ -1055,7 +1201,9 @@ async function run() {
     const target = migrationTarget(targetProvider);
     const engine = createMediaMigrationEngine({
       repository,
-      sourceStorage: getSupabaseMigrationSourceStorage(),
+        sourceStorage: (provider) => provider === "r2"
+          ? getObjectStorage("r2")
+          : getSupabaseMigrationSourceStorage(),
       targetStorage: target.storage,
       targetProvider,
       targetBucket: target.bucket,

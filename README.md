@@ -54,10 +54,19 @@ cửa hàng, 3 hồ sơ, 3.292 sản phẩm, 3.157 đơn và 469 media object. �
 được xác nhận là nguồn chính; không chạy importer vào database này.
 
 Trong cùng đợt kiểm tra, `lumapos_rehearsal` được tạo riêng, nhập từ database
-đang cấu hình và đối soát thành công 138 bảng, các tổng hợp tài chính, 3 hồ sơ,
-3 Auth credentials và trạng thái receipt sync. DB này chỉ là bản rehearsal; chưa bật
-Auth/backend mới, chưa chuyển media bytes sang filesystem local và chưa nhận ghi
+đang cấu hình và đối soát thành công 140 bảng cùng các tổng hợp tài chính. Hai
+`email_verified_at` chỉ khác nhau ở phần microsecond dưới độ chính xác millisecond;
+email, hash mật khẩu và trạng thái reset khớp. `lumapos_rehearsal` hiện có migration
+local bổ sung `0166_media_migration_library_assets.sql`; migration nguồn vẫn còn
+177 bước. DB này chỉ là bản rehearsal; chưa bật Auth/backend mới và chưa nhận ghi
 từ client.
+
+**Media rehearsal ngày 2026-11-13:** snapshot có 469 `media_objects` trên R2,
+gồm 454 `ready` và 15 `deleted`. Preview tìm 2.476 tham chiếu; 454 được nhận diện
+là LumaPOS-owned theo host và bucket allowlist, còn 2.022 bị đánh dấu `skipped`
+và cần rà soát trước cutover. Probe R2 hiện trả `ready: false`; chưa có file nào
+được chép hoặc đổi provider sang local. Không coi các mục `skipped` là vendor
+media đã xác nhận nếu chưa kiểm tra allowlist và domain.
 
 Để diễn tập trên database rỗng riêng, dùng cùng tên đích cho migration, import
 và đối soát. Ví dụ:

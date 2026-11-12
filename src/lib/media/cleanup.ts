@@ -143,7 +143,7 @@ export function createDatabaseMediaCleanupRepository(
               select 1 from media_migration_items
               where media_migration_items.store_id = media.store_id
                 and media_migration_items.media_object_id = media.id
-                and media_migration_items.status <> 'rolled_back'
+                and media_migration_items.status not in ('rolled_back', 'source_deleted')
             )
             and not exists (
               select 1
