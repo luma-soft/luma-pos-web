@@ -105,16 +105,28 @@ bun run ops:maintenance -- --task=media-cleanup
 bun run ops:maintenance -- --task=einvoices
 ```
 
-Lên lịch `notifications` hằng ngày, `media-cleanup` hằng ngày sau giờ đóng cửa,
-và `einvoices` theo tần suất nghiệp vụ đã duyệt. Mỗi lệnh yêu cầu
-`CRON_SECRET`; chỉ local supervisor được gọi. Không để cron legacy của Vercel
-chạy song song sau khi cutover.
+Mỗi lệnh yêu cầu `CRON_SECRET`; chỉ local supervisor được gọi. Trước khi cấu
+hình lịch Mac, phân biệt lịch hiện có với endpoint chưa được lịch hóa:
+
+| Công việc | Hiện trạng theo `vercel.json` | Hành động trên Mac |
+| --- | --- | --- |
+| `/api/cron/notifications/outbox` | Mỗi ngày lúc 00:00 UTC (07:00 giờ Việt Nam). Worker PostgreSQL mới đã tự poll và phục hồi outbox liên tục. | Không tạo cron lặp lại cho route này sau cutover. |
+| `/api/cron/media/cleanup` | Mỗi ngày lúc 02:15 UTC (09:15 giờ Việt Nam). | Giữ lịch này trong lần chuyển đầu để bảo toàn hành vi; chỉ đổi sang sau giờ đóng cửa khi chủ cửa hàng duyệt. |
+| `/api/cron/notifications` | Không có trong `vercel.json`; route chạy thông báo nghiệp vụ định kỳ và bảo trì. | Chưa tự tạo lịch mới. Xác nhận lịch đang dùng và múi giờ trước khi chuyển. |
+| `/api/cron/einvoices` | Không có trong `vercel.json`. | Chỉ bật sau khi chốt tần suất và hoàn tất rehearsal nghiệp vụ. |
+
+Không để cron legacy của Vercel chạy song song sau cutover. Lịch Mac phải dùng
+`launchd` và gọi `ops:maintenance` trên loopback; không mở endpoint cron ra
+Internet. Giữ lịch cụ thể trong cấu hình deployment theo giờ địa phương của
+cửa hàng, không suy diễn lịch mới từ tên endpoint.
 
 Health check:
 
 - `/api/health/live` xác nhận tiến trình Next.js.
-- `/api/health/ready` kiểm tra PostgreSQL và heartbeat của sync, notification,
-  backup worker; route trả 503 nếu database hoặc worker bắt buộc chưa sẵn sàng.
+- `/api/health/ready` kiểm tra PostgreSQL và heartbeat mới hơn 45 giây của sync,
+  notification, backup worker. Khi Auth provider là `lumapos`, route trả 503
+  nếu database hoặc bất kỳ worker bắt buộc nào chưa sẵn sàng; ở runtime legacy,
+  chỉ yêu cầu PostgreSQL.
 - Trang `/admin` hiển thị quản lý tài khoản cùng trạng thái backend, workers,
   hàng đợi sync và backup cho owner.
 

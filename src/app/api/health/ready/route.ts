@@ -10,7 +10,8 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     await db.execute(sql`select 1`);
-    const workers = authProvider() === "lumapos"
+    const selfHostedAuth = authProvider() === "lumapos";
+    const workers = selfHostedAuth
       ? await db.select({
         workerKey: systemWorkerHeartbeats.workerKey,
         state: systemWorkerHeartbeats.state,
@@ -22,19 +23,32 @@ export async function GET() {
       ]))
       : [];
     const now = Date.now();
+    const workerStatuses = Object.fromEntries(workers.map((worker) => [
+      worker.workerKey,
+      {
+        status: worker.state === "running" && now - worker.lastSeenAt.getTime() < 45_000
+          ? "online"
+          : "offline",
+        lastSeenAt: worker.lastSeenAt.toISOString(),
+      },
+    ]));
+    const requiredWorkerKeys = selfHostedAuth
+      ? ["sync-inbox", "notification-outbox", "database-backup"]
+      : [];
+    const missingWorkers = requiredWorkerKeys.filter((workerKey) =>
+      workerStatuses[workerKey]?.status !== "online"
+    );
+    const ready = missingWorkers.length === 0;
+
     return NextResponse.json({
-      status: "ready",
+      status: ready ? "ready" : "not_ready",
       database: "ready",
-      workers: Object.fromEntries(workers.map((worker) => [
-        worker.workerKey,
-        {
-          status: worker.state === "running" && now - worker.lastSeenAt.getTime() < 45_000
-            ? "online"
-            : "offline",
-          lastSeenAt: worker.lastSeenAt.toISOString(),
-        },
-      ])),
-    }, { headers: { "Cache-Control": "no-store" } });
+      workers: workerStatuses,
+      ...(missingWorkers.length > 0 ? { missingWorkers } : {}),
+    }, {
+      status: ready ? 200 : 503,
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch {
     return NextResponse.json({ status: "not_ready" }, {
       status: 503,
