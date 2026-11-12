@@ -1,3 +1,6 @@
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { orders } from "@/db/schema";
 import type { StoreContext } from "@/lib/auth/store-context";
 import { SALES_ACCESS_ROLES } from "@/lib/auth/roles";
 import { getRawStorePrefs } from "@/lib/data/settings";
@@ -30,6 +33,17 @@ export async function createOrderForSalesPrincipal(
 
   const parsed = createOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (parsed.data.clientId) {
+    const [existing] = await db.select({ id: orders.id, code: orders.code })
+      .from(orders)
+      .where(and(
+        eq(orders.storeId, principal.storeId),
+        eq(orders.clientId, parsed.data.clientId),
+      ))
+      .limit(1);
+    if (existing) return { ok: true, data: existing };
+  }
+
   let orderInput = parsed.data;
   let trustedItems: NormalizedOrderItem[];
   let taxPrefs: StorePrefs["tax"];
