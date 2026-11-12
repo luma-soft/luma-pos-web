@@ -149,7 +149,13 @@ export function getLocalMediaConfig(): LocalMediaConfig {
 
 export function getMediaWriteProvider(): "local" | "r2" {
   const configured = process.env.MEDIA_WRITE_PROVIDER?.trim().toLowerCase();
-  if (!configured || configured === "r2") return "r2";
+  if (!configured) {
+    if (process.env.LUMAPOS_AUTH_PROVIDER?.trim().toLowerCase() === "lumapos") {
+      throw new Error("MEDIA_WRITE_PROVIDER must be explicitly set for the self-hosted LumaPOS runtime");
+    }
+    return "r2";
+  }
+  if (configured === "r2") return "r2";
   if (configured === "local") return "local";
   throw new Error("MEDIA_WRITE_PROVIDER must be 'local' or 'r2'");
 }

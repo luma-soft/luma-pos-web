@@ -199,6 +199,10 @@ khi final snapshot được xác nhận:
 | `LUMAPOS_BACKUP_ROOT` | Volume backup riêng | Volume backup riêng hoặc agent offsite |
 | `LUMAPOS_BACKUP_ENCRYPTION_KEY` | Khóa 32 byte dạng hex | Giữ qua secret manager, không đặt cùng backup |
 
+Self-hosted runtime phải đặt tường minh `MEDIA_WRITE_PROVIDER`; trên Mac dùng
+`local`. Nếu bỏ trống khi Auth provider là `lumapos`, backend từ chối khởi tạo
+media thay vì âm thầm ghi sang R2 theo mặc định legacy.
+
 `DATABASE_URL`, `CRON_SECRET`, `MEDIA_LOCAL_SIGNING_SECRET`, khóa backup, khóa
 mobile và credentials của webhook/provider chỉ có ở server. Không commit
 `.env.local`, không đưa biến server vào `NEXT_PUBLIC_*`. Wrapper launchd trên
