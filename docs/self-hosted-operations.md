@@ -71,7 +71,8 @@ Rehearsal có thêm migration local `0166_media_migration_library_assets.sql`;
 `lumapos_local` và nguồn chưa áp dụng bước này.
 
 Preview media trên rehearsal phát hiện 2.476 tham chiếu: 454 owned theo host và
-bucket allowlist hiện tại, 2.022 `skipped` cần rà soát thủ công. Trong 469
+bucket allowlist hiện tại, 2.022 `external_url` ngoài allowlist Supabase hiện tại;
+cần rà soát domain trước cutover, không tải hoặc viết lại nhóm này. Trong 469
 `media_objects` R2 có 454 `ready`, 15 `deleted`. Probe R2 hiện trả `ready: false`;
 chưa chép file hay đổi provider. Vì thế rehearsal vẫn giữ R2 làm provider cho
 các media hiện có và chưa bật Auth/backend mới hoặc nhận ghi từ client. Các số

@@ -1023,6 +1023,30 @@ function classifyDiscovered(
   return { kind: "external" as const, coordinates: externalCoordinate(identity) };
 }
 
+function skippedReason(
+  reference: DiscoveredReference,
+  hosts: ReadonlySet<string>,
+  buckets: ReadonlySet<string>,
+) {
+  if (reference.sourceProvider) return null;
+  if (reference.bucket && reference.key) {
+    return buckets.has(reference.bucket) ? null : "bucket_not_allowlisted";
+  }
+  if (!reference.url) return "missing_source_coordinates";
+  let url: URL;
+  try {
+    url = new URL(reference.url);
+  } catch {
+    return "malformed_url";
+  }
+  if (classifyLegacyUrl(reference.url, { allowedHosts: hosts, allowedBuckets: buckets })) {
+    return null;
+  }
+  return hosts.has(url.hostname.toLowerCase())
+    ? "supabase_url_not_classified"
+    : "external_url";
+}
+
 function summarize(
   discovered: DiscoveredReference[],
   hosts: ReadonlySet<string>,
@@ -1031,13 +1055,18 @@ function summarize(
   let owned = 0;
   let skipped = 0;
   const domains: Record<string, number> = {};
+  const skippedByReason: Record<string, number> = {};
   for (const reference of discovered) {
     const classification = classifyDiscovered(reference, hosts, buckets);
     if (classification.kind === "owned") owned += 1;
-    else skipped += 1;
+    else {
+      skipped += 1;
+      const reason = skippedReason(reference, hosts, buckets) ?? "unclassified";
+      skippedByReason[reason] = (skippedByReason[reason] ?? 0) + 1;
+    }
     domains[reference.domain] = (domains[reference.domain] ?? 0) + 1;
   }
-  return { discovered: discovered.length, owned, skipped, domains };
+  return { discovered: discovered.length, owned, skipped, domains, skippedByReason };
 }
 
 async function run() {

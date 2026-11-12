@@ -67,10 +67,11 @@ Keep R2 source objects during the rollback window; do not run `delete-source`
 for the local migration until the product owner approves its retention gate.
 
 **Current gate (2026-11-13):** rehearsal dry-run discovered 2,476 references,
-454 owned and 2,022 skipped under the current allowlist. The skipped list has
-not been approved as external media. The R2 readiness check reports
-`ready: false`; no files have been copied and no provider has changed. Do not
-cut over until R2 reachability and skipped-reference review are complete.
+454 owned and 2,022 classified as `external_url` because their hosts are outside
+the current Supabase allowlist. Review domain ownership before cutover; do not
+download or rewrite these URLs. The R2 readiness check reports `ready: false`;
+no files have been copied and no provider has changed. Do not cut over until R2
+reachability and external-domain review are complete.
 
 ## Current production status
 

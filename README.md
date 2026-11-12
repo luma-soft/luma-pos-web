@@ -63,10 +63,10 @@ từ client.
 
 **Media rehearsal ngày 2026-11-13:** snapshot có 469 `media_objects` trên R2,
 gồm 454 `ready` và 15 `deleted`. Preview tìm 2.476 tham chiếu; 454 được nhận diện
-là LumaPOS-owned theo host và bucket allowlist, còn 2.022 bị đánh dấu `skipped`
-và cần rà soát trước cutover. Probe R2 hiện trả `ready: false`; chưa có file nào
-được chép hoặc đổi provider sang local. Không coi các mục `skipped` là vendor
-media đã xác nhận nếu chưa kiểm tra allowlist và domain.
+là LumaPOS-owned theo host và bucket allowlist, còn 2.022 bị phân loại
+`external_url` vì host không thuộc allowlist Supabase hiện tại. Cần rà soát domain
+trước cutover; các mục này không bị tải hoặc viết lại. Probe R2 hiện trả
+`ready: false`; chưa có file nào được chép hoặc đổi provider sang local.
 
 Để diễn tập trên database rỗng riêng, dùng cùng tên đích cho migration, import
 và đối soát. Ví dụ:
