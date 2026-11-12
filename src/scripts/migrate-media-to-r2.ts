@@ -1056,6 +1056,7 @@ function summarize(
   let skipped = 0;
   const domains: Record<string, number> = {};
   const skippedByReason: Record<string, number> = {};
+  const externalHosts: Record<string, number> = {};
   for (const reference of discovered) {
     const classification = classifyDiscovered(reference, hosts, buckets);
     if (classification.kind === "owned") owned += 1;
@@ -1063,10 +1064,24 @@ function summarize(
       skipped += 1;
       const reason = skippedReason(reference, hosts, buckets) ?? "unclassified";
       skippedByReason[reason] = (skippedByReason[reason] ?? 0) + 1;
+      if (reason === "external_url") {
+        let host = "invalid-url";
+        try {
+          host = new URL(reference.url ?? "").hostname.toLowerCase() || host;
+        } catch {}
+        externalHosts[host] = (externalHosts[host] ?? 0) + 1;
+      }
     }
     domains[reference.domain] = (domains[reference.domain] ?? 0) + 1;
   }
-  return { discovered: discovered.length, owned, skipped, domains, skippedByReason };
+  return {
+    discovered: discovered.length,
+    owned,
+    skipped,
+    domains,
+    skippedByReason,
+    externalHosts,
+  };
 }
 
 async function run() {

@@ -24,7 +24,8 @@ LUMAPOS_LOCAL_DATABASE_NAME=lumapos_rehearsal bun run db:migrate:local
 
 Inventory one store per run because migration-run ownership is tenant-scoped.
 Review all `skipped` references and the host/bucket allowlist before copying.
-The dry-run is read-only:
+The read-only dry-run reports `externalHosts` as hostname-only counts, without
+printing complete URLs, paths, query strings, or signed tokens:
 
 ```bash
 LUMAPOS_LOCAL_DATABASE_NAME=lumapos_rehearsal \
