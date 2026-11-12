@@ -3,11 +3,12 @@ import "server-only";
 import { R2ObjectStorage } from "@/lib/media/r2-storage";
 import { getLocalFileStorage } from "@/lib/media/local-storage";
 import { SupabaseObjectStorage } from "@/lib/media/supabase-storage";
-import { getMediaWriteProvider } from "@/lib/media/config";
+import { getMediaWriteProvider, readR2SourceConfig } from "@/lib/media/config";
 import { authProvider } from "@/lib/auth/provider";
 import type { MediaProvider, ObjectStorage } from "@/lib/media/types";
 
 let r2Storage: ObjectStorage | null = null;
+let r2MigrationSourceStorage: ObjectStorage | null = null;
 let supabaseStorage: ObjectStorage | null = null;
 let localStorage: ObjectStorage | null = null;
 
@@ -32,4 +33,10 @@ export function getObjectStorage(provider: MediaProvider = getMediaWriteProvider
 export function getSupabaseMigrationSourceStorage(): ObjectStorage {
   supabaseStorage ??= new SupabaseObjectStorage();
   return supabaseStorage;
+}
+
+/** Migration source access does not require a public URL or R2 target-write configuration. */
+export function getR2MigrationSourceStorage(): ObjectStorage {
+  r2MigrationSourceStorage ??= new R2ObjectStorage(readR2SourceConfig(process.env));
+  return r2MigrationSourceStorage;
 }

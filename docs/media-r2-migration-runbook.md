@@ -91,9 +91,31 @@ breakdown is:
 
 Counts help triage only; they do not establish ownership, license, or permission
 to copy. Confirm each source before changing the allowlist. The R2 readiness
-check still reports `ready: false`; no files have been copied and no provider
-has changed. Do not cut over until R2 reachability and external-domain review are
-complete.
+target-write check (`media:r2:preflight`) previously reported `ready: false`.
+That check requires the application to be configured to write to R2 and does not
+prove whether existing R2 objects can be read as a migration source. The
+self-hosted local target uses a separate, read-only source check. It requires an
+explicit rehearsal database name, reads one representative ready object from
+each visibility class present, and outputs only capability booleans:
+
+```bash
+LUMAPOS_LOCAL_DATABASE_NAME=lumapos_rehearsal bun run media:r2:source-preflight
+```
+
+This check performs PostgreSQL `SELECT` queries and R2 `HEAD` requests only; it
+does not write database or object data and does not require
+`R2_PUBLIC_BASE_URL`. A `ready: true` result confirms the sampled source reads,
+not every object. The migration copy/verify stages still need to pass for all
+objects before cutover.
+
+**Source-read probe (2026-11-13):** the rehearsal database was reachable and
+contained ready source objects in both visibility classes. The R2 source
+credential configuration was absent, so public/private reads were not attempted
+(`null`). This probe copied no files and changed no provider. Configure the
+server-side `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY` for
+the migration process, then rerun the check before copying. Do not cut over
+until the source-read check, all-object checksum verification, local file
+serving/backup rehearsal, and external-domain review are complete.
 
 ## Current production status
 

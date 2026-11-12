@@ -17,7 +17,11 @@ import {
   type MediaMigrationRepository,
   type MediaMigrationStatus,
 } from "@/lib/media/migration";
-import { getObjectStorage, getSupabaseMigrationSourceStorage } from "@/lib/media/storage";
+import {
+  getObjectStorage,
+  getR2MigrationSourceStorage,
+  getSupabaseMigrationSourceStorage,
+} from "@/lib/media/storage";
 import { getLocalPostgresTarget } from "./local-postgres-target";
 
 loadEnvConfig(process.cwd());
@@ -1148,7 +1152,7 @@ async function run() {
       const engine = createMediaMigrationEngine({
         repository,
         sourceStorage: (provider) => provider === "r2"
-          ? getObjectStorage("r2")
+          ? getR2MigrationSourceStorage()
           : getSupabaseMigrationSourceStorage(),
         targetStorage: target.storage,
         targetProvider,
@@ -1245,8 +1249,8 @@ async function run() {
     const target = migrationTarget(targetProvider);
     const engine = createMediaMigrationEngine({
       repository,
-        sourceStorage: (provider) => provider === "r2"
-          ? getObjectStorage("r2")
+      sourceStorage: (provider) => provider === "r2"
+        ? getR2MigrationSourceStorage()
           : getSupabaseMigrationSourceStorage(),
       targetStorage: target.storage,
       targetProvider,

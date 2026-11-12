@@ -7,6 +7,13 @@ export type R2Config = {
   publicBaseUrl: string;
 };
 
+export type R2SourceConfig = Pick<
+  R2Config,
+  "accountId" | "accessKeyId" | "secretAccessKey"
+>;
+export type R2ObjectStorageConfig = R2SourceConfig &
+  Partial<Pick<R2Config, "publicBucket" | "privateBucket" | "publicBaseUrl">>;
+
 export type PublicMediaConfig = Pick<
   R2Config,
   "publicBucket" | "publicBaseUrl"
@@ -84,20 +91,25 @@ export function readPublicMediaConfig(
   };
 }
 
-export function readR2Config(env: R2Environment): R2Config {
-  const publicMedia = readPublicMediaConfig(env);
-  const privateBucket = readBucketName(env, "R2_PRIVATE_BUCKET");
-
-  if (publicMedia.publicBucket === privateBucket) {
-    throw new Error("R2 public and private buckets must be different");
-  }
-
+export function readR2SourceConfig(env: R2Environment): R2SourceConfig {
   return {
     accountId: readAccountId(env),
     accessKeyId: requiredValue(env, "R2_ACCESS_KEY_ID"),
     secretAccessKey: requiredValue(env, "R2_SECRET_ACCESS_KEY"),
-    ...publicMedia,
+  };
+}
+
+export function readR2Config(env: R2Environment): R2Config {
+  const publicBucket = readBucketName(env, "R2_PUBLIC_BUCKET");
+  const privateBucket = readBucketName(env, "R2_PRIVATE_BUCKET");
+  if (publicBucket === privateBucket) {
+    throw new Error("R2 public and private buckets must be different");
+  }
+  return {
+    ...readR2SourceConfig(env),
+    publicBucket,
     privateBucket,
+    publicBaseUrl: readPublicBaseUrl(env),
   };
 }
 

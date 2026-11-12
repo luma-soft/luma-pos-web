@@ -9,7 +9,10 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-import { getR2Config, type R2Config } from "@/lib/media/config";
+import {
+  getR2Config,
+  type R2ObjectStorageConfig,
+} from "@/lib/media/config";
 import {
   ObjectStorageWriteError,
   type MediaObjectHead,
@@ -75,7 +78,7 @@ export class R2ObjectStorage implements ObjectStorage {
   private readonly client: S3Client;
 
   constructor(
-    private readonly config: R2Config = getR2Config(),
+    private readonly config: R2ObjectStorageConfig = getR2Config(),
     client?: S3Client,
     private readonly presign: typeof getSignedUrl = getSignedUrl,
   ) {
@@ -223,6 +226,9 @@ export class R2ObjectStorage implements ObjectStorage {
   }
 
   publicUrl(input: { key: string }): string {
+    if (!this.config.publicBaseUrl) {
+      throw new Error("R2_PUBLIC_BASE_URL is required to create a public object URL");
+    }
     return publicObjectUrl(this.config.publicBaseUrl, input.key);
   }
 }
