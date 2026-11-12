@@ -223,71 +223,74 @@ async function createSession(input: {
   deviceId?: string | null;
   deviceName?: string | null;
 }) {
-  const [profile] = await db.select({
-    storeId: profiles.storeId,
-  }).from(profiles)
-    .innerJoin(stores, eq(stores.id, profiles.storeId))
-    .where(and(
-      eq(profiles.id, input.profileId),
-      eq(profiles.isActive, true),
-      eq(stores.status, "active"),
-    ))
-    .limit(1);
-  if (!profile) return null;
+  return db.transaction(async (tx) => {
+    const [profile] = await tx.select({
+      storeId: profiles.storeId,
+    }).from(profiles)
+      .innerJoin(stores, eq(stores.id, profiles.storeId))
+      .where(and(
+        eq(profiles.id, input.profileId),
+        eq(profiles.isActive, true),
+        eq(stores.status, "active"),
+      ))
+      .limit(1)
+      .for("update");
+    if (!profile) return null;
 
-  const now = new Date();
-  const sessionExpiresAt = new Date(now.getTime() + (
-    input.kind === "web" ? WEB_SESSION_TTL_MS : MOBILE_SESSION_TTL_MS
-  ));
-  const [session] = await db.insert(authSessions).values({
-    storeId: profile.storeId,
-    profileId: input.profileId,
-    kind: input.kind,
-    deviceId: input.deviceId?.trim().slice(0, 160) || null,
-    deviceName: input.deviceName?.trim().slice(0, 160) || null,
-    expiresAt: sessionExpiresAt,
-  }).returning({ id: authSessions.id });
+    const now = new Date();
+    const sessionExpiresAt = new Date(now.getTime() + (
+      input.kind === "web" ? WEB_SESSION_TTL_MS : MOBILE_SESSION_TTL_MS
+    ));
+    const [session] = await tx.insert(authSessions).values({
+      storeId: profile.storeId,
+      profileId: input.profileId,
+      kind: input.kind,
+      deviceId: input.deviceId?.trim().slice(0, 160) || null,
+      deviceName: input.deviceName?.trim().slice(0, 160) || null,
+      expiresAt: sessionExpiresAt,
+    }).returning({ id: authSessions.id });
 
-  if (input.kind === "web") {
-    const token = createOpaqueToken();
-    const expiresAt = new Date(Math.min(now.getTime() + WEB_SESSION_TTL_MS, sessionExpiresAt.getTime()));
-    await db.insert(authSessionTokens).values({
+    if (input.kind === "web") {
+      const token = createOpaqueToken();
+      const expiresAt = new Date(Math.min(now.getTime() + WEB_SESSION_TTL_MS, sessionExpiresAt.getTime()));
+      await tx.insert(authSessionTokens).values({
+        sessionId: session.id,
+        tokenHash: hashAuthToken(token),
+        kind: "web_session",
+        expiresAt,
+      });
+      return { sessionId: session.id, token, expiresAt: expiresAt.getTime() };
+    }
+
+    const accessToken = createOpaqueToken();
+    const refreshToken = createOpaqueToken();
+    const accessExpiresAt = new Date(now.getTime() + MOBILE_ACCESS_TTL_MS);
+    const refreshExpiresAt = new Date(Math.min(
+      now.getTime() + MOBILE_REFRESH_TTL_MS,
+      sessionExpiresAt.getTime(),
+    ));
+    await tx.insert(authSessionTokens).values([
+      {
+        sessionId: session.id,
+        tokenHash: hashAuthToken(accessToken),
+        kind: "mobile_access",
+        expiresAt: accessExpiresAt,
+      },
+      {
+        sessionId: session.id,
+        tokenHash: hashAuthToken(refreshToken),
+        kind: "mobile_refresh",
+        expiresAt: refreshExpiresAt,
+      },
+    ]);
+
+    return {
       sessionId: session.id,
-      tokenHash: hashAuthToken(token),
-      kind: "web_session",
-      expiresAt,
-    });
-    return { sessionId: session.id, token, expiresAt: expiresAt.getTime() };
-  }
-
-  const accessToken = createOpaqueToken();
-  const refreshToken = createOpaqueToken();
-  const accessExpiresAt = new Date(now.getTime() + MOBILE_ACCESS_TTL_MS);
-  const refreshExpiresAt = new Date(Math.min(
-    now.getTime() + MOBILE_REFRESH_TTL_MS,
-    sessionExpiresAt.getTime(),
-  ));
-  await db.insert(authSessionTokens).values([
-    {
-      sessionId: session.id,
-      tokenHash: hashAuthToken(accessToken),
-      kind: "mobile_access",
-      expiresAt: accessExpiresAt,
-    },
-    {
-      sessionId: session.id,
-      tokenHash: hashAuthToken(refreshToken),
-      kind: "mobile_refresh",
-      expiresAt: refreshExpiresAt,
-    },
-  ]);
-
-  return {
-    sessionId: session.id,
-    accessToken,
-    refreshToken,
-    expiresAt: accessExpiresAt.getTime(),
-  };
+      accessToken,
+      refreshToken,
+      expiresAt: accessExpiresAt.getTime(),
+    };
+  });
 }
 
 export function createWebAuthSession(profileId: string) {
