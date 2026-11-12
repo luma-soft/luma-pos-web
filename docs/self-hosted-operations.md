@@ -132,7 +132,7 @@ Health check:
   attachment AI chưa gắn media ID, migration chưa hoàn tất hoặc URL ngoài
   allowlist chưa được chủ sản phẩm xác nhận.
 - Trang `/admin` hiển thị quản lý tài khoản cùng trạng thái backend, workers,
-  hàng đợi sync và backup cho owner.
+  hàng đợi sync, backup, provider lưu file và các blocker media cutover cho owner.
 
 ### File, URL và quyền truy cập
 

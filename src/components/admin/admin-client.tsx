@@ -18,7 +18,9 @@ type Account = {
 
 type Operations = {
   backend: { status: string; uptimeSeconds: number };
+  readiness: { status: string; missingWorkers: string[]; missingMedia: string[] };
   database: { status: string };
+  media: { status: string; provider: "local" | "r2" | null; blockers: Record<string, boolean> };
   sync: { worker: { status: string; lastSeenAt: string | null }; queue: Record<string, number> };
   workers: {
     notifications: { status: string; lastSeenAt: string | null };
@@ -116,9 +118,22 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
 
   const displayRole = (role: Role) => t(`roles.${role}`);
   const displayStatus = (status: string) => {
-    const known = ["online", "offline", "ready", "pending", "processing", "accepted", "rejected", "conflict", "queued", "running", "succeeded", "failed"] as const;
+    const known = ["online", "offline", "ready", "not_ready", "not_required", "pending", "processing", "accepted", "rejected", "conflict", "queued", "running", "succeeded", "failed"] as const;
     return t(`statuses.${known.includes(status as typeof known[number]) ? status : "offline"}` as "statuses.online");
   };
+  const mediaBlockerLabels: Record<string, string> = {
+    externalMediaReview: t("mediaBlockers.externalMediaReview"),
+    supabaseManagedMedia: t("mediaBlockers.supabaseManagedMedia"),
+    legacyServiceAttachments: t("mediaBlockers.legacyServiceAttachments"),
+    legacyCustomerRequestAttachments: t("mediaBlockers.legacyCustomerRequestAttachments"),
+    pendingRemoteRequestCleanup: t("mediaBlockers.pendingRemoteRequestCleanup"),
+    legacyAiAttachments: t("mediaBlockers.legacyAiAttachments"),
+    nonLocalManagedMedia: t("mediaBlockers.nonLocalManagedMedia"),
+    unfinishedLocalMediaMigration: t("mediaBlockers.unfinishedLocalMediaMigration"),
+  };
+  const activeMediaBlockers = Object.entries(operations?.media.blockers ?? {})
+    .filter(([, blocked]) => blocked)
+    .map(([key]) => mediaBlockerLabels[key] ?? t("mediaBlockers.unknown"));
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
@@ -241,10 +256,12 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {[
                   [t("backend"), operations.backend.status],
+                  [t("readiness"), operations.readiness.status],
                   [t("database"), operations.database.status],
                   [t("syncWorker"), operations.sync.worker.status],
                   [t("notificationWorker"), operations.workers.notifications.status],
                   [t("backupWorker"), operations.workers.backups.status],
+                  [t("mediaStorage"), operations.media.status],
                 ].map(([label, status]) => (
                   <div key={label} className="rounded-xl bg-surface-2 p-4">
                     <p className="text-xs text-slate-500">{label}</p>
@@ -255,7 +272,25 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
                   <p className="text-xs text-slate-500">{t("queue")}</p>
                   <p className="mt-1 font-semibold">{Object.entries(operations.sync.queue).map(([status, count]) => `${displayStatus(status)}: ${count}`).join(" · ") || "0"}</p>
                 </div>
+                <div className="rounded-xl bg-surface-2 p-4">
+                  <p className="text-xs text-slate-500">{t("mediaProvider")}</p>
+                  <p className="mt-1 font-semibold">
+                    {operations.media.provider === "local"
+                      ? t("mediaProviders.local")
+                      : operations.media.provider === "r2"
+                        ? t("mediaProviders.r2")
+                        : "—"}
+                  </p>
+                </div>
               </div>
+              {activeMediaBlockers.length > 0 && (
+                <div role="status" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                  <p className="font-semibold">{t("mediaCutoverPending")}</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {activeMediaBlockers.map((label) => <li key={label}>{label}</li>)}
+                  </ul>
+                </div>
+              )}
               <div className="mt-5 flex items-center justify-between gap-3">
                 <h3 className="font-semibold">{t("backup")}</h3>
                 <button type="button" disabled={busy} onClick={() => void mutate("/api/admin/operations", "POST")} className="h-9 rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white disabled:opacity-50">

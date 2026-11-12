@@ -1,10 +1,11 @@
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { databaseBackupRuns, syncEvents, systemWorkerHeartbeats } from "@/db/schema";
+import { databaseBackupRuns, syncEvents } from "@/db/schema";
 import { authProvider } from "@/lib/auth/provider";
 import { OWNER_ROLES } from "@/lib/auth/roles";
 import { requireStoreRole } from "@/lib/auth/store-context";
+import { readSelfHostedReadiness } from "@/lib/ops/self-hosted-readiness";
 
 export const dynamic = "force-dynamic";
 
@@ -20,17 +21,12 @@ export async function GET() {
   if (authProvider() !== "lumapos") return unavailable();
   try {
     const context = await requireStoreRole(OWNER_ROLES);
-    await db.execute(sql`select 1`);
-    const [queueRows, workerRows, backups] = await Promise.all([
+    const [readiness, queueRows, backups] = await Promise.all([
+      readSelfHostedReadiness(),
       db.select({ status: syncEvents.status, count: sql<number>`count(*)::int` })
         .from(syncEvents)
         .where(eq(syncEvents.storeId, context.storeId))
         .groupBy(syncEvents.status),
-      db.select().from(systemWorkerHeartbeats).where(inArray(systemWorkerHeartbeats.workerKey, [
-        "sync-inbox",
-        "notification-outbox",
-        "database-backup",
-      ])),
       db.select({
         id: databaseBackupRuns.id,
         status: databaseBackupRuns.status,
@@ -42,28 +38,24 @@ export async function GET() {
         failureCode: databaseBackupRuns.failureCode,
       }).from(databaseBackupRuns).orderBy(desc(databaseBackupRuns.requestedAt)).limit(10),
     ]);
-    const currentTime = Date.now();
-    const workerStatus = (workerKey: string) => {
-      const worker = workerRows.find((row) => row.workerKey === workerKey);
-      return worker ? {
-        status: worker.state === "running" && currentTime - worker.lastSeenAt.getTime() < 45_000
-          ? "online"
-          : "offline",
-        lastSeenAt: worker.lastSeenAt.toISOString(),
-      } : { status: "offline", lastSeenAt: null };
-    };
     return json({
       ok: true,
       data: {
         backend: { status: "online", uptimeSeconds: Math.floor(process.uptime()) },
-        database: { status: "ready" },
+        readiness: {
+          status: readiness.status,
+          missingWorkers: readiness.missingWorkers,
+          missingMedia: readiness.missingMedia,
+        },
+        database: { status: readiness.database },
+        media: readiness.media,
         sync: {
-          worker: workerStatus("sync-inbox"),
+          worker: readiness.workers["sync-inbox"] ?? { status: "offline", lastSeenAt: null },
           queue: Object.fromEntries(queueRows.map((row) => [row.status, row.count])),
         },
         workers: {
-          notifications: workerStatus("notification-outbox"),
-          backups: workerStatus("database-backup"),
+          notifications: readiness.workers["notification-outbox"] ?? { status: "offline", lastSeenAt: null },
+          backups: readiness.workers["database-backup"] ?? { status: "offline", lastSeenAt: null },
         },
         backups: backups.map((run) => ({
           ...run,
