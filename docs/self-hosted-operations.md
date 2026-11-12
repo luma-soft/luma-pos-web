@@ -74,11 +74,14 @@ cũng lệch 1,0 đơn vị. Snapshot này chưa được xác nhận là nguồ
 ảnh chụp của lần kiểm tra, không khẳng định trạng thái ở thời điểm sau đó.
 
 Trong cùng đợt, `lumapos_rehearsal` được tạo riêng, nhập từ database đang cấu
-hình và đối soát thành công 140 bảng cùng các tổng hợp tài chính; 3 hồ sơ có 3
-Auth credentials tương thích, không có tài khoản cần reset, receipt sync khớp.
-Hai `email_verified_at` chỉ khác ở microsecond dưới độ chính xác millisecond.
-Rehearsal có thêm migration local `0166_media_migration_library_assets.sql`;
-`lumapos_local` và nguồn chưa áp dụng bước này.
+hình. Đối soát chỉ đọc chạy lại ngày 2026-11-13 trả `reconciled`: 140 bảng so
+sánh được, không thiếu bảng/cột và không có lệch row count, row checksum hay
+tổng hợp tài chính. Cả 177 migration nguồn đều có ở rehearsal; rehearsal có
+thêm `0166_media_migration_library_assets.sql`. Hai bên có cùng 469 media object
+R2. Ba hồ sơ có ba Auth credentials khớp, không có tài khoản cần reset; hai
+`email_verified_at` chỉ khác ở microsecond dưới độ chính xác millisecond. Trạng
+thái sync receipt hai bên đều rỗng và khớp. Đây vẫn là rehearsal, chưa được tuyên
+bố làm nguồn dữ liệu chính.
 
 Preview media trên rehearsal phát hiện 2.476 tham chiếu: 454 owned theo host và
 bucket allowlist hiện tại, 2.022 `external_url` ngoài allowlist Supabase hiện tại;
