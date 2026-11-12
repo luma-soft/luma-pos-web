@@ -14,6 +14,7 @@ import {
   servicePublicRateLimits,
 } from "@/db/schema";
 import { isCustomerRequestTokenSubmittable } from "@/lib/services/customer-request-token";
+import type { MediaProvider } from "@/lib/media/types";
 
 type ServiceTransaction = Parameters<
   Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]
@@ -415,7 +416,7 @@ export async function stageCustomerRequestStorageCleanupCore(
   tx: ServiceTransaction,
   input: {
     requestId: string;
-    objects: Array<{ bucket: string; path: string }>;
+    objects: Array<{ bucket: string; path: string; provider?: MediaProvider }>;
     now?: Date;
   },
 ) {
@@ -432,12 +433,14 @@ export async function stageCustomerRequestStorageCleanupCore(
       requestId: input.requestId,
       bucket: object.bucket,
       path: object.path,
+      provider: object.provider ?? "supabase",
       notBefore: new Date(now.getTime() + 15 * 60 * 1000),
     })),
   ).returning({
     id: serviceCustomerRequestStorageCleanup.id,
     bucket: serviceCustomerRequestStorageCleanup.bucket,
     path: serviceCustomerRequestStorageCleanup.path,
+    provider: serviceCustomerRequestStorageCleanup.provider,
   });
 }
 
@@ -445,7 +448,7 @@ const CUSTOMER_REQUEST_CLEANUP_LEASE_MS = 5 * 60 * 1000;
 
 export async function drainCustomerRequestStorageCleanup(input: {
   database: NodePgDatabase<typeof schema>;
-  storage: { remove(bucket: string, path: string): Promise<void> };
+  storage: { remove(bucket: string, path: string, provider: MediaProvider): Promise<void> };
   now?: Date;
   limit?: number;
 }) {
@@ -477,10 +480,11 @@ export async function drainCustomerRequestStorageCleanup(input: {
       id: serviceCustomerRequestStorageCleanup.id,
       bucket: serviceCustomerRequestStorageCleanup.bucket,
       path: serviceCustomerRequestStorageCleanup.path,
+      provider: serviceCustomerRequestStorageCleanup.provider,
     });
     if (!claimed) continue;
     try {
-      await input.storage.remove(claimed.bucket, claimed.path);
+      await input.storage.remove(claimed.bucket, claimed.path, claimed.provider);
       await input.database.delete(serviceCustomerRequestStorageCleanup).where(and(
         eq(serviceCustomerRequestStorageCleanup.id, claimed.id),
         eq(serviceCustomerRequestStorageCleanup.claimToken, claimToken),

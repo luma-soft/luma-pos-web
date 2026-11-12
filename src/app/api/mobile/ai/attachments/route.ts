@@ -4,7 +4,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { requireAiProviderConfigured } from "@/lib/ai/config";
 import { getAiAttachmentsBucket } from "@/lib/data/settings";
 import type { MediaActor } from "@/lib/media/authorization";
-import { getR2Config } from "@/lib/media/config";
+import { getLocalMediaConfig, getMediaWriteProvider, getR2Config } from "@/lib/media/config";
 import {
   getMediaService,
   MediaServiceError,
@@ -16,6 +16,7 @@ import {
 } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { authProvider } from "@/lib/auth/provider";
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
@@ -63,6 +64,9 @@ function sniffMime(bytes: Uint8Array, declared: string) {
 }
 
 async function defaultLegacySigner(bucket: string, path: string) {
+  if (authProvider() === "lumapos") {
+    throw new Error("LEGACY_ATTACHMENT_NOT_MIGRATED");
+  }
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase.storage
     .from(bucket)
@@ -90,7 +94,10 @@ export function createAiAttachmentHandlers(dependencies: {
   const authenticate = dependencies.authenticate ?? requireMobileAiUser;
   const requireProvider = dependencies.requireProvider ?? requireAiProviderConfigured;
   const mediaService = () => dependencies.mediaService ?? getMediaService();
-  const privateBucket = () => dependencies.privateBucket ?? getR2Config().privateBucket;
+  const mediaProvider = getMediaWriteProvider();
+  const privateBucket = () => dependencies.privateBucket ?? (
+    mediaProvider === "local" ? getLocalMediaConfig().privateBucket : getR2Config().privateBucket
+  );
   const getLegacyBucket = dependencies.getLegacyBucket ?? getAiAttachmentsBucket;
   const signLegacy = dependencies.signLegacy ?? defaultLegacySigner;
 
@@ -195,7 +202,7 @@ export function createAiAttachmentHandlers(dependencies: {
             code: file.name,
           }],
           metadata: {
-            provider: "r2",
+            provider: mediaProvider,
             bucket: privateBucket(),
             sessionId,
             surface: form.get("surface") || "web",

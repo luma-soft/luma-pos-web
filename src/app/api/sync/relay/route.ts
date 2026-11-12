@@ -1,3 +1,9 @@
+import { createHash } from "node:crypto";
+import { and, eq, inArray } from "drizzle-orm";
+import { db } from "@/db";
+import { syncEvents } from "@/db/schema";
+import { authProvider } from "@/lib/auth/provider";
+import { getAuthenticatedUser, resolveStoreContextForUser } from "@/lib/auth/store-context";
 import { createClient as createBearerClient } from "@supabase/supabase-js";
 import { createClient as createCookieClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -14,6 +20,8 @@ export const dynamic = "force-dynamic";
 type RelayRole = "owner" | "manager" | "cashier" | "warehouse" | "technician";
 
 async function authenticatedUser(request: Request) {
+  if (authProvider() === "lumapos") return getAuthenticatedUser();
+
   const bearer = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
   if (bearer) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -63,6 +71,16 @@ function privateJson(body: unknown, status = 200) {
 
 function relayDisabledResponse() {
   return privateJson({ ok: false, error: "SYNC_RELAY_DISABLED" }, 503);
+}
+
+function canonicalPayloadHash(commandType: string, payload: unknown, baseRevision?: string | number) {
+  return createHash("sha256")
+    .update(stableJson({
+      commandType,
+      payload,
+      baseRevision: baseRevision == null ? null : String(baseRevision),
+    }))
+    .digest("hex");
 }
 
 class RelayRequestBodyError extends Error {
@@ -120,7 +138,12 @@ function stableJson(value: unknown): string {
 }
 
 export async function POST(request: Request) {
-  if (process.env.LUMAPOS_SYNC_RELAY_ENABLED !== "true") return relayDisabledResponse();
+  const provider = authProvider();
+  if (provider === "lumapos"
+    ? process.env.LUMAPOS_SYNC_INBOX_ENABLED !== "true"
+    : process.env.LUMAPOS_SYNC_RELAY_ENABLED !== "true") {
+    return relayDisabledResponse();
+  }
   const user = await authenticatedUser(request);
   if (!user) return privateJson({ ok: false, error: "UNAUTHORIZED" }, 401);
 
@@ -136,10 +159,90 @@ export async function POST(request: Request) {
 
   const input = parsed.data;
   const commandType = input.commandType ?? POS_ORDER_SYNC_COMMAND;
-  if (commandType === SERVICE_FIELD_MUTATION_SYNC_COMMAND
-    && process.env.LUMAPOS_SERVICE_FIELD_RELAY_ENABLED !== "true") {
+  const serviceFieldSyncEnabled = provider === "lumapos"
+    ? process.env.LUMAPOS_SERVICE_FIELD_SYNC_ENABLED === "true"
+    : process.env.LUMAPOS_SERVICE_FIELD_RELAY_ENABLED === "true";
+  if (commandType === SERVICE_FIELD_MUTATION_SYNC_COMMAND && !serviceFieldSyncEnabled) {
     return privateJson({ ok: false, error: "SYNC_COMMAND_DISABLED" }, 503);
   }
+
+  if (authProvider() === "lumapos") {
+    const context = await resolveStoreContextForUser(user.id);
+    if (!context || context.storeId !== input.storeId
+      || !canSubmitCommand(context.role, commandType)) {
+      return privateJson({ ok: false, error: "FORBIDDEN" }, 403);
+    }
+
+    const payloadHash = canonicalPayloadHash(commandType, input.payload, input.baseRevision);
+    try {
+      return await db.transaction(async (tx) => {
+        const [created] = await tx.insert(syncEvents).values({
+          storeId: input.storeId,
+          eventId: input.eventId,
+          userId: user.id,
+          deviceId: input.deviceId,
+          commandType,
+          baseRevision: input.baseRevision == null ? null : BigInt(input.baseRevision),
+          payload: input.payload as Record<string, unknown>,
+          payloadHash,
+          status: "pending",
+        }).onConflictDoNothing({
+          target: [syncEvents.storeId, syncEvents.eventId],
+        }).returning({
+          position: syncEvents.position,
+          eventId: syncEvents.eventId,
+          status: syncEvents.status,
+        });
+
+        if (created) {
+          return privateJson({
+            ok: true,
+            data: {
+              duplicate: false,
+              position: created.position.toString(),
+              eventId: created.eventId,
+              status: created.status,
+            },
+          }, 202);
+        }
+
+        const [existing] = await tx.select({
+          position: syncEvents.position,
+          eventId: syncEvents.eventId,
+          userId: syncEvents.userId,
+          deviceId: syncEvents.deviceId,
+          commandType: syncEvents.commandType,
+          payloadHash: syncEvents.payloadHash,
+          status: syncEvents.status,
+        }).from(syncEvents).where(and(
+          eq(syncEvents.storeId, input.storeId),
+          eq(syncEvents.eventId, input.eventId),
+        )).limit(1).for("update");
+
+        if (!existing || existing.userId !== user.id) {
+          return privateJson({ ok: false, error: "SYNC_EVENT_ID_CONFLICT" }, 409);
+        }
+        if (existing.payloadHash !== payloadHash
+          || existing.deviceId !== input.deviceId
+          || existing.commandType !== commandType) {
+          return privateJson({ ok: false, error: "SYNC_EVENT_ID_REUSED" }, 409);
+        }
+
+        return privateJson({
+          ok: true,
+          data: {
+            duplicate: true,
+            position: existing.position.toString(),
+            eventId: existing.eventId,
+            status: existing.status,
+          },
+        }, 202);
+      });
+    } catch {
+      return privateJson({ ok: false, error: "SYNC_RELAY_UNAVAILABLE" }, 503);
+    }
+  }
+
   const role = await relayMembership(input.storeId, user.id);
   if (!role || !canSubmitCommand(role, commandType)) return privateJson({ ok: false, error: "FORBIDDEN" }, 403);
 
@@ -204,7 +307,12 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  if (process.env.LUMAPOS_SYNC_RELAY_ENABLED !== "true") return relayDisabledResponse();
+  const provider = authProvider();
+  if (provider === "lumapos"
+    ? process.env.LUMAPOS_SYNC_INBOX_ENABLED !== "true"
+    : process.env.LUMAPOS_SYNC_RELAY_ENABLED !== "true") {
+    return relayDisabledResponse();
+  }
   const user = await authenticatedUser(request);
   if (!user) return privateJson({ ok: false, error: "UNAUTHORIZED" }, 401);
 
@@ -220,6 +328,45 @@ export async function GET(request: Request) {
   if (eventIds.length < 1 || eventIds.length > SYNC_RELAY_STATUS_LIMIT
     || eventIds.some((eventId) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId))) {
     return privateJson({ ok: false, error: "INVALID_SYNC_EVENT_IDS" }, 400);
+  }
+
+  if (authProvider() === "lumapos") {
+    const context = await resolveStoreContextForUser(user.id);
+    if (!context || context.storeId !== storeId) {
+      return privateJson({ ok: false, error: "FORBIDDEN" }, 403);
+    }
+    try {
+      const rows = await db.select({
+        position: syncEvents.position,
+        eventId: syncEvents.eventId,
+        storeId: syncEvents.storeId,
+        status: syncEvents.status,
+        result: syncEvents.result,
+        errorCode: syncEvents.errorCode,
+        processedAt: syncEvents.processedAt,
+      }).from(syncEvents).where(and(
+        eq(syncEvents.storeId, storeId),
+        eq(syncEvents.userId, user.id),
+        inArray(syncEvents.eventId, eventIds),
+      )).orderBy(syncEvents.position).limit(SYNC_RELAY_STATUS_LIMIT);
+
+      return privateJson({
+        ok: true,
+        data: {
+          receipts: rows.map((event) => ({
+            position: event.position.toString(),
+            eventId: event.eventId,
+            storeId: event.storeId,
+            status: event.status,
+            result: event.result,
+            errorCode: event.errorCode,
+            processedAt: event.processedAt?.toISOString() ?? null,
+          })),
+        },
+      });
+    } catch {
+      return privateJson({ ok: false, error: "SYNC_RELAY_UNAVAILABLE" }, 503);
+    }
   }
 
   const role = await relayMembership(storeId, user.id);

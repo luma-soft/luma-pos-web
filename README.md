@@ -21,6 +21,8 @@ Hệ thống quản lý bán hàng cho cửa hàng VLXD / thiết bị điện n
 - **UI**: Tailwind CSS v4 + Lucide icons
 
 Chi tiết quyết định và rollout: [ADR-0002](docs/adr/0002-self-hosted-postgresql-nextjs.md).
+Vận hành Mac/VPS: [self-hosted operations](docs/self-hosted-operations.md); danh
+sách phụ thuộc còn chuyển: [Supabase dependency matrix](docs/self-hosted-dependency-matrix.md).
 
 ## PostgreSQL local trên macOS
 
@@ -49,33 +51,22 @@ tất nhập dữ liệu và cutover.
 local còn rỗng, chạy:
 
 ```bash
-bun db:import:local
+bun run db:import:local -- --confirm-bootstrap-target
 ```
 
-Lệnh dùng kết nối session hiện có, giữ nguyên dữ liệu nguồn và chỉ chạy khi
-`lumapos_local` không có dữ liệu ngoài các hàng mẫu do migration tạo. File dump
-tạm được xóa sau khi nhập xong; sự kiện và thành viên của hàng đợi sync không
-được sao chép. Đây là bản sao tại thời điểm chạy, chưa phải đồng bộ liên tục.
+Lệnh tạo dump trước, giữ nguyên dữ liệu nguồn và chỉ thay bootstrap rows đã biết
+trong `lumapos_local`. Nó nhập thông tin credentials tương thích và biên nhận
+relay cũ; không nhập phiên/token Auth, worker heartbeat hay lịch sử backup. Các
+receipt `processing` được đưa về `pending` để xử lý lại an toàn; receipt kết thúc
+giữ trạng thái. Đây là snapshot một lần, chưa phải đồng bộ liên tục. Trạng thái
+database hiện tại không được xác minh trong lượt cập nhật này.
 
-Bộ xử lý relay chỉ chạy sau khi đã đối soát bản sao local và tuyên bố PostgreSQL
-trên Mac là database chính thức. Khi đã sẵn sàng, đặt cờ xác nhận cho riêng tiến
-trình:
-
-```bash
-LUMAPOS_LOCAL_AUTHORITY_CONFIRMED=true bun run sync:relay:local
-```
-
-Bộ xử lý chỉ mở kết nối PostgreSQL qua `127.0.0.1`, kéo lệnh chờ từ Supabase,
-và ghi kết quả xác nhận trở lại relay. Không mở cổng PostgreSQL ra Internet.
-
-Relay trên web mặc định bị khóa. Chỉ đặt `LUMAPOS_SYNC_RELAY_ENABLED=true` trong
-môi trường chạy web sau khi đã đối soát dữ liệu local, cài worker trên Mac và
-chuẩn bị chuyển toàn bộ luồng ghi POS được hỗ trợ sang PostgreSQL local. Khi
-cờ chưa bật, web tiếp tục dùng luồng hiện tại và endpoint relay không nhận lệnh.
-
-Đây là relay Supabase hiện hữu để duy trì runtime trong giai đoạn chuyển đổi,
-không phải kiến trúc đích. Không mở rộng relay cho luồng mới; từng luồng sẽ được
-chuyển sang API Next.js và đồng bộ tới PostgreSQL theo ADR-0002.
+`sync:relay:local` và `LUMAPOS_SYNC_RELAY_ENABLED` chỉ thuộc relay Supabase cũ
+trong giai đoạn chuyển đổi. Không bật hoặc mở rộng relay này cho kiến trúc đích.
+Target dùng `bun run sync:postgres:worker`, inbox trong PostgreSQL và API
+`/api/sync/relay` theo Auth provider đang bật. Xem
+[runbook self-hosted](docs/self-hosted-operations.md) trước mọi thao tác nhập,
+đối soát hoặc cutover.
 
 ## Quản trị PostgreSQL bằng pgAdmin 4
 
@@ -94,6 +85,26 @@ Backend có hai endpoint vận hành không cần đăng nhập: `/api/health/li
 nhận tiến trình Next.js phản hồi; `/api/health/ready` kiểm tra thêm kết nối
 PostgreSQL và trả HTTP 503 khi database chưa sẵn sàng. Hai endpoint không trả lỗi
 nội bộ hoặc thông tin kết nối.
+
+## Chuyển Auth và đồng bộ sang PostgreSQL
+
+`LUMAPOS_AUTH_PROVIDER` mặc định là `supabase` để bản runtime cũ tiếp tục hoạt
+động. Chỉ đặt thành `lumapos` sau khi đã nhập `auth_credentials`, hoàn tất các
+luồng sync inbox và cài worker PostgreSQL. Web dùng cookie `HttpOnly`; iPhone
+tiếp tục dùng hợp đồng `/api/mobile/auth/*` và cất access/refresh token trong
+Keychain. Khi bật provider `lumapos`, API relay dùng inbox PostgreSQL; không bật
+provider mới trước khi snapshot được đối soát và cả worker đã sẵn sàng.
+
+Worker `bun run sync:postgres:worker` dùng advisory lock PostgreSQL, nhận lệnh
+theo `FOR UPDATE SKIP LOCKED` và xử lý qua cùng domain command với API. Chỉ bật
+`LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true` sau khi snapshot local đã được đối soát
+và chọn làm nguồn dữ liệu chính. Trên Mac/VPS, chạy worker dưới process
+supervisor thay vì một cron ngắn hạn.
+
+Worker notification và backup cùng trạng thái vận hành được mô tả trong
+[runbook self-hosted](docs/self-hosted-operations.md). Mặc định hiện tại vẫn là
+runtime legacy; tài liệu không xác nhận PostgreSQL local đang chạy hay đã được
+chọn làm nguồn dữ liệu chính.
 
 ## Setup runtime hiện tại (chỉ trong giai đoạn chuyển đổi)
 

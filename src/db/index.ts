@@ -2,6 +2,9 @@ import { attachDatabasePool } from "@vercel/functions";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
+import { assertSelfHostedPrimaryDatabase } from "./self-hosted-primary";
+
+assertSelfHostedPrimaryDatabase(process.env);
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -24,7 +27,7 @@ function getNodePostgresConnectionString(value: string) {
 
 // Runtime app dùng Supabase transaction pooler (:6543). `pg` không tạo named
 // prepared statements nếu query không có `name`, nên tương thích transaction mode.
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: getNodePostgresConnectionString(connectionString),
   // Giới hạn pool phía app; Supavisor tiếp tục chia sẻ backend connections.
   max: process.env.NODE_ENV === "production" ? 3 : 10,

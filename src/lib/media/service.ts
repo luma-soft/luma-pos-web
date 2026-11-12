@@ -2,10 +2,11 @@ import { createHash, randomUUID as nodeRandomUUID } from "node:crypto";
 
 import {
   isDefinitiveObjectStorageWriteError,
+  type MediaProvider,
   type MediaVisibility,
   type ObjectStorage,
 } from "@/lib/media/types";
-import { getR2Config } from "@/lib/media/config";
+import { getLocalMediaConfig, getMediaWriteProvider, getR2Config } from "@/lib/media/config";
 import { createMediaThumbnail, isSafeRasterMimeType } from "@/lib/media/image-variants";
 import { createObjectKey } from "@/lib/media/object-key";
 import { db } from "@/db";
@@ -67,7 +68,7 @@ export type MediaStatus = "pending" | "ready" | "quarantined" | "deleted";
 export type MediaRecord = {
   id: string;
   storeId: string;
-  provider: "r2" | "supabase";
+  provider: MediaProvider;
   visibility: MediaVisibility;
   purpose: MediaPurpose;
   targetId: string;
@@ -156,6 +157,7 @@ export type MediaService = ReturnType<typeof createMediaService>;
 
 export type MediaServiceDependencies = {
   storage: ObjectStorage;
+  provider?: MediaProvider;
   repository: MediaRepository;
   config: { publicBucket: string; privateBucket: string };
   authorizeTarget: AuthorizeMediaTarget;
@@ -176,6 +178,7 @@ function thumbnailKey(objectKey: string): string {
 }
 
 export function createMediaService(dependencies: MediaServiceDependencies) {
+  const provider = dependencies.provider ?? "r2";
   const now = dependencies.now ?? (() => new Date());
   const createId = dependencies.randomUUID ?? nodeRandomUUID;
   const logger = dependencies.logger ?? console;
@@ -290,7 +293,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     const media = await dependencies.repository.createPending({
       id: mediaId,
       storeId: actor.storeId,
-      provider: "r2",
+      provider,
       visibility: policy.visibility,
       purpose: input.purpose,
       targetId,
@@ -342,7 +345,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     const reserved = await dependencies.repository.reservePending({
       id: mediaId,
       storeId: actor.storeId,
-      provider: "r2",
+      provider,
       visibility: policy.visibility,
       purpose: input.purpose,
       targetId,
@@ -362,7 +365,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     if (
       !media
       || media.storeId !== actor.storeId
-      || media.provider !== "r2"
+      || media.provider !== provider
       || media.visibility !== policy.visibility
       || media.purpose !== input.purpose
       || !uuidCoordinatesEqual(media.targetId, targetId)
@@ -401,6 +404,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       contentType: input.mimeType,
       ifNoneMatch: "*",
       expiresInSeconds: UPLOAD_EXPIRY_SECONDS,
+      contentLength: input.sizeBytes,
     });
     return {
       media: {
@@ -553,7 +557,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     const running = metadataInFlight.get(key);
     if (running) return running;
     const operation = (async () => {
-      const storage = media.provider === "r2" ? dependencies.storage : getObjectStorage(media.provider);
+      const storage = media.provider === provider ? dependencies.storage : getObjectStorage(media.provider);
       const metadata = await extractFileMetadata({
         mimeType: media.mimeType, sizeBytes: media.sizeBytes, now,
         read: async (length, offset, signal) => {
@@ -1007,7 +1011,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       !media
       || !uuidCoordinatesEqual(media.id, mediaId)
       || !uuidCoordinatesEqual(media.storeId, actor.storeId)
-      || media.provider !== "r2"
+      || media.provider !== provider
       || media.visibility !== "public"
       || media.purpose !== "product-image"
       || !uuidCoordinatesEqual(media.targetId, actor.storeId)
@@ -1042,9 +1046,11 @@ let singleton: MediaService | null = null;
 
 export function getMediaService(): MediaService {
   if (!singleton) {
-    const config = getR2Config();
+    const provider = getMediaWriteProvider();
+    const config = provider === "local" ? getLocalMediaConfig() : getR2Config();
     singleton = createMediaService({
-      storage: getObjectStorage("r2"),
+      storage: getObjectStorage(provider),
+      provider,
       repository: defaultRepository(),
       config,
       authorizeTarget: authorizeMediaTarget,

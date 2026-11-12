@@ -4,6 +4,7 @@ import { parseAiAttachmentWithProvider, type AiAttachmentParseResult } from "@/l
 import { getAiAttachmentsBucket } from "@/lib/data/settings";
 import type { MediaActor } from "@/lib/media/authorization";
 import { getMediaService } from "@/lib/media/service";
+import { authProvider } from "@/lib/auth/provider";
 
 export type AiAttachmentMetadata = {
   id?: string;
@@ -68,6 +69,9 @@ function unsupportedResult(message: string): AiAttachmentParseResult {
 }
 
 async function defaultLegacyDownload(bucket: string, path: string) {
+  if (authProvider() === "lumapos") {
+    throw new Error("LEGACY_ATTACHMENT_NOT_MIGRATED");
+  }
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase.storage.from(bucket).download(path);
   if (error) throw error;

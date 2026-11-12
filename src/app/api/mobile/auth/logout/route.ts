@@ -1,5 +1,7 @@
 import { createMobileAuthClient } from "@/lib/mobile/auth-session";
 import { mobileOk, readJson } from "@/lib/mobile/response";
+import { authProvider } from "@/lib/auth/provider";
+import { revokeAuthSessionForTokens } from "@/lib/auth/lumapos-auth";
 
 export async function POST(request: Request) {
   const body = await readJson(request);
@@ -11,6 +13,11 @@ export async function POST(request: Request) {
     body && typeof body === "object" && "refreshToken" in body
       ? String(body.refreshToken)
       : "";
+
+  if (authProvider() === "lumapos") {
+    await revokeAuthSessionForTokens([accessToken, refreshToken]);
+    return mobileOk({ signedOut: true });
+  }
 
   if (accessToken && refreshToken) {
     try {

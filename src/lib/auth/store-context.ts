@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient as createBearerClient, type User } from "@supabase/supabase-js";
 import { db } from "@/db";
 import { profiles, storeFeatures, storeSettings, stores } from "@/db/schema";
@@ -9,6 +9,8 @@ import {
   type StorePrincipal,
 } from "@/lib/auth/store-context-policy";
 import { createClient as createCookieClient } from "@/lib/supabase/server";
+import { authProvider, AUTH_SESSION_COOKIE } from "@/lib/auth/provider";
+import { getLumaAuthenticatedUser, type LumaAuthenticatedUser } from "@/lib/auth/lumapos-auth";
 import {
   resolveStoreFeatures,
   storeFeatureEnabled,
@@ -29,9 +31,16 @@ export class UnauthorizedError extends Error {
   }
 }
 
-export async function getAuthenticatedUser(): Promise<User | null> {
+export async function getAuthenticatedUser(): Promise<User | LumaAuthenticatedUser | null> {
   const authorization = (await headers()).get("authorization");
   const bearer = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+
+  if (authProvider() === "lumapos") {
+    if (bearer) return getLumaAuthenticatedUser(bearer, "mobile_access");
+    const cookieStore = await cookies();
+    const token = cookieStore.get(AUTH_SESSION_COOKIE)?.value;
+    return token ? getLumaAuthenticatedUser(token, "web_session") : null;
+  }
 
   if (bearer) {
     const supabase = createBearerClient(

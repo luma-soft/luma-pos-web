@@ -180,6 +180,7 @@ export class R2ObjectStorage implements ObjectStorage {
     contentType: string;
     ifNoneMatch: "*";
     expiresInSeconds: number;
+    contentLength?: number;
   }): Promise<string> {
     return this.presign(
       this.client,

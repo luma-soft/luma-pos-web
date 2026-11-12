@@ -1,9 +1,12 @@
 import {
   createMobileAuthClient,
+  lumaposMobileAuthPayload,
   mobileAuthPayload,
 } from "@/lib/mobile/auth-session";
 import { signInWithInternalPhonePassword } from "@/lib/auth/internal-phone-password";
 import { mobileError, mobileOk, readJson } from "@/lib/mobile/response";
+import { authProvider } from "@/lib/auth/provider";
+import { authenticatePassword, createMobileAuthSession } from "@/lib/auth/lumapos-auth";
 
 function safeErrorCode(error: unknown): string | undefined {
   let current = error;
@@ -32,6 +35,22 @@ export async function POST(request: Request) {
 
     if ((!email && !phone) || !password) {
       return mobileError("errors.invalidData");
+    }
+
+    if (authProvider() === "lumapos") {
+      const user = await authenticatePassword({ email: email || null, phone, password });
+      if (!user) return mobileError("errors.unauthorized", 401);
+      const tokens = await createMobileAuthSession({
+        profileId: user.id,
+        deviceId: request.headers.get("x-luma-device-id"),
+        deviceName: request.headers.get("x-luma-device-name"),
+      });
+      if (!tokens) return mobileError("errors.unauthorized", 401);
+      const payload = await lumaposMobileAuthPayload(tokens);
+      if (!payload.ok) {
+        return mobileError(payload.error, payload.error === "errors.serverError" ? 500 : 401);
+      }
+      return mobileOk(payload.data);
     }
 
     const session = phone

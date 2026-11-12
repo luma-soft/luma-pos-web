@@ -1,0 +1,9 @@
+# Example only. Replace the tunnel UUID, hostname and credentials path before use.
+# Keep the credentials JSON outside the repository with owner-only permissions.
+tunnel: 00000000-0000-0000-0000-000000000000
+credentials-file: /Users/Shared/LumaPOS/secrets/cloudflared-tunnel.json
+
+ingress:
+  - hostname: pos.example.com
+    service: http://127.0.0.1:3000
+  - service: http_status:404

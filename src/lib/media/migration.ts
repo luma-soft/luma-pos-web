@@ -42,6 +42,7 @@ export type MediaMigrationItem = {
   runId: string;
   storeId: string;
   sourceProvider: MediaMigrationSourceProvider;
+  targetProvider: "local" | "r2";
   sourceBucket: string;
   sourceKey: string;
   targetBucket: string | null;
@@ -250,12 +251,14 @@ export function createMediaMigrationEngine(dependencies: {
   repository: MediaMigrationRepository;
   sourceStorage: ObjectStorage;
   targetStorage: ObjectStorage;
+  targetProvider?: "local" | "r2";
   targetBucket: string | ((visibility: MediaVisibility) => string);
   idFactory?: () => string;
   now?: () => Date;
 }) {
   const idFactory = dependencies.idFactory ?? randomUUID;
   const now = dependencies.now ?? (() => new Date());
+  const targetProvider = dependencies.targetProvider ?? "r2";
 
   async function inventory(
     input: MediaMigrationInventoryInput,
@@ -274,6 +277,7 @@ export function createMediaMigrationEngine(dependencies: {
     return dependencies.repository.upsertInventoried({
       ...input,
       id,
+      targetProvider,
       targetBucket,
       targetKey: createMigrationTargetKey({
         storeId: input.storeId,
@@ -301,6 +305,7 @@ export function createMediaMigrationEngine(dependencies: {
     return dependencies.repository.upsertInventoried({
       ...input,
       id,
+      targetProvider,
       sourceProvider: "external",
       targetBucket: null,
       targetKey: null,
@@ -320,6 +325,7 @@ export function createMediaMigrationEngine(dependencies: {
 
   async function copy(id: string): Promise<MediaMigrationItem> {
     const item = requireItem(await dependencies.repository.getItem(id));
+    if (item.targetProvider !== targetProvider) throw new Error("migration_target_provider_mismatch");
     if (alreadyCopied(item.status)) return item;
     if (item.status === "quarantined" || item.status === "skipped") return item;
     if (!["inventoried", "failed"].includes(item.status)) {
@@ -427,6 +433,7 @@ export function createMediaMigrationEngine(dependencies: {
 
   async function verify(id: string): Promise<MediaMigrationItem> {
     const item = requireItem(await dependencies.repository.getItem(id));
+    if (item.targetProvider !== targetProvider) throw new Error("migration_target_provider_mismatch");
     if (["verified", "cutover", "source_deleted", "rolled_back"].includes(item.status)) {
       return item;
     }
@@ -495,6 +502,7 @@ export function createMediaMigrationEngine(dependencies: {
 
   async function cutover(id: string): Promise<MediaMigrationItem> {
     const item = requireItem(await dependencies.repository.getItem(id));
+    if (item.targetProvider !== targetProvider) throw new Error("migration_target_provider_mismatch");
     if (["cutover", "source_deleted"].includes(item.status)) return item;
     if (item.status !== "verified") {
       throw new Error(`cutover_invalid_status:${item.status}`);
@@ -504,6 +512,7 @@ export function createMediaMigrationEngine(dependencies: {
 
   async function rollback(id: string): Promise<MediaMigrationItem> {
     const item = requireItem(await dependencies.repository.getItem(id));
+    if (item.targetProvider !== targetProvider) throw new Error("migration_target_provider_mismatch");
     if (item.status === "rolled_back") return item;
     if (item.status !== "cutover") {
       throw new Error(`rollback_invalid_status:${item.status}`);
@@ -516,6 +525,7 @@ export function createMediaMigrationEngine(dependencies: {
     options: { confirmedAfter: Date },
   ): Promise<MediaMigrationItem> {
     const item = requireItem(await dependencies.repository.getItem(id));
+    if (item.targetProvider !== targetProvider) throw new Error("migration_target_provider_mismatch");
     if (item.status === "source_deleted") return item;
     if (item.status !== "cutover") {
       throw new Error(`delete_source_invalid_status:${item.status}`);

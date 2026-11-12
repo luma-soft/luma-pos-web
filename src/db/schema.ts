@@ -16,10 +16,13 @@ export type InstalledAssetSpecs = Record<string, unknown>;
 export type DatabaseBackupStatus = "queued" | "running" | "succeeded" | "failed";
 export type DatabaseBackupTrigger = "manual" | "scheduled";
 export type DatabaseBackupManifest = {
-  format: "supabase-cli-logical";
+  format: "postgres-custom-and-media-aes-256-gcm" | "supabase-cli-logical";
   included: string[];
   excluded: string[];
   files: Array<{ name: string; sizeBytes: number; sha256: string }>;
+  version?: 1;
+  createdAt?: string;
+  databaseMajorVersion?: number;
 };
 
 function missingStoreId(): string {
@@ -94,6 +97,13 @@ export const auditLogSourceEnum = pgEnum("audit_log_source", [
 export const auditLogStatusEnum = pgEnum("audit_log_status", [
   "previewed", "confirmed", "succeeded", "failed", "cancelled", "unauthorized",
 ]);
+export const authSessionKindEnum = pgEnum("auth_session_kind", ["web", "mobile"]);
+export const authTokenKindEnum = pgEnum("auth_token_kind", [
+  "web_session", "mobile_access", "mobile_refresh",
+]);
+export const syncEventStatusEnum = pgEnum("sync_event_status", [
+  "pending", "processing", "accepted", "rejected", "conflict",
+]);
 
 // ============= Stores =============
 
@@ -105,7 +115,7 @@ export const stores = pgTable("stores", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-// ============= Users (linked to Supabase auth.users) =============
+// ============= LumaPOS identities and store staff =============
 
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey(),
@@ -128,6 +138,112 @@ export const profiles = pgTable("profiles", {
   unique("profiles_store_id_id_unique").on(t.storeId, t.id),
 ]);
 
+export const authCredentials = pgTable("auth_credentials", {
+  profileId: uuid("profile_id").primaryKey().references(() => profiles.id, { onDelete: "cascade" }),
+  email: text("email"),
+  emailNormalized: text("email_normalized"),
+  passwordHash: text("password_hash"),
+  passwordHashType: varchar("password_hash_type", { length: 16 }).notNull().default("bcrypt"),
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+  mustResetPassword: boolean("must_reset_password").notNull().default(false),
+  failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("auth_credentials_email_normalized_unique")
+    .on(t.emailNormalized)
+    .where(sql`${t.emailNormalized} is not null`),
+  check("auth_credentials_password_hash_type_check", sql`${t.passwordHashType} in ('bcrypt', 'scrypt')`),
+  check("auth_credentials_password_hash_state_check", sql`${t.passwordHash} is not null or ${t.mustResetPassword}`),
+]);
+
+export const authSessions = pgTable("auth_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "cascade" }),
+  profileId: uuid("profile_id").notNull(),
+  kind: authSessionKindEnum("kind").notNull(),
+  deviceId: text("device_id"),
+  deviceName: text("device_name"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  revokedBy: uuid("revoked_by").references(() => profiles.id, { onDelete: "set null" }),
+}, (t) => [
+  foreignKey({
+    name: "auth_sessions_store_profile_fk",
+    columns: [t.storeId, t.profileId],
+    foreignColumns: [profiles.storeId, profiles.id],
+  }).onDelete("cascade"),
+  index("auth_sessions_profile_created_idx").on(t.profileId, t.createdAt),
+  index("auth_sessions_store_active_idx").on(t.storeId, t.revokedAt, t.expiresAt),
+]);
+
+export const authSessionTokens = pgTable("auth_session_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: uuid("session_id").notNull().references(() => authSessions.id, { onDelete: "cascade" }),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  kind: authTokenKindEnum("kind").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+}, (t) => [
+  index("auth_session_tokens_session_kind_idx").on(t.sessionId, t.kind, t.expiresAt),
+]);
+
+// Durable command inbox replacing the Supabase relay for self-hosted runtimes.
+export const syncEvents = pgTable("sync_events", {
+  position: bigint("position", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+  storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "cascade" }),
+  eventId: uuid("event_id").notNull(),
+  userId: uuid("user_id").notNull(),
+  deviceId: text("device_id").notNull(),
+  commandType: text("command_type").notNull(),
+  baseRevision: bigint("base_revision", { mode: "bigint" }),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  payloadHash: varchar("payload_hash", { length: 64 }).notNull(),
+  status: syncEventStatusEnum("status").notNull().default("pending"),
+  result: jsonb("result").$type<Record<string, unknown> | null>(),
+  errorCode: text("error_code"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  availableAt: timestamp("available_at", { withTimezone: true }).defaultNow().notNull(),
+  leaseOwner: text("lease_owner"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  foreignKey({
+    name: "sync_events_store_user_fk",
+    columns: [t.storeId, t.userId],
+    foreignColumns: [profiles.storeId, profiles.id],
+  }).onDelete("restrict"),
+  uniqueIndex("sync_events_store_event_unique").on(t.storeId, t.eventId),
+  index("sync_events_pending_available_idx")
+    .on(t.availableAt, t.position)
+    .where(sql`${t.status} = 'pending'`),
+  index("sync_events_expired_lease_idx")
+    .on(t.leaseExpiresAt, t.position)
+    .where(sql`${t.status} = 'processing'`),
+  index("sync_events_user_created_idx").on(t.storeId, t.userId, t.createdAt),
+  check("sync_events_payload_hash_check", sql`length(${t.payloadHash}) = 64`),
+  check("sync_events_attempt_count_check", sql`${t.attemptCount} >= 0`),
+]);
+
+export const systemWorkerHeartbeats = pgTable("system_worker_heartbeats", {
+  workerKey: text("worker_key").primaryKey(),
+  workerId: text("worker_id").notNull(),
+  state: text("state").$type<"running" | "stopped">().notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+  details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+}, (t) => [
+  check("system_worker_heartbeats_state_check", sql`${t.state} in ('running', 'stopped')`),
+]);
+
 export const posSharedDrafts = pgTable("pos_shared_drafts", {
   id: uuid("id").primaryKey().defaultRandom(),
   storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "cascade" }),
@@ -148,7 +264,7 @@ export const posSharedDrafts = pgTable("pos_shared_drafts", {
 ]);
 
 // Project-wide database backup job history. This table stores operational
-// metadata only; the backup worker excludes its rows from data.sql.
+// metadata only; backups retain its schema but exclude the history rows.
 export const databaseBackupRuns = pgTable("database_backup_runs", {
   id: uuid("id").primaryKey().defaultRandom(),
   triggerType: text("trigger_type").$type<DatabaseBackupTrigger>().notNull(),
@@ -217,7 +333,7 @@ export const mediaObjects = pgTable("media_objects", {
   legacyPath: text("legacy_path"),
   legacyUrl: text("legacy_url"),
 }, (t) => [
-  check("media_objects_provider_check", sql`${t.provider} in ('r2', 'supabase')`),
+  check("media_objects_provider_check", sql`${t.provider} in ('local', 'r2', 'supabase')`),
   check("media_objects_visibility_check", sql`${t.visibility} in ('public', 'private')`),
   check("media_objects_purpose_check", sql`${t.purpose} in ('product-image', 'project-document', 'service-evidence', 'ai-attachment', 'library-asset')`),
   check("media_objects_status_check", sql`${t.status} in ('pending', 'ready', 'quarantined', 'deleted')`),
@@ -2431,6 +2547,7 @@ export const serviceCustomerRequestStorageCleanup = pgTable("service_customer_re
   requestId: uuid("request_id").references(() => serviceCustomerRequests.id, { onDelete: "set null" }),
   bucket: text("bucket").notNull(),
   path: text("path").notNull().unique(),
+  provider: text("provider").$type<MediaProvider>().notNull().default("supabase"),
   notBefore: timestamp("not_before", { withTimezone: true }).notNull(),
   attempts: integer("attempts").notNull().default(0),
   lastError: text("last_error"),
@@ -2438,6 +2555,7 @@ export const serviceCustomerRequestStorageCleanup = pgTable("service_customer_re
   claimedAt: timestamp("claimed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  check("service_customer_request_cleanup_provider_check", sql`${t.provider} in ('local', 'r2', 'supabase')`),
   check("service_customer_request_cleanup_claim_check", sql`(${t.claimToken} is null) = (${t.claimedAt} is null)`),
   check("service_customer_request_cleanup_attempts_check", sql`${t.attempts} >= 0`),
   index("service_customer_request_cleanup_retry_idx").on(t.notBefore, t.claimedAt, t.createdAt),
@@ -3152,6 +3270,7 @@ export const mediaMigrationItems = pgTable("media_migration_items", {
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
   runId: uuid("run_id").notNull(),
   sourceProvider: text("source_provider").$type<MediaProvider | "external">().notNull(),
+  targetProvider: text("target_provider").$type<"local" | "r2">().notNull().default("r2"),
   sourceBucket: text("source_bucket").notNull(),
   sourceKey: text("source_key").notNull(),
   targetBucket: text("target_bucket"),
@@ -3179,6 +3298,7 @@ export const mediaMigrationItems = pgTable("media_migration_items", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   check("media_migration_items_source_provider_check", sql`${t.sourceProvider} in ('r2', 'supabase', 'external')`),
+  check("media_migration_items_target_provider_check", sql`${t.targetProvider} in ('local', 'r2')`),
   check("media_migration_items_status_check", sql`${t.status} in ('inventoried', 'copied', 'verified', 'cutover', 'source_deleted', 'quarantined', 'skipped', 'failed', 'rolled_back')`),
   check("media_migration_items_purpose_check", sql`${t.purpose} in ('product-image', 'project-document', 'service-evidence', 'ai-attachment')`),
   check("media_migration_items_visibility_check", sql`${t.visibility} in ('public', 'private')`),

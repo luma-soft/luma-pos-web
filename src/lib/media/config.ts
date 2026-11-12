@@ -12,6 +12,14 @@ export type PublicMediaConfig = Pick<
   "publicBucket" | "publicBaseUrl"
 >;
 
+export type LocalMediaConfig = {
+  root: string;
+  publicBucket: string;
+  privateBucket: string;
+  publicBaseUrl: string;
+  signingSecret: string;
+};
+
 type R2Environment = Record<string, string | undefined>;
 const CLOUDFLARE_ACCOUNT_ID_PATTERN = /^[0-9a-f]{32}$/i;
 const R2_BUCKET_NAME_PATTERN = /^(?=.{3,63}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])$/;
@@ -93,7 +101,67 @@ export function readR2Config(env: R2Environment): R2Config {
   };
 }
 
+function requiredLocalValue(env: R2Environment, name: string): string {
+  const value = env[name]?.trim();
+  if (!value) throw new Error("Local media configuration is incomplete");
+  return value;
+}
+
+function readLocalBucket(env: R2Environment, name: string, fallback: string) {
+  const bucket = env[name]?.trim() || fallback;
+  if (!/^[a-z0-9][a-z0-9_-]{0,62}$/.test(bucket)) {
+    throw new Error("Local media bucket name is invalid");
+  }
+  return bucket;
+}
+
+export function readLocalMediaConfig(env: R2Environment): LocalMediaConfig {
+  const root = requiredLocalValue(env, "MEDIA_LOCAL_ROOT");
+  if (!root.startsWith("/")) throw new Error("MEDIA_LOCAL_ROOT must be an absolute path");
+  const publicBaseUrl = requiredLocalValue(env, "LUMAPOS_PUBLIC_URL");
+  let publicUrl: URL;
+  try {
+    publicUrl = new URL(publicBaseUrl);
+  } catch {
+    throw new Error("LUMAPOS_PUBLIC_URL is invalid");
+  }
+  if (
+    !publicUrl.hostname || publicUrl.username || publicUrl.password ||
+    publicUrl.pathname !== "/" || publicUrl.search || publicUrl.hash ||
+    (process.env.NODE_ENV === "production" && publicUrl.protocol !== "https:") ||
+    !["https:", "http:"].includes(publicUrl.protocol)
+  ) {
+    throw new Error("LUMAPOS_PUBLIC_URL must be an HTTPS origin in production");
+  }
+  const signingSecret = requiredLocalValue(env, "MEDIA_LOCAL_SIGNING_SECRET");
+  if (new TextEncoder().encode(signingSecret).byteLength < 32) {
+    throw new Error("MEDIA_LOCAL_SIGNING_SECRET must contain at least 32 bytes");
+  }
+  const publicBucket = readLocalBucket(env, "MEDIA_LOCAL_PUBLIC_BUCKET", "products");
+  const privateBucket = readLocalBucket(env, "MEDIA_LOCAL_PRIVATE_BUCKET", "private");
+  if (publicBucket === privateBucket) throw new Error("Local media buckets must be different");
+  return { root, publicBucket, privateBucket, publicBaseUrl: publicUrl.origin, signingSecret };
+}
+
+export function getLocalMediaConfig(): LocalMediaConfig {
+  return readLocalMediaConfig(process.env);
+}
+
+export function getMediaWriteProvider(): "local" | "r2" {
+  const configured = process.env.MEDIA_WRITE_PROVIDER?.trim().toLowerCase();
+  if (!configured || configured === "r2") return "r2";
+  if (configured === "local") return "local";
+  throw new Error("MEDIA_WRITE_PROVIDER must be 'local' or 'r2'");
+}
+
 export function getPublicMediaConfig(): PublicMediaConfig {
+  if (getMediaWriteProvider() === "local") {
+    const config = getLocalMediaConfig();
+    return {
+      publicBucket: config.publicBucket,
+      publicBaseUrl: `${config.publicBaseUrl}/api/media/local/public`,
+    };
+  }
   return readPublicMediaConfig(process.env);
 }
 

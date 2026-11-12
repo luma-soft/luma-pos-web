@@ -4,7 +4,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import type { db } from "@/db";
 import { mediaObjects } from "@/db/schema";
 import { getLiveMediaReferenceStateInTransaction } from "@/lib/media/repository-core";
-import type { ObjectStorage } from "@/lib/media/types";
+import type { MediaProvider, ObjectStorage } from "@/lib/media/types";
 
 const MAX_BATCH_SIZE = 50;
 const DEFAULT_BATCH_SIZE = 50;
@@ -13,7 +13,7 @@ const CLEANUP_LEASE_MS = 15 * 60 * 1_000;
 
 export type MediaCleanupCandidate = {
   id: string;
-  provider: "r2";
+  provider: MediaProvider;
   bucket: string;
   objectKey: string;
   thumbnailObjectKey: string | null;
@@ -57,7 +57,7 @@ type MediaCleanupDatabase = Pick<typeof db, "transaction" | "update">;
 
 type CleanupRow = {
   id: string;
-  provider: "r2";
+  provider: MediaProvider;
   bucket: string;
   object_key: string;
   thumbnail_object_key: string | null;
@@ -96,7 +96,7 @@ export function createDatabaseMediaCleanupRepository(
               else 'soft-deleted'
             end as reason
           from media_objects media
-          where media.provider = 'r2'
+          where media.provider in ('local', 'r2', 'supabase')
             and media.storage_deleted_at is null
             and (
               media.cleanup_claim_token is null
@@ -245,13 +245,9 @@ function errorMessage(error: unknown) {
 }
 
 async function defaultDependencies() {
-  const [{ db: database }, { getObjectStorage }] = await Promise.all([
-    import("@/db"),
-    import("@/lib/media/storage"),
-  ]);
+  const [{ db: database }] = await Promise.all([import("@/db")]);
   return {
     repository: createDatabaseMediaCleanupRepository(database),
-    storage: getObjectStorage("r2"),
   };
 }
 
@@ -272,7 +268,7 @@ export async function drainMediaCleanup(input: {
     ? null
     : await defaultDependencies();
   const repository = input.repository ?? defaults!.repository;
-  const storage = input.storage ?? defaults!.storage;
+  const { getObjectStorage } = input.storage ? { getObjectStorage: null } : await import("@/lib/media/storage");
   const leaseToken = (input.createLeaseToken ?? randomUUID)();
   const candidates = await repository.claim({
     now,
@@ -303,6 +299,7 @@ export async function drainMediaCleanup(input: {
 
     let removedBytes = 0;
     let failure: unknown = null;
+    const storage = input.storage ?? getObjectStorage!(candidate.provider);
     for (const [key, sizeBytes] of objects) {
       try {
         await storage.remove({ bucket: candidate.bucket, key });

@@ -6,6 +6,7 @@ import {
   createQstashNotificationQueue,
   type QstashNotificationQueueConfig,
 } from "./qstash";
+import { createDatabaseNotificationQueue } from "./database";
 
 function unconfigured(): never {
   throw new Error("NOTIFICATION_QUEUE_NOT_CONFIGURED");
@@ -33,6 +34,13 @@ export function resolveNotificationQueue(
   publisher: NotificationQueuePublisher;
   verifier: NotificationQueueRequestVerifier;
 } {
+  if (env.NOTIFICATION_QUEUE_PROVIDER === "database") {
+    return {
+      provider: "database",
+      ...createDatabaseNotificationQueue(),
+    };
+  }
+
   if (env.NOTIFICATION_QUEUE_PROVIDER !== "qstash") return unconfigured();
 
   const queue = createQstashNotificationQueue(resolveQstashConfig(env));

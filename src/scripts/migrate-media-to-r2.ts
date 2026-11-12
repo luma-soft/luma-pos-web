@@ -6,7 +6,7 @@ import {
   buildAiAttachmentCutoverSql,
   buildAiAttachmentRollbackSql,
 } from "@/lib/media/ai-migration-sql";
-import { getR2Config } from "@/lib/media/config";
+import { getLocalMediaConfig, getR2Config } from "@/lib/media/config";
 import {
   classifyLegacyUrl,
   createMediaMigrationEngine,
@@ -16,7 +16,7 @@ import {
   type MediaMigrationRepository,
   type MediaMigrationStatus,
 } from "@/lib/media/migration";
-import { getObjectStorage } from "@/lib/media/storage";
+import { getObjectStorage, getSupabaseMigrationSourceStorage } from "@/lib/media/storage";
 
 const COMMANDS = new Set([
   "inventory",
@@ -38,6 +38,7 @@ const DEFAULT_BUCKETS = new Set([
 ]);
 
 type Command = "inventory" | "copy" | "verify" | "cutover" | "rollback" | "delete-source";
+type TargetProvider = "local" | "r2";
 type Database = ReturnType<typeof postgres>;
 type MigrationRow = Record<string, unknown>;
 
@@ -80,6 +81,27 @@ function optionalStoreId() {
   const value = argument("store-id");
   if (!value) return null;
   return requireUuid("store_id", value);
+}
+
+function migrationTarget(provider: TargetProvider) {
+  if (provider === "local") {
+    const config = getLocalMediaConfig();
+    return {
+      provider,
+      storage: getObjectStorage(provider),
+      bucket: (visibility: "public" | "private") => visibility === "public"
+        ? config.publicBucket
+        : config.privateBucket,
+    };
+  }
+  const config = getR2Config();
+  return {
+    provider,
+    storage: getObjectStorage(provider),
+    bucket: (visibility: "public" | "private") => visibility === "public"
+      ? config.publicBucket
+      : config.privateBucket,
+  };
 }
 
 function allowedHosts() {
@@ -161,6 +183,7 @@ function rowToItem(row: MigrationRow): MediaMigrationItem {
     runId: String(row.run_id),
     storeId: String(row.store_id),
     sourceProvider: row.source_provider as MediaMigrationItem["sourceProvider"],
+    targetProvider: row.target_provider === "local" ? "local" : "r2",
     sourceBucket: String(row.source_bucket),
     sourceKey: String(row.source_key),
     targetBucket: row.target_bucket == null ? null : String(row.target_bucket),
@@ -218,13 +241,13 @@ class PostgresMigrationRepository implements MediaMigrationRepository {
   async upsertInventoried(input: MediaMigrationItem) {
     const [row] = await this.sql<MigrationRow[]>`
       insert into media_migration_items (
-        id, store_id, run_id, source_provider, source_bucket, source_key,
+        id, store_id, run_id, source_provider, target_provider, source_bucket, source_key,
         target_bucket, target_key, status, purpose, target_id, domain, visibility,
         original_file_name, mime_type, reference_documents,
         attempts, last_error, updated_at
       ) values (
         ${input.id}::uuid, ${input.storeId}::uuid, ${input.runId}::uuid,
-        ${input.sourceProvider}, ${input.sourceBucket}, ${input.sourceKey},
+        ${input.sourceProvider}, ${input.targetProvider}, ${input.sourceBucket}, ${input.sourceKey},
         ${input.targetBucket}, ${input.targetKey}, ${input.status},
         ${input.purpose}, ${input.targetId}::uuid, ${input.domain},
         ${input.visibility}, ${input.originalFileName},
@@ -234,7 +257,8 @@ class PostgresMigrationRepository implements MediaMigrationRepository {
       on conflict (run_id, source_provider, source_bucket, source_key)
       do update set
         reference_documents = case
-          when media_migration_items.purpose = excluded.purpose
+          when media_migration_items.target_provider = excluded.target_provider
+            and media_migration_items.purpose = excluded.purpose
             and media_migration_items.target_id = excluded.target_id
             and media_migration_items.domain = excluded.domain
             and media_migration_items.visibility = excluded.visibility
@@ -252,7 +276,8 @@ class PostgresMigrationRepository implements MediaMigrationRepository {
         end,
         status = case
           when (
-            media_migration_items.purpose <> excluded.purpose
+            media_migration_items.target_provider <> excluded.target_provider
+            or media_migration_items.purpose <> excluded.purpose
             or media_migration_items.target_id <> excluded.target_id
             or media_migration_items.domain <> excluded.domain
             or media_migration_items.visibility <> excluded.visibility
@@ -262,11 +287,16 @@ class PostgresMigrationRepository implements MediaMigrationRepository {
           else media_migration_items.status
         end,
         last_error = case
-          when media_migration_items.purpose <> excluded.purpose
+          when media_migration_items.target_provider <> excluded.target_provider
+            or media_migration_items.purpose <> excluded.purpose
             or media_migration_items.target_id <> excluded.target_id
             or media_migration_items.domain <> excluded.domain
             or media_migration_items.visibility <> excluded.visibility
-          then 'reference_policy_conflict'
+          then case
+            when media_migration_items.target_provider <> excluded.target_provider
+              then 'target_provider_conflict'
+            else 'reference_policy_conflict'
+          end
           else media_migration_items.last_error
         end,
         updated_at = now()
@@ -357,7 +387,7 @@ class PostgresMigrationRepository implements MediaMigrationRepository {
           purpose, target_id, upload_expires_at,
           ready_at, verified_at, legacy_bucket, legacy_path
         ) values (
-          ${locked.id}::uuid, ${locked.storeId}::uuid, 'r2',
+          ${locked.id}::uuid, ${locked.storeId}::uuid, ${locked.targetProvider},
           ${locked.visibility}, ${locked.domain}, ${locked.targetBucket},
           ${locked.targetKey}, ${locked.originalFileName}, ${locked.mimeType},
           ${locked.sourceSizeBytes}, ${locked.sourceSha256}, 'ready',
@@ -883,6 +913,11 @@ async function run() {
   const runIdValue = argument("run-id");
   const storeId = optionalStoreId();
   const batchSize = integerArgument("batch-size", 50);
+  const targetProviderValue = argument("target-provider")?.toLowerCase() ?? "r2";
+  if (targetProviderValue !== "local" && targetProviderValue !== "r2") {
+    throw new Error("target_provider_must_be_local_or_r2");
+  }
+  const targetProvider = targetProviderValue as TargetProvider;
   if (execute && process.argv.includes("--dry-run")) {
     throw new Error("execute_and_dry_run_are_mutually_exclusive");
   }
@@ -919,16 +954,15 @@ async function run() {
         return;
       }
 
-      const config = getR2Config();
+      const target = migrationTarget(targetProvider);
       const repository = new PostgresMigrationRepository(sql);
       await repository.ensureRun({ runId, storeId: storeId! });
       const engine = createMediaMigrationEngine({
         repository,
-        sourceStorage: getObjectStorage("supabase"),
-        targetStorage: getObjectStorage("r2"),
-        targetBucket: (visibility) => visibility === "public"
-          ? config.publicBucket
-          : config.privateBucket,
+        sourceStorage: getSupabaseMigrationSourceStorage(),
+        targetStorage: target.storage,
+        targetProvider,
+        targetBucket: target.bucket,
       });
       let inventoried = 0;
       let skipped = 0;
@@ -973,6 +1007,7 @@ async function run() {
       console.log(JSON.stringify({
         command: typedCommand,
         mode: "execute",
+          targetProvider,
         runId,
         inventoried,
         skipped,
@@ -1017,14 +1052,13 @@ async function run() {
       return;
     }
 
-    const config = getR2Config();
+    const target = migrationTarget(targetProvider);
     const engine = createMediaMigrationEngine({
       repository,
-      sourceStorage: getObjectStorage("supabase"),
-      targetStorage: getObjectStorage("r2"),
-      targetBucket: (visibility) => visibility === "public"
-        ? config.publicBucket
-        : config.privateBucket,
+      sourceStorage: getSupabaseMigrationSourceStorage(),
+      targetStorage: target.storage,
+      targetProvider,
+      targetBucket: target.bucket,
     });
     const results: Record<string, number> = {};
     for (const candidate of candidates) {
@@ -1045,6 +1079,7 @@ async function run() {
     console.log(JSON.stringify({
       command: typedCommand,
       mode: "execute",
+      targetProvider,
       runId,
       processed: candidates.length,
       results,

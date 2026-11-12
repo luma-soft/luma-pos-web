@@ -1,4 +1,4 @@
-export type MediaProvider = "r2" | "supabase";
+export type MediaProvider = "local" | "r2" | "supabase";
 
 export type MediaVisibility = "public" | "private";
 
@@ -65,6 +65,7 @@ export interface ObjectStorage {
     contentType: string;
     ifNoneMatch: "*";
     expiresInSeconds: number;
+    contentLength?: number;
   }): Promise<string>;
   createDownloadUrl(input: {
     bucket: string;

@@ -78,6 +78,7 @@ export class SupabaseObjectStorage implements ObjectStorage {
     contentType: string;
     ifNoneMatch: "*";
     expiresInSeconds: number;
+    contentLength?: number;
   }): Promise<string> {
     void input;
     throw new ObjectStorageOperationUnsupportedError(

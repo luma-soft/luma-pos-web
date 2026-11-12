@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { Routes } from "@/lib/routes";
 import { Button } from "@/components/ui/button";
 import { clearProductCatalogSnapshotsForUser } from "@/lib/offline/product-catalog-store";
@@ -10,14 +9,13 @@ import { clearCachedStockHistoryForUser } from "@/lib/offline/product-stock-hist
 
 export function LogoutButton({ userId }: { userId: string }) {
   const router = useRouter();
-  const supabase = createClient();
 
   async function logout() {
     await Promise.all([
       clearProductCatalogSnapshotsForUser(userId),
       clearCachedStockHistoryForUser(userId),
     ]);
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" });
     router.push(Routes.Login);
     router.refresh();
   }

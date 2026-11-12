@@ -70,6 +70,7 @@ export const Routes = {
   Shopee: "/shopee",
   ShopeeInbox: "/shopee/inbox",
   Settings: "/settings",
+  Admin: "/admin",
   PrintSettings: "/settings/print",
   LabelSettings: "/settings/labels",
 

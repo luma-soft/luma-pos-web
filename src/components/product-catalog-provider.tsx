@@ -35,7 +35,6 @@ import {
   writeProductSortPreferenceCookie,
   type ProductSort,
 } from "@/lib/product-sort-policy";
-import { createClient } from "@/lib/supabase/client";
 import { createRefreshQueue } from "@/lib/sync/refresh-queue";
 
 type ProductCatalogStatus = "loading" | "cached" | "synced" | "unavailable";
@@ -53,7 +52,6 @@ type ProductCatalogContextValue = {
 
 const ProductCatalogContext = createContext<ProductCatalogContextValue | null>(null);
 const REVISION_POLL_INTERVAL_MS = 60_000;
-const CONNECTED_REVISION_POLL_INTERVAL_MS = 5 * 60_000;
 const PRODUCT_CATALOG_CHANNEL = "luma-pos-product-catalog";
 const PRODUCT_SORT_CHANNEL = "luma-product-sort-preference";
 const MAX_IN_MEMORY_CATALOGS = 3;
@@ -110,7 +108,6 @@ export function ProductCatalogProvider({
   const snapshotRef = useRef<ProductCatalogSnapshot | null>(snapshot);
   const revisionRef = useRef<string | null>(snapshot?.revision ?? null);
   const syncStartedAtRef = useRef<number | null>(null);
-  const realtimeConnectedRef = useRef(false);
 
   useEffect(() => {
     const queue = createRefreshQueue({
@@ -390,19 +387,9 @@ export function ProductCatalogProvider({
     const checkWhenVisible = () => {
       if (document.visibilityState === "visible") void checkForUpdates();
     };
-    let connectedPollTicks = 0;
     const interval = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      if (!realtimeConnectedRef.current) {
-        connectedPollTicks = 0;
-        checkWhenVisible();
-        return;
-      }
-      connectedPollTicks += 1;
-      if (connectedPollTicks >= CONNECTED_REVISION_POLL_INTERVAL_MS / REVISION_POLL_INTERVAL_MS) {
-        connectedPollTicks = 0;
-        checkWhenVisible();
-      }
+      checkWhenVisible();
     }, REVISION_POLL_INTERVAL_MS);
     window.addEventListener("online", check);
     window.addEventListener("focus", check);
@@ -416,37 +403,6 @@ export function ProductCatalogProvider({
       document.removeEventListener("visibilitychange", checkWhenVisible);
     };
   }, [checkForUpdates, refresh, scopeId, userId]);
-
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`product-catalog-revision:${scopeId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "catalog_sync_state",
-          filter: `store_id=eq.${scopeId.split(":", 1)[0]}`,
-        },
-        (payload) => {
-          const remoteRevision = String(
-            (payload.new as { revision?: string | number }).revision ?? "",
-          );
-          if (catalogRevisionChanged(revisionRef.current, remoteRevision)) {
-            void refresh(remoteRevision);
-          }
-        },
-      )
-      .subscribe((status) => {
-        realtimeConnectedRef.current = status === "SUBSCRIBED";
-      });
-
-    return () => {
-      realtimeConnectedRef.current = false;
-      void supabase.removeChannel(channel);
-    };
-  }, [refresh, scopeId]);
 
   useEffect(() => {
     if (typeof BroadcastChannel === "undefined") return;

@@ -1,7 +1,7 @@
 import { getRole } from "@/lib/actions/common";
+import { getAuthenticatedUser } from "@/lib/auth/store-context";
 import { getCameraQuoteFormOptions, type CameraQuoteProductOption } from "@/lib/data/camera-quotes";
 import { getStoreSettings } from "@/lib/data/settings";
-import { createClient } from "@/lib/supabase/server";
 import { CameraPriceListClient } from "@/app/(app)/camera-price-list/camera-price-list-client";
 import { estimateStorageDays } from "@/lib/camera-storage-estimate";
 import {
@@ -14,14 +14,13 @@ import {
 type CameraBrand = "EZVIZ" | "IMOU";
 
 export async function CameraBrandPriceList({ brand, storeId }: { brand: CameraBrand; storeId: string }) {
-  const [options, store, supabase] = await Promise.all([
+  const [options, store, user] = await Promise.all([
     getCameraQuoteFormOptions(storeId),
     getStoreSettings(storeId),
-    createClient(),
+    getAuthenticatedUser(),
   ]);
   const quoteSettings = store.prefs.cameraQuote;
   const quoteDefaults = resolveCameraQuoteDefaults(options, quoteSettings);
-  const { data: { user } } = await supabase.auth.getUser();
   let canEdit = false;
   if (user) {
     try {

@@ -8,7 +8,7 @@ import { isNotificationCronAuthorized } from "@/lib/notifications/cron-auth";
 import { mobileError, mobileOk } from "@/lib/mobile/response";
 import { runMaintenanceWorker } from "@/lib/services/maintenance-worker";
 import { drainCustomerRequestStorageCleanup } from "@/lib/services/customer-request-portal";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getObjectStorage } from "@/lib/media/storage";
 import {
   dispatchPendingWarrantyNotificationsCore,
 } from "@/lib/services/technician-warranty";
@@ -149,13 +149,11 @@ export async function GET(request: Request) {
   ] as const)));
   const results = [];
   const maintenance = await runMaintenanceWorker();
-  const cleanupStorage = createSupabaseAdminClient();
   const customerRequestStorageCleanup = await drainCustomerRequestStorageCleanup({
     database: db,
     storage: {
-      async remove(bucket, path) {
-        const { error } = await cleanupStorage.storage.from(bucket).remove([path]);
-        if (error) throw error;
+      async remove(bucket, path, provider) {
+        await getObjectStorage(provider).remove({ bucket, key: path });
       },
     },
   });

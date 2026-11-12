@@ -985,7 +985,7 @@ export type ProjectMediaInternalRecord = {
   mimeType: string;
   sizeBytes: number;
   createdAt: Date;
-  provider: "r2" | "supabase";
+  provider: MediaProvider;
   bucket: string;
   objectKey: string;
   thumbnailObjectKey?: string | null;
@@ -1045,7 +1045,7 @@ export async function requireReadyManagedMediaInTransaction(
   )).limit(1).for("update");
   if (
     !media
-    || media.provider !== "r2"
+    || media.provider === "supabase"
     || media.visibility !== "private"
     || media.status !== "ready"
     || media.deletedAt !== null
@@ -1602,7 +1602,7 @@ export function createDatabaseProjectMediaRepository(
           )).limit(1).for("update");
           if (
             !media
-            || media.provider !== "r2"
+            || media.provider === "supabase"
             || media.visibility !== "private"
             || (media.status !== "pending" && media.status !== "ready")
             || media.deletedAt !== null

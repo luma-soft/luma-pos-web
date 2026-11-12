@@ -1,6 +1,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { Session } from "@supabase/supabase-js";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
+import { getLumaAuthenticatedUser, type LumaTokenSet } from "@/lib/auth/lumapos-auth";
 
 export function createMobileAuthClient() {
   return createSupabaseClient(
@@ -39,6 +40,43 @@ export async function mobileAuthPayload(session: Session) {
       user: {
         id: session.user.id,
         email: session.user.email ?? "",
+        role: context.role,
+        fullName: context.fullName,
+      },
+      store: {
+        id: context.storeId,
+        name: context.storeName,
+        slug: context.storeSlug,
+        features: context.features,
+      },
+    },
+  };
+}
+
+export async function lumaposMobileAuthPayload(tokens: LumaTokenSet) {
+  const user = await getLumaAuthenticatedUser(tokens.accessToken, "mobile_access");
+  if (!user) return { ok: false as const, error: "errors.unauthorized" };
+
+  let context;
+  try {
+    context = await resolveStoreContextForUser(user.id);
+  } catch (error) {
+    console.error("LumaPOS mobile auth payload failed:", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    return { ok: false as const, error: "errors.serverError" };
+  }
+  if (!context) return { ok: false as const, error: "errors.unauthorized" };
+
+  return {
+    ok: true as const,
+    data: {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresAt: tokens.expiresAt,
+      user: {
+        id: user.id,
+        email: user.email ?? "",
         role: context.role,
         fullName: context.fullName,
       },

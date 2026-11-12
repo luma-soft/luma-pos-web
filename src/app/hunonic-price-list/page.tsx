@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { getRole } from "@/lib/actions/common";
+import { getAuthenticatedUser } from "@/lib/auth/store-context";
 import { BrandPriceListClient } from "../(app)/brand-price-list/brand-price-list-client";
 import { getBrandPriceListProducts } from "@/lib/data/brand-price-lists";
-import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { resolveLegacyCurrentPublicStore } from "@/lib/tenancy/public-store";
 
@@ -30,8 +30,10 @@ export const metadata: Metadata = {
 export default async function HunonicPriceListPage() {
   const store = await resolveLegacyCurrentPublicStore("hunonic_price_list");
   if (!store) notFound();
-  const [products, supabase] = await Promise.all([getBrandPriceListProducts(store.id, ["Hunonic"]), createClient()]);
-  const { data: { user } } = await supabase.auth.getUser();
+  const [products, user] = await Promise.all([
+    getBrandPriceListProducts(store.id, ["Hunonic"]),
+    getAuthenticatedUser(),
+  ]);
   let canEdit = false;
   if (user) {
     try {

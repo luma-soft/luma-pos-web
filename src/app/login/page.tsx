@@ -7,7 +7,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useTranslations } from "next-intl";
 import { Mail, Phone } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -33,7 +32,6 @@ type LoginInput = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const t = useTranslations();
   const router = useRouter();
-  const supabase = createClient();
   const [serverErr, setServerErr] = useState<string | null>(null);
   const [storeName, setStoreName] = useState<string | null>(null);
 
@@ -56,20 +54,21 @@ export default function LoginPage() {
 
   async function onSubmit(values: LoginInput) {
     setServerErr(null);
-    const { error } = values.method === "email"
-      ? await supabase.auth.signInWithPassword({
-          email: values.identifier.trim().toLowerCase(),
-          password: values.password,
-        })
-      : await signInWithInternalPhone({
-          phone: normalizePhone(values.identifier)!,
-          password: values.password,
-          supabase,
-          invalidCredentialsMessage: t("auth.invalidCredentials"),
-          serverErrorMessage: t("errors.serverError"),
-        });
-    if (error) {
-      setServerErr(error.message);
+    const body = values.method === "email"
+      ? { email: values.identifier.trim().toLowerCase(), password: values.password }
+      : { phone: normalizePhone(values.identifier), password: values.password };
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        setServerErr(response.status === 401 ? t("auth.invalidCredentials") : t("errors.serverError"));
+        return;
+      }
+    } catch {
+      setServerErr(t("errors.serverError"));
       return;
     }
     const nextRoute = ONLINE_SALES_ENABLED && values.method === "email" && values.identifier.trim().toLowerCase() === "review@lumapos.shop"
@@ -162,39 +161,4 @@ function normalizePhone(value: string) {
   if (/^0\d{9,10}$/.test(compact)) return `+84${compact.slice(1)}`;
   if (/^84\d{9,10}$/.test(compact)) return `+${compact}`;
   return /^\+[1-9]\d{7,14}$/.test(compact) ? compact : null;
-}
-
-async function signInWithInternalPhone({
-  phone,
-  password,
-  supabase,
-  invalidCredentialsMessage,
-  serverErrorMessage,
-}: {
-  phone: string;
-  password: string;
-  supabase: ReturnType<typeof createClient>;
-  invalidCredentialsMessage: string;
-  serverErrorMessage: string;
-}) {
-  const response = await fetch("/api/mobile/auth/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ phone, password }),
-  });
-  const body = await response.json().catch(() => null) as {
-    ok?: boolean;
-    error?: string;
-    data?: { accessToken?: string; refreshToken?: string };
-  } | null;
-  if (response.status === 401) {
-    return { error: new Error(invalidCredentialsMessage) };
-  }
-  if (!response.ok || !body?.ok || !body.data?.accessToken || !body.data.refreshToken) {
-    return { error: new Error(serverErrorMessage) };
-  }
-  return supabase.auth.setSession({
-    access_token: body.data.accessToken,
-    refresh_token: body.data.refreshToken,
-  });
 }

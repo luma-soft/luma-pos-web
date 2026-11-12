@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { mobileError } from "@/lib/mobile/response";
+import { authProvider } from "@/lib/auth/provider";
+import { createWebAuthSession, validateMobileTokenPair } from "@/lib/auth/lumapos-auth";
+import { setWebSessionCookie } from "@/lib/auth/session-cookie";
 import {
   readBearerToken,
   readRefreshToken,
@@ -28,6 +31,15 @@ export async function GET(request: NextRequest) {
   Object.entries(noStoreHeaders).forEach(([name, value]) =>
     response.headers.set(name, value),
   );
+
+  if (authProvider() === "lumapos") {
+    const principal = await validateMobileTokenPair(accessToken, refreshToken);
+    if (!principal) return mobileError("errors.unauthorized", 401);
+    const session = await createWebAuthSession(principal.profileId);
+    if (!session) return mobileError("errors.unauthorized", 401);
+    setWebSessionCookie(response, session.token, session.expiresAt);
+    return response;
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
