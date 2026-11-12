@@ -2,15 +2,25 @@
 
 Hệ thống quản lý bán hàng cho cửa hàng VLXD / thiết bị điện nước / thiết bị nhà bếp.
 
-## Stack
+## Runtime hiện tại và kiến trúc đích
+
+### Runtime hiện tại trong giai đoạn chuyển đổi
 
 - **Framework**: Next.js 16 (App Router) + TypeScript + Turbopack
-- **DB hiện tại**: Supabase Postgres + Drizzle ORM
-- **DB mục tiêu**: PostgreSQL trên Mac tại cửa hàng, có thể chuyển lên VPS sau này
-- **Auth**: Supabase Auth (email/password)
+- **DB/Auth**: Supabase Postgres + Supabase Auth; Drizzle ORM được Next.js server sử dụng
+- **Hosting**: Vercel; một số luồng đồng bộ còn dùng Supabase relay/Realtime
+- Các client gửi request nghiệp vụ qua Next.js API/server actions; một số luồng Auth, Realtime, Storage và relay vẫn gọi Supabase trực tiếp.
+
+### Kiến trúc đích đã chốt
+
+- PostgreSQL là nguồn dữ liệu kinh doanh duy nhất; Next.js tự host cùng PostgreSQL trên Mac tại cửa hàng trước, rồi chuyển cùng schema và hành vi lên VPS.
+- Next.js là API/backend duy nhất cho web và iPhone. Client không kết nối PostgreSQL trực tiếp.
+- Không dùng Supabase Cloud hoặc Supabase self-host trong kiến trúc đích. Auth, relay, Realtime, Storage và tác vụ nền sẽ được thay bằng thành phần do LumaPOS vận hành.
+- Web giữ dữ liệu offline trong IndexedDB; iPhone giữ dữ liệu trong SQLite. Thay đổi offline được gửi tới backend LumaPOS để xác nhận hoặc trả conflict.
+- **Quản trị database**: pgAdmin 4 Desktop trên Mac, chỉ dành cho quản trị viên DB. Không cấp quyền SQL cho tài khoản người dùng POS.
 - **UI**: Tailwind CSS v4 + Lucide icons
-- **Realtime hiện tại**: Supabase Realtime (sync stock giữa POS)
-- **Sync mục tiêu**: Supabase chỉ chuyển tiếp dữ liệu giữa các thiết bị; PostgreSQL local giữ dữ liệu kinh doanh đã xác nhận
+
+Chi tiết quyết định và rollout: [ADR-0002](docs/adr/0002-self-hosted-postgresql-nextjs.md).
 
 ## PostgreSQL local trên macOS
 
@@ -30,10 +40,10 @@ bun db:migrate:local
 ```
 
 Lệnh này thêm các compatibility objects local cần cho migration lịch sử rồi
-apply toàn bộ migration hiện có lên `lumapos_local`. Schema đã được tạo, nhưng
-database local chỉ có dữ liệu cửa hàng sau khi chạy bước nhập bên dưới. Runtime của app vẫn dùng database đang cấu
-hình; chưa chuyển sang PostgreSQL local cho đến khi hoàn tất nhập dữ liệu và
-chuyển các luồng đọc/ghi cùng sync sang Mac.
+apply toàn bộ migration hiện có lên `lumapos_local`. Tài liệu repo trước đây ghi
+schema đã được tạo; trạng thái database hiện tại chưa được kiểm tra trong lượt
+cập nhật này. Runtime của app vẫn dùng database đang cấu hình cho tới khi hoàn
+tất nhập dữ liệu và cutover.
 
 Để nhập một bản sao dữ liệu hiện tại từ database đang cấu hình vào database
 local còn rỗng, chạy:
@@ -63,7 +73,32 @@ môi trường chạy web sau khi đã đối soát dữ liệu local, cài work
 chuẩn bị chuyển toàn bộ luồng ghi POS được hỗ trợ sang PostgreSQL local. Khi
 cờ chưa bật, web tiếp tục dùng luồng hiện tại và endpoint relay không nhận lệnh.
 
-## Setup (lần đầu)
+Đây là relay Supabase hiện hữu để duy trì runtime trong giai đoạn chuyển đổi,
+không phải kiến trúc đích. Không mở rộng relay cho luồng mới; từng luồng sẽ được
+chuyển sang API Next.js và đồng bộ tới PostgreSQL theo ADR-0002.
+
+## Quản trị PostgreSQL bằng pgAdmin 4
+
+pgAdmin 4 Desktop là công cụ quản trị được chọn cho môi trường Mac tại cửa hàng.
+Khi provision runtime đích, đăng ký server PostgreSQL local với host `127.0.0.1`,
+port `5432` và maintenance database `lumapos_local`. Dùng role quản trị riêng cho
+pgAdmin và role runtime giới hạn quyền cho ứng dụng. Không mở pgAdmin hoặc cổng
+PostgreSQL ra Internet.
+
+`bun db:studio` vẫn có thể dùng như công cụ tiện ích cho nhà phát triển, nhưng
+không thay pgAdmin trong quy trình vận hành. Người dùng POS thông thường chỉ
+được thao tác qua màn hình quản trị LumaPOS theo vai trò, không được cấp quyền
+pgAdmin hoặc SQL.
+
+Backend có hai endpoint vận hành không cần đăng nhập: `/api/health/live` chỉ xác
+nhận tiến trình Next.js phản hồi; `/api/health/ready` kiểm tra thêm kết nối
+PostgreSQL và trả HTTP 503 khi database chưa sẵn sàng. Hai endpoint không trả lỗi
+nội bộ hoặc thông tin kết nối.
+
+## Setup runtime hiện tại (chỉ trong giai đoạn chuyển đổi)
+
+Các bước Supabase bên dưới chỉ để duy trì runtime đang chạy cho tới cutover; chúng
+không mô tả kiến trúc đích.
 
 ### 1. Tạo Supabase project
 

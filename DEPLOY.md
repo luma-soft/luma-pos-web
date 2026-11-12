@@ -1,5 +1,12 @@
 # Deploy lên Vercel
 
+> **Runbook runtime cũ trong giai đoạn chuyển đổi.** Tài liệu này mô tả Vercel +
+> Supabase hiện hữu và không phải hướng dẫn triển khai đích. Kiến trúc đích là
+> Next.js tự host cùng PostgreSQL, không dùng Supabase Cloud hoặc self-host;
+> pgAdmin 4 là công cụ quản trị database. Xem
+> [ADR-0002](docs/adr/0002-self-hosted-postgresql-nextjs.md). Chỉ dùng các bước
+> bên dưới để vận hành runtime cũ cho đến cutover.
+
 ## Chuẩn bị (1 lần)
 
 ### 1. Lấy hai connection string đúng mục đích

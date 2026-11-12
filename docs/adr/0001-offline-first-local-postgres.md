@@ -1,6 +1,6 @@
 # ADR-0001: Local PostgreSQL with device-first offline and Supabase relay
 
-- **Status:** Accepted direction; implementation in progress
+- **Status:** Superseded by [ADR-0002](0002-self-hosted-postgresql-nextjs.md)
 - **Date:** 2026-11-12
 - **Decision owners:** LumaPOS product owner
 
@@ -43,4 +43,4 @@ The web client currently uses a remote PostgreSQL database through the Next.js s
 
 ## Local host state
 
-PostgreSQL 17 is installed through Homebrew and runs on loopback at `127.0.0.1:5432`. The `lumapos_local` database contains the current schema, applied with local compatibility objects for legacy Supabase SQL, plus one data snapshot imported from the configured database. The source database was not modified. The app runtime has not been switched to this database, and no Supabase credentials were copied into PostgreSQL.
+Earlier project documentation records PostgreSQL 17 installed through Homebrew, `lumapos_local` migrated with local compatibility objects, and one snapshot imported from the configured database. This ADR update did not inspect the current database state. The app runtime remains documented as not switched to it; no Supabase credentials should be copied into PostgreSQL.

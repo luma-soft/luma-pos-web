@@ -1,7 +1,12 @@
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "./lib/supabase/middleware";
 
 export async function proxy(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  if (path === "/api/health/live" || path === "/api/health/ready") {
+    return NextResponse.next({ request });
+  }
+
   return await updateSession(request);
 }
 
