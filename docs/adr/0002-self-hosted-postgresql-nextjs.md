@@ -20,6 +20,7 @@ The current runtime uses Vercel and Supabase for PostgreSQL, Auth, selected Real
 7. Uploaded files use a storage adapter and stable object keys. The store Mac uses a local filesystem provider first; a VPS migration can switch to a compatible remote provider without embedding machine-specific paths in business records.
 8. Background jobs run as supervised backend workers or protected backend tasks with durable scheduling/locking. Vercel Cron and external Supabase relay processing are not target dependencies.
 9. Cutover uses a final write freeze, final export/import, reconciliation, and a single authority switch. No prolonged dual-write is allowed. Supabase Cloud can be retired only after reconciliation, rollback-window approval, and removal of all runtime dependencies.
+10. Remote Internet traffic reaches the Mac through a named Cloudflare Tunnel and a stable public HTTPS API hostname. `cloudflared` initiates outbound connections; the store router does not expose inbound ports. The tunnel routes only to the Next.js service. LumaPOS authentication and signed webhook verification remain authoritative at the application layer; Cloudflare Access must not gate the whole API hostname. pgAdmin and PostgreSQL are never published through the tunnel.
 
 ## Consequences
 
@@ -27,6 +28,7 @@ The current runtime uses Vercel and Supabase for PostgreSQL, Auth, selected Real
 - The Mac host must provide HTTPS reachability for remote iPhone use, supervised Next.js and worker processes, protected secrets, backup monitoring, and documented recovery procedures.
 - The VPS move must preserve application configuration contracts, PostgreSQL schema, object keys, and backend API behavior. Only host-specific infrastructure values such as database endpoint, public HTTPS origin, file provider, and process supervisor should change.
 - pgAdmin is an operator tool, not the LumaPOS product admin UI. User/role management, backup status, backend health, and background-job status belong in authenticated, audited LumaPOS administration pages.
+- Remote access depends on the Mac, its Internet connection, `cloudflared`, and Cloudflare availability. If the store's WAN is down, remote iPhones cannot reach the tunnel; clients keep queued work locally until connectivity returns. If the business requires server-validated transactions over the store LAN during a WAN outage, add a private LAN HTTPS route as a separate availability slice.
 
 ## Rollout outline
 
@@ -39,10 +41,10 @@ The current runtime uses Vercel and Supabase for PostgreSQL, Auth, selected Real
 
 ## Open decisions
 
-- **Remote iPhone connectivity:** choose a stable public HTTPS endpoint, a VPN-only endpoint, or a managed outbound tunnel in front of the store Mac. A public endpoint is easiest for phones but requires hardening and uptime planning; VPN limits exposure but requires enrollment and may complicate support; a managed tunnel avoids inbound router ports but adds a vendor dependency. The default recommendation is a stable HTTPS hostname with a managed tunnel or reverse proxy and strict application authentication, with VPN as a store-owner preference.
 - **Authentication lifecycle:** choose the initial account-invitation and password-reset workflow, recovery administrator, and token/session lifetime policy before implementation.
 - **File provider on VPS:** choose object storage provider and retention policy before moving beyond the local Mac provider.
 - **Final cutover window and rollback duration:** set after rehearsal duration and acceptable offline queue drain time are known.
+- **Store LAN during WAN outage:** decide whether the initial release accepts queued/offline work until Internet returns or also provides a private LAN HTTPS route directly to the Mac backend.
 
 ## State verification note
 
