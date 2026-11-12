@@ -41,6 +41,8 @@ Next.js; không route PostgreSQL, pgAdmin, SSH hoặc thư mục media.
 Plist dùng cú pháp tunnel locally managed:
 `cloudflared tunnel --config <PATH> run <UUID-or-name>` theo
 [Cloudflare Tunnel run parameters](https://developers.cloudflare.com/tunnel/reference/run-parameters/).
+Giữ file config và tunnel credentials ngoài repo, owner `lumapos_svc`, mode
+`600`; credential JSON không được đưa vào log hoặc plist.
 
 `com.lumapos.media-cleanup.plist.example` giữ lịch hiện tại 09:15 giờ địa
 phương Việt Nam. Chỉ cài khi timezone macOS là `Asia/Ho_Chi_Minh`; nếu đổi giờ
