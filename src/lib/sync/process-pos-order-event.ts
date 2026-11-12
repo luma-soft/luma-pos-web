@@ -1,3 +1,6 @@
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { orders } from "@/db/schema";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 import { createOrderForSalesPrincipal } from "@/lib/orders/create-command";
 import { CHECKOUT_PRICING_CHANGED } from "@/lib/orders/checkout-pricing";
@@ -30,6 +33,21 @@ export async function processPosOrderRelayEvent(
   const principal = await resolveStoreContextForUser(userId);
   if (!principal || principal.storeId !== parsed.data.storeId) {
     return { status: "rejected", result: null, errorCode: "errors.forbidden" };
+  }
+
+  // Recover a committed order when the worker stopped before acknowledging its
+  // sync receipt. Do this before pricing validation so a later catalog change
+  // cannot turn an already-created order into a reported conflict.
+  const clientId = parsed.data.payload.clientId;
+  if (clientId) {
+    const [existing] = await db.select({ id: orders.id, code: orders.code })
+      .from(orders)
+      .where(and(
+        eq(orders.storeId, principal.storeId),
+        eq(orders.clientId, clientId),
+      ))
+      .limit(1);
+    if (existing) return { status: "accepted", result: existing, errorCode: null };
   }
 
   const result = await createOrderForSalesPrincipal(principal, parsed.data.payload);
