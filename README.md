@@ -96,8 +96,11 @@ Target dùng `bun run sync:postgres:worker`, inbox trong PostgreSQL và API
 pgAdmin 4 Desktop là công cụ quản trị được chọn cho môi trường Mac tại cửa hàng.
 Khi provision runtime đích, đăng ký server PostgreSQL local với host `127.0.0.1`,
 port `5432` và maintenance database `lumapos_local`. Dùng role quản trị riêng cho
-pgAdmin và role runtime giới hạn quyền cho ứng dụng. Không mở pgAdmin hoặc cổng
-PostgreSQL ra Internet.
+pgAdmin và role runtime giới hạn quyền cho ứng dụng. Tạo login `lumapos_runtime`
+trong pgAdmin, rồi chạy
+[`scripts/grant-self-hosted-runtime-role.sql`](scripts/grant-self-hosted-runtime-role.sql)
+trên target bằng migration owner. Runbook mô tả quyền role và URL DBA riêng cho
+migration/restore. Không mở pgAdmin hoặc cổng PostgreSQL ra Internet.
 
 `bun db:studio` vẫn có thể dùng như công cụ tiện ích cho nhà phát triển, nhưng
 không thay pgAdmin trong quy trình vận hành. Người dùng POS thông thường chỉ
@@ -106,8 +109,9 @@ pgAdmin hoặc SQL.
 
 Backend có hai endpoint vận hành không cần đăng nhập: `/api/health/live` chỉ xác
 nhận tiến trình Next.js phản hồi; `/api/health/ready` kiểm tra PostgreSQL cùng
-heartbeat worker bắt buộc và trả HTTP 503 khi thành phần chưa sẵn sàng. Hai
-endpoint không trả lỗi nội bộ hoặc thông tin kết nối.
+quyền hạn runtime role và heartbeat worker bắt buộc; endpoint trả HTTP 503 khi
+thành phần chưa sẵn sàng. Hai endpoint không trả lỗi nội bộ hoặc thông tin kết
+nối.
 
 ## Chuyển Auth và đồng bộ sang PostgreSQL
 
