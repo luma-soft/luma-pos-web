@@ -16,6 +16,13 @@ if [[ ! -d "$app_root" || ! -x "$bun_bin" ]]; then
   exit 78
 fi
 
+for dotenv_file in .env .env.local .env.production .env.production.local; do
+  if [[ -e "$app_root/$dotenv_file" ]]; then
+    printf '%s\n' "Remove project dotenv files from the self-hosted release; use the protected runtime environment file." >&2
+    exit 78
+  fi
+done
+
 if [[ ! -f "$env_file" || -L "$env_file" ]]; then
   printf '%s\n' "LumaPOS runtime environment file is missing or is a symlink." >&2
   exit 78

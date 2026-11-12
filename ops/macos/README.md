@@ -16,6 +16,9 @@ credentials.
   `/Users/Shared/LumaPOS/secrets/runtime.env`, owner `lumapos_svc`, mode `600`.
   Đây là file shell assignments đã được tin cậy, không phải `.env.local`; không
   ghi secrets vào plist hoặc log. Chỉ tiến trình launchd đọc file này.
+- Release không được chứa `.env`, `.env.local`, `.env.production` hoặc
+  `.env.production.local`; wrapper từ chối khởi chạy nếu thấy một trong các file
+  đó mà không đọc nội dung.
 - Cài Bun và `cloudflared` tại đường dẫn trong plist mẫu hoặc sửa đường dẫn cho
   đúng máy. Tạo thư mục log trước khi nạp dịch vụ.
 - Cấp quyền `lumapos_svc` cho thư mục media và thư mục backup riêng. Chúng phải
