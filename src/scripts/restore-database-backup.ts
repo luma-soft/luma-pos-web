@@ -227,14 +227,48 @@ try {
      DECLARE runtime_role pg_roles%ROWTYPE;
      BEGIN
        SELECT * INTO runtime_role FROM pg_roles WHERE rolname = 'lumapos_runtime';
-       IF NOT FOUND
-         OR NOT runtime_role.rolcanlogin
+       IF NOT FOUND THEN
+         RAISE EXCEPTION 'lumapos_runtime is missing';
+       END IF;
+       IF NOT runtime_role.rolcanlogin
          OR runtime_role.rolsuper
          OR runtime_role.rolcreatedb
          OR runtime_role.rolcreaterole
          OR NOT runtime_role.rolbypassrls
          OR runtime_role.rolreplication THEN
-         RAISE EXCEPTION 'lumapos_runtime is missing or has unsafe role attributes';
+         RAISE EXCEPTION 'lumapos_runtime has unsafe role attributes';
+       END IF;
+       IF has_database_privilege('lumapos_runtime', current_database(), 'CREATE')
+         OR has_schema_privilege('lumapos_runtime', 'public', 'CREATE')
+         OR EXISTS (
+           SELECT 1 FROM pg_catalog.pg_database database
+           WHERE database.datname = current_database()
+             AND database.datdba = runtime_role.oid
+         )
+         OR EXISTS (
+           SELECT 1 FROM pg_catalog.pg_namespace namespace
+           WHERE namespace.nspname = 'public'
+             AND namespace.nspowner = runtime_role.oid
+         )
+         OR EXISTS (
+           SELECT 1 FROM pg_catalog.pg_class relation
+           JOIN pg_catalog.pg_namespace namespace ON namespace.oid = relation.relnamespace
+           WHERE namespace.nspname = 'public'
+             AND relation.relowner = runtime_role.oid
+         )
+         OR EXISTS (
+           SELECT 1 FROM pg_catalog.pg_proc routine
+           JOIN pg_catalog.pg_namespace namespace ON namespace.oid = routine.pronamespace
+           WHERE namespace.nspname = 'public'
+             AND routine.proowner = runtime_role.oid
+         )
+         OR EXISTS (
+           SELECT 1 FROM pg_catalog.pg_type object_type
+           JOIN pg_catalog.pg_namespace namespace ON namespace.oid = object_type.typnamespace
+           WHERE namespace.nspname = 'public'
+             AND object_type.typowner = runtime_role.oid
+         ) THEN
+         RAISE EXCEPTION 'lumapos_runtime must not create databases/schemas or own database objects';
        END IF;
      END
      $$`,

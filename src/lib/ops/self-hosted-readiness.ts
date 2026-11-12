@@ -59,7 +59,35 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
         runtime_account.rolcreatedb AS "createDatabase",
         runtime_account.rolcreaterole AS "createRoles",
         runtime_account.rolreplication AS "replication",
-        runtime_account.rolbypassrls AS "bypassRls"
+        runtime_account.rolbypassrls AS "bypassRls",
+        has_database_privilege(current_user, current_database(), 'CREATE') AS "databaseCreate",
+        has_schema_privilege(current_user, 'public', 'CREATE') AS "publicSchemaCreate",
+        EXISTS (
+          SELECT 1 FROM pg_catalog.pg_database database
+          WHERE database.datname = current_database()
+            AND database.datdba = runtime_account.oid
+        ) AS "ownsDatabase",
+        EXISTS (
+          SELECT 1 FROM pg_catalog.pg_namespace namespace
+          WHERE namespace.nspname = 'public'
+            AND namespace.nspowner = runtime_account.oid
+        ) AS "ownsPublicSchema",
+        EXISTS (
+          SELECT 1 FROM pg_catalog.pg_class relation
+          JOIN pg_catalog.pg_namespace namespace ON namespace.oid = relation.relnamespace
+          WHERE namespace.nspname = 'public'
+            AND relation.relowner = runtime_account.oid
+        ) OR EXISTS (
+          SELECT 1 FROM pg_catalog.pg_proc routine
+          JOIN pg_catalog.pg_namespace namespace ON namespace.oid = routine.pronamespace
+          WHERE namespace.nspname = 'public'
+            AND routine.proowner = runtime_account.oid
+        ) OR EXISTS (
+          SELECT 1 FROM pg_catalog.pg_type object_type
+          JOIN pg_catalog.pg_namespace namespace ON namespace.oid = object_type.typnamespace
+          WHERE namespace.nspname = 'public'
+            AND object_type.typowner = runtime_account.oid
+        ) AS "ownsPublicObjects"
       FROM pg_catalog.pg_roles AS runtime_account
       WHERE runtime_account.rolname = current_user
     `),
@@ -126,6 +154,11 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     ...(roleState.createRoles === false ? [] : ["createRoles"]),
     ...(roleState.replication === false ? [] : ["replication"]),
     ...(roleState.bypassRls === true ? [] : ["bypassRls"]),
+    ...(roleState.databaseCreate === false ? [] : ["databaseCreate"]),
+    ...(roleState.publicSchemaCreate === false ? [] : ["publicSchemaCreate"]),
+    ...(roleState.ownsDatabase === false ? [] : ["ownsDatabase"]),
+    ...(roleState.ownsPublicSchema === false ? [] : ["ownsPublicSchema"]),
+    ...(roleState.ownsPublicObjects === false ? [] : ["ownsPublicObjects"]),
   ];
 
   const now = Date.now();

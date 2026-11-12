@@ -250,6 +250,11 @@
       "createRoles": "Tài khoản runtime không được tạo role.",
       "replication": "Tài khoản runtime không được có quyền replication.",
       "bypassRls": "Tài khoản runtime cần Bypass RLS để backend áp dụng phân quyền cửa hàng.",
+      "databaseCreate": "Tài khoản runtime không được tạo object hoặc schema trong database.",
+      "publicSchemaCreate": "Tài khoản runtime không được tạo object trong schema public.",
+      "ownsDatabase": "Tài khoản runtime không được sở hữu database.",
+      "ownsPublicSchema": "Tài khoản runtime không được sở hữu schema public.",
+      "ownsPublicObjects": "Tài khoản runtime không được sở hữu table, function hoặc object trong public.",
       "unknown": "Quyền tài khoản runtime chưa đáp ứng yêu cầu."
     },
     "mediaStorage": "Kho file",

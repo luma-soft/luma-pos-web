@@ -140,6 +140,11 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
     createRoles: t("databaseBlockers.createRoles"),
     replication: t("databaseBlockers.replication"),
     bypassRls: t("databaseBlockers.bypassRls"),
+    databaseCreate: t("databaseBlockers.databaseCreate"),
+    publicSchemaCreate: t("databaseBlockers.publicSchemaCreate"),
+    ownsDatabase: t("databaseBlockers.ownsDatabase"),
+    ownsPublicSchema: t("databaseBlockers.ownsPublicSchema"),
+    ownsPublicObjects: t("databaseBlockers.ownsPublicObjects"),
   };
   const activeDatabaseBlockers = (operations?.database.blockers ?? [])
     .map((key) => databaseBlockerLabels[key] ?? t("databaseBlockers.unknown"));

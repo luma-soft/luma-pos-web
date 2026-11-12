@@ -250,6 +250,11 @@
       "createRoles": "The runtime account must not create roles.",
       "replication": "The runtime account must not have replication privileges.",
       "bypassRls": "The runtime account needs Bypass RLS so the backend can enforce store authorization.",
+      "databaseCreate": "The runtime account must not create objects or schemas in the database.",
+      "publicSchemaCreate": "The runtime account must not create objects in the public schema.",
+      "ownsDatabase": "The runtime account must not own the database.",
+      "ownsPublicSchema": "The runtime account must not own the public schema.",
+      "ownsPublicObjects": "The runtime account must not own tables, functions, or objects in public.",
       "unknown": "The runtime account does not meet a database privilege requirement."
     },
     "mediaStorage": "File storage",

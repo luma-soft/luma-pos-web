@@ -53,7 +53,8 @@ flowchart LR
    [`scripts/grant-self-hosted-runtime-role.sql`](../scripts/grant-self-hosted-runtime-role.sql)
    bằng đúng DBA/migration owner. Script cấp quyền CRUD, sequence và function
    trong `public`, đồng thời đặt default privileges cho schema tương lai; role
-   runtime không nhận DDL.
+   runtime không có quyền CREATE và không sở hữu database, schema hay object
+   nghiệp vụ.
 4. Đặt URL của `lumapos_runtime` trong `DATABASE_URL` của Next.js/workers. Giữ
    role DBA riêng cho pgAdmin và `MIGRATION_DATABASE_URL`; không dùng superuser
    làm kết nối thường trực của ứng dụng. Sau mỗi data import, chạy grant script
@@ -135,8 +136,9 @@ Health check:
 - `/api/health/live` xác nhận tiến trình Next.js.
 - `/api/health/ready` kiểm tra PostgreSQL, quyền runtime role và heartbeat mới
   hơn 45 giây của sync, notification, backup worker. Khi Auth provider là
-  `lumapos`, route trả 503 nếu role còn quyền superuser/DDL/replication, thiếu
-  `BYPASSRLS`, worker bắt buộc hoặc cổng media cutover chưa sẵn sàng; ở runtime
+  `lumapos`, route trả 503 nếu role còn quyền superuser/DDL/replication, sở hữu
+  database/schema/object, thiếu `BYPASSRLS`, worker bắt buộc hoặc cổng media
+  cutover chưa sẵn sàng; ở runtime
   legacy, chỉ yêu cầu PostgreSQL. Với media local, route chặn khi còn managed
   object chưa chuyển local, attachment legacy, tác vụ xóa file ở provider cũ,
   attachment AI chưa gắn media ID, migration chưa hoàn tất hoặc URL ngoài
