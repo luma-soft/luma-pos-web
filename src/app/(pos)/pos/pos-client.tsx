@@ -62,7 +62,21 @@ import { createOrder } from "@/lib/actions/orders";
 import { createPosReturn } from "@/lib/actions/returns";
 import { searchPosProducts } from "@/lib/actions/pos-search";
 import { createPosCustomer } from "@/lib/actions/pos-customers";
-import { enqueueOrder, getOutbox, removeOutbox, markFailed } from "@/lib/offline/pos-store";
+import {
+  enqueueOrder,
+  getOutbox,
+  getOrCreateSyncDeviceId,
+  removeOutbox,
+  markFailed,
+  storeRelayEventId,
+  storeRelaySubmission,
+} from "@/lib/offline/pos-store";
+import {
+  fetchSyncRelayReceipts,
+  stableSyncEventId,
+  submitSyncRelayEvent,
+  SyncRelayRequestError,
+} from "@/lib/sync/relay-client";
 import { buildPrintDocumentBaseName } from "@/lib/print/share-document";
 import { Routes } from "@/lib/routes";
 import type { PosData, PosProduct, PosUnit } from "@/lib/data/pos";
@@ -512,6 +526,8 @@ function currentTimestamp(): number {
 
 export function PosClient({
   storageScope,
+  storeId,
+  syncRelayEnabled,
   data,
   orderPrintTemplates,
   quotePrintTemplates,
@@ -525,6 +541,8 @@ export function PosClient({
   cameraQuoteSettings,
 }: {
   storageScope: string;
+  storeId: string;
+  syncRelayEnabled: boolean;
   data: PosData;
   orderPrintTemplates: PrintTemplate[];
   quotePrintTemplates: PrintTemplate[];
@@ -1513,27 +1531,70 @@ export function PosClient({
   }, [cachedPosSearchProducts, catalogPosSearchCache, catalogProducts, effectivePosPriceBookId, hasPosPriceComparison, posPriceAgainst, posPriceCondition]);
 
   const syncingRef = useRef(false);
+  async function refreshOutboxSummary() {
+    const remain = await getOutbox(storageScope);
+    setPending(remain.filter((item) => !item.failed).length);
+    setPricingConflicts(countPosPricingConflicts(remain));
+  }
+
   async function flushOutbox() {
-    if (syncingRef.current || !navigator.onLine) return;
+    if (!syncRelayEnabled || syncingRef.current || !navigator.onLine) return;
     const items = (await getOutbox(storageScope)).filter((x) => !x.failed);
     if (items.length === 0) return;
     syncingRef.current = true; setSyncing(true);
-    for (const it of items) {
-      if (!navigator.onLine) break;
-      try {
-        const res = await requestPosOrder(it.payload as Parameters<typeof createOrder>[0], createOrder);
-        if (res.kind === "created") {
-          await removeOutbox(storageScope, it.localId);
-          void productCatalog.refresh();
+    try {
+      const deviceId = getOrCreateSyncDeviceId();
+      for (const it of items) {
+        if (!navigator.onLine) break;
+        let eventId = it.eventId;
+        try {
+          if (!eventId) {
+            eventId = await stableSyncEventId(it.localId);
+            await storeRelayEventId(storageScope, it.localId, eventId);
+          }
+          if (!it.relayPosition) {
+            const submission = await submitSyncRelayEvent({
+              eventId,
+              storeId,
+              deviceId,
+              payload: it.payload as Parameters<typeof createOrder>[0],
+            });
+            if (submission.eventId !== eventId) throw new Error("SYNC_EVENT_ID_MISMATCH");
+            await storeRelaySubmission(storageScope, it.localId, eventId, submission.position);
+          }
+        } catch (error) {
+          if (error instanceof SyncRelayRequestError
+            && error.statusCode >= 400
+            && error.statusCode < 500
+            && ![401, 408, 425, 429].includes(error.statusCode)) {
+            await markFailed(storageScope, it.localId, error.message);
+            continue;
+          }
+          break;
         }
-        else if (res.kind === "rejected") await markFailed(storageScope, it.localId, res.error); // giữ nguyên snapshot để xử lý, không tự thử giá mới
-        else break;
-      } catch { break; } // vẫn mất mạng → thử lại sau
+      }
+
+      if (navigator.onLine) {
+        const submitted = (await getOutbox(storageScope)).filter((item) => !item.failed && item.eventId && item.relayPosition);
+        const receipts = await fetchSyncRelayReceipts(storeId, submitted.map((item) => item.eventId!));
+        const receiptById = new Map(receipts.map((receipt) => [receipt.eventId, receipt]));
+        for (const item of submitted) {
+          const receipt = item.eventId ? receiptById.get(item.eventId) : undefined;
+          if (!receipt) continue;
+          if (receipt.status === "accepted") {
+            await removeOutbox(storageScope, item.localId);
+            void productCatalog.refresh();
+          } else if (receipt.status === "rejected" || receipt.status === "conflict") {
+            await markFailed(storageScope, item.localId, receipt.errorCode || "SYNC_COMMAND_REJECTED");
+          }
+        }
+      }
+    } catch {
+      // Keep queued commands durable and retry on the next online/focus interval.
+    } finally {
+      await refreshOutboxSummary();
+      setSyncing(false); syncingRef.current = false;
     }
-    const remain = await getOutbox(storageScope);
-    setPending(remain.filter((x) => !x.failed).length);
-    setPricingConflicts(countPosPricingConflicts(remain));
-    setSyncing(false); syncingRef.current = false;
   }
 
   // Product Catalog được provider toàn app đồng bộ; POS chỉ theo dõi online + outbox.
@@ -1552,9 +1613,18 @@ export function PosClient({
     });
     const on = () => { setOnline(true); flushOutbox(); };
     const off = () => setOnline(false);
+    const onFocus = () => { if (navigator.onLine) flushOutbox(); };
+    const syncTimer = window.setInterval(onFocus, 15_000);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
-    return () => { cancelled = true; window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(syncTimer);
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+      window.removeEventListener("focus", onFocus);
+    };
     // Chỉ đăng ký listener một lần; flushOutbox dùng state khởi tạo và tự chống chạy trùng.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -2089,12 +2159,82 @@ export function PosClient({
   /** Lưu đơn vào hàng đợi offline + báo người dùng. */
   async function queueOffline(payload: Parameters<typeof createOrder>[0]) {
     // localId = clientId của đơn → sync lại dùng đúng clientId, server khử trùng.
-    await enqueueOrder(storageScope, { localId: payload.clientId ?? makeClientId(), payload, savedAt: currentTimestamp() });
+    const localId = payload.clientId ?? makeClientId();
+    const previous = (await getOutbox(storageScope)).find((item) => item.localId === localId);
+    await enqueueOrder(storageScope, {
+      localId,
+      eventId: previous?.eventId ?? await stableSyncEventId(localId),
+      ...(previous?.relayPosition ? { relayPosition: previous.relayPosition } : {}),
+      payload,
+      savedAt: currentTimestamp(),
+    });
     setSubmittingMode(null);
     setPending((c) => c + 1);
     closeInvoice(activeId, true);
     setOfflineSaved(true);
     setTimeout(() => setOfflineSaved(false), 3500);
+    if (navigator.onLine) queueMicrotask(flushOutbox);
+  }
+
+  async function createOrderThroughSyncRelay(
+    payload: Parameters<typeof createOrder>[0],
+  ): Promise<Awaited<ReturnType<typeof createOrder>>> {
+    const localId = payload.clientId ?? makeClientId();
+    const eventId = await stableSyncEventId(localId);
+    const relayPayload = { ...payload, clientId: localId };
+    await enqueueOrder(storageScope, {
+      localId,
+      eventId,
+      payload: relayPayload,
+      savedAt: currentTimestamp(),
+    });
+
+    try {
+      const submission = await submitSyncRelayEvent({
+        eventId,
+        storeId,
+        deviceId: getOrCreateSyncDeviceId(),
+        payload: relayPayload,
+      });
+      if (submission.eventId !== eventId) throw new Error("SYNC_EVENT_ID_MISMATCH");
+      await storeRelaySubmission(storageScope, localId, eventId, submission.position);
+
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        if (!navigator.onLine) throw new Error("SYNC_RELAY_OFFLINE");
+        const receipts = await fetchSyncRelayReceipts(storeId, [eventId]);
+        const receipt = receipts.find((item) => item.eventId === eventId);
+        if (receipt?.status === "accepted") {
+          const result = receipt.result as { id?: unknown; code?: unknown } | null;
+          if (typeof result?.id !== "string" || typeof result.code !== "string") {
+            await markFailed(storageScope, localId, "SYNC_RESULT_INVALID");
+            await refreshOutboxSummary();
+            return { ok: false, error: "errors.serverError" };
+          }
+          await removeOutbox(storageScope, localId);
+          await refreshOutboxSummary();
+          return { ok: true, data: { id: result.id, code: result.code } };
+        }
+        if (receipt?.status === "rejected" || receipt?.status === "conflict") {
+          const error = receipt.errorCode || "errors.serverError";
+          await markFailed(storageScope, localId, error);
+          await refreshOutboxSummary();
+          return { ok: false, error };
+        }
+        if (attempt < 7) await new Promise((resolve) => window.setTimeout(resolve, 750));
+      }
+      throw new Error("SYNC_RELAY_PENDING");
+    } catch (error) {
+      if (error instanceof SyncRelayRequestError
+        && error.statusCode >= 400
+        && error.statusCode < 500
+        && ![401, 408, 425, 429].includes(error.statusCode)) {
+        const message = error.statusCode === 403 ? "errors.forbidden" : "errors.invalidData";
+        await markFailed(storageScope, localId, message);
+        await refreshOutboxSummary();
+        return { ok: false, error: message };
+      }
+      throw error;
+    }
   }
 
   async function startSepayCheckout() {
@@ -2235,7 +2375,18 @@ export function PosClient({
       await queueOffline(payload);
       return;
     }
-    const res = await requestPosOrder(payload, createOrder);
+    const relayCompatible = syncRelayEnabled
+      && !payload.source
+      && !payload.posDraftId
+      && !payload.paymentPending
+      && !payload.paymentSessionId
+      && Number(payload.discount ?? 0) <= 0
+      && ["cash", "credit"].includes(payload.payment.method)
+      && payload.items.every((item) => item.manualUnitPrice == null && (item.lineDiscount ?? 0) <= 0);
+    const res = await requestPosOrder(
+      payload,
+      relayCompatible ? createOrderThroughSyncRelay : createOrder,
+    );
     if (res.kind === "created") {
       try {
         if (sourceInvoice?.mode === "draft_edit" && sourceInvoice.id) {

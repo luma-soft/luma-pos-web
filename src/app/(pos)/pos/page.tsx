@@ -132,6 +132,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
     ...(validCreatedProductId ? [validCreatedProductId] : []),
   ];
   const defaultSort = await getProductSortPreference(context.storeId, context.role);
+  const syncRelayEnabled = process.env.LUMAPOS_SYNC_RELAY_ENABLED === "true";
   const [data, settings, t, orderPrintTemplates, quotePrintTemplates, bookingPrintTemplates, returnPrintTemplates] = await Promise.all([
     getPosData(context.storeId, {
       includeProductIds,
@@ -200,6 +201,8 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
       <div className="flex-1 min-h-0">
         <PosClient
           storageScope={productCatalogScopeId(context.storeId, context.userId, context.role)}
+          storeId={context.storeId}
+          syncRelayEnabled={syncRelayEnabled}
           data={data}
           orderPrintTemplates={orderPrintTemplates}
           quotePrintTemplates={quotePrintTemplates}

@@ -1998,7 +1998,7 @@
     "offline": {
       "banner": "Đang offline — đơn sẽ tự đồng bộ khi có mạng",
       "syncing": "Đang đồng bộ…",
-      "pending": "Chờ đồng bộ {n} đơn",
+      "pending": "Chờ Mac xác nhận {n} đơn",
       "savedToast": "Đã lưu đơn (offline)"
     },
     "priceBook": {

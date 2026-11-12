@@ -43,6 +43,8 @@ export interface OutboxOrder {
   storageId: string;
   scopeId: string;
   localId: string;
+  eventId?: string;
+  relayPosition?: string;
   payload: unknown;   // input của createOrder
   savedAt: number;
   failed?: boolean;
@@ -60,7 +62,7 @@ export async function enqueueOrder(
 }
 export async function getOutbox(scopeId: string): Promise<OutboxOrder[]> {
   const all = await run<OutboxOrder[]>("outbox", "readonly", (s) => s.getAll());
-  return (all ?? []).filter((item) => item.scopeId === scopeId);
+  return (all ?? []).filter((item) => item.scopeId === scopeId).sort((a, b) => a.savedAt - b.savedAt);
 }
 export async function removeOutbox(scopeId: string, localId: string): Promise<void> {
   await run("outbox", "readwrite", (s) => s.delete(`${scopeId}:${localId}`));
@@ -69,4 +71,45 @@ export async function markFailed(scopeId: string, localId: string, reason: strin
   const storageId = `${scopeId}:${localId}`;
   const item = await run<OutboxOrder>("outbox", "readonly", (s) => s.get(storageId));
   if (item) await run("outbox", "readwrite", (s) => s.put({ ...item, failed: true, failReason: reason }));
+}
+
+export async function storeRelaySubmission(
+  scopeId: string,
+  localId: string,
+  eventId: string,
+  position: string,
+): Promise<OutboxOrder | null> {
+  const storageId = `${scopeId}:${localId}`;
+  const item = await run<OutboxOrder>("outbox", "readonly", (s) => s.get(storageId));
+  if (!item || item.scopeId !== scopeId) return null;
+  const updated = { ...item, eventId, relayPosition: position };
+  await run("outbox", "readwrite", (s) => s.put(updated));
+  return updated;
+}
+
+export async function storeRelayEventId(
+  scopeId: string,
+  localId: string,
+  eventId: string,
+): Promise<OutboxOrder | null> {
+  const storageId = `${scopeId}:${localId}`;
+  const item = await run<OutboxOrder>("outbox", "readonly", (s) => s.get(storageId));
+  if (!item || item.scopeId !== scopeId) return null;
+  const updated = { ...item, eventId: item.eventId || eventId };
+  await run("outbox", "readwrite", (s) => s.put(updated));
+  return updated;
+}
+
+export function getOrCreateSyncDeviceId(): string {
+  const key = "luma.sync.device-id.v1";
+  if (typeof localStorage === "undefined") return crypto.randomUUID();
+  try {
+    const existing = localStorage.getItem(key)?.trim();
+    if (existing) return existing;
+    const created = crypto.randomUUID();
+    localStorage.setItem(key, created);
+    return created;
+  } catch {
+    return crypto.randomUUID();
+  }
 }

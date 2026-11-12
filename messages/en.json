@@ -1998,7 +1998,7 @@
     "offline": {
       "banner": "Offline — orders will sync when back online",
       "syncing": "Syncing…",
-      "pending": "{n} orders pending sync",
+      "pending": "Waiting for Mac to confirm {n} orders",
       "savedToast": "Order saved (offline)"
     },
     "priceBook": {

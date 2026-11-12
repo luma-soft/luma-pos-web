@@ -64,3 +64,11 @@ write detection. See `docs/pricing-workflow.md` for the complete web/mobile rule
 Warehouse Stock is the quantity, reserved quantity, and minimum level of one
 product in one warehouse. It is included in the Catalog Snapshot for display
 and product selection; stock mutations remain server-authoritative.
+
+## Offline-first target
+
+The business PostgreSQL database runs on the store's macOS host and owns accepted business records. The same PostgreSQL schema can move to a VPS later. iPhone and web clients keep durable local data and save user changes locally before synchronization.
+
+Supabase is a cloud sync relay for store-scoped change envelopes and device checkpoints. It is not the authoritative business database. A Mac-hosted application process is the only writer to local PostgreSQL; clients never connect to PostgreSQL directly. Supabase identity may authorize access to the sync relay only.
+
+Orders, payments, debt and inventory changes remain provisional while offline. The Mac-hosted process validates and applies each command in a PostgreSQL transaction, then publishes an accepted result or a conflict for clients to reconcile. Conflicting financial or stock changes are never resolved by last-write-wins.

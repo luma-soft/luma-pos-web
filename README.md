@@ -5,10 +5,63 @@ Hệ thống quản lý bán hàng cho cửa hàng VLXD / thiết bị điện n
 ## Stack
 
 - **Framework**: Next.js 16 (App Router) + TypeScript + Turbopack
-- **DB**: Supabase Postgres + Drizzle ORM
+- **DB hiện tại**: Supabase Postgres + Drizzle ORM
+- **DB mục tiêu**: PostgreSQL trên Mac tại cửa hàng, có thể chuyển lên VPS sau này
 - **Auth**: Supabase Auth (email/password)
 - **UI**: Tailwind CSS v4 + Lucide icons
-- **Realtime**: Supabase Realtime (sync stock giữa POS)
+- **Realtime hiện tại**: Supabase Realtime (sync stock giữa POS)
+- **Sync mục tiêu**: Supabase chỉ chuyển tiếp dữ liệu giữa các thiết bị; PostgreSQL local giữ dữ liệu kinh doanh đã xác nhận
+
+## PostgreSQL local trên macOS
+
+Khởi tạo PostgreSQL 17 và database `lumapos_local` trên Mac:
+
+```bash
+bun db:setup:local
+```
+
+PostgreSQL chỉ lắng nghe trên loopback của Mac. Lệnh này không apply schema và
+không copy dữ liệu từ Supabase.
+
+Để tạo schema local theo migration hiện tại, chạy:
+
+```bash
+bun db:migrate:local
+```
+
+Lệnh này thêm các compatibility objects local cần cho migration lịch sử rồi
+apply toàn bộ migration hiện có lên `lumapos_local`. Schema đã được tạo, nhưng
+database local chỉ có dữ liệu cửa hàng sau khi chạy bước nhập bên dưới. Runtime của app vẫn dùng database đang cấu
+hình; chưa chuyển sang PostgreSQL local cho đến khi hoàn tất nhập dữ liệu và
+chuyển các luồng đọc/ghi cùng sync sang Mac.
+
+Để nhập một bản sao dữ liệu hiện tại từ database đang cấu hình vào database
+local còn rỗng, chạy:
+
+```bash
+bun db:import:local
+```
+
+Lệnh dùng kết nối session hiện có, giữ nguyên dữ liệu nguồn và chỉ chạy khi
+`lumapos_local` không có dữ liệu ngoài các hàng mẫu do migration tạo. File dump
+tạm được xóa sau khi nhập xong; sự kiện và thành viên của hàng đợi sync không
+được sao chép. Đây là bản sao tại thời điểm chạy, chưa phải đồng bộ liên tục.
+
+Bộ xử lý relay chỉ chạy sau khi đã đối soát bản sao local và tuyên bố PostgreSQL
+trên Mac là database chính thức. Khi đã sẵn sàng, đặt cờ xác nhận cho riêng tiến
+trình:
+
+```bash
+LUMAPOS_LOCAL_AUTHORITY_CONFIRMED=true bun run sync:relay:local
+```
+
+Bộ xử lý chỉ mở kết nối PostgreSQL qua `127.0.0.1`, kéo lệnh chờ từ Supabase,
+và ghi kết quả xác nhận trở lại relay. Không mở cổng PostgreSQL ra Internet.
+
+Relay trên web mặc định bị khóa. Chỉ đặt `LUMAPOS_SYNC_RELAY_ENABLED=true` trong
+môi trường chạy web sau khi đã đối soát dữ liệu local, cài worker trên Mac và
+chuẩn bị chuyển toàn bộ luồng ghi POS được hỗ trợ sang PostgreSQL local. Khi
+cờ chưa bật, web tiếp tục dùng luồng hiện tại và endpoint relay không nhận lệnh.
 
 ## Setup (lần đầu)
 

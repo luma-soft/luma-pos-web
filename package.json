@@ -4,6 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "db:setup:local": "bash scripts/setup-local-postgres-macos.sh",
+    "db:migrate:local": "bash scripts/migrate-local-postgres-macos.sh",
+    "db:migrate:configured": "bun run src/db/apply-migrations-from-database-url.ts",
+    "db:import:local": "bun run src/scripts/import-configured-data-to-local.ts",
+    "sync:relay:local": "bun --conditions=react-server run src/scripts/process-sync-relay-local.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
