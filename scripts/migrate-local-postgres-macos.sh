@@ -10,8 +10,13 @@ if [[ ! "$database_user" =~ ^[A-Za-z0-9_.-]+$ ]]; then
   echo "The local macOS account name cannot be used safely in a PostgreSQL URL." >&2
   exit 1
 fi
+database="${LUMAPOS_LOCAL_DATABASE_NAME:-lumapos_local}"
+if [[ ! "$database" =~ ^[A-Za-z0-9_][A-Za-z0-9_-]{0,62}$ ]]; then
+  echo "LUMAPOS_LOCAL_DATABASE_NAME must be a valid PostgreSQL database name." >&2
+  exit 1
+fi
 
-migration_url="postgresql://${database_user}@127.0.0.1:5432/lumapos_local"
+migration_url="postgresql://${database_user}@127.0.0.1:5432/${database}"
 "$pg_bin/psql" "$migration_url" -v ON_ERROR_STOP=1 \
   -f scripts/bootstrap-local-postgres-compat.sql
 
@@ -19,4 +24,4 @@ migration_url="postgresql://${database_user}@127.0.0.1:5432/lumapos_local"
 # so the runner keeps its backend-PID and advisory-lock checks enabled.
 MIGRATION_DATABASE_URL="$migration_url" bun run src/db/apply-migrations.ts
 
-echo "The local PostgreSQL schema migration is complete; this command did not import data."
+echo "The local PostgreSQL schema migration is complete for '$database'; this command did not import data."

@@ -1,9 +1,9 @@
-import { userInfo } from "node:os";
 import { loadEnvConfig } from "@next/env";
 import {
   createMigrationPostgresClient,
   readMigrationDatabaseUrl,
 } from "@/db/migration-runner";
+import { getLocalPostgresTarget } from "./local-postgres-target";
 
 loadEnvConfig(process.cwd());
 
@@ -14,12 +14,7 @@ if (sourceUrl.hostname.endsWith(".pooler.supabase.com") && sourceUrl.port === "6
   sourceUrl.port = "5432";
 }
 const sourceConfig = readMigrationDatabaseUrl({ MIGRATION_DATABASE_URL: sourceUrl.toString() });
-const localUser = userInfo().username;
-if (!/^[A-Za-z0-9_.-]+$/.test(localUser)) {
-  throw new Error("The local macOS account name cannot be used safely in a PostgreSQL URL");
-}
-const localUrl = new URL("postgresql://127.0.0.1:5432/lumapos_local");
-localUrl.username = localUser;
+const { databaseName: localDatabaseName, url: localUrl } = getLocalPostgresTarget();
 const localConfig = readMigrationDatabaseUrl({ MIGRATION_DATABASE_URL: localUrl.toString() });
 if (
   sourceConfig.hostname === localConfig.hostname
@@ -171,6 +166,7 @@ try {
       || !sourceMigrationsPresentLocally
       ? "mismatch"
       : "reconciled",
+    localDatabase: localDatabaseName,
     sourceMigrationCount: sourceMigrationNames.length,
     localMigrationCount: localMigrationNames.length,
     sourceMigrationsPresentLocally,

@@ -1,13 +1,14 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir, userInfo } from "node:os";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import {
   createMigrationPostgresClient,
   readMigrationDatabaseUrl,
 } from "@/db/migration-runner";
+import { getLocalPostgresTarget } from "./local-postgres-target";
 
 loadEnvConfig(process.cwd());
 
@@ -273,12 +274,7 @@ function validateLegacyAuthIdentities(rows: LegacyAuthIdentity[]) {
   });
 }
 
-const localUser = userInfo().username;
-if (!/^[A-Za-z0-9_.-]+$/.test(localUser)) {
-  throw new Error("The local macOS account name cannot be used safely in a PostgreSQL URL");
-}
-const localUrl = new URL("postgresql://127.0.0.1:5432/lumapos_local");
-localUrl.username = localUser;
+const { databaseName: localDatabaseName, url: localUrl } = getLocalPostgresTarget();
 const localConfig = readMigrationDatabaseUrl({ MIGRATION_DATABASE_URL: localUrl.toString() });
 if (
   sourceConfig.hostname === localConfig.hostname
@@ -374,24 +370,26 @@ try {
 
 const local = createMigrationPostgresClient(localConfig);
 try {
-  await local.unsafe(`
-    INSERT INTO public.auth_credentials (
-      profile_id, email, email_normalized, password_hash, password_hash_type,
-      email_verified_at, must_reset_password
-    )
-    SELECT
-      profile_id, email, email_normalized, password_hash, password_hash_type,
-      email_verified_at, must_reset_password
-    FROM jsonb_to_recordset($1::jsonb) AS imported(
-      profile_id uuid,
-      email text,
-      email_normalized text,
-      password_hash text,
-      password_hash_type varchar(16),
-      email_verified_at timestamptz,
-      must_reset_password boolean
-    )
-  `, [JSON.stringify(authCredentials)]);
+  if (authCredentials.length > 0) {
+    await local.begin(async (transaction) => {
+      for (const credential of authCredentials) {
+        await transaction.unsafe(`
+          INSERT INTO public.auth_credentials (
+            profile_id, email, email_normalized, password_hash, password_hash_type,
+            email_verified_at, must_reset_password
+          ) VALUES ($1::uuid, $2, $3, $4, $5, $6::timestamptz, $7)
+        `, [
+          credential.profileId,
+          credential.email,
+          credential.emailNormalized,
+          credential.passwordHash,
+          credential.passwordHashType,
+          credential.emailVerifiedAt?.toISOString() ?? null,
+          credential.mustResetPassword,
+        ]);
+      }
+    });
+  }
 
   const importedSyncReceipts = await importLegacyRelayReceipts(source, local);
   const expectedSyncReceipts = sourceInboxEventCount + importedSyncReceipts;
@@ -419,7 +417,7 @@ try {
   ) {
     throw new Error("Local data import verification did not match the expected store schema");
   }
-  console.log(`Local snapshot imported: ${counts.stores} stores, ${counts.profiles} profiles, ${counts.auth_credentials} auth identities (${counts.auth_password_resets} require password reset), ${counts.products} products, ${counts.orders} orders, ${counts.sync_events} sync receipts (${importedSyncReceipts} legacy relay receipts copied); ${counts.migrations} migrations retained.`);
+  console.log(`Local snapshot imported into '${localDatabaseName}': ${counts.stores} stores, ${counts.profiles} profiles, ${counts.auth_credentials} auth identities (${counts.auth_password_resets} require password reset), ${counts.products} products, ${counts.orders} orders, ${counts.sync_events} sync receipts (${importedSyncReceipts} legacy relay receipts copied); ${counts.migrations} migrations retained.`);
 } finally {
   await Promise.all([
     local.end({ timeout: 5 }),

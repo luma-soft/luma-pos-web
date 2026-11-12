@@ -2,8 +2,9 @@
 
 Tài liệu này mô tả runtime PostgreSQL + Next.js đã chọn, cấu hình dự kiến trên
 Mac tại cửa hàng, đường chuyển lên VPS và các cổng kiểm soát trước cutover.
-Đây là runbook cho giai đoạn triển khai; nó không xác nhận rằng PostgreSQL
-local đang chạy, đã nhập dữ liệu hoặc đang là nguồn dữ liệu chính thức.
+Đây là runbook triển khai, không phải kiểm tra trạng thái realtime. Trạng thái
+đã quan sát được ghi kèm ngày kiểm tra bên dưới; trước mỗi thao tác vận hành,
+xác minh lại database và runtime đang dùng.
 
 ## Kiến trúc chạy
 
@@ -54,9 +55,19 @@ flowchart LR
    Mô hình login role riêng cho runtime và DBA vẫn là điều kiện cần trước khi
    production; không dùng superuser làm tài khoản kết nối thường trực của Next.js.
 
-Trạng thái hiện tại của database không được xác minh trong lượt triển khai này.
-Tài liệu và script trong repo ghi nhận đã từng tạo PostgreSQL local và nhập một
-snapshot; không suy ra database còn tồn tại, đang chạy, hoặc chứa snapshot đó.
+**Trạng thái đã kiểm tra ngày 2026-11-13:** PostgreSQL 17.11 đang chấp nhận kết
+nối tại `127.0.0.1:5432`. `lumapos_local` có 177 migration tới
+`0165_cleanup_storage_provider.sql`, 3 cửa hàng, 3 hồ sơ, 3.292 sản phẩm, 3.157
+đơn và 469 media object. Đối soát chỉ đọc với database đang cấu hình cho thấy
+cùng 177 migration nhưng lệch số dòng ở 9 bảng; tổng số lượng `stock_movements`
+cũng lệch 1,0 đơn vị. Snapshot này chưa được xác nhận là nguồn chính. Các số liệu là
+ảnh chụp của lần kiểm tra, không khẳng định trạng thái ở thời điểm sau đó.
+
+Trong cùng đợt, `lumapos_rehearsal` được tạo riêng, nhập từ database đang cấu
+hình và đối soát thành công 138 bảng cùng các tổng hợp tài chính; 3 hồ sơ có 3
+Auth credentials tương thích, không có tài khoản cần reset, receipt sync khớp. Đây
+chỉ là bản rehearsal; chưa bật Auth/backend mới, chưa chuyển media bytes sang
+filesystem local và chưa nhận ghi từ client.
 
 ### Next.js và workers
 
@@ -226,20 +237,19 @@ chỉ nhận bản rehearsal và chưa được mở cho người dùng.
 
 1. Xác nhận hostname HTTPS ổn định, tunnel chạy khi Mac khởi động, app và worker
    có supervisor, PostgreSQL chỉ bind loopback, pgAdmin không public.
-2. Apply đủ migration hiện có của repo lên target local. Importer yêu cầu mọi
-   migration đã có trên source phải tồn tại ở target; target được phép có các
-   migration tương thích mới hơn. Khởi chạy Auth LumaPOS và workers trong môi
-   trường riêng. Chưa đặt `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true` cho production.
+2. Dùng database rehearsal riêng, ví dụ `lumapos_rehearsal`, bằng cách đặt
+   `LUMAPOS_LOCAL_DATABASE_NAME` cho cả `db:migrate:local`, `db:import:local` và
+   `db:reconcile:local`. Importer chỉ nhận target bootstrap trống; không chạy
+   lên `lumapos_local` hiện đang có dữ liệu. Target được phép có các migration
+   tương thích mới hơn source. Khởi chạy Auth LumaPOS và workers trong môi trường
+   riêng. Chưa đặt `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true` cho production.
 3. Copy media ban đầu tới local bằng `media:migrate`; kiểm tra checksum và mọi
    tham chiếu. Không xóa nguồn Supabase.
-4. Chạy rehearsal
-   `bun run db:import:local -- --confirm-bootstrap-target`, rồi
-   `bun run db:reconcile:local`. Cờ xác nhận bắt buộc vì importer sẽ thay
-   bootstrap rows trong `lumapos_local`. Xử lý mọi sai khác về table counts, orders,
-   payments, purchase orders, stock, Auth và sync receipt trước khi lên lịch
-   cutover. Lệnh importer chỉ thay bootstrap seed data trong `lumapos_local`
-   sau khi tạo dump thành công; tuyệt đối không chạy khi chưa xác định đúng
-   `DATABASE_URL` nguồn và target local.
+4. Chạy importer với `--confirm-bootstrap-target`, rồi đối soát cùng database
+   rehearsal. Cờ xác nhận bắt buộc vì importer thay bootstrap rows sau khi dump
+   nguồn thành công. Xử lý mọi khác biệt về table counts, orders, payments,
+   purchase orders, stock, Auth và sync receipt trước khi lên lịch cutover. Không
+   chạy importer lên database đang có business data.
 5. Test login/password reset, thu hồi session, web/mobile API, sync lặp cùng event
    ID, conflict tồn kho/giá/tài chính, file public/private, payment webhooks,
    e-invoice và notification trên target.
@@ -251,9 +261,11 @@ chỉ nhận bản rehearsal và chưa được mở cho người dùng.
 2. Thông báo cửa sổ bảo trì; đặt `LUMAPOS_MAINTENANCE_MODE=true` trên legacy
    web, dừng Vercel Cron và mọi worker/seed/import đang ghi. Đợi request và
    payment webhook đang chạy kết thúc hoặc được nhà cung cấp retry.
-3. Copy delta media cuối cùng, verify; tạo final snapshot PostgreSQL/Auth/relay
-   và import lên target. Reconcile counts, financial aggregates, Auth reset
-   count, sync receipts, media references và checksums.
+3. Copy delta media cuối cùng, verify; tạo một database cutover mới, rỗng, apply
+   migrations và nhập final snapshot PostgreSQL/Auth/relay vào database đó.
+   Reconcile counts, financial aggregates, Auth reset count, sync receipts,
+   media references và checksums. Giữ nguyên các database snapshot cũ để rollback
+   và điều tra; không ghi đè database đã có dữ liệu.
 4. Tạo encrypted backup của target. Đặt target env sang
    `LUMAPOS_AUTH_PROVIDER=lumapos`, `NOTIFICATION_QUEUE_PROVIDER=database`,
    `MEDIA_WRITE_PROVIDER=local` và `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true`.

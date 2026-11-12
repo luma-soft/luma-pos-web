@@ -2,7 +2,11 @@
 set -euo pipefail
 
 formula="postgresql@17"
-database="lumapos_local"
+database="${LUMAPOS_LOCAL_DATABASE_NAME:-lumapos_local}"
+if [[ ! "$database" =~ ^[A-Za-z0-9_][A-Za-z0-9_-]{0,62}$ ]]; then
+  echo "LUMAPOS_LOCAL_DATABASE_NAME must be a valid PostgreSQL database name." >&2
+  exit 1
+fi
 
 if ! command -v brew >/dev/null 2>&1; then
   echo "Homebrew is required to set up local PostgreSQL on macOS." >&2

@@ -42,24 +42,38 @@ bun db:migrate:local
 ```
 
 Lệnh này thêm các compatibility objects local cần cho migration lịch sử rồi
-apply toàn bộ migration hiện có lên `lumapos_local`. Tài liệu repo trước đây ghi
-schema đã được tạo; trạng thái database hiện tại chưa được kiểm tra trong lượt
-cập nhật này. Runtime của app vẫn dùng database đang cấu hình cho tới khi hoàn
-tất nhập dữ liệu và cutover.
+apply toàn bộ migration hiện có lên database đích. Mặc định đích là
+`lumapos_local`; có thể đặt `LUMAPOS_LOCAL_DATABASE_NAME` để tạo database diễn
+tập riêng mà không chạm vào snapshot đang giữ.
 
-Để nhập một bản sao dữ liệu hiện tại từ database đang cấu hình vào database
-local còn rỗng, chạy:
+**Trạng thái đã xác minh ngày 2026-11-13:** PostgreSQL local chấp nhận kết nối;
+`lumapos_local` có 177 migration tới `0165_cleanup_storage_provider.sql`, 3
+cửa hàng, 3 hồ sơ, 3.292 sản phẩm, 3.157 đơn và 469 media object. Đối soát chỉ
+đọc với database đang cấu hình cho thấy migration khớp nhưng dữ liệu chưa khớp:
+9 bảng lệch số dòng, gồm tồn kho và biến động kho. Vì vậy `lumapos_local` chưa
+được xác nhận là nguồn chính; không chạy importer vào database này.
+
+Trong cùng đợt kiểm tra, `lumapos_rehearsal` được tạo riêng, nhập từ database
+đang cấu hình và đối soát thành công 138 bảng, các tổng hợp tài chính, 3 hồ sơ,
+3 Auth credentials và trạng thái receipt sync. DB này chỉ là bản rehearsal; chưa bật
+Auth/backend mới, chưa chuyển media bytes sang filesystem local và chưa nhận ghi
+từ client.
+
+Để diễn tập trên database rỗng riêng, dùng cùng tên đích cho migration, import
+và đối soát. Ví dụ:
 
 ```bash
-bun run db:import:local -- --confirm-bootstrap-target
+LUMAPOS_LOCAL_DATABASE_NAME=lumapos_rehearsal bun run db:migrate:local
+LUMAPOS_LOCAL_DATABASE_NAME=lumapos_rehearsal bun run db:import:local -- --confirm-bootstrap-target
+LUMAPOS_LOCAL_DATABASE_NAME=lumapos_rehearsal bun run db:reconcile:local
 ```
 
-Lệnh tạo dump trước, giữ nguyên dữ liệu nguồn và chỉ thay bootstrap rows đã biết
-trong `lumapos_local`. Nó nhập thông tin credentials tương thích và biên nhận
-relay cũ; không nhập phiên/token Auth, worker heartbeat hay lịch sử backup. Các
-receipt `processing` được đưa về `pending` để xử lý lại an toàn; receipt kết thúc
-giữ trạng thái. Đây là snapshot một lần, chưa phải đồng bộ liên tục. Trạng thái
-database hiện tại không được xác minh trong lượt cập nhật này.
+Lệnh tạo dump trước, giữ nguyên dữ liệu nguồn và chỉ nhận target bootstrap
+trống. Nó nhập credentials tương thích và biên nhận relay cũ; không nhập
+session/token Auth, heartbeat worker hay lịch sử backup. Receipt `processing`
+được đưa về `pending`; receipt kết thúc giữ trạng thái. Đây là snapshot một lần,
+không phải đồng bộ liên tục. Khi cutover, tạo một database target mới, rỗng và
+được đặt tên riêng; không dùng importer để ghi đè `lumapos_local` đang có dữ liệu.
 
 `sync:relay:local` và `LUMAPOS_SYNC_RELAY_ENABLED` chỉ thuộc relay Supabase cũ
 trong giai đoạn chuyển đổi. Không bật hoặc mở rộng relay này cho kiến trúc đích.
@@ -82,9 +96,9 @@ không thay pgAdmin trong quy trình vận hành. Người dùng POS thông thư
 pgAdmin hoặc SQL.
 
 Backend có hai endpoint vận hành không cần đăng nhập: `/api/health/live` chỉ xác
-nhận tiến trình Next.js phản hồi; `/api/health/ready` kiểm tra thêm kết nối
-PostgreSQL và trả HTTP 503 khi database chưa sẵn sàng. Hai endpoint không trả lỗi
-nội bộ hoặc thông tin kết nối.
+nhận tiến trình Next.js phản hồi; `/api/health/ready` kiểm tra PostgreSQL cùng
+heartbeat worker bắt buộc và trả HTTP 503 khi thành phần chưa sẵn sàng. Hai
+endpoint không trả lỗi nội bộ hoặc thông tin kết nối.
 
 ## Chuyển Auth và đồng bộ sang PostgreSQL
 
@@ -102,9 +116,9 @@ và chọn làm nguồn dữ liệu chính. Trên Mac/VPS, chạy worker dưới
 supervisor thay vì một cron ngắn hạn.
 
 Worker notification và backup cùng trạng thái vận hành được mô tả trong
-[runbook self-hosted](docs/self-hosted-operations.md). Mặc định hiện tại vẫn là
-runtime legacy; tài liệu không xác nhận PostgreSQL local đang chạy hay đã được
-chọn làm nguồn dữ liệu chính.
+[runbook self-hosted](docs/self-hosted-operations.md). Runtime phục vụ vẫn là
+legacy; PostgreSQL local đã được kiểm tra và nâng schema nhưng chưa được chọn làm
+nguồn dữ liệu chính.
 
 ## Setup runtime hiện tại (chỉ trong giai đoạn chuyển đổi)
 
