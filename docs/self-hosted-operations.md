@@ -126,8 +126,11 @@ Health check:
 - `/api/health/live` xác nhận tiến trình Next.js.
 - `/api/health/ready` kiểm tra PostgreSQL và heartbeat mới hơn 45 giây của sync,
   notification, backup worker. Khi Auth provider là `lumapos`, route trả 503
-  nếu database hoặc bất kỳ worker bắt buộc nào chưa sẵn sàng; ở runtime legacy,
-  chỉ yêu cầu PostgreSQL.
+  nếu database, worker bắt buộc hoặc cổng media cutover chưa sẵn sàng; ở runtime
+  legacy, chỉ yêu cầu PostgreSQL. Với media local, route chặn khi còn managed
+  object chưa chuyển local, attachment legacy, tác vụ xóa file ở provider cũ,
+  attachment AI chưa gắn media ID, migration chưa hoàn tất hoặc URL ngoài
+  allowlist chưa được chủ sản phẩm xác nhận.
 - Trang `/admin` hiển thị quản lý tài khoản cùng trạng thái backend, workers,
   hàng đợi sync và backup cho owner.
 
@@ -193,6 +196,7 @@ khi final snapshot được xác nhận:
 | `LUMAPOS_SERVICE_FIELD_SYNC_ENABLED` | `true` chỉ khi slice service đã đạt gate | Giữ nguyên |
 | `NOTIFICATION_QUEUE_PROVIDER` | `database` | Giữ nguyên |
 | `MEDIA_WRITE_PROVIDER` | `local` | Giữ `local` hoặc chuyển adapter sau khi đã copy file |
+| `LUMAPOS_EXTERNAL_MEDIA_REVIEW_CONFIRMED` | `true` chỉ sau khi duyệt toàn bộ URL bị bỏ qua trong inventory | Giữ nguyên |
 | `MEDIA_LOCAL_ROOT` | Volume dữ liệu Mac | Volume dữ liệu VPS |
 | `LUMAPOS_PUBLIC_URL` | Hostname HTTPS của tunnel | Giữ hostname nếu tunnel chuyển cùng domain |
 | `LUMAPOS_INTERNAL_URL` | `http://127.0.0.1:3000` | Origin loopback của Next.js trên VPS |
