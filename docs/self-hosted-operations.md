@@ -175,7 +175,9 @@ Cloudflare Tunnel đã được chọn. Tạo tunnel đặt tên riêng cho cử
 hostname HTTPS đã duyệt tới `http://127.0.0.1:3000`. Khuyến nghị dùng
 `pos.lumapos.shop` làm origin chung cho web và API để cookie web cùng endpoint
 iPhone có một host ổn định. DNS/tunnel chưa được cấu hình và tên này chưa được
-xác nhận. Mẫu không chứa tunnel credential ở
+chủ sản phẩm xác nhận. Tra cứu DNS công khai ngày 2026-11-13 trả `NXDOMAIN` cho
+`pos.lumapos.shop`; chưa thể dùng hostname này cho build iPhone hoặc tunnel.
+Mẫu không chứa tunnel credential ở
 [`ops/cloudflared/config.yml.example`](../ops/cloudflared/config.yml.example).
 
 - Tunnel tạo kết nối outbound; router không mở cổng inbound tới Mac. Chỉ route
