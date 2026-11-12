@@ -130,6 +130,8 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
     legacyAiAttachments: t("mediaBlockers.legacyAiAttachments"),
     nonLocalManagedMedia: t("mediaBlockers.nonLocalManagedMedia"),
     unfinishedLocalMediaMigration: t("mediaBlockers.unfinishedLocalMediaMigration"),
+    localMediaConfiguration: t("mediaBlockers.localMediaConfiguration"),
+    localMediaRoot: t("mediaBlockers.localMediaRoot"),
   };
   const activeMediaBlockers = Object.entries(operations?.media.blockers ?? {})
     .filter(([, blocked]) => blocked)

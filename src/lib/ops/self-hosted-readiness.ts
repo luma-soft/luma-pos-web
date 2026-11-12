@@ -1,10 +1,12 @@
 import "server-only";
 
+import { constants as fsConstants } from "node:fs";
+import { access, stat } from "node:fs/promises";
 import { inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { systemWorkerHeartbeats } from "@/db/schema";
 import { authProvider } from "@/lib/auth/provider";
-import { getMediaWriteProvider } from "@/lib/media/config";
+import { getLocalMediaConfig, getMediaWriteProvider } from "@/lib/media/config";
 
 type WorkerKey = "sync-inbox" | "notification-outbox" | "database-backup";
 type WorkerStatus = { status: "online" | "offline"; lastSeenAt: string | null };
@@ -32,6 +34,26 @@ function resultRows(result: unknown): Array<Record<string, unknown>> {
   return [];
 }
 
+async function readLocalMediaReadiness() {
+  let root: string;
+  try {
+    root = getLocalMediaConfig().root;
+  } catch {
+    return { configurationValid: false, rootAccessible: false };
+  }
+
+  try {
+    const rootStats = await stat(root);
+    if (!rootStats.isDirectory()) {
+      return { configurationValid: true, rootAccessible: false };
+    }
+    await access(root, fsConstants.R_OK | fsConstants.W_OK | fsConstants.X_OK);
+    return { configurationValid: true, rootAccessible: true };
+  } catch {
+    return { configurationValid: true, rootAccessible: false };
+  }
+}
+
 export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
   await db.execute(sql`select 1`);
   if (authProvider() !== "lumapos") {
@@ -47,6 +69,9 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
   }
 
   const mediaWriteProvider = getMediaWriteProvider();
+  const localMediaReadiness = mediaWriteProvider === "local"
+    ? await readLocalMediaReadiness()
+    : null;
   const workerKeys: WorkerKey[] = [
     "sync-inbox",
     "notification-outbox",
@@ -189,6 +214,9 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     ...(mediaWriteProvider === "local" ? {
       nonLocalManagedMedia: mediaState.nonLocalManagedMedia === true,
       unfinishedLocalMediaMigration: mediaState.unfinishedLocalMediaMigration === true,
+      localMediaConfiguration: localMediaReadiness?.configurationValid !== true,
+      localMediaRoot: localMediaReadiness?.configurationValid === true
+        && localMediaReadiness.rootAccessible !== true,
     } : {}),
   };
   const missingMedia = Object.entries(blockers)

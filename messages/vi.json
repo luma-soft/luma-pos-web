@@ -273,6 +273,8 @@
       "legacyAiAttachments": "Còn AI attachment chưa chuyển sang media ID.",
       "nonLocalManagedMedia": "Còn managed media chưa nằm trên ổ local.",
       "unfinishedLocalMediaMigration": "Còn một đợt chuyển media chưa hoàn tất.",
+      "localMediaConfiguration": "Cấu hình kho file local chưa đầy đủ hoặc không hợp lệ.",
+      "localMediaRoot": "Thư mục kho file local không tồn tại hoặc service không có quyền truy cập ghi.",
       "unknown": "Còn điều kiện media chưa đạt."
     },
     "syncWorker": "Worker đồng bộ",

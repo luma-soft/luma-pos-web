@@ -141,7 +141,9 @@ Health check:
   hơn 45 giây của sync, notification, backup worker. Khi Auth provider là
   `lumapos`, route trả 503 nếu role còn quyền superuser/DDL/replication, sở hữu
   database/schema/object, thiếu `BYPASSRLS`, worker bắt buộc hoặc cổng media
-  cutover chưa sẵn sàng; ở runtime
+  cutover chưa sẵn sàng. Với media local, route còn kiểm tra cấu hình hợp lệ và
+  thư mục root tồn tại, là thư mục, có quyền đọc/ghi/truy cập cho service
+  account; kiểm tra này chỉ dùng `stat`/`access`, không tạo file. Ở runtime
   legacy, chỉ yêu cầu PostgreSQL. Với media local, route chặn khi còn managed
   object chưa chuyển local, attachment legacy, tác vụ xóa file ở provider cũ,
   attachment AI chưa gắn media ID, migration chưa hoàn tất hoặc URL ngoài

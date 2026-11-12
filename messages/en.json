@@ -273,6 +273,8 @@
       "legacyAiAttachments": "Legacy AI attachments are not linked to media IDs.",
       "nonLocalManagedMedia": "Managed media is not on local storage.",
       "unfinishedLocalMediaMigration": "A local media migration is unfinished.",
+      "localMediaConfiguration": "Local media configuration is incomplete or invalid.",
+      "localMediaRoot": "The local media directory is missing or the service cannot access it for writing.",
       "unknown": "A media readiness requirement is still unmet."
     },
     "syncWorker": "Sync worker",
