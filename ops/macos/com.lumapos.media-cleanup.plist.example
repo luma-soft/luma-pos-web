@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.lumapos.media-cleanup</string>
+	<key>UserName</key>
+	<string>lumapos_svc</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>/Users/Shared/LumaPOS/app/ops/macos/run-service.sh</string>
+		<string>maintenance:media-cleanup</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>/Users/Shared/LumaPOS/app</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>LUMAPOS_APP_ROOT</key>
+		<string>/Users/Shared/LumaPOS/app</string>
+		<key>LUMAPOS_ENV_FILE</key>
+		<string>/Users/Shared/LumaPOS/secrets/runtime.env</string>
+		<key>LUMAPOS_BUN_BIN</key>
+		<string>/opt/homebrew/bin/bun</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>9</integer>
+		<key>Minute</key>
+		<integer>15</integer>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>/Users/Shared/LumaPOS/logs/media-cleanup.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/Shared/LumaPOS/logs/media-cleanup.log</string>
+</dict>
+</plist>

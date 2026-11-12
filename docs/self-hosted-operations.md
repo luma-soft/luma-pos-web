@@ -80,10 +80,11 @@ liệu là ảnh chụp ngày 2026-11-13, không khẳng định trạng thái s
 
 ### Next.js và workers
 
-Chạy ứng dụng tự host trên loopback bằng `bun run start:self-hosted`. Dịch vụ
-được supervisor của macOS khởi động lại khi lỗi và khởi động cùng máy. PostgreSQL
-được Homebrew quản lý. Trong triển khai 24/7, chọn LaunchDaemon/service account
-phù hợp; không phụ thuộc vào cửa sổ Terminal hoặc phiên phát triển.
+Chạy ứng dụng tự host trên loopback bằng `bun run start:self-hosted`. Dùng
+LaunchDaemon với service account để tự khởi động cùng máy và phục hồi khi tiến
+trình lỗi; không phụ thuộc vào cửa sổ Terminal hay phiên đăng nhập của nhân viên.
+Ví dụ plist, wrapper và quy trình cài đặt nằm trong
+[`ops/macos`](../ops/macos/README.md). PostgreSQL được Homebrew quản lý.
 
 Các tiến trình dài hạn:
 
@@ -199,11 +200,11 @@ khi final snapshot được xác nhận:
 | `LUMAPOS_BACKUP_ENCRYPTION_KEY` | Khóa 32 byte dạng hex | Giữ qua secret manager, không đặt cùng backup |
 
 `DATABASE_URL`, `CRON_SECRET`, `MEDIA_LOCAL_SIGNING_SECRET`, khóa backup, khóa
-mobile và credentials của webhook/provider chỉ có ở server. Đặt quyền đọc file
-secrets cho tài khoản service, không commit `.env.local`, không đưa biến server
-vào `NEXT_PUBLIC_*`. Trên VPS dùng secret manager hoặc file quyền `0600`. Trên
-Mac có thể lưu secret trong Keychain và nạp vào môi trường service; tránh ghi
-giá trị thật trong plist/log.
+mobile và credentials của webhook/provider chỉ có ở server. Không commit
+`.env.local`, không đưa biến server vào `NEXT_PUBLIC_*`. Wrapper launchd trên
+Mac đọc file shell assignments có owner là service account và mode `0600`; không
+đặt giá trị secret trong plist hoặc log. Trên VPS dùng secret manager hoặc file
+quyền `0600`.
 
 Migrations nằm trong `drizzle/` và được apply theo thứ tự qua runner có kiểm tra
 session/advisory lock. Local bootstrap dùng `bun db:migrate:local`; môi trường
