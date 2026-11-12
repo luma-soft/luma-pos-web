@@ -1807,6 +1807,8 @@
       "creditNeedsCustomer": "Credit sales require a saved customer.",
       "pricingChanged": "Prices, promotions or unit conversions changed. The order has not been saved or paid; your cart is preserved. Refresh and review the prices before submitting again.",
       "unitUnavailable": "This unit is no longer available for direct sale. Choose another unit that is for sale.",
+      "offlineSaveFailed": "The order could not be saved on this device. Your cart is still here; please try again.",
+      "onlineRequired": "This transaction requires an Internet connection. Your cart is still on screen.",
       "emptyCart": "Cart is empty.",
       "draftAlreadyFinalized": "This saved order has already been checked out or deleted. Refresh the order list before continuing."
     },

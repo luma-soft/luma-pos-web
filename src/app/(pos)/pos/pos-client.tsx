@@ -2156,38 +2156,63 @@ export function PosClient({
     return line.returnSoldQuantity == null ? normalized : Math.min(normalized, line.returnSoldQuantity);
   }
 
-  /** Lưu đơn vào hàng đợi offline + báo người dùng. */
+  function isOfflineQueueableOrder(payload: Parameters<typeof createOrder>[0]) {
+    return !payload.source
+      && !payload.posDraftId
+      && !payload.paymentPending
+      && !payload.paymentSessionId
+      && Number(payload.discount ?? 0) <= 0
+      && ["cash", "credit"].includes(payload.payment.method)
+      && payload.items.every((item) => item.manualUnitPrice == null && (item.lineDiscount ?? 0) <= 0);
+  }
+
+  async function persistOrderToOutbox(payload: Parameters<typeof createOrder>[0]) {
+    try {
+      const localId = payload.clientId ?? makeClientId();
+      const previous = (await getOutbox(storageScope)).find((item) => item.localId === localId);
+      const eventId = previous?.eventId ?? await stableSyncEventId(localId);
+      const durablePayload = { ...payload, clientId: localId };
+      const saved = await enqueueOrder(storageScope, {
+        localId,
+        eventId,
+        ...(previous?.relayPosition ? { relayPosition: previous.relayPosition } : {}),
+        payload: durablePayload,
+        savedAt: currentTimestamp(),
+      });
+      return saved ? { localId, eventId, payload: durablePayload } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Lưu đơn vào hàng đợi trên thiết bị trước khi đóng hóa đơn. */
   async function queueOffline(payload: Parameters<typeof createOrder>[0]) {
-    // localId = clientId của đơn → sync lại dùng đúng clientId, server khử trùng.
-    const localId = payload.clientId ?? makeClientId();
-    const previous = (await getOutbox(storageScope)).find((item) => item.localId === localId);
-    await enqueueOrder(storageScope, {
-      localId,
-      eventId: previous?.eventId ?? await stableSyncEventId(localId),
-      ...(previous?.relayPosition ? { relayPosition: previous.relayPosition } : {}),
-      payload,
-      savedAt: currentTimestamp(),
-    });
+    if (!isOfflineQueueableOrder(payload)) {
+      setSubmittingMode(null);
+      setError(t("pos.errors.onlineRequired"));
+      return false;
+    }
+    const saved = await persistOrderToOutbox(payload);
+    if (!saved) {
+      setSubmittingMode(null);
+      setError(t("pos.errors.offlineSaveFailed"));
+      return false;
+    }
     setSubmittingMode(null);
-    setPending((c) => c + 1);
+    await refreshOutboxSummary();
     closeInvoice(activeId, true);
     setOfflineSaved(true);
     setTimeout(() => setOfflineSaved(false), 3500);
     if (navigator.onLine) queueMicrotask(flushOutbox);
+    return true;
   }
 
   async function createOrderThroughSyncRelay(
     payload: Parameters<typeof createOrder>[0],
   ): Promise<Awaited<ReturnType<typeof createOrder>>> {
-    const localId = payload.clientId ?? makeClientId();
-    const eventId = await stableSyncEventId(localId);
-    const relayPayload = { ...payload, clientId: localId };
-    await enqueueOrder(storageScope, {
-      localId,
-      eventId,
-      payload: relayPayload,
-      savedAt: currentTimestamp(),
-    });
+    const persisted = await persistOrderToOutbox(payload);
+    if (!persisted) throw new Error("POS_OUTBOX_WRITE_FAILED");
+    const { localId, eventId, payload: relayPayload } = persisted;
 
     try {
       const submission = await submitSyncRelayEvent({
@@ -2365,29 +2390,51 @@ export function PosClient({
     setError("");
     setPricingConflictId(null);
 
-    // offline → xếp hàng chờ đồng bộ
+    const offlineQueueable = isOfflineQueueableOrder(payload);
+    const relayCompatible = syncRelayEnabled && offlineQueueable;
+
+    // Offline: chỉ xếp những đơn có thể gửi an toàn qua hàng đợi POS.
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       if (selectedPayMethod === "bank_transfer") {
         setSubmittingMode(null);
         setError(t("pos.sepay.onlineRequired"));
         return;
       }
+      if (!offlineQueueable) {
+        setSubmittingMode(null);
+        setError(t("pos.errors.onlineRequired"));
+        return;
+      }
       await queueOffline(payload);
       return;
     }
-    const relayCompatible = syncRelayEnabled
-      && !payload.source
-      && !payload.posDraftId
-      && !payload.paymentPending
-      && !payload.paymentSessionId
-      && Number(payload.discount ?? 0) <= 0
-      && ["cash", "credit"].includes(payload.payment.method)
-      && payload.items.every((item) => item.manualUnitPrice == null && (item.lineDiscount ?? 0) <= 0);
+
+    // During the relay rollout, keep a local write-ahead copy of supported
+    // orders that still use the existing server action. Delete it only after
+    // the server returns a definite result; a lost response remains retryable.
+    let directOutboxLocalId: string | null = null;
+    let submittedPayload: Parameters<typeof createOrder>[0] = payload;
+    if (offlineQueueable && !syncRelayEnabled) {
+      const persisted = await persistOrderToOutbox(payload);
+      if (!persisted) {
+        setSubmittingMode(null);
+        setError(t("pos.errors.offlineSaveFailed"));
+        return;
+      }
+      directOutboxLocalId = persisted.localId;
+      submittedPayload = persisted.payload;
+      await refreshOutboxSummary();
+    }
     const res = await requestPosOrder(
-      payload,
+      submittedPayload,
       relayCompatible ? createOrderThroughSyncRelay : createOrder,
     );
     if (res.kind === "created") {
+      if (directOutboxLocalId) {
+        await removeOutbox(storageScope, directOutboxLocalId);
+        directOutboxLocalId = null;
+        await refreshOutboxSummary();
+      }
       try {
         if (sourceInvoice?.mode === "draft_edit" && sourceInvoice.id) {
           setSubmittingMode(null);
@@ -2459,6 +2506,11 @@ export function PosClient({
         setError(t(selectedPayMethod === "bank_transfer" ? "pos.sepay.createFailed" : "errors.serverError"));
       }
     } else if (res.kind === "rejected") {
+      if (directOutboxLocalId) {
+        await removeOutbox(storageScope, directOutboxLocalId);
+        directOutboxLocalId = null;
+        await refreshOutboxSummary();
+      }
       setSubmittingMode(null);
       if (res.referenceCode && t.has(res.error)) {
         setError(t(res.error, {
@@ -2479,7 +2531,7 @@ export function PosClient({
         return;
       }
       // mất mạng giữa chừng → xếp hàng offline
-      await queueOffline(payload);
+      await queueOffline(submittedPayload);
     }
   }
 

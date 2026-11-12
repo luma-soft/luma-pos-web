@@ -32,10 +32,17 @@ function run<T>(storeName: string, mode: IDBTransactionMode, fn: (store: IDBObje
     return new Promise<T | null>((resolve) => {
       const tx = db.transaction(storeName, mode);
       const req = fn(tx.objectStore(storeName));
-      req.onsuccess = () => resolve(req.result as T);
-      req.onerror = () => resolve(null);
+      let requestSucceeded = false;
+      let result: T | null = null;
+      req.onsuccess = () => {
+        requestSucceeded = true;
+        result = req.result == null ? null : req.result as T;
+      };
+      req.onerror = () => { requestSucceeded = false; };
+      tx.oncomplete = () => resolve(requestSucceeded ? result : null);
+      tx.onerror = tx.onabort = () => resolve(null);
     });
-  });
+  }).catch(() => null);
 }
 
 // ---- outbox ----
@@ -53,12 +60,13 @@ export interface OutboxOrder {
 export async function enqueueOrder(
   scopeId: string,
   rec: Omit<OutboxOrder, "storageId" | "scopeId">,
-): Promise<void> {
-  await run("outbox", "readwrite", (s) => s.put({
+): Promise<boolean> {
+  const key = await run<IDBValidKey>("outbox", "readwrite", (s) => s.put({
     ...rec,
     scopeId,
     storageId: `${scopeId}:${rec.localId}`,
   }));
+  return key != null;
 }
 export async function getOutbox(scopeId: string): Promise<OutboxOrder[]> {
   const all = await run<OutboxOrder[]>("outbox", "readonly", (s) => s.getAll());

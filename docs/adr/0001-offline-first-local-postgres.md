@@ -29,6 +29,8 @@ The web client currently uses a remote PostgreSQL database through the Next.js s
 - The relay may contain pending business change payloads. Access must remain store-scoped and authenticated; a client must never write directly to the local PostgreSQL host.
 - Existing Supabase business data has not been copied or cut over. Data export, local import, reconciliation and rollback require a separate controlled migration step.
 - The relay is disabled behind `LUMAPOS_SYNC_RELAY_ENABLED` until snapshot reconciliation, Mac worker readiness and client rollout are complete. Enabling the POS slice alone does not cut over other business writes or read models.
+- The POS client slice now writes eligible cash/credit orders to a durable device outbox before network submission. Web confirms the IndexedDB transaction committed; iPhone persists both the SQLite outbox entry and queued invoice state before sending. Retries reuse the same client ID. Gateway payments, discounts, manual prices, source-derived edits and returns still require their supported online flows.
+- This protects a POS order across a dropped response or app interruption; it does not finish the authority cutover. The existing web order action remains in place while the relay and Mac processor are staged, and queued orders remain pending until the configured synchronization path accepts them.
 
 ## Rollout
 
