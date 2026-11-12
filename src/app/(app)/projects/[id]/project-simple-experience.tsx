@@ -1,4 +1,5 @@
 import {
+  ClipboardCheck,
   CheckCircle2,
   FileStack,
   House,
@@ -6,12 +7,19 @@ import {
   MapPin,
   NotebookPen,
   Server,
+  Wrench,
 } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
 import type { ProjectDetail } from "@/lib/data/projects";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import type { getServiceFormOptions } from "@/lib/data/services";
-import { InstalledAssetQuickCreate } from "../../services/service-widgets";
+import {
+  InstalledAssetQuickCreate,
+  ServiceChecklistEditor,
+  ServiceJobEdit,
+  ServiceJobStatusAction,
+} from "../../services/service-widgets";
 import { InstalledAssetPhotoThumbnail } from "./installed-asset-photo-thumbnail";
 import { InstalledAssetDeleteButton } from "./installed-asset-delete-button";
 import {
@@ -25,14 +33,24 @@ import { BUSINESS_TIME_ZONE } from "@/lib/dates/business-date";
 
 type ServiceOptions = Awaited<ReturnType<typeof getServiceFormOptions>>;
 
-export function ProjectSimpleExperience({
+export async function ProjectSimpleExperience({
   detail,
+  serviceOptions,
   canManage,
+  offlineScopeId,
+  storeId,
+  serviceFieldRelayEnabled,
+  canEditFieldService,
 }: {
   detail: ProjectDetail;
   serviceOptions: ServiceOptions;
   canManage: boolean;
+  offlineScopeId?: string;
+  storeId?: string;
+  serviceFieldRelayEnabled: boolean;
+  canEditFieldService: boolean;
 }) {
+  const t = await getTranslations();
   const { project, assets } = detail;
   const completed = project.status === "done";
   const installedCount = assets.filter((asset) => asset.status === "installed").length;
@@ -85,6 +103,57 @@ export function ProjectSimpleExperience({
                 </div>
               </div>
             </div>
+          </ProjectServiceTab>
+
+          <ProjectServiceTab id="jobs" label={t("services.tabs.jobs")} icon={<ClipboardCheck />} count={detail.jobs.length}>
+            <section>
+              <header className="mb-4">
+                <h2 className="font-semibold">{t("services.tabs.jobs")}</h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  {t("services.summary.openJobs", { count: detail.jobs.filter((job) => !["completed", "cancelled"].includes(job.status)).length })}
+                </p>
+              </header>
+              {detail.jobs.length ? (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {detail.jobs.map((job) => (
+                    <article key={job.id} className="rounded-xl border border-border-soft bg-surface p-4">
+                      <header className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-mono text-xs text-slate-500">{job.code}</p>
+                          <h3 className="mt-1 font-semibold">{job.title}</h3>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {t(`services.types.${job.serviceType}` as never)} · {job.assignedToName ?? t("services.fields.unassigned")}
+                          </p>
+                        </div>
+                        {canManage && (
+                          <div className="flex items-center gap-3">
+                            <ServiceJobEdit
+                              job={job}
+                              projectType={project.serviceType!}
+                              assignees={serviceOptions.assigneeOptions}
+                              orders={detail.orders.map((order) => ({ id: order.id, code: order.code, status: order.status }))}
+                            />
+                            <ServiceJobStatusAction jobId={job.id} status={job.status} />
+                          </div>
+                        )}
+                      </header>
+                      {job.description && <p className="mb-3 text-sm text-slate-600">{job.description}</p>}
+                      <ServiceChecklistEditor
+                        jobId={job.id}
+                        checklist={job.checklist}
+                        checklistVersion={job.checklistVersion ?? 1}
+                        storeId={storeId}
+                        scopeId={offlineScopeId}
+                        relayEnabled={serviceFieldRelayEnabled}
+                        canEdit={canManage || (serviceFieldRelayEnabled && canEditFieldService)}
+                      />
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState icon={<Wrench />} title={t("services.jobs.empty")} text={t("services.jobs.empty")} />
+              )}
+            </section>
           </ProjectServiceTab>
 
           <ProjectServiceTab id="devices" label="Thiết bị" icon={<Server />} count={assets.length}>

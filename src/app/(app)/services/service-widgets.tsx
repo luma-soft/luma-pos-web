@@ -6,7 +6,7 @@ import { legacyText } from "@/lib/i18n/catalog-text";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -72,6 +72,15 @@ import {
 import { ProjectEdit } from "../projects/project-widgets";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { InstalledAssetBatchCreate } from "./installed-asset-batch-create";
+import {
+  getServiceChecklistQueueEntry,
+  markServiceChecklistQueueEntryFailed,
+  removeServiceChecklistQueueEntry,
+  saveServiceChecklistQueueEntry,
+  type ServiceChecklistQueueEntry,
+} from "@/lib/offline/service-checklist-store";
+import { getOrCreateSyncDeviceId } from "@/lib/offline/pos-store";
+import { fetchSyncRelayReceipts, submitSyncRelayEvent, SyncRelayRequestError } from "@/lib/sync/relay-client";
 
 type ProjectOption = { id: string; name: string; serviceType: string | null };
 type AssigneeOption = { id: string; name: string };
@@ -833,24 +842,157 @@ export function InstalledAssetQuickCreate({
 export function ServiceChecklistEditor({
   jobId,
   checklist,
+  checklistVersion = 1,
+  storeId,
+  scopeId,
+  relayEnabled = false,
+  canEdit = true,
 }: {
   jobId: string;
   checklist: ServiceChecklistItem[];
+  checklistVersion?: number;
+  storeId?: string;
+  scopeId?: string;
+  relayEnabled?: boolean;
+  canEdit?: boolean;
 }) {
   const t = useTranslations();
   const router = useRouter();
+  const dialog = useConfirmDialog();
   const [items, setItems] = useState(checklist);
   const [busyCode, setBusyCode] = useState<string | null>(null);
+  const [pendingEntry, setPendingEntry] = useState<ServiceChecklistQueueEntry | null>(null);
+  const [saveError, setSaveError] = useState(false);
+  const syncingRef = useRef(false);
+
+  useEffect(() => {
+    if (!pendingEntry) setItems(checklist);
+  }, [checklist, pendingEntry]);
+
+  const flushEntry = useCallback(async (entry: ServiceChecklistQueueEntry) => {
+    if (!relayEnabled || !storeId || !scopeId || !navigator.onLine || syncingRef.current || entry.failed) return;
+    syncingRef.current = true;
+    try {
+      const submission = await submitSyncRelayEvent({
+        commandType: "service.field.mutation",
+        eventId: entry.eventId,
+        storeId,
+        deviceId: getOrCreateSyncDeviceId(),
+        payload: entry.payload,
+      });
+      if (submission.eventId !== entry.eventId) throw new Error("SYNC_EVENT_ID_MISMATCH");
+
+      for (let attempt = 0; attempt < 8 && navigator.onLine; attempt += 1) {
+        const receipts = await fetchSyncRelayReceipts(storeId, [entry.eventId]);
+        const receipt = receipts.find((item) => item.eventId === entry.eventId);
+        if (receipt?.status === "accepted") {
+          await removeServiceChecklistQueueEntry(scopeId, jobId);
+          setPendingEntry(null);
+          router.refresh();
+          return;
+        }
+        if (receipt?.status === "rejected" || receipt?.status === "conflict") {
+          const errorCode = receipt.errorCode || "SYNC_COMMAND_REJECTED";
+          await markServiceChecklistQueueEntryFailed(scopeId, jobId, errorCode);
+          setPendingEntry({ ...entry, failed: true, errorCode });
+          return;
+        }
+        if (attempt < 7) await new Promise((resolve) => setTimeout(resolve, 750));
+      }
+    } catch (error) {
+      if (error instanceof SyncRelayRequestError
+        && error.statusCode >= 400
+        && error.statusCode < 500
+        && ![401, 408, 425, 429].includes(error.statusCode)) {
+        await markServiceChecklistQueueEntryFailed(scopeId, jobId, error.message);
+        setPendingEntry({ ...entry, failed: true, errorCode: error.message });
+      }
+    } finally {
+      syncingRef.current = false;
+    }
+  }, [jobId, relayEnabled, router, scopeId, storeId]);
+
+  useEffect(() => {
+    if (!scopeId) return;
+    let cancelled = false;
+    void getServiceChecklistQueueEntry(scopeId, jobId).then((entry) => {
+      if (cancelled || !entry) return;
+      setPendingEntry(entry);
+      setItems(entry.payload.checklist);
+      if (relayEnabled && navigator.onLine) void flushEntry(entry);
+    });
+    return () => { cancelled = true; };
+  }, [flushEntry, jobId, relayEnabled, scopeId]);
+
+  useEffect(() => {
+    if (!pendingEntry || !relayEnabled) return;
+    const sync = () => { if (navigator.onLine) void flushEntry(pendingEntry); };
+    window.addEventListener("online", sync);
+    const interval = window.setInterval(sync, 15_000);
+    sync();
+    return () => {
+      window.removeEventListener("online", sync);
+      window.clearInterval(interval);
+    };
+  }, [flushEntry, pendingEntry, relayEnabled]);
 
   async function toggle(code: string, completed: boolean) {
+    if (pendingEntry || busyCode) return;
     const previous = items;
     const next = items.map((item) => item.code === code ? { ...item, completed } : item);
     setItems(next);
     setBusyCode(code);
+
+    if (scopeId && storeId && (!navigator.onLine || relayEnabled)) {
+      setSaveError(false);
+      const eventId = crypto.randomUUID();
+      const entry: Omit<ServiceChecklistQueueEntry, "storageId"> = {
+        scopeId,
+        storeId,
+        jobId,
+        eventId,
+        savedAt: Date.now(),
+        payload: {
+          type: "checklist.update",
+          jobId,
+          clientMutationId: eventId,
+          expectedVersion: checklistVersion,
+          checklist: next,
+        },
+      };
+      const saved = await saveServiceChecklistQueueEntry(entry);
+      if (!saved) {
+        setItems(previous);
+        setSaveError(true);
+        setBusyCode(null);
+        return;
+      }
+      const persisted = { ...entry, storageId: `${scopeId}:${jobId}` };
+      setPendingEntry(persisted);
+      setBusyCode(null);
+      if (navigator.onLine) void flushEntry(persisted);
+      return;
+    }
+
     const result = await updateServiceChecklist(jobId, next);
     setBusyCode(null);
     if (result.ok) router.refresh();
     else setItems(previous);
+  }
+
+  async function discardRejectedChange() {
+    if (!pendingEntry?.failed || !scopeId) return;
+    const confirmed = await dialog.confirm({
+      title: t("services.offline.discardTitle"),
+      description: t("services.offline.discardDescription"),
+      confirmLabel: t("common.delete"),
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+    await removeServiceChecklistQueueEntry(scopeId, jobId);
+    setPendingEntry(null);
+    setItems(checklist);
+    router.refresh();
   }
 
   return (
@@ -858,9 +1000,22 @@ export function ServiceChecklistEditor({
       {items.map((item) => (
         <div key={item.code} className="flex items-center justify-between gap-3 border-b border-border-soft pb-2 last:border-b-0">
           <Text size="sm" className={cn(item.completed && "text-slate-400 line-through")} text={t(item.labelKey as never)} />
-          <Toggle checked={item.completed} disabled={busyCode === item.code} onChange={(value) => toggle(item.code, value)} aria-label={t(item.labelKey as never)} />
+          <Toggle checked={item.completed} disabled={!canEdit || busyCode === item.code || pendingEntry !== null} onChange={(value) => toggle(item.code, value)} aria-label={t(item.labelKey as never)} />
         </div>
       ))}
+      {pendingEntry && (
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <Text
+            size="xs"
+            variant={pendingEntry.failed ? "destructive" : "muted"}
+            text={t(pendingEntry.failed ? "services.offline.failed" : "services.offline.waiting")}
+          />
+          {pendingEntry.failed && (
+            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={discardRejectedChange} tx="services.offline.discard" />
+          )}
+        </div>
+      )}
+      {saveError && <Text size="xs" variant="destructive" text={t("services.offline.saveFailed")} />}
     </div>
   );
 }

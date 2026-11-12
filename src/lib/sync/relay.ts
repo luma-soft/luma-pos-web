@@ -1,11 +1,17 @@
 import { z } from "zod";
 import { createOrderSchema } from "@/lib/schemas/order";
+import {
+  serviceChecklistUpdateSchema,
+  serviceFieldAssetCreateSchema,
+  serviceFieldMaterialUsageSchema,
+} from "@/lib/services/schemas";
 
 export const POS_ORDER_SYNC_COMMAND = "pos.order.create" as const;
+export const SERVICE_FIELD_MUTATION_SYNC_COMMAND = "service.field.mutation" as const;
 export const SYNC_RELAY_MAX_BODY_BYTES = 65_536;
 export const SYNC_RELAY_STATUS_LIMIT = 100;
 
-export const syncRelaySubmitSchema = z.object({
+const syncRelayEnvelopeSchema = z.object({
   eventId: z.uuid(),
   storeId: z.uuid(),
   deviceId: z.string().trim().min(1).max(200),
@@ -13,6 +19,10 @@ export const syncRelaySubmitSchema = z.object({
     z.string().regex(/^\d+$/),
     z.number().int().nonnegative().safe(),
   ]).optional(),
+}).strict();
+
+export const posOrderSyncSchema = syncRelayEnvelopeSchema.extend({
+  commandType: z.literal(POS_ORDER_SYNC_COMMAND).optional(),
   payload: createOrderSchema,
 }).strict().superRefine((value, context) => {
   const order = value.payload;
@@ -27,8 +37,26 @@ export const syncRelaySubmitSchema = z.object({
   }
 });
 
+const serviceFieldMutationPayloadSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("checklist.update") }).merge(serviceChecklistUpdateSchema).strict(),
+  z.object({ type: z.literal("material.usage") }).merge(serviceFieldMaterialUsageSchema).strict(),
+  z.object({ type: z.literal("asset.create") }).merge(serviceFieldAssetCreateSchema).strict(),
+]);
+
+const serviceFieldMutationSyncSchema = syncRelayEnvelopeSchema.extend({
+  commandType: z.literal(SERVICE_FIELD_MUTATION_SYNC_COMMAND),
+  payload: serviceFieldMutationPayloadSchema,
+}).strict();
+
+export const syncRelaySubmitSchema = z.union([
+  posOrderSyncSchema,
+  serviceFieldMutationSyncSchema,
+]);
+
 export type SyncRelaySubmit = z.output<typeof syncRelaySubmitSchema>;
 export type SyncRelaySubmitInput = z.input<typeof syncRelaySubmitSchema>;
+export type POSOrderSyncPayload = z.output<typeof createOrderSchema>;
+export type ServiceFieldMutationRelayPayload = z.output<typeof serviceFieldMutationPayloadSchema>;
 
 export type SyncRelayReceipt = {
   position: string;

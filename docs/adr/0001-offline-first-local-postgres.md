@@ -28,16 +28,17 @@ The web client currently uses a remote PostgreSQL database through the Next.js s
 - Device-local state needs explicit pending, accepted and conflict states, scoped by store, user and device. Existing POS order idempotency and native mutation recovery provide starting points, not a complete cross-feature sync model.
 - The relay may contain pending business change payloads. Access must remain store-scoped and authenticated; a client must never write directly to the local PostgreSQL host.
 - Existing Supabase business data has not been copied or cut over. Data export, local import, reconciliation and rollback require a separate controlled migration step.
-- The relay is disabled behind `LUMAPOS_SYNC_RELAY_ENABLED` until snapshot reconciliation, Mac worker readiness and client rollout are complete. Enabling the POS slice alone does not cut over other business writes or read models.
+- The relay is disabled behind `LUMAPOS_SYNC_RELAY_ENABLED` until snapshot reconciliation, Mac worker readiness and client rollout are complete. Service field commands also require `LUMAPOS_SERVICE_FIELD_RELAY_ENABLED`; this does not cut over other business writes or read models.
 - The POS client slice now writes eligible cash/credit orders to a durable device outbox before network submission. Web confirms the IndexedDB transaction committed; iPhone persists both the SQLite outbox entry and queued invoice state before sending. Retries reuse the same client ID. Gateway payments, discounts, manual prices, source-derived edits and returns still require their supported online flows.
 - This protects a POS order across a dropped response or app interruption; it does not finish the authority cutover. The existing web order action remains in place while the relay and Mac processor are staged, and queued orders remain pending until the configured synchronization path accepts them.
+- The service field slice sends checklist changes from web and checklist, material-usage and installed-asset changes from iPhone through the relay. The Mac processor reuses the existing field-operation validation, idempotency and version-conflict rules. Web keeps an IndexedDB copy; iPhone keeps its SQLite mutation row until the Mac returns an accepted receipt. This slice remains off until its database constraint migration and service relay flag are enabled.
 
 ## Rollout
 
 1. Bootstrap the local PostgreSQL schema and remove Supabase-only database assumptions from the local runtime.
 2. Run the business application process beside PostgreSQL and establish the sync relay and durable command-processing rules.
 3. Migrate a vertical slice from Product Catalog through POS order creation, including offline pending state and canonical conflict handling.
-4. Expand local-first reads and queued writes through inventory, purchasing, customers, services and finance, retaining domain validation.
+4. Expand local-first reads and queued writes through inventory, purchasing, customers, the remaining service workflows and finance, retaining domain validation.
 5. Add the macOS client after shared persistence and sync behavior is stable on web and iPhone.
 
 ## Local host state

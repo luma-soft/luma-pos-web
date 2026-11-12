@@ -39,6 +39,10 @@ type ProjectDetailViewProps = {
   detail: ProjectDetail;
   serviceOptions: ServiceOptions;
   presentation: "page" | "modal";
+  offlineScopeId?: string;
+  storeId?: string;
+  serviceFieldRelayEnabled?: boolean;
+  canEditFieldService?: boolean;
   canDelete?: boolean;
 };
 
@@ -46,6 +50,10 @@ export async function ProjectDetailView({
   detail,
   serviceOptions,
   presentation,
+  offlineScopeId,
+  storeId,
+  serviceFieldRelayEnabled = false,
+  canEditFieldService = false,
   canDelete = false,
 }: ProjectDetailViewProps) {
   const t = await getTranslations();
@@ -75,9 +83,22 @@ export async function ProjectDetailView({
           detail={detail}
           serviceOptions={serviceOptions}
           canManage={canDelete}
+          offlineScopeId={offlineScopeId}
+          storeId={storeId}
+          serviceFieldRelayEnabled={serviceFieldRelayEnabled}
+          canEditFieldService={canEditFieldService}
         />
       ) : (
-        <ProjectDetailBody detail={detail} serviceOptions={serviceOptions} t={t} />
+        <ProjectDetailBody
+          detail={detail}
+          serviceOptions={serviceOptions}
+          t={t}
+          offlineScopeId={offlineScopeId}
+          storeId={storeId}
+          serviceFieldRelayEnabled={serviceFieldRelayEnabled}
+          canManage={canDelete}
+          canEditFieldService={canEditFieldService}
+        />
       )}
     </div>
   );
@@ -150,10 +171,20 @@ function ProjectDetailBody({
   detail,
   serviceOptions,
   t,
+  offlineScopeId,
+  storeId,
+  serviceFieldRelayEnabled,
+  canManage,
+  canEditFieldService,
 }: {
   detail: ProjectDetail;
   serviceOptions: ServiceOptions;
   t: Translator;
+  offlineScopeId?: string;
+  storeId?: string;
+  serviceFieldRelayEnabled: boolean;
+  canManage: boolean;
+  canEditFieldService: boolean;
 }) {
   const { project, orders, jobs, assets, claims, materials, statusLogs, costEntries, profitability, plannedMaterialCost, handoverDocuments, maintenancePlans } = detail;
   const timeline = [
@@ -386,7 +417,15 @@ function ProjectDetailBody({
                         {job.materialOrderId && <OrderDetailLink orderId={job.materialOrderId} className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{t("services.fields.materialOrder")}</OrderDetailLink>}
                       </div>
                     )}
-                    <ServiceChecklistEditor jobId={job.id} checklist={job.checklist} />
+                    <ServiceChecklistEditor
+                      jobId={job.id}
+                      checklist={job.checklist}
+                      checklistVersion={job.checklistVersion ?? 1}
+                      storeId={storeId}
+                      scopeId={offlineScopeId}
+                      relayEnabled={serviceFieldRelayEnabled}
+                      canEdit={canManage || (serviceFieldRelayEnabled && canEditFieldService)}
+                    />
                     {statusLogs.some((log) => log.jobId === job.id) && (
                       <div className="mt-3 border-t border-border-soft pt-3">
                         <Text as="div" weight="semibold" size="xs" className="mb-2" tx="services.fields.history" />

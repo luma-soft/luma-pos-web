@@ -5190,6 +5190,14 @@
   },
   "services": {
     "title": "Projects & Services",
+    "offline": {
+      "saveFailed": "This change could not be saved on the device. Please try again.",
+      "waiting": "Saved on this device; waiting for Mac confirmation.",
+      "failed": "Mac did not accept this change. The device copy is still saved.",
+      "discard": "Remove pending change",
+      "discardTitle": "Remove the unsynced change?",
+      "discardDescription": "The checklist change saved on this device will be removed and the latest server data will be loaded."
+    },
     "tabs": {
       "projects": "Projects",
       "jobs": "Work orders",

@@ -33,6 +33,11 @@ export default async function ProjectDetailModalPage({
         serviceOptions={serviceOptions}
         presentation="modal"
         canDelete={["owner", "manager"].includes(context.role)}
+        offlineScopeId={`${context.storeId}:${context.userId}`}
+        storeId={context.storeId}
+        serviceFieldRelayEnabled={process.env.LUMAPOS_SYNC_RELAY_ENABLED === "true"
+          && process.env.LUMAPOS_SERVICE_FIELD_RELAY_ENABLED === "true"}
+        canEditFieldService={["owner", "manager", "technician"].includes(context.role)}
       />
     </ProjectDetailDialog>
   );

@@ -3,6 +3,7 @@ import { createClient as createCookieClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   POS_ORDER_SYNC_COMMAND,
+  SERVICE_FIELD_MUTATION_SYNC_COMMAND,
   SYNC_RELAY_MAX_BODY_BYTES,
   SYNC_RELAY_STATUS_LIMIT,
   syncRelaySubmitSchema,
@@ -10,7 +11,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-type RelayRole = "owner" | "manager" | "cashier";
+type RelayRole = "owner" | "manager" | "cashier" | "warehouse" | "technician";
 
 async function authenticatedUser(request: Request) {
   const bearer = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
@@ -30,7 +31,7 @@ async function authenticatedUser(request: Request) {
   return error ? null : data.user;
 }
 
-async function salesMembership(storeId: string, userId: string) {
+async function relayMembership(storeId: string, userId: string) {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("sync_relay_memberships")
@@ -40,8 +41,18 @@ async function salesMembership(storeId: string, userId: string) {
     .eq("is_active", true)
     .maybeSingle();
   if (error || !data?.is_active) return null;
-  if (data.role !== "owner" && data.role !== "manager" && data.role !== "cashier") return null;
+  if (!(["owner", "manager", "cashier", "warehouse", "technician"] as string[]).includes(data.role)) return null;
   return data.role as RelayRole;
+}
+
+function canSubmitCommand(role: RelayRole, commandType: string) {
+  if (commandType === POS_ORDER_SYNC_COMMAND) {
+    return role === "owner" || role === "manager" || role === "cashier";
+  }
+  if (commandType === SERVICE_FIELD_MUTATION_SYNC_COMMAND) {
+    return role === "owner" || role === "manager" || role === "technician";
+  }
+  return false;
 }
 
 function privateJson(body: unknown, status = 200) {
@@ -124,8 +135,13 @@ export async function POST(request: Request) {
   if (!parsed.success) return privateJson({ ok: false, error: "INVALID_SYNC_EVENT" }, 400);
 
   const input = parsed.data;
-  const role = await salesMembership(input.storeId, user.id);
-  if (!role) return privateJson({ ok: false, error: "FORBIDDEN" }, 403);
+  const commandType = input.commandType ?? POS_ORDER_SYNC_COMMAND;
+  if (commandType === SERVICE_FIELD_MUTATION_SYNC_COMMAND
+    && process.env.LUMAPOS_SERVICE_FIELD_RELAY_ENABLED !== "true") {
+    return privateJson({ ok: false, error: "SYNC_COMMAND_DISABLED" }, 503);
+  }
+  const role = await relayMembership(input.storeId, user.id);
+  if (!role || !canSubmitCommand(role, commandType)) return privateJson({ ok: false, error: "FORBIDDEN" }, 403);
 
   try {
     const supabase = createSupabaseAdminClient();
@@ -136,7 +152,7 @@ export async function POST(request: Request) {
         store_id: input.storeId,
         user_id: user.id,
         device_id: input.deviceId,
-        command_type: POS_ORDER_SYNC_COMMAND,
+        command_type: commandType,
         base_revision: input.baseRevision == null ? null : String(input.baseRevision),
         payload: input.payload,
         status: "pending",
@@ -180,7 +196,7 @@ export async function POST(request: Request) {
       return privateJson({ ok: false, error: "SYNC_EVENT_ID_CONFLICT" }, 409);
     }
 
-    console.error("Sync relay rejected a POS command", error?.code ?? "UNKNOWN");
+    console.error("Sync relay rejected a command", error?.code ?? "UNKNOWN");
     return privateJson({ ok: false, error: "SYNC_RELAY_UNAVAILABLE" }, 503);
   } catch {
     return privateJson({ ok: false, error: "SYNC_RELAY_UNAVAILABLE" }, 503);
@@ -206,7 +222,7 @@ export async function GET(request: Request) {
     return privateJson({ ok: false, error: "INVALID_SYNC_EVENT_IDS" }, 400);
   }
 
-  const role = await salesMembership(storeId, user.id);
+  const role = await relayMembership(storeId, user.id);
   if (!role) return privateJson({ ok: false, error: "FORBIDDEN" }, 403);
 
   try {
@@ -216,13 +232,12 @@ export async function GET(request: Request) {
       .select("position, event_id, store_id, status, result, error_code, processed_at")
       .eq("store_id", storeId)
       .eq("user_id", user.id)
-      .eq("command_type", POS_ORDER_SYNC_COMMAND)
       .in("event_id", eventIds)
       .order("position", { ascending: true })
       .limit(SYNC_RELAY_STATUS_LIMIT);
 
     if (error) {
-      console.error("Sync relay could not read POS events", error.code);
+      console.error("Sync relay could not read events", error.code);
       return privateJson({ ok: false, error: "SYNC_RELAY_UNAVAILABLE" }, 503);
     }
 

@@ -118,6 +118,7 @@ export async function getProjectDetail(storeId: string, id: string) {
     completedAt: serviceJobs.completedAt,
     description: serviceJobs.description,
     checklist: serviceJobs.checklist,
+    checklistVersion: serviceJobs.checklistVersion,
     quoteOrderId: serviceJobs.quoteOrderId,
     materialOrderId: serviceJobs.materialOrderId,
     createdAt: serviceJobs.createdAt,

@@ -5190,6 +5190,14 @@
   },
   "services": {
     "title": "Thi công & Dịch vụ",
+    "offline": {
+      "saveFailed": "Không lưu được thay đổi trên thiết bị. Hãy thử lại.",
+      "waiting": "Đã lưu trên thiết bị, chờ Mac xác nhận.",
+      "failed": "Mac chưa chấp nhận thay đổi. Bản lưu trên thiết bị vẫn được giữ.",
+      "discard": "Xóa bản chờ",
+      "discardTitle": "Xóa thay đổi chưa đồng bộ?",
+      "discardDescription": "Thay đổi checklist đang lưu trên thiết bị sẽ bị xóa và dữ liệu mới nhất từ máy chủ sẽ được tải lại."
+    },
     "tabs": {
       "projects": "Công trình",
       "jobs": "Lệnh việc",

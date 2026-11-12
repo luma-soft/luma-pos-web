@@ -1,7 +1,7 @@
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 import { createOrderForSalesPrincipal } from "@/lib/orders/create-command";
 import { CHECKOUT_PRICING_CHANGED } from "@/lib/orders/checkout-pricing";
-import { syncRelaySubmitSchema } from "@/lib/sync/relay";
+import { posOrderSyncSchema } from "@/lib/sync/relay";
 
 export type PosOrderRelayResult =
   | { status: "accepted"; result: { id: string; code: string }; errorCode: null }
@@ -22,7 +22,7 @@ export async function processPosOrderRelayEvent(
     ...rawCommand,
     ...(rawCommand.baseRevision == null ? {} : { baseRevision: rawCommand.baseRevision }),
   };
-  const parsed = syncRelaySubmitSchema.safeParse(command);
+  const parsed = posOrderSyncSchema.safeParse(command);
   if (!parsed.success) {
     return { status: "rejected", result: null, errorCode: "SYNC_EVENT_INVALID" };
   }

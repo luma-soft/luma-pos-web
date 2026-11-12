@@ -2,8 +2,13 @@ import { randomUUID } from "node:crypto";
 import { hostname, userInfo } from "node:os";
 import { loadEnvConfig } from "@next/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import type { SyncRelaySubmit } from "@/lib/sync/relay";
+import {
+  POS_ORDER_SYNC_COMMAND,
+  SERVICE_FIELD_MUTATION_SYNC_COMMAND,
+  type POSOrderSyncPayload,
+} from "@/lib/sync/relay";
 import type { PosOrderRelayResult } from "@/lib/sync/process-pos-order-event";
+import type { ServiceFieldRelayResult } from "@/lib/sync/process-service-field-event";
 import { createMigrationPostgresClient, readMigrationDatabaseUrl } from "@/db/migration-runner";
 
 type RelayRow = {
@@ -12,8 +17,9 @@ type RelayRow = {
   store_id: string;
   user_id: string;
   device_id: string;
+  command_type: string;
   base_revision: string | null;
-  payload: SyncRelaySubmit["payload"];
+  payload: unknown;
   attempt_count: number;
 };
 
@@ -58,6 +64,7 @@ process.on("SIGTERM", () => { running = false; });
 const workerId = `${hostname()}:${localAccount}:${randomUUID()}`;
 const supabase = createSupabaseAdminClient();
 const { processPosOrderRelayEvent } = await import("@/lib/sync/process-pos-order-event");
+const { processServiceFieldRelayEvent } = await import("@/lib/sync/process-service-field-event");
 
 async function updateEvent(
   event: RelayRow,
@@ -76,14 +83,25 @@ async function updateEvent(
 
 async function processEvent(event: RelayRow) {
   try {
-    const result: PosOrderRelayResult = await processPosOrderRelayEvent({
-      eventId: event.event_id,
-      storeId: event.store_id,
-      userId: event.user_id,
-      deviceId: event.device_id,
-      baseRevision: event.base_revision,
-      payload: event.payload,
-    });
+    let result: PosOrderRelayResult | ServiceFieldRelayResult;
+    if (event.command_type === POS_ORDER_SYNC_COMMAND) {
+      result = await processPosOrderRelayEvent({
+        eventId: event.event_id,
+        storeId: event.store_id,
+        userId: event.user_id,
+        deviceId: event.device_id,
+        baseRevision: event.base_revision,
+        payload: event.payload as POSOrderSyncPayload,
+      });
+    } else if (event.command_type === SERVICE_FIELD_MUTATION_SYNC_COMMAND) {
+      result = await processServiceFieldRelayEvent({
+        storeId: event.store_id,
+        userId: event.user_id,
+        payload: event.payload,
+      });
+    } else {
+      result = { status: "rejected", result: null, errorCode: "SYNC_COMMAND_UNSUPPORTED" };
+    }
     await updateEvent(event, {
       status: result.status,
       result: result.result,
