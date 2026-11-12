@@ -44,10 +44,14 @@ export async function GET() {
         backend: { status: "online", uptimeSeconds: Math.floor(process.uptime()) },
         readiness: {
           status: readiness.status,
+          missingDatabasePrivileges: readiness.missingDatabasePrivileges,
           missingWorkers: readiness.missingWorkers,
           missingMedia: readiness.missingMedia,
         },
-        database: { status: readiness.database },
+        database: {
+          status: readiness.database,
+          blockers: readiness.missingDatabasePrivileges,
+        },
         media: readiness.media,
         sync: {
           worker: readiness.workers["sync-inbox"] ?? { status: "offline", lastSeenAt: null },

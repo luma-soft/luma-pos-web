@@ -11,7 +11,8 @@ type WorkerStatus = { status: "online" | "offline"; lastSeenAt: string | null };
 
 export type SelfHostedReadiness = {
   status: "ready" | "not_ready";
-  database: "ready";
+  database: "ready" | "not_ready";
+  missingDatabasePrivileges: string[];
   workers: Partial<Record<WorkerKey, WorkerStatus>>;
   media: {
     status: "ready" | "not_ready" | "not_required";
@@ -37,6 +38,7 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     return {
       status: "ready",
       database: "ready",
+      missingDatabasePrivileges: [],
       workers: {},
       media: { status: "not_required", provider: null, blockers: {} },
       missingWorkers: [],
@@ -50,7 +52,17 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     "notification-outbox",
     "database-backup",
   ];
-  const [workerRows, mediaRows] = await Promise.all([
+  const [roleRows, workerRows, mediaRows] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        runtime_account.rolsuper AS "superuser",
+        runtime_account.rolcreatedb AS "createDatabase",
+        runtime_account.rolcreaterole AS "createRoles",
+        runtime_account.rolreplication AS "replication",
+        runtime_account.rolbypassrls AS "bypassRls"
+      FROM pg_catalog.pg_roles AS runtime_account
+      WHERE runtime_account.rolname = current_user
+    `),
     db.select({
       workerKey: systemWorkerHeartbeats.workerKey,
       state: systemWorkerHeartbeats.state,
@@ -107,6 +119,15 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     `),
   ]);
 
+  const roleState = resultRows(roleRows)[0] ?? {};
+  const missingDatabasePrivileges = [
+    ...(roleState.superuser === false ? [] : ["superuser"]),
+    ...(roleState.createDatabase === false ? [] : ["createDatabase"]),
+    ...(roleState.createRoles === false ? [] : ["createRoles"]),
+    ...(roleState.replication === false ? [] : ["replication"]),
+    ...(roleState.bypassRls === true ? [] : ["bypassRls"]),
+  ];
+
   const now = Date.now();
   const workers: Record<WorkerKey, WorkerStatus> = {
     "sync-inbox": { status: "offline", lastSeenAt: null },
@@ -142,8 +163,11 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     .map(([blocker]) => blocker);
 
   return {
-    status: missingWorkers.length === 0 && missingMedia.length === 0 ? "ready" : "not_ready",
-    database: "ready",
+    status: missingDatabasePrivileges.length === 0
+      && missingWorkers.length === 0
+      && missingMedia.length === 0 ? "ready" : "not_ready",
+    database: missingDatabasePrivileges.length === 0 ? "ready" : "not_ready",
+    missingDatabasePrivileges,
     workers,
     media: {
       status: missingMedia.length === 0 ? "ready" : "not_ready",

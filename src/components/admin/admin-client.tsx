@@ -18,8 +18,8 @@ type Account = {
 
 type Operations = {
   backend: { status: string; uptimeSeconds: number };
-  readiness: { status: string; missingWorkers: string[]; missingMedia: string[] };
-  database: { status: string };
+  readiness: { status: string; missingDatabasePrivileges: string[]; missingWorkers: string[]; missingMedia: string[] };
+  database: { status: string; blockers: string[] };
   media: { status: string; provider: "local" | "r2" | null; blockers: Record<string, boolean> };
   sync: { worker: { status: string; lastSeenAt: string | null }; queue: Record<string, number> };
   workers: {
@@ -134,6 +134,15 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
   const activeMediaBlockers = Object.entries(operations?.media.blockers ?? {})
     .filter(([, blocked]) => blocked)
     .map(([key]) => mediaBlockerLabels[key] ?? t("mediaBlockers.unknown"));
+  const databaseBlockerLabels: Record<string, string> = {
+    superuser: t("databaseBlockers.superuser"),
+    createDatabase: t("databaseBlockers.createDatabase"),
+    createRoles: t("databaseBlockers.createRoles"),
+    replication: t("databaseBlockers.replication"),
+    bypassRls: t("databaseBlockers.bypassRls"),
+  };
+  const activeDatabaseBlockers = (operations?.database.blockers ?? [])
+    .map((key) => databaseBlockerLabels[key] ?? t("databaseBlockers.unknown"));
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
@@ -283,6 +292,14 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
                   </p>
                 </div>
               </div>
+              {activeDatabaseBlockers.length > 0 && (
+                <div role="status" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                  <p className="font-semibold">{t("databaseRoleNotReady")}</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {activeDatabaseBlockers.map((label) => <li key={label}>{label}</li>)}
+                  </ul>
+                </div>
+              )}
               {activeMediaBlockers.length > 0 && (
                 <div role="status" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
                   <p className="font-semibold">{t("mediaCutoverPending")}</p>

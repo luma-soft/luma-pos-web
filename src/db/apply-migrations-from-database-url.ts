@@ -3,16 +3,34 @@ import {
   readMigrationDatabaseUrl,
 } from "./migration-runner";
 
+const configuredMigrationUrl = process.env.MIGRATION_DATABASE_URL?.trim();
 const configuredUrl = process.env.DATABASE_URL?.trim();
-if (!configuredUrl) {
-  throw new Error("DATABASE_URL is not set");
+if (!configuredMigrationUrl && !configuredUrl) {
+  throw new Error("MIGRATION_DATABASE_URL or DATABASE_URL must be set");
+}
+if (configuredMigrationUrl && configuredUrl
+  && process.env.LUMAPOS_AUTH_PROVIDER?.trim().toLowerCase() === "lumapos") {
+  let runtimeUsername: string;
+  let migrationUsername: string;
+  try {
+    runtimeUsername = decodeURIComponent(new URL(configuredUrl).username);
+    migrationUsername = decodeURIComponent(new URL(configuredMigrationUrl).username);
+  } catch {
+    throw new Error("DATABASE_URL or MIGRATION_DATABASE_URL is invalid");
+  }
+  if (runtimeUsername === migrationUsername) {
+    throw new Error("Self-hosted migrations require a separate DBA/migration role from DATABASE_URL");
+  }
 }
 
-const sessionUrl = new URL(configuredUrl);
-if (
-  sessionUrl.port === "6543" &&
-  sessionUrl.hostname.endsWith(".pooler.supabase.com")
-) {
+// Prefer the dedicated DBA/session URL so the application DATABASE_URL can
+// remain a restricted runtime role. Preserve the legacy one-shot behavior for
+// local and Supabase workflows that intentionally derive a direct URL from
+// DATABASE_URL (including Supabase's transaction-pooler port conversion).
+const sessionUrl = new URL(configuredMigrationUrl || configuredUrl!);
+if (!configuredMigrationUrl
+  && sessionUrl.port === "6543"
+  && sessionUrl.hostname.endsWith(".pooler.supabase.com")) {
   sessionUrl.port = "5432";
 }
 

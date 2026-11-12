@@ -31,13 +31,13 @@ if (!archiveName || path.basename(archiveName) !== archiveName || !/^lumapos-[0-
 }
 const backupRoot = process.env.LUMAPOS_BACKUP_ROOT?.trim();
 const mediaRoot = process.env.MEDIA_LOCAL_ROOT?.trim();
-const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!backupRoot || !path.isAbsolute(backupRoot)) throw new Error("LUMAPOS_BACKUP_ROOT must be an absolute path");
 if (!mediaRoot || !path.isAbsolute(mediaRoot)) throw new Error("MEDIA_LOCAL_ROOT must be an absolute path");
-if (!databaseUrl) throw new Error("DATABASE_URL is not configured");
+const migrationDatabase = readMigrationDatabaseUrl(process.env);
+const databaseUrl = migrationDatabase.connectionString;
 const parsedUrl = new URL(databaseUrl);
 if (parsedUrl.protocol !== "postgres:" && parsedUrl.protocol !== "postgresql:") {
-  throw new Error("DATABASE_URL must use the postgres or postgresql protocol");
+  throw new Error("MIGRATION_DATABASE_URL must use the postgres or postgresql protocol");
 }
 if (parsedUrl.hostname.endsWith(".supabase.com") || parsedUrl.hostname.endsWith(".supabase.co")) {
   throw new Error("Restore cannot target a Supabase database endpoint");
@@ -99,13 +99,7 @@ if (expectedSha256 && archiveSha256 !== expectedSha256) {
   throw new Error("Backup archive checksum does not match the supplied checksum");
 }
 
-const sessionUrl = new URL(databaseUrl);
-if (sessionUrl.hostname.endsWith(".pooler.supabase.com") && sessionUrl.port === "6543") {
-  sessionUrl.port = "5432";
-}
-const connection = createMigrationPostgresClient(readMigrationDatabaseUrl({
-  MIGRATION_DATABASE_URL: sessionUrl.toString(),
-}));
+const connection = createMigrationPostgresClient(migrationDatabase);
 const staging = await mkdtemp(path.join(os.tmpdir(), "lumapos-restore-"));
 const bundlePath = path.join(staging, "backup.tar.gz");
 const unpackPath = path.join(staging, "unpacked");
@@ -224,6 +218,38 @@ try {
     "--no-same-owner",
     "--no-same-permissions",
   ]);
+
+  // The encrypted archive intentionally excludes ACLs. Restore the restricted
+  // application grants after pg_restore, using the same DBA role that owns the
+  // restored objects and will apply future migrations.
+  const runtimePrivileges = [
+    `DO $$
+     DECLARE runtime_role pg_roles%ROWTYPE;
+     BEGIN
+       SELECT * INTO runtime_role FROM pg_roles WHERE rolname = 'lumapos_runtime';
+       IF NOT FOUND
+         OR NOT runtime_role.rolcanlogin
+         OR runtime_role.rolsuper
+         OR runtime_role.rolcreatedb
+         OR runtime_role.rolcreaterole
+         OR NOT runtime_role.rolbypassrls
+         OR runtime_role.rolreplication THEN
+         RAISE EXCEPTION 'lumapos_runtime is missing or has unsafe role attributes';
+       END IF;
+     END
+     $$`,
+    `DO $$ BEGIN
+       EXECUTE format('GRANT CONNECT ON DATABASE %I TO lumapos_runtime', current_database());
+     END $$`,
+    "GRANT USAGE ON SCHEMA public TO lumapos_runtime",
+    "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO lumapos_runtime",
+    "GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO lumapos_runtime",
+    "GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO lumapos_runtime",
+    "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO lumapos_runtime",
+    "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO lumapos_runtime",
+    "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO lumapos_runtime",
+  ];
+  for (const statement of runtimePrivileges) await connection.unsafe(statement);
 
   console.log(JSON.stringify({
     status: "restored",

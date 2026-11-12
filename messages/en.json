@@ -243,6 +243,15 @@
     "backend": "Backend",
     "readiness": "Overall readiness",
     "database": "PostgreSQL",
+    "databaseRoleNotReady": "The backend PostgreSQL account must use restricted privileges.",
+    "databaseBlockers": {
+      "superuser": "The runtime account must not be a superuser.",
+      "createDatabase": "The runtime account must not create databases.",
+      "createRoles": "The runtime account must not create roles.",
+      "replication": "The runtime account must not have replication privileges.",
+      "bypassRls": "The runtime account needs Bypass RLS so the backend can enforce store authorization.",
+      "unknown": "The runtime account does not meet a database privilege requirement."
+    },
     "mediaStorage": "File storage",
     "mediaProvider": "Media provider",
     "mediaProviders": {

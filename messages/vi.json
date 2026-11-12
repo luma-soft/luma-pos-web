@@ -243,6 +243,15 @@
     "backend": "Backend",
     "readiness": "Mức sẵn sàng",
     "database": "PostgreSQL",
+    "databaseRoleNotReady": "Tài khoản PostgreSQL của backend cần được giới hạn quyền.",
+    "databaseBlockers": {
+      "superuser": "Tài khoản runtime không được là superuser.",
+      "createDatabase": "Tài khoản runtime không được tạo database.",
+      "createRoles": "Tài khoản runtime không được tạo role.",
+      "replication": "Tài khoản runtime không được có quyền replication.",
+      "bypassRls": "Tài khoản runtime cần Bypass RLS để backend áp dụng phân quyền cửa hàng.",
+      "unknown": "Quyền tài khoản runtime chưa đáp ứng yêu cầu."
+    },
     "mediaStorage": "Kho file",
     "mediaProvider": "Provider lưu file",
     "mediaProviders": {

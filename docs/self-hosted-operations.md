@@ -47,13 +47,22 @@ flowchart LR
 2. Trong pgAdmin 4 Desktop, đăng ký server với host `127.0.0.1`, port `5432`,
    maintenance database `lumapos_local` và tài khoản quản trị DB riêng.
    pgAdmin không chạy trong Next.js và không được xuất bản qua tunnel.
-3. Tách tài khoản vận hành pgAdmin khỏi role runtime của ứng dụng trước khi mở
-   cho cửa hàng. Chỉ tài khoản DBA được xem/sửa bảng tùy ý hoặc chạy SQL. Người
-   dùng POS quản lý tài khoản, vai trò, worker và backup trong các trang
-   LumaPOS được phân quyền.
-4. Các script bootstrap hiện dùng tài khoản PostgreSQL của macOS để tạo schema.
-   Mô hình login role riêng cho runtime và DBA vẫn là điều kiện cần trước khi
-   production; không dùng superuser làm tài khoản kết nối thường trực của Next.js.
+3. Tạo role đăng nhập `lumapos_runtime` trong pgAdmin: bật Login, Bypass RLS;
+   tắt Superuser, Create roles, Create databases và Replication. Đặt mật khẩu
+   mạnh riêng cho role này. Chọn target database rồi chạy
+   [`scripts/grant-self-hosted-runtime-role.sql`](../scripts/grant-self-hosted-runtime-role.sql)
+   bằng đúng DBA/migration owner. Script cấp quyền CRUD, sequence và function
+   trong `public`, đồng thời đặt default privileges cho schema tương lai; role
+   runtime không nhận DDL.
+4. Đặt URL của `lumapos_runtime` trong `DATABASE_URL` của Next.js/workers. Giữ
+   role DBA riêng cho pgAdmin và `MIGRATION_DATABASE_URL`; không dùng superuser
+   làm kết nối thường trực của ứng dụng. Sau mỗi data import, chạy grant script
+   trên target bằng migration owner để cấp quyền cho objects vừa được nhập.
+   `db:restore` tự áp dụng lại các grant và default privileges sau khi phục hồi.
+5. Chỉ DBA được xem/sửa bảng tùy ý hoặc chạy SQL trong pgAdmin. Người dùng POS
+   quản lý tài khoản, vai trò, worker và backup trong các trang LumaPOS được
+   phân quyền. Các script bootstrap vẫn dùng tài khoản PostgreSQL của macOS để
+   tạo schema ban đầu; sau đó app runtime chuyển sang login role riêng.
 
 **Trạng thái đã kiểm tra ngày 2026-11-13:** PostgreSQL 17.11 đang chấp nhận kết
 nối tại `127.0.0.1:5432`. `lumapos_local` có 177 migration tới
@@ -124,9 +133,10 @@ cửa hàng, không suy diễn lịch mới từ tên endpoint.
 Health check:
 
 - `/api/health/live` xác nhận tiến trình Next.js.
-- `/api/health/ready` kiểm tra PostgreSQL và heartbeat mới hơn 45 giây của sync,
-  notification, backup worker. Khi Auth provider là `lumapos`, route trả 503
-  nếu database, worker bắt buộc hoặc cổng media cutover chưa sẵn sàng; ở runtime
+- `/api/health/ready` kiểm tra PostgreSQL, quyền runtime role và heartbeat mới
+  hơn 45 giây của sync, notification, backup worker. Khi Auth provider là
+  `lumapos`, route trả 503 nếu role còn quyền superuser/DDL/replication, thiếu
+  `BYPASSRLS`, worker bắt buộc hoặc cổng media cutover chưa sẵn sàng; ở runtime
   legacy, chỉ yêu cầu PostgreSQL. Với media local, route chặn khi còn managed
   object chưa chuyển local, attachment legacy, tác vụ xóa file ở provider cũ,
   attachment AI chưa gắn media ID, migration chưa hoàn tất hoặc URL ngoài
@@ -189,7 +199,8 @@ khi final snapshot được xác nhận:
 
 | Biến | Mac | Chuyển lên VPS |
 | --- | --- | --- |
-| `DATABASE_URL` | PostgreSQL loopback | Endpoint PostgreSQL private trên VPS |
+| `DATABASE_URL` | PostgreSQL loopback, role `lumapos_runtime` | Endpoint PostgreSQL private trên VPS, cùng role quyền hạn giới hạn |
+| `MIGRATION_DATABASE_URL` | Chỉ truyền cho tiến trình migration/restore; kết nối trực tiếp bằng DBA/migration owner | Chỉ truyền cho tiến trình migration/restore qua secret operator riêng |
 | `LUMAPOS_AUTH_PROVIDER` | `lumapos` | Giữ nguyên |
 | `LUMAPOS_PRIMARY_DATABASE_CONFIRMED` | `true` sau đối soát | Giữ nguyên |
 | `LUMAPOS_SYNC_INBOX_ENABLED` | `true` sau rehearsal sync POS | Giữ nguyên |
@@ -208,7 +219,9 @@ Self-hosted runtime phải đặt tường minh `MEDIA_WRITE_PROVIDER`; trên Ma
 media thay vì âm thầm ghi sang R2 theo mặc định legacy.
 
 `DATABASE_URL`, `CRON_SECRET`, `MEDIA_LOCAL_SIGNING_SECRET`, khóa backup, khóa
-mobile và credentials của webhook/provider chỉ có ở server. Không commit
+mobile và credentials của webhook/provider chỉ có ở server. `MIGRATION_DATABASE_URL`
+chỉ được cấp cho lệnh migration/restore, không đặt trong LaunchDaemon runtime
+environment. Không commit
 `.env.local`, không đưa biến server vào `NEXT_PUBLIC_*`. Wrapper launchd trên
 Mac đọc file shell assignments có owner là service account và mode `0600`; không
 đặt giá trị secret trong plist hoặc log. Trên VPS dùng secret manager hoặc file
@@ -216,9 +229,12 @@ quyền `0600`.
 
 Migrations nằm trong `drizzle/` và được apply theo thứ tự qua runner có kiểm tra
 session/advisory lock. Local bootstrap dùng `bun db:migrate:local`; môi trường
-đã provision dùng quy trình migration đã duyệt, không dùng `drizzle-kit push`
-trực tiếp lên production. Bản restore phải dùng cùng major PostgreSQL với
-backup.
+đã provision dùng `MIGRATION_DATABASE_URL` riêng với `bun run db:migrate:configured`.
+Runner ưu tiên URL này để role của ứng dụng không cần quyền DDL; nếu không đặt,
+giữ tương thích luồng cũ bằng cách derive direct/session URL từ `DATABASE_URL`
+trong đúng tiến trình migration. Không dùng `drizzle-kit push` trực tiếp lên
+production. Bản restore phải dùng cùng major PostgreSQL với backup và
+`MIGRATION_DATABASE_URL` có quyền tạo schema.
 
 ## Auth và quản trị LumaPOS
 
@@ -255,6 +271,8 @@ major version công cụ khác PostgreSQL server. Có thể đặt
    là việc vận hành bắt buộc trước go-live.
 3. Diễn tập restore vào database mới, rỗng và thư mục media rỗng bằng
    `bun run db:restore -- --confirm-empty-database --archive lumapos-<uuid>.lumaenc`.
+   Tiến trình này bắt buộc nhận `MIGRATION_DATABASE_URL` của DBA/migration
+   owner; không dùng role `lumapos_runtime` để restore.
    Có thể truyền `--sha256 <checksum>` để đối chiếu checksum ngoài. Dừng app
    trước restore; không restore đè database đang chạy.
 4. Nếu restore dừng giữa chừng, giữ app dừng, bỏ database/media staging bị lỗi,
@@ -279,7 +297,10 @@ chỉ nhận bản rehearsal và chưa được mở cho người dùng.
    `db:reconcile:local`. Importer chỉ nhận target bootstrap trống; không chạy
    lên `lumapos_local` hiện đang có dữ liệu. Target được phép có các migration
    tương thích mới hơn source. Khởi chạy Auth LumaPOS và workers trong môi trường
-   riêng. Chưa đặt `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true` cho production.
+   riêng. Sau import, chạy
+   [`scripts/grant-self-hosted-runtime-role.sql`](../scripts/grant-self-hosted-runtime-role.sql)
+   trong target bằng migration owner để role runtime đọc/ghi được schema đã nhập.
+   Chưa đặt `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true` cho production.
 3. Copy media ban đầu tới local bằng `media:migrate`; kiểm tra checksum và mọi
    tham chiếu. Không xóa nguồn Supabase.
 4. Chạy importer với `--confirm-bootstrap-target`, rồi đối soát cùng database
@@ -300,9 +321,10 @@ chỉ nhận bản rehearsal và chưa được mở cho người dùng.
    payment webhook đang chạy kết thúc hoặc được nhà cung cấp retry.
 3. Copy delta media cuối cùng, verify; tạo một database cutover mới, rỗng, apply
    migrations và nhập final snapshot PostgreSQL/Auth/relay vào database đó.
-   Reconcile counts, financial aggregates, Auth reset count, sync receipts,
-   media references và checksums. Giữ nguyên các database snapshot cũ để rollback
-   và điều tra; không ghi đè database đã có dữ liệu.
+   Chạy grant script bằng migration owner, rồi reconcile counts, financial
+   aggregates, Auth reset count, sync receipts, media references và checksums.
+   Giữ nguyên các database snapshot cũ để rollback và điều tra; không ghi đè
+   database đã có dữ liệu.
 4. Tạo encrypted backup của target. Đặt target env sang
    `LUMAPOS_AUTH_PROVIDER=lumapos`, `NOTIFICATION_QUEUE_PROVIDER=database`,
    `MEDIA_WRITE_PROVIDER=local` và `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true`.
