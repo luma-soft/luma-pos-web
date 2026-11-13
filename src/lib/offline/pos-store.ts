@@ -14,7 +14,9 @@ function openDB(): Promise<IDBDatabase | null> {
     const req = indexedDB.open(DB_NAME, DB_VER);
     req.onupgradeneeded = (event) => {
       const db = req.result;
-      const transaction = req.transaction;
+      // IDBRequest.transaction is nullable in general, but is present while
+      // handling the upgradeneeded event for this open request.
+      const transaction = req.transaction!;
       const previousVersion = event.oldVersion;
       // Catalog v1 không tách user và chỉ chứa một phần danh mục; xóa khi
       // chuyển sang Product Catalog dùng chung đã được scope theo user/role.
