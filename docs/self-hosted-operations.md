@@ -96,13 +96,23 @@ bucket allowlist hiện tại, 2.022 `external_url` ngoài allowlist Supabase hi
 cần rà soát domain trước cutover, không tải hoặc viết lại nhóm này. Trong 469
 `media_objects` R2 có 454 `ready`, 15 `deleted`. Probe R2 hiện trả `ready: false`;
 đây là preflight kiểm tra R2 làm đích ghi, không xác nhận quyền đọc object R2
-nguồn. Probe nguồn riêng xác nhận rehearsal DB truy cập được và có object mẫu
-public/private, nhưng thiếu cấu hình credential R2 nên chưa gửi `HEAD` request
-(`readable: null`). Chưa chép file hay đổi provider; rehearsal vẫn giữ R2 cho
-media hiện có và chưa bật Auth/backend mới hoặc nhận ghi từ client. Các số liệu
-là ảnh chụp ngày 2026-11-13, không khẳng định trạng thái sau thời điểm đó.
+nguồn. Ngày 2026-11-13, probe nguồn xác nhận đọc được object mẫu public/private.
+Clone `lumapos_runtime_rehearsal_20261113_a` đã chép và SHA-256 verify đủ 454
+object R2 vào `/Users/Shared/LumaPOS/media`; 2.022 URL ngoài allowlist vẫn được
+bỏ qua. Database clone chính vẫn giữ provider `r2` và chưa cutover. Một clone
+riêng dùng cho backup rehearsal đã cutover media local. Các bước này không đổi
+Supabase Cloud, không xóa object R2 và không xác nhận snapshot cuối là nguồn
+chính. Các số liệu là ảnh chụp ngày 2026-11-13.
 
 ### Next.js và workers
+
+**Trạng thái ngày 2026-11-13:** bản production đã build trong
+`/Users/Shared/LumaPOS/app`, nhưng Next.js và tunnel connector hiện đã dừng.
+`LUMAPOS_PRIMARY_DATABASE_CONFIRMED` vẫn `false`; app chưa nhận traffic nghiệp
+vụ. Kiểm tra loopback cho thấy `/api/health/live` trả 200 và
+`/api/health/ready` trả 503 `not_ready` khi gate này còn khóa. pgAdmin 4 đã cài,
+nhưng profile server trong pgAdmin chưa đăng ký. Chưa cài LaunchDaemon/service
+account cho backend và worker.
 
 Chạy ứng dụng tự host trên loopback bằng `bun run start:self-hosted`. Dùng
 LaunchDaemon với service account để tự khởi động cùng máy và phục hồi khi tiến
@@ -191,13 +201,13 @@ Health check:
 
 ## iPhone ngoài mạng cửa hàng: Cloudflare Tunnel
 
-Cloudflare Tunnel đã được chọn. Tạo tunnel đặt tên riêng cho cửa hàng và trỏ
-hostname HTTPS đã duyệt tới `http://127.0.0.1:3000`. Khuyến nghị dùng
-`pos.lumapos.shop` làm origin chung cho web và API để cookie web cùng endpoint
-iPhone có một host ổn định. Chủ sản phẩm đã chọn hostname này; DNS/tunnel chưa
-được cấu hình. Tra cứu DNS công khai ngày 2026-11-13 vẫn trả `NXDOMAIN` cho
-`pos.lumapos.shop`, nên chưa thể dùng hostname cho build iPhone hoặc tunnel.
-Mẫu không chứa tunnel credential ở
+Cloudflare Tunnel đã được chọn và tạo với tên `lumapos-store-mac`. Hostname đã
+chốt là `pos.haidangshop.com`; DNS route trong zone `haidangshop.com` trỏ riêng
+hostname này tới tunnel, ingress chỉ tới `http://127.0.0.1:3000`, catch-all trả
+404. Root domain và `www` vẫn ở Vercel; `media.haidangshop.com` vẫn là custom
+domain của R2. Tại lần kiểm tra 2026-11-13, DNS đã cấu hình nhưng connector và
+Next.js chưa chạy nên chưa có backend phục vụ hostname. iOS vẫn dùng API origin
+Vercel trong build hiện tại. Mẫu không chứa tunnel credential ở
 [`ops/cloudflared/config.yml.example`](../ops/cloudflared/config.yml.example).
 
 - Tunnel tạo kết nối outbound; router không mở cổng inbound tới Mac. Chỉ route
@@ -234,7 +244,7 @@ khi final snapshot được xác nhận:
 | `LUMAPOS_EXTERNAL_MEDIA_POLICY` | Mặc định `block_until_review`; dùng `preserve_until_review` để giữ URL ngoài nguyên trạng theo quyết định chủ sản phẩm và hiện cảnh báo trong admin | Giữ nguyên |
 | `LUMAPOS_EXTERNAL_MEDIA_REVIEW_CONFIRMED` | `true` chỉ sau khi rà quyền và chấp nhận/xử lý toàn bộ URL bị bỏ qua trong inventory; chính sách giữ URL không thay thế review | Giữ nguyên |
 | `MEDIA_LOCAL_ROOT` | Volume dữ liệu Mac | Volume dữ liệu VPS |
-| `LUMAPOS_PUBLIC_URL` | Hostname HTTPS của tunnel | Giữ hostname nếu tunnel chuyển cùng domain |
+| `LUMAPOS_PUBLIC_URL` | `https://pos.haidangshop.com` | Giữ hostname nếu tunnel chuyển cùng domain |
 | `LUMAPOS_INTERNAL_URL` | `http://127.0.0.1:3000` | Origin loopback của Next.js trên VPS |
 | `LUMAPOS_BACKUP_ROOT` | Volume backup riêng | Volume backup riêng hoặc agent offsite |
 | `LUMAPOS_BACKUP_ENCRYPTION_KEY` | Khóa 32 byte dạng hex | Giữ qua secret manager, không đặt cùng backup |
@@ -281,7 +291,11 @@ production. Bản restore phải dùng cùng major PostgreSQL với backup và
 ## Backup và restore
 
 Backup worker dùng `pg_dump` custom format cho schema `public`, snapshot media
-local, ghi checksum từng thành phần và mã hóa gói bằng AES-256-GCM. Dữ liệu lịch
+local, ghi checksum từng thành phần và mã hóa gói bằng AES-256-GCM. Restore bỏ
+mục tạo schema `public` trùng schema mặc định, cài `pg_trgm` trước khi nạp chỉ
+mục trigram, và không khôi phục policy RLS legacy gắn với Supabase `auth.uid()`;
+RLS table flags vẫn bật, còn app dùng role `BYPASSRLS` và phân quyền ở API.
+Dữ liệu lịch
 sử của bảng `database_backup_runs` không nằm trong backup; schema của bảng vẫn
 được giữ để runtime khởi động được sau restore. Secrets và database Supabase
 system schemas không nằm trong gói. Worker tự tìm `pg_dump`/`pg_restore` ở
@@ -303,6 +317,13 @@ major version công cụ khác PostgreSQL server. Có thể đặt
 4. Nếu restore dừng giữa chừng, giữ app dừng, bỏ database/media staging bị lỗi,
    tạo target rỗng mới rồi chạy lại. Kiểm tra row/financial aggregates, file
    checksum và `/api/health/ready` trước khi mở traffic.
+
+**Diễn tập ngày 2026-11-13:** trên clone phụ, backup AES-256-GCM và restore vào
+database rỗng khác thành công; checksum archive khớp. Database nguồn và bản
+restore có cùng 151 bảng public, 3 cửa hàng, 3 hồ sơ, 3.293 sản phẩm, 3.158 đơn,
+469 media object và 454 media ready local. Media archive khôi phục 1.056 file
+(152 MB). Archive rehearsal vẫn nằm trên cùng volume APFS với database/media;
+chưa có ổ backup riêng hoặc bản offsite, vì vậy đây chưa phải cổng backup go-live.
 
 Worker backup cần `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true`, Auth provider
 `lumapos`, media provider local, `pg_dump`, tar và khóa backup. Đây là điều kiện

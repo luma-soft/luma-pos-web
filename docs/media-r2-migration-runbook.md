@@ -119,13 +119,21 @@ still depends on Internet and the source domains. Preserving URLs is not a
 rights review and does not authorize copying or allowlisting those hosts.
 
 **Source-read probe (2026-11-13):** the rehearsal database was reachable and
-contained ready source objects in both visibility classes. The R2 source
-credential configuration was absent, so public/private reads were not attempted
-(`null`). This probe copied no files and changed no provider. Configure the
-server-side `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY` for
-the migration process, then rerun the check before copying. Do not cut over
-until the source-read check, all-object checksum verification, local file
-serving/backup rehearsal, and external-domain review are complete.
+the scoped read-only R2 credential successfully read one public and one private
+object. The runtime clone inventory found 454 managed objects and 2,022 external
+references. All 454 managed objects, including available thumbnails, were copied
+to the Mac filesystem and reached `verified` with matching SHA-256 checksums;
+no object failed or was quarantined. The clone still stores provider `r2`, so
+this stage did not change business media references. The 2,022 external URLs
+remain unchanged and were not downloaded.
+
+A separate backup rehearsal clone used the verified media to exercise media
+cutover, encrypted backup, and restore into an empty database/media root. Restore
+completed with matching archive checksum and all 1,056 local files. This does
+not cut over the runtime rehearsal database or authorize deleting R2 sources.
+The backup artifact remains on the same Mac volume, so offsite/separate-volume
+backup is still a production readiness gate. Review external-domain rights and
+finish the final database snapshot before any production media cutover.
 
 ## Current production status
 

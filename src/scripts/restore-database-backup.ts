@@ -1,9 +1,9 @@
 import { createDecipheriv, createHash } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { lstat, open, mkdir, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
+import { lstat, open, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { pipeline } from "node:stream/promises";
 import { loadEnvConfig } from "@next/env";
 import {
@@ -79,7 +79,7 @@ function run(command: string, args: string[], env: NodeJS.ProcessEnv = process.e
     child.on("error", () => reject(new Error("RESTORE_COMMAND_UNAVAILABLE")));
     child.on("close", (code) => code === 0
       ? resolve()
-      : reject(new Error("RESTORE_COMMAND_FAILED")));
+      : reject(new Error(`RESTORE_COMMAND_FAILED:${path.basename(command)}`)));
   });
 }
 
@@ -199,11 +199,38 @@ try {
     PGPASSWORD: password,
     PGSSLMODE: parsedUrl.searchParams.get("sslmode") ?? "disable",
   };
+  const listResult = spawnSync(pgRestorePath, ["--list", path.join(unpackPath, "database.dump")], {
+    encoding: "utf8",
+    maxBuffer: 32 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  if (listResult.status !== 0 || !listResult.stdout) {
+    throw new Error("RESTORE_ARCHIVE_LIST_FAILED");
+  }
+  const restoreListPath = path.join(unpackPath, "restore.list");
+  const restoreList = listResult.stdout
+    .split(/\r?\n/)
+    .filter((line) => !/^\d+;\s+\d+\s+\d+\s+SCHEMA - public(?:\s|$)/.test(line))
+    // The self-hosted server authenticates at the LumaPOS API boundary and
+    // connects with BYPASSRLS. Old policies target Supabase roles and auth.uid;
+    // omit those policy definitions while retaining RLS table flags (which
+    // deny direct access to any role that does not explicitly bypass RLS).
+    .filter((line) => !/^\d+;\s+\d+\s+\d+\s+POLICY\s+public\s/.test(line))
+    .join("\n");
+  await writeFile(restoreListPath, restoreList, { mode: 0o600, flag: "wx" });
+  // PostgreSQL creates the public schema in a new database, while pg_dump
+  // includes CREATE SCHEMA public. The target was checked empty above. Recreate
+  // the schema and the extension required by trigram indexes, then omit only
+  // the conflicting CREATE SCHEMA entry from pg_restore's table of contents.
+  await connection.unsafe("DROP SCHEMA IF EXISTS public CASCADE");
+  await connection.unsafe("CREATE SCHEMA public");
+  await connection.unsafe("CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public");
   await run(pgRestorePath, [
     "--exit-on-error",
     "--single-transaction",
     "--no-owner",
     "--no-acl",
+    "--use-list", restoreListPath,
     "--host", parsedUrl.hostname,
     "--port", parsedUrl.port || "5432",
     "--username", decodeURIComponent(parsedUrl.username),
@@ -290,6 +317,7 @@ try {
     databaseMajorVersion: manifest.databaseMajorVersion,
     mediaArchiveBytes,
     archiveSha256,
+    legacySupabaseRlsPoliciesOmitted: true,
   }));
 } finally {
   await connection.end({ timeout: 5 });
