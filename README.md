@@ -86,7 +86,9 @@ không phải đồng bộ liên tục. Khi cutover, tạo một database target
 
 `sync:relay:local` và `LUMAPOS_SYNC_RELAY_ENABLED` chỉ thuộc relay Supabase cũ
 trong giai đoạn chuyển đổi. Không bật hoặc mở rộng relay này cho kiến trúc đích.
-Target dùng `bun run sync:postgres:worker`, inbox trong PostgreSQL và API
+Worker Supabase cũ tự từ chối chạy khi Auth provider là `lumapos` hoặc
+`LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true`. Target dùng
+`bun run sync:postgres:worker`, inbox trong PostgreSQL và API
 `/api/sync/relay` theo Auth provider đang bật. Xem
 [runbook self-hosted](docs/self-hosted-operations.md) trước mọi thao tác nhập,
 đối soát hoặc cutover.

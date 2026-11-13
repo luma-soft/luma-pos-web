@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { hostname, userInfo } from "node:os";
 import { loadEnvConfig } from "@next/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { authProvider } from "@/lib/auth/provider";
 import {
   POS_ORDER_SYNC_COMMAND,
   SERVICE_FIELD_MUTATION_SYNC_COMMAND,
@@ -29,6 +30,12 @@ const LEASE_SECONDS = 90;
 const LOCAL_LOCK_KEY = 1_280_657_218;
 
 loadEnvConfig(process.cwd());
+
+if (authProvider() === "lumapos" || process.env.LUMAPOS_PRIMARY_DATABASE_CONFIRMED === "true") {
+  throw new Error(
+    "The Supabase relay processor is legacy-only. Use sync:postgres:worker after the self-hosted runtime is selected.",
+  );
+}
 
 if (process.env.LUMAPOS_LOCAL_AUTHORITY_CONFIRMED !== "true") {
   throw new Error(
