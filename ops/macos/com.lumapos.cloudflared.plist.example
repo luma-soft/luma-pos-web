@@ -13,6 +13,8 @@
 		<string>--config</string>
 		<string>/Users/Shared/LumaPOS/secrets/cloudflared.yml</string>
 		<string>run</string>
+		<!-- Keep this UUID or name identical to the tunnel field in cloudflared.yml. -->
+		<string>00000000-0000-0000-0000-000000000000</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
