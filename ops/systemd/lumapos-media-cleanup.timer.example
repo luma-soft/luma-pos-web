@@ -1,0 +1,10 @@
+[Unit]
+Description=Run LumaPOS media cleanup daily
+
+[Timer]
+OnCalendar=*-*-* 09:15:00
+Persistent=true
+Unit=lumapos-media-cleanup.service
+
+[Install]
+WantedBy=timers.target

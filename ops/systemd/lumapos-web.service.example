@@ -1,0 +1,32 @@
+[Unit]
+Description=LumaPOS Next.js backend
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=lumapos_svc
+Group=lumapos_svc
+WorkingDirectory=/opt/lumapos/app
+Environment=LUMAPOS_APP_ROOT=/opt/lumapos/app
+Environment=LUMAPOS_ENV_FILE=/etc/lumapos/runtime.env
+Environment=LUMAPOS_BUN_BIN=/usr/local/bin/bun
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/bin/bash /opt/lumapos/app/ops/shared/run-service.sh web
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/lib/lumapos/media /opt/lumapos/app/.next/cache
+
+[Install]
+WantedBy=multi-user.target

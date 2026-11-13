@@ -1,0 +1,8 @@
+# Replace the tunnel UUID with the store's locally managed Tunnel ID.
+tunnel: 00000000-0000-0000-0000-000000000000
+credentials-file: /etc/lumapos/cloudflared-tunnel.json
+
+ingress:
+  - hostname: pos.lumapos.shop
+    service: http://127.0.0.1:3000
+  - service: http_status:404

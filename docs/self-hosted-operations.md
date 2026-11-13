@@ -382,9 +382,10 @@ chỉ nhận bản rehearsal và chưa được mở cho người dùng.
 1. Provision cùng major PostgreSQL và apply cùng thư mục migration `drizzle/`.
 2. Dừng ghi trên Mac, tạo encrypted backup, restore vào database/media volume
    rỗng của VPS, reconcile counts và checksums.
-3. Chuyển `.env` server-side: database private endpoint, media volume, backup
-   volume, secrets manager và process supervisor (systemd). Giữ Auth provider,
-   queue provider, schema, object keys, API contract và hostname.
+3. Chuyển server-side runtime configuration: database private endpoint, media
+   volume, backup volume, secrets manager và process supervisor (systemd). Giữ
+   Auth provider, queue provider, schema, object keys, API contract và hostname.
+   Mẫu unit nằm trong [`ops/systemd`](../ops/systemd/README.md).
 4. Chuyển Cloudflare Tunnel connector sang VPS, kiểm tra `/api/health/ready`,
    mở traffic rồi giữ Mac ở chế độ không ghi cho đến hết khoảng xác minh.
 5. Không mở PostgreSQL public; pgAdmin từ máy quản trị truy cập bằng SSH

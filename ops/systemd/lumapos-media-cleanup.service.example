@@ -1,0 +1,27 @@
+[Unit]
+Description=LumaPOS scheduled media cleanup task
+After=network-online.target lumapos-web.service
+Wants=network-online.target
+Requires=lumapos-web.service
+
+[Service]
+Type=oneshot
+User=lumapos_svc
+Group=lumapos_svc
+WorkingDirectory=/opt/lumapos/app
+Environment=LUMAPOS_APP_ROOT=/opt/lumapos/app
+Environment=LUMAPOS_ENV_FILE=/etc/lumapos/runtime.env
+Environment=LUMAPOS_BUN_BIN=/usr/local/bin/bun
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/bin/bash /opt/lumapos/app/ops/shared/run-service.sh maintenance:media-cleanup
+TimeoutStartSec=6min
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true

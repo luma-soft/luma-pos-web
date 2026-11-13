@@ -27,7 +27,8 @@ credentials.
 ## Dịch vụ
 
 Sao chép `com.lumapos.worker.plist.example` thành một plist cho từng dịch vụ
-dài hạn. Đổi `Label`, tham số cuối của `run-service.sh` và tên file log:
+dài hạn. Đổi `Label`, tham số cuối của shared `ops/shared/run-service.sh` và
+tên file log:
 
 | Tham số | Dịch vụ |
 | --- | --- |
@@ -66,6 +67,6 @@ phương Việt Nam. Chỉ cài khi timezone macOS là `Asia/Ho_Chi_Minh`; nếu
    trên cùng PostgreSQL.
 
 Các ví dụ mặc định giả định Homebrew ARM ở `/opt/homebrew`. Mac Intel hoặc cách
-cài khác cần sửa `PATH`, Bun, `cloudflared` và PostgreSQL binary path. Trên VPS,
-thay `launchd` bằng `systemd`; giữ nguyên env contract, schema, backend và object
-keys.
+cài khác cần sửa `PATH`, Bun, `cloudflared` và PostgreSQL binary path. Khi
+chuyển lên VPS, dùng mẫu `systemd` trong [`ops/systemd`](../systemd/README.md);
+giữ nguyên env contract, schema, backend và object keys.

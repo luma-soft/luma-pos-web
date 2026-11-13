@@ -9,7 +9,7 @@
 	<key>ProgramArguments</key>
 	<array>
 		<string>/bin/bash</string>
-		<string>/Users/Shared/LumaPOS/app/ops/macos/run-service.sh</string>
+		<string>/Users/Shared/LumaPOS/app/ops/shared/run-service.sh</string>
 		<string>sync</string>
 	</array>
 	<key>WorkingDirectory</key>

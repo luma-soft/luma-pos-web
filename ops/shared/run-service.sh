@@ -28,7 +28,22 @@ if [[ ! -f "$env_file" || -L "$env_file" ]]; then
   exit 78
 fi
 
-if [[ "$(stat -f '%Su' "$env_file")" != "$(id -un)" || "$(stat -f '%Lp' "$env_file")" != "600" ]]; then
+case "$(uname -s)" in
+  Darwin)
+    env_owner="$(stat -f '%Su' "$env_file")"
+    env_mode="$(stat -f '%Lp' "$env_file")"
+    ;;
+  Linux)
+    env_owner="$(stat -c '%U' "$env_file")"
+    env_mode="$(stat -c '%a' "$env_file")"
+    ;;
+  *)
+    printf '%s\n' "LumaPOS services support only macOS and Linux." >&2
+    exit 78
+    ;;
+esac
+
+if [[ "$env_owner" != "$(id -un)" || "$env_mode" != "600" ]]; then
   printf '%s\n' "LumaPOS runtime environment file must be owned by the service user with mode 600." >&2
   exit 78
 fi

@@ -1,0 +1,26 @@
+[Unit]
+Description=Cloudflare Tunnel connector for LumaPOS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lumapos_svc
+Group=lumapos_svc
+ExecStart=/usr/local/bin/cloudflared tunnel --config /etc/lumapos/cloudflared.yml run 00000000-0000-0000-0000-000000000000
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadOnlyPaths=/etc/lumapos/cloudflared.yml /etc/lumapos/cloudflared-tunnel.json
+
+[Install]
+WantedBy=multi-user.target
