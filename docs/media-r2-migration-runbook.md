@@ -108,6 +108,13 @@ does not write database or object data and does not require
 not every object. The migration copy/verify stages still need to pass for all
 objects before cutover.
 
+**Owner decision (2026-11-13):** preserve the current URLs for all 2,022
+external references unchanged until rights are reviewed. Do not download these
+files, rewrite their URLs, or add their hosts to the managed-media allowlist in
+the meantime. Preserving a URL is not a rights review; the product owner must
+complete the review and explicitly accept the remaining external dependency
+before self-hosted readiness can pass.
+
 **Source-read probe (2026-11-13):** the rehearsal database was reachable and
 contained ready source objects in both visibility classes. The R2 source
 credential configuration was absent, so public/private reads were not attempted

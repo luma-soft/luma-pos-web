@@ -182,9 +182,9 @@ Health check:
 Cloudflare Tunnel đã được chọn. Tạo tunnel đặt tên riêng cho cửa hàng và trỏ
 hostname HTTPS đã duyệt tới `http://127.0.0.1:3000`. Khuyến nghị dùng
 `pos.lumapos.shop` làm origin chung cho web và API để cookie web cùng endpoint
-iPhone có một host ổn định. DNS/tunnel chưa được cấu hình và tên này chưa được
-chủ sản phẩm xác nhận. Tra cứu DNS công khai ngày 2026-11-13 trả `NXDOMAIN` cho
-`pos.lumapos.shop`; chưa thể dùng hostname này cho build iPhone hoặc tunnel.
+iPhone có một host ổn định. Chủ sản phẩm đã chọn hostname này; DNS/tunnel chưa
+được cấu hình. Tra cứu DNS công khai ngày 2026-11-13 vẫn trả `NXDOMAIN` cho
+`pos.lumapos.shop`, nên chưa thể dùng hostname cho build iPhone hoặc tunnel.
 Mẫu không chứa tunnel credential ở
 [`ops/cloudflared/config.yml.example`](../ops/cloudflared/config.yml.example).
 
@@ -379,8 +379,9 @@ chỉ nhận bản rehearsal và chưa được mở cho người dùng.
 
 ## Các quyết định trước go-live
 
-- Chốt hostname API và quyền quản lý DNS/tunnel; `pos.example.com` trong mẫu
-  chỉ là placeholder.
+- Cấu hình DNS và Cloudflare Tunnel cho hostname đã chọn
+  `pos.lumapos.shop`; chưa phát hành build iPhone hoặc mở traffic trước khi
+  hostname phân giải được và tunnel đạt rehearsal.
 - Chốt account recovery/password reset và recovery administrator. Hash không
   chuyển được phải có quy trình reset hỗ trợ, không gửi mật khẩu tạm qua log.
 - Chốt role PostgreSQL runtime/DBA và cách giữ secrets trên Mac.
