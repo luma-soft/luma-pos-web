@@ -149,8 +149,12 @@ Health check:
   account; kiểm tra này chỉ dùng `stat`/`access`, không tạo file. Ở runtime
   legacy, chỉ yêu cầu PostgreSQL. Với media local, route chặn khi còn managed
   object chưa chuyển local, attachment legacy, tác vụ xóa file ở provider cũ,
-  attachment AI chưa gắn media ID, migration chưa hoàn tất hoặc URL ngoài
-  allowlist chưa được chủ sản phẩm xác nhận.
+  attachment AI chưa gắn media ID hoặc migration chưa hoàn tất. URL ngoài chưa
+  được rà quyền mặc định chặn readiness. Có thể cấu hình chính sách
+  `preserve_until_review` để giữ URL tạm thời; khi bật, readiness chỉ tiếp tục
+  nếu các điều kiện khác đạt và trang quản trị hiện cảnh báo thiết bị cần
+  Internet cùng domain nguồn còn hoạt động. Chính sách này không xác nhận
+  quyền sử dụng hay cho phép tải/allowlist URL.
 - Trang `/admin` hiển thị quản lý tài khoản cùng trạng thái backend, workers,
   hàng đợi sync, backup, provider lưu file và các blocker media cutover cho owner.
 
