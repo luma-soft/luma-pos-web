@@ -30,6 +30,14 @@ export type LumaTokenSet = {
   expiresAt: number;
 };
 
+type WebAuthSession = {
+  sessionId: string;
+  token: string;
+  expiresAt: number;
+};
+
+type MobileAuthSession = LumaTokenSet & { sessionId: string };
+
 export function hashAuthToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
@@ -217,12 +225,21 @@ export async function changeAuthPassword(input: {
   });
 }
 
-async function createSession(input: {
+type CreateSessionInput = {
   profileId: string;
-  kind: "web" | "mobile";
   deviceId?: string | null;
   deviceName?: string | null;
-}) {
+};
+
+function createSession(
+  input: CreateSessionInput & { kind: "web" },
+): Promise<WebAuthSession | null>;
+function createSession(
+  input: CreateSessionInput & { kind: "mobile" },
+): Promise<MobileAuthSession | null>;
+async function createSession(input: CreateSessionInput & {
+  kind: "web" | "mobile";
+}): Promise<WebAuthSession | MobileAuthSession | null> {
   return db.transaction(async (tx) => {
     const [profile] = await tx.select({
       storeId: profiles.storeId,
@@ -302,10 +319,7 @@ export function createMobileAuthSession(input: {
   deviceId?: string | null;
   deviceName?: string | null;
 }) {
-  return createSession({ ...input, kind: "mobile" }) as Promise<
-    | (LumaTokenSet & { sessionId: string })
-    | null
-  >;
+  return createSession({ ...input, kind: "mobile" });
 }
 
 export async function getLumaAuthenticatedUser(

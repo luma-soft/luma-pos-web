@@ -56,7 +56,7 @@ test("retries a transient signed PUT before completing product media", async () 
           mimeType: "image/png",
           sizeBytes: FILE.size,
           fileName: FILE.name,
-          url: "https://media.lumapos.shop/stores/example/products/image.png",
+          url: "https://media.haidangshop.com/stores/example/products/image.png",
           thumbnailUrl: null,
         },
       });
