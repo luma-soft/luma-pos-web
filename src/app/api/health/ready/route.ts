@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { readSelfHostedReadiness } from "@/lib/ops/self-hosted-readiness";
 
 export const runtime = "nodejs";
 
 export async function GET() {
   try {
+    const { readSelfHostedReadiness } = await import("@/lib/ops/self-hosted-readiness");
     const readiness = await readSelfHostedReadiness();
     return NextResponse.json(readiness, {
       status: readiness.status === "ready" ? 200 : 503,

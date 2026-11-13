@@ -1,7 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { updateSession } from "./lib/supabase/middleware";
 import { authProvider } from "./lib/auth/provider";
-import { updateLumaSession } from "./lib/auth/session-middleware";
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -21,9 +19,11 @@ export async function proxy(request: NextRequest) {
   }
 
   if (authProvider() === "lumapos") {
+    const { updateLumaSession } = await import("./lib/auth/session-middleware");
     return await updateLumaSession(request);
   }
 
+  const { updateSession } = await import("./lib/supabase/middleware");
   return await updateSession(request);
 }
 
