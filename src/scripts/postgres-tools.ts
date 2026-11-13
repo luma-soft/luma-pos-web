@@ -34,7 +34,10 @@ export function postgresUtilityMajorVersion(utilityPath: string) {
   const result = spawnSync(utilityPath, ["--version"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
-    env: { PATH: process.env.PATH ?? "" },
+    env: {
+      PATH: process.env.PATH ?? "",
+      NODE_ENV: process.env.NODE_ENV ?? "production",
+    },
   });
   if (result.status !== 0) throw new Error("POSTGRES_TOOL_UNAVAILABLE");
   const major = result.stdout.match(/\)\s*(\d+)\./)?.[1];
