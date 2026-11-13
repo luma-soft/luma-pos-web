@@ -10,6 +10,11 @@ import { getLocalMediaConfig, getMediaWriteProvider } from "@/lib/media/config";
 
 type WorkerKey = "sync-inbox" | "notification-outbox" | "database-backup";
 type WorkerStatus = { status: "online" | "offline"; lastSeenAt: string | null };
+type ExternalMediaPolicy = "block_until_review" | "preserve_until_review";
+const externalMediaPolicies: readonly ExternalMediaPolicy[] = [
+  "block_until_review",
+  "preserve_until_review",
+];
 
 export type SelfHostedReadiness = {
   status: "ready" | "not_ready";
@@ -20,6 +25,7 @@ export type SelfHostedReadiness = {
     status: "ready" | "not_ready" | "not_required";
     provider: "local" | "r2" | null;
     blockers: Record<string, boolean>;
+    warnings: string[];
   };
   missingWorkers: WorkerKey[];
   missingMedia: string[];
@@ -62,13 +68,22 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
       database: "ready",
       missingDatabasePrivileges: [],
       workers: {},
-      media: { status: "not_required", provider: null, blockers: {} },
+      media: { status: "not_required", provider: null, blockers: {}, warnings: [] },
       missingWorkers: [],
       missingMedia: [],
     };
   }
 
   const mediaWriteProvider = getMediaWriteProvider();
+  const configuredExternalMediaPolicy = process.env.LUMAPOS_EXTERNAL_MEDIA_POLICY?.trim()
+    || "block_until_review";
+  const externalMediaPolicyValid = externalMediaPolicies.includes(
+    configuredExternalMediaPolicy as ExternalMediaPolicy,
+  );
+  const externalMediaReviewed = process.env.LUMAPOS_EXTERNAL_MEDIA_REVIEW_CONFIRMED === "true";
+  const preserveExternalMedia = externalMediaPolicyValid
+    && configuredExternalMediaPolicy === "preserve_until_review"
+    && !externalMediaReviewed;
   const localMediaReadiness = mediaWriteProvider === "local"
     ? await readLocalMediaReadiness()
     : null;
@@ -202,8 +217,8 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
   const missingWorkers = workerKeys.filter((workerKey) => workers[workerKey].status !== "online");
   const mediaState = resultRows(mediaRows)[0] ?? {};
   const blockers: Record<string, boolean> = {
-    externalMediaReview:
-      process.env.LUMAPOS_EXTERNAL_MEDIA_REVIEW_CONFIRMED !== "true",
+    externalMediaReview: !externalMediaReviewed && !preserveExternalMedia,
+    externalMediaPolicyInvalid: !externalMediaPolicyValid,
     supabaseManagedMedia: mediaState.supabaseManagedMedia === true,
     legacyServiceAttachments: mediaState.legacyServiceAttachments === true,
     legacyCustomerRequestAttachments: mediaState.legacyCustomerRequestAttachments === true,
@@ -222,6 +237,9 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
   const missingMedia = Object.entries(blockers)
     .filter(([, blocked]) => blocked)
     .map(([blocker]) => blocker);
+  const mediaWarnings = preserveExternalMedia
+    ? ["externalMediaPreservedUntilReview"]
+    : [];
 
   return {
     status: missingDatabasePrivileges.length === 0
@@ -234,6 +252,7 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
       status: missingMedia.length === 0 ? "ready" : "not_ready",
       provider: mediaWriteProvider,
       blockers,
+      warnings: mediaWarnings,
     },
     missingWorkers,
     missingMedia,

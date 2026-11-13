@@ -111,9 +111,12 @@ objects before cutover.
 **Owner decision (2026-11-13):** preserve the current URLs for all 2,022
 external references unchanged until rights are reviewed. Do not download these
 files, rewrite their URLs, or add their hosts to the managed-media allowlist in
-the meantime. Preserving a URL is not a rights review; the product owner must
-complete the review and explicitly accept the remaining external dependency
-before self-hosted readiness can pass.
+the meantime. `LUMAPOS_EXTERNAL_MEDIA_POLICY` defaults to
+`block_until_review`; `preserve_until_review` is the explicit runtime choice for
+this temporary policy. It allows health readiness to pass only when all other
+gates pass, and the admin screen displays a warning that device image loading
+still depends on Internet and the source domains. Preserving URLs is not a
+rights review and does not authorize copying or allowlisting those hosts.
 
 **Source-read probe (2026-11-13):** the rehearsal database was reachable and
 contained ready source objects in both visibility classes. The R2 source

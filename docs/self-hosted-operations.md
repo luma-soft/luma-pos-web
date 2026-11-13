@@ -219,7 +219,8 @@ khi final snapshot được xác nhận:
 | `LUMAPOS_SERVICE_FIELD_SYNC_ENABLED` | `true` chỉ khi slice service đã đạt gate | Giữ nguyên |
 | `NOTIFICATION_QUEUE_PROVIDER` | `database` | Giữ nguyên |
 | `MEDIA_WRITE_PROVIDER` | `local` | Giữ `local` hoặc chuyển adapter sau khi đã copy file |
-| `LUMAPOS_EXTERNAL_MEDIA_REVIEW_CONFIRMED` | `true` chỉ sau khi duyệt toàn bộ URL bị bỏ qua trong inventory | Giữ nguyên |
+| `LUMAPOS_EXTERNAL_MEDIA_POLICY` | Mặc định `block_until_review`; dùng `preserve_until_review` để giữ URL ngoài nguyên trạng theo quyết định chủ sản phẩm và hiện cảnh báo trong admin | Giữ nguyên |
+| `LUMAPOS_EXTERNAL_MEDIA_REVIEW_CONFIRMED` | `true` chỉ sau khi rà quyền và chấp nhận/xử lý toàn bộ URL bị bỏ qua trong inventory; chính sách giữ URL không thay thế review | Giữ nguyên |
 | `MEDIA_LOCAL_ROOT` | Volume dữ liệu Mac | Volume dữ liệu VPS |
 | `LUMAPOS_PUBLIC_URL` | Hostname HTTPS của tunnel | Giữ hostname nếu tunnel chuyển cùng domain |
 | `LUMAPOS_INTERNAL_URL` | `http://127.0.0.1:3000` | Origin loopback của Next.js trên VPS |

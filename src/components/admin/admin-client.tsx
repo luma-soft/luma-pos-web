@@ -20,7 +20,7 @@ type Operations = {
   backend: { status: string; uptimeSeconds: number };
   readiness: { status: string; missingDatabasePrivileges: string[]; missingWorkers: string[]; missingMedia: string[] };
   database: { status: string; blockers: string[] };
-  media: { status: string; provider: "local" | "r2" | null; blockers: Record<string, boolean> };
+  media: { status: string; provider: "local" | "r2" | null; blockers: Record<string, boolean>; warnings: string[] };
   sync: { worker: { status: string; lastSeenAt: string | null }; queue: Record<string, number> };
   workers: {
     notifications: { status: string; lastSeenAt: string | null };
@@ -132,10 +132,16 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
     unfinishedLocalMediaMigration: t("mediaBlockers.unfinishedLocalMediaMigration"),
     localMediaConfiguration: t("mediaBlockers.localMediaConfiguration"),
     localMediaRoot: t("mediaBlockers.localMediaRoot"),
+    externalMediaPolicyInvalid: t("mediaBlockers.externalMediaPolicyInvalid"),
   };
   const activeMediaBlockers = Object.entries(operations?.media.blockers ?? {})
     .filter(([, blocked]) => blocked)
     .map(([key]) => mediaBlockerLabels[key] ?? t("mediaBlockers.unknown"));
+  const mediaWarningLabels: Record<string, string> = {
+    externalMediaPreservedUntilReview: t("mediaWarnings.externalMediaPreservedUntilReview"),
+  };
+  const activeMediaWarnings = (operations?.media.warnings ?? [])
+    .map((warning) => mediaWarningLabels[warning] ?? t("mediaWarnings.unknown"));
   const databaseBlockerLabels: Record<string, string> = {
     superuser: t("databaseBlockers.superuser"),
     createDatabase: t("databaseBlockers.createDatabase"),
@@ -312,6 +318,14 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
                   <p className="font-semibold">{t("mediaCutoverPending")}</p>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
                     {activeMediaBlockers.map((label) => <li key={label}>{label}</li>)}
+                  </ul>
+                </div>
+              )}
+              {activeMediaWarnings.length > 0 && (
+                <div role="note" className="mt-4 rounded-xl border border-sky-300 bg-sky-50 p-4 text-sm text-sky-950 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100">
+                  <p className="font-semibold">{t("mediaWarnings.title")}</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {activeMediaWarnings.map((warning) => <li key={warning}>{warning}</li>)}
                   </ul>
                 </div>
               )}

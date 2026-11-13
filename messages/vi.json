@@ -275,7 +275,13 @@
       "unfinishedLocalMediaMigration": "Còn một đợt chuyển media chưa hoàn tất.",
       "localMediaConfiguration": "Cấu hình kho file local chưa đầy đủ hoặc không hợp lệ.",
       "localMediaRoot": "Thư mục kho file local không tồn tại hoặc service không có quyền truy cập ghi.",
+      "externalMediaPolicyInvalid": "Chính sách URL media ngoài không hợp lệ.",
       "unknown": "Còn điều kiện media chưa đạt."
+    },
+    "mediaWarnings": {
+      "title": "Đang giữ phụ thuộc media bên ngoài",
+      "externalMediaPreservedUntilReview": "URL ảnh ngoài được giữ nguyên tới khi rà quyền; thiết bị cần Internet và các domain nguồn còn hoạt động.",
+      "unknown": "Có cảnh báo media cần được xem xét."
     },
     "syncWorker": "Worker đồng bộ",
     "notificationWorker": "Worker thông báo",
