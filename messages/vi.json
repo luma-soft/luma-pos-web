@@ -1797,7 +1797,6 @@
   },
   "dashboard": {
     "title": "Tổng quan",
-    "realtime": "Thời gian thực",
     "subtitle": "Tình hình kinh doanh hôm nay",
     "revenueToday": "Doanh thu hôm nay",
     "ordersToday": "Đơn hàng hôm nay",

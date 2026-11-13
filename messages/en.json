@@ -1797,7 +1797,6 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "realtime": "Realtime",
     "subtitle": "Today's business",
     "revenueToday": "Revenue today",
     "ordersToday": "Orders today",

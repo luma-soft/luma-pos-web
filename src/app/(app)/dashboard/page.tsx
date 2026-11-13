@@ -287,16 +287,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       </div>
 
       <div className="hidden space-y-5 p-4 sm:p-6 lg:block">
-      {/* header — theo design: title + Realtime + range seg + nút bán hàng */}
+      {/* header — title + range selector + nút bán hàng */}
       <div className="flex items-center gap-3 flex-wrap">
         <Text as="h1" size="2xl" weight="bold" className="min-w-0 flex-1 sm:flex-none" text={t("dashboard.title")} />
-        <Text
-          as="span"
-          size="xs"
-          weight="medium"
-          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 bg-ok-soft text-ok"
-          text={`● ${t("dashboard.realtime")}`}
-        />
         <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-3 flex-wrap">
           <div className="inline-flex w-full sm:w-auto bg-surface-2 rounded-lg p-0.5 gap-0.5 overflow-x-auto">
             {RANGES.map((r) => (
