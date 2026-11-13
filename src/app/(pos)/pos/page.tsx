@@ -13,6 +13,7 @@ import { formatDate } from "@/lib/utils";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { productCatalogScopeId } from "@/lib/product-catalog";
 import { getProductSortPreference } from "@/lib/product-sort-preference-server";
+import { getSyncRelayConfig } from "@/lib/sync/config";
 import { PosClient, type PosSourceInvoice } from "./pos-client";
 import type { PosInitialContext } from "./pos-client";
 import { ProductEditorModal } from "@/app/(app)/inventory/tabs/products";
@@ -132,7 +133,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
     ...(validCreatedProductId ? [validCreatedProductId] : []),
   ];
   const defaultSort = await getProductSortPreference(context.storeId, context.role);
-  const syncRelayEnabled = process.env.LUMAPOS_SYNC_RELAY_ENABLED === "true";
+  const syncRelayEnabled = getSyncRelayConfig().enabled;
   const [data, settings, t, orderPrintTemplates, quotePrintTemplates, bookingPrintTemplates, returnPrintTemplates] = await Promise.all([
     getPosData(context.storeId, {
       includeProductIds,

@@ -4,6 +4,7 @@ import { ProjectDetailDialog } from "@/components/project-detail-dialog";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { getProjectDetail } from "@/lib/data/projects";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { getSyncRelayConfig } from "@/lib/sync/config";
 import { getServiceFormOptions } from "@/lib/data/services";
 import { ProjectDetailView } from "@/app/(app)/projects/[id]/project-detail-view";
 
@@ -14,6 +15,7 @@ export default async function ProjectDetailModalPage({
 }) {
   const { id } = await params;
   const context = await requireStoreContext();
+  const syncRelayConfig = getSyncRelayConfig();
   const detail = await getProjectDetail(context.storeId, id);
   if (!detail) notFound();
 
@@ -35,8 +37,7 @@ export default async function ProjectDetailModalPage({
         canDelete={["owner", "manager"].includes(context.role)}
         offlineScopeId={`${context.storeId}:${context.userId}`}
         storeId={context.storeId}
-        serviceFieldRelayEnabled={process.env.LUMAPOS_SYNC_RELAY_ENABLED === "true"
-          && process.env.LUMAPOS_SERVICE_FIELD_RELAY_ENABLED === "true"}
+        serviceFieldRelayEnabled={syncRelayConfig.serviceFieldEnabled}
         canEditFieldService={["owner", "manager", "technician"].includes(context.role)}
       />
     </ProjectDetailDialog>

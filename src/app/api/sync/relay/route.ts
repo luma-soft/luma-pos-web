@@ -7,6 +7,7 @@ import { getAuthenticatedUser, resolveStoreContextForUser } from "@/lib/auth/sto
 import { createClient as createBearerClient } from "@supabase/supabase-js";
 import { createClient as createCookieClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getSyncRelayConfig } from "@/lib/sync/config";
 import {
   POS_ORDER_SYNC_COMMAND,
   SERVICE_FIELD_MUTATION_SYNC_COMMAND,
@@ -138,12 +139,9 @@ function stableJson(value: unknown): string {
 }
 
 export async function POST(request: Request) {
-  const provider = authProvider();
-  if (provider === "lumapos"
-    ? process.env.LUMAPOS_SYNC_INBOX_ENABLED !== "true"
-    : process.env.LUMAPOS_SYNC_RELAY_ENABLED !== "true") {
-    return relayDisabledResponse();
-  }
+  const syncRelayConfig = getSyncRelayConfig();
+  const provider = syncRelayConfig.provider;
+  if (!syncRelayConfig.enabled) return relayDisabledResponse();
   const user = await authenticatedUser(request);
   if (!user) return privateJson({ ok: false, error: "UNAUTHORIZED" }, 401);
 
@@ -159,10 +157,7 @@ export async function POST(request: Request) {
 
   const input = parsed.data;
   const commandType = input.commandType ?? POS_ORDER_SYNC_COMMAND;
-  const serviceFieldSyncEnabled = provider === "lumapos"
-    ? process.env.LUMAPOS_SERVICE_FIELD_SYNC_ENABLED === "true"
-    : process.env.LUMAPOS_SERVICE_FIELD_RELAY_ENABLED === "true";
-  if (commandType === SERVICE_FIELD_MUTATION_SYNC_COMMAND && !serviceFieldSyncEnabled) {
+  if (commandType === SERVICE_FIELD_MUTATION_SYNC_COMMAND && !syncRelayConfig.serviceFieldEnabled) {
     return privateJson({ ok: false, error: "SYNC_COMMAND_DISABLED" }, 503);
   }
 
@@ -307,12 +302,8 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const provider = authProvider();
-  if (provider === "lumapos"
-    ? process.env.LUMAPOS_SYNC_INBOX_ENABLED !== "true"
-    : process.env.LUMAPOS_SYNC_RELAY_ENABLED !== "true") {
-    return relayDisabledResponse();
-  }
+  const { provider, enabled } = getSyncRelayConfig();
+  if (!enabled) return relayDisabledResponse();
   const user = await authenticatedUser(request);
   if (!user) return privateJson({ ok: false, error: "UNAUTHORIZED" }, 401);
 
