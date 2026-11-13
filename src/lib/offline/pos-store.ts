@@ -31,10 +31,6 @@ function openDB(): Promise<IDBDatabase | null> {
         // The v2 outbox was keyed only by localId and had no tenant scope. Keep
         // its rows out of the active queue so they can never be replayed under
         // a different account, but preserve them for owner-assisted recovery.
-        if (!transaction) {
-          req.transaction?.abort();
-          return;
-        }
         const legacyOutbox = transaction.objectStore(OUTBOX_STORE);
         const quarantine = transaction.objectStore(LEGACY_OUTBOX_STORE);
         const cursorRequest = legacyOutbox.openCursor();
