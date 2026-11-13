@@ -10,6 +10,7 @@ import {
 import { getLocalMediaConfig, getR2Config } from "@/lib/media/config";
 import {
   classifyLegacyUrl,
+  createMigrationTargetKey,
   createMediaMigrationEngine,
   type MediaMigrationInventoryInput,
   type MediaMigrationItem,
