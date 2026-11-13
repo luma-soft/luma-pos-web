@@ -22,6 +22,7 @@ const password = disposable
 if (
   !slug?.match(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
   || !storeName
+  || !ownerEmail
   || !ownerEmailNormalized?.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
   || !ownerName
   || !password
