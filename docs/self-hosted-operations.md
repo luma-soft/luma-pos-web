@@ -40,6 +40,9 @@ flowchart LR
   nhập. Owner hoặc manager có thể tải bản sao để xác minh và xử lý thủ công;
   file xuất có thể chứa dữ liệu khách hàng/tài chính. Outbox đã được scope ở
   phiên bản hiện tại được giữ nguyên khi nâng cấp schema IndexedDB tiếp theo.
+  Bản nâng cấp này không thể phục hồi hàng đợi đã bị xóa nếu thiết bị đã từng
+  mở bản v3; kiểm tra các thiết bị từng có đơn offline chờ trước khi dựa vào
+  bản sao trong kho cách ly.
 
 ## Mac tại cửa hàng
 
