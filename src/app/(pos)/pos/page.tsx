@@ -203,6 +203,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
           storageScope={productCatalogScopeId(context.storeId, context.userId, context.role)}
           storeId={context.storeId}
           syncRelayEnabled={syncRelayEnabled}
+          canRecoverLegacyOutbox={context.role === "owner" || context.role === "manager"}
           data={data}
           orderPrintTemplates={orderPrintTemplates}
           quotePrintTemplates={quotePrintTemplates}

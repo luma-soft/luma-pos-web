@@ -64,6 +64,8 @@ import { searchPosProducts } from "@/lib/actions/pos-search";
 import { createPosCustomer } from "@/lib/actions/pos-customers";
 import {
   enqueueOrder,
+  getQuarantinedOutbox,
+  getQuarantinedOutboxCount,
   getOutbox,
   getOrCreateSyncDeviceId,
   removeOutbox,
@@ -528,6 +530,7 @@ export function PosClient({
   storageScope,
   storeId,
   syncRelayEnabled,
+  canRecoverLegacyOutbox,
   data,
   orderPrintTemplates,
   quotePrintTemplates,
@@ -543,6 +546,7 @@ export function PosClient({
   storageScope: string;
   storeId: string;
   syncRelayEnabled: boolean;
+  canRecoverLegacyOutbox: boolean;
   data: PosData;
   orderPrintTemplates: PrintTemplate[];
   quotePrintTemplates: PrintTemplate[];
@@ -1380,6 +1384,7 @@ export function PosClient({
   // ===== offline (Mức A) =====
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
+  const [legacyOutboxCount, setLegacyOutboxCount] = useState(0);
   const [pricingConflicts, setPricingConflicts] = useState(0);
   const [aiUnresolvedItems, setAiUnresolvedItems] = useState<PosAiUnresolvedItem[]>([]);
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
@@ -1387,6 +1392,38 @@ export function PosClient({
   const [syncing, setSyncing] = useState(false);
   const [offlineSaved, setOfflineSaved] = useState(false);
   const [heldSaved, setHeldSaved] = useState(false);
+
+  useEffect(() => {
+    if (!canRecoverLegacyOutbox) return;
+    let cancelled = false;
+    void getQuarantinedOutboxCount().then((count) => {
+      if (!cancelled) setLegacyOutboxCount(count);
+    });
+    return () => { cancelled = true; };
+  }, [canRecoverLegacyOutbox]);
+
+  async function exportLegacyOutboxRecoveryCopy() {
+    const records = await getQuarantinedOutbox();
+    setLegacyOutboxCount(records.length);
+    if (records.length === 0) return;
+
+    const blob = new Blob([
+      JSON.stringify({
+        format: "lumapos-legacy-offline-outbox-v1",
+        exportedAt: new Date().toISOString(),
+        warning: t("pos.offline.legacyOutboxExportWarning"),
+        records,
+      }, null, 2),
+    ], { type: "application/json" });
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = `lumapos-legacy-offline-orders-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+  }
 
   /** Khi chỉ có một tab, nút X sẽ làm trống hóa đơn thay vì đóng tab. */
   function clearInvoice(id: string) {
@@ -3176,6 +3213,28 @@ export function PosClient({
         </button>
         <div className="mb-3 space-y-2">
           {invoiceTabs}
+          {canRecoverLegacyOutbox && legacyOutboxCount > 0 && (
+            <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="font-semibold">{t("pos.offline.legacyOutboxTitle", { count: legacyOutboxCount })}</p>
+                  <p className="mt-1">{t("pos.offline.legacyOutboxBody")}</p>
+                  <p className="mt-1 text-xs opacity-80">{t("pos.offline.legacyOutboxPrivacy")}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void exportLegacyOutboxRecoveryCopy()}
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "h-9 shrink-0 gap-2 border-amber-500/50 px-3 text-xs font-semibold text-amber-950 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-100 dark:hover:bg-amber-900/60",
+                  )}
+                >
+                  <FileText className="h-4 w-4" />
+                  {t("pos.offline.legacyOutboxExport")}
+                </button>
+              </div>
+            </div>
+          )}
           {showSourceInvoiceBanner && sourceInvoice && (
             <div className={cn(
               "grid gap-2 rounded-xl border p-3",

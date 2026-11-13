@@ -35,6 +35,11 @@ flowchart LR
   tra cứu; nó không cấp quyền ghi đè giá hay tồn kho đã được server xác nhận.
 - Mỗi loại command phải được chuyển và kiểm chứng riêng. Có dữ liệu offline ở
   client không đồng nghĩa mọi màn hình hiện đã hỗ trợ ghi offline.
+- Khi trình duyệt nâng cấp từ outbox cũ chưa có tenant scope, app giữ bản ghi
+  trong IndexedDB riêng và không tự phát lại dưới cửa hàng/tài khoản đang đăng
+  nhập. Owner hoặc manager có thể tải bản sao để xác minh và xử lý thủ công;
+  file xuất có thể chứa dữ liệu khách hàng/tài chính. Outbox đã được scope ở
+  phiên bản hiện tại được giữ nguyên khi nâng cấp schema IndexedDB tiếp theo.
 
 ## Mac tại cửa hàng
 

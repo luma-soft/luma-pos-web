@@ -2101,7 +2101,12 @@
       "banner": "Đang offline — đơn sẽ tự đồng bộ khi có mạng",
       "syncing": "Đang đồng bộ…",
       "pending": "Chờ Mac xác nhận {n} đơn",
-      "savedToast": "Đã lưu đơn (offline)"
+      "savedToast": "Đã lưu đơn (offline)",
+      "legacyOutboxTitle": "Đã giữ lại {count} đơn offline từ phiên bản cũ",
+      "legacyOutboxBody": "Không xác định được cửa hàng và tài khoản ban đầu nên các đơn này không được tự đồng bộ. Hãy tải bản sao và xác minh quyền sở hữu trước khi khôi phục thủ công.",
+      "legacyOutboxPrivacy": "Tệp có thể chứa thông tin khách hàng hoặc tài chính. Hãy giữ riêng tư và lưu ở nơi an toàn.",
+      "legacyOutboxExport": "Tải bản sao khôi phục",
+      "legacyOutboxExportWarning": "Các đơn offline này không được đồng bộ vì chưa xác định được cửa hàng và tài khoản ban đầu. Hãy xác minh quyền sở hữu trước khi khôi phục thủ công."
     },
     "priceBook": {
       "title": "Chọn bảng giá",

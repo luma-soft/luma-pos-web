@@ -2101,7 +2101,12 @@
       "banner": "Offline — orders will sync when back online",
       "syncing": "Syncing…",
       "pending": "Waiting for Mac to confirm {n} orders",
-      "savedToast": "Order saved (offline)"
+      "savedToast": "Order saved (offline)",
+      "legacyOutboxTitle": "{count} older offline orders were preserved",
+      "legacyOutboxBody": "Their original store and account are unknown, so they were not replayed. Export a recovery copy and verify ownership before any manual recovery.",
+      "legacyOutboxPrivacy": "The file may contain customer or financial details. Keep it private and store it securely.",
+      "legacyOutboxExport": "Export recovery copy",
+      "legacyOutboxExportWarning": "These offline orders were not replayed because their original store and account are unknown. Verify ownership before any manual recovery."
     },
     "priceBook": {
       "title": "Select price book",
