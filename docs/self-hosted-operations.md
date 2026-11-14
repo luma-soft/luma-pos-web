@@ -93,6 +93,13 @@ R2. Ba hồ sơ có ba Auth credentials khớp, không có tài khoản cần re
 thái sync receipt hai bên đều rỗng và khớp. Đây vẫn là rehearsal, chưa được tuyên
 bố làm nguồn dữ liệu chính.
 
+Kiểm tra metadata chỉ đọc qua pgAdmin ngày 2026-11-14 xác nhận
+`lumapos_local.public._migrations` vẫn có 177 migration, mới nhất là
+`0165_cleanup_storage_provider.sql`; repo hiện có thêm
+`0166_media_migration_library_assets.sql`. Không chạy migration và không đọc
+dòng nghiệp vụ trong lần kiểm tra này. Database `_20261114_b` bên dưới là
+rehearsal riêng có đủ 178 migration; không suy ra `lumapos_local` là nguồn chính.
+
 Ngày 2026-11-14, một snapshot rehearsal mới được nhập riêng vào
 `lumapos_rehearsal_20261114_a`; không sửa `lumapos_local` hay ghi vào Supabase.
 Target có 178 migration, trong khi nguồn có 177; migration bổ sung duy nhất là
@@ -170,13 +177,17 @@ service account. `runtime.env`, `cloudflared.yml` và tunnel credential thuộc
 `/Users/Shared/LumaPOS/bin/bun`; các plist mẫu dùng service account này. Chưa
 cài hoặc nạp LaunchDaemon cho backend/worker; Next.js và Tunnel vẫn dừng.
 PostgreSQL tiếp tục chạy dưới LaunchAgent của phiên người dùng; không chuyển
-PostgreSQL sang user khác khi chưa có cửa sổ bảo trì. Chủ sản phẩm đổi quyết
-định backup ngày 2026-11-14: Google Drive thay hoàn toàn ổ cứng ngoài. Rclone
-chưa được cài và chưa có OAuth remote/config; worker, readiness và restore đang
-được chuyển sang đích Drive. Rclone đã được cài qua Homebrew trên Mac nhưng
-OAuth remote/config chưa được tạo. `/Users/Shared/LumaPOS/backups` hiện chứa một
-archive rehearsal mã hóa cũ và còn thuộc tài khoản tương tác; không dùng archive
-này làm nguồn backup production. Cửa sổ bảo trì 60 phút vẫn để sau; chưa cutover.
+PostgreSQL sang user khác khi chưa có cửa sổ bảo trì. Chủ sản phẩm chọn Google
+Drive thay hoàn toàn ổ cứng ngoài ngày 2026-11-14. Rclone đã được cài qua
+Homebrew; remote OAuth `lumapos` đã được cấu hình bằng OAuth client riêng,
+scope `drive.file`, account đang đăng nhập trong Chrome. Helper xác nhận thư mục
+`Backups/LumaPOS` truy cập được. Config nằm tại
+`/Users/Shared/LumaPOS/secrets/rclone.conf`, owner `_lumapos_svc`, mode `0600`.
+Chưa upload archive hoặc diễn tập download/restore từ Drive. Archive rehearsal
+cũ trong `/Users/Shared/LumaPOS/backups` vẫn chỉ là bản cục bộ trên cùng volume
+APFS, không phải backup production. `backup-staging` chưa tồn tại và worker
+chưa được cài/nạp; khóa AES runtime, quota và quy trình retention chưa được
+xác minh. Cửa sổ bảo trì và cutover vẫn để sau.
 `cloudflared` đã có tại `/opt/homebrew/bin/cloudflared`; connector vẫn dừng.
 Release app thuộc tài khoản tương tác và đọc được qua group `staff`.
 
@@ -453,8 +464,9 @@ restore có cùng 151 bảng public, 3 cửa hàng, 3 hồ sơ, 3.293 sản ph�
 469 media object và 454 media ready local. Media archive khôi phục 1.056 file
 (152 MB). Archive rehearsal cũ nằm trong `/Users/Shared/LumaPOS/backups` trên
 cùng volume APFS với database/media; nó chưa được upload lên Drive và không phải
-backup production. Sau khi chuyển sang Drive, cần lặp lại rehearsal
-upload/download/restore qua OAuth remote thực tế trước khi cổng backup go-live đạt.
+backup production. OAuth remote Drive đã được xác minh ngày 2026-11-14; cần lặp
+lại rehearsal upload/download/restore qua remote này trước khi cổng backup
+go-live đạt.
 
 Worker backup cần `LUMAPOS_BACKUP_SOURCE_CONFIRMED=true`, Auth provider
 `lumapos`, endpoint PostgreSQL không phải Supabase, media provider local,
@@ -516,8 +528,8 @@ chỉ nhận bản rehearsal và chưa được mở cho người dùng.
    `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=false`, và chỉ đặt
    `LUMAPOS_BACKUP_SOURCE_CONFIRMED=true` sau khi kiểm tra `DATABASE_URL` cùng
    `MEDIA_LOCAL_ROOT` trỏ đúng final target. Khởi động riêng backup worker, tạo
-   archive mã hóa trực tiếp lên ổ ngoài đã mount; xác minh đường dẫn tương đối,
-   dung lượng và checksum đã đọc lại từ file trước khi bật primary.
+   archive mã hóa qua remote Google Drive đã cấu hình; xác minh remote size/MD5,
+   SHA-256 và manifest trước khi bật primary.
    Chỉ sau khi backup thành công mới bật `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true`;
    bật `LUMAPOS_SYNC_INBOX_ENABLED=true` cho POS sync và chỉ bật
    `LUMAPOS_SERVICE_FIELD_SYNC_ENABLED=true` nếu slice service đã vượt rehearsal.
@@ -568,8 +580,8 @@ chỉ nhận bản rehearsal và chưa được mở cho người dùng.
 - Chốt account recovery/password reset và recovery administrator. Hash không
   chuyển được phải có quy trình reset hỗ trợ, không gửi mật khẩu tạm qua log.
 - Chốt role PostgreSQL runtime/DBA và cách giữ secrets trên Mac.
-- Chốt rollback window, retention cho ổ ngoài, có cần bản sao offsite thứ hai
-  hay không, RPO/RTO và thời gian phục hồi được chấp nhận.
+- Chốt rollback window, retention và quota Google Drive, có cần bản sao độc lập
+  thứ hai hay không, RPO/RTO và thời gian phục hồi được chấp nhận.
 - Chốt có cần route LAN riêng cho iPhone khi WAN cửa hàng mất hay chấp nhận giữ
   command offline cho đến khi Internet trở lại.
 - Chốt các command nghiệp vụ nào được phép offline ở đợt đầu; mọi command khác
