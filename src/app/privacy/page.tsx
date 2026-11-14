@@ -25,7 +25,8 @@ const sections = [
   {
     title: "Dịch vụ bên thứ ba và tích hợp",
     paragraphs: [
-      "Dữ liệu cần thiết được xử lý trên hạ tầng cung cấp ứng dụng, cơ sở dữ liệu, xác thực và lưu trữ tệp. Một số chức năng có thể dùng Supabase, Vercel hoặc dịch vụ lưu trữ phương tiện được cấu hình cho hệ thống.",
+      "Dữ liệu cần thiết được xử lý trên hạ tầng cung cấp ứng dụng, cơ sở dữ liệu, xác thực và lưu trữ tệp. Một số chức năng có thể dùng Supabase, Vercel, Google Drive cho bản sao lưu tự lưu trữ hoặc dịch vụ lưu trữ phương tiện được cấu hình cho hệ thống.",
+      "Khi quản trị viên bật backup trên máy chủ LumaPOS tự lưu trữ, hệ thống tạo archive gồm bản dump PostgreSQL và các tệp trong thư mục media local được cấu hình, sau đó mã hóa bằng AES-256-GCM trước khi tải lên tài khoản Google Drive đã kết nối. Khóa giải mã được giữ riêng trong cấu hình bí mật của máy chủ và không được tải lên Drive. Kết nối chỉ xin quyền Google Drive `drive.file`, giới hạn quyền truy cập vào các tệp và thư mục do chính ứng dụng backup tạo. Google xử lý dữ liệu lưu trữ theo chính sách và điều khoản riêng của Google. Worker hiện không tự xóa archive; quản trị viên chịu trách nhiệm xác định thời hạn lưu và xóa các bản backup khi cần.",
       "Nếu tổ chức bật tích hợp bên ngoài hoặc tính năng AI, dữ liệu liên quan chỉ được gửi khi người dùng hoặc tổ chức chủ động sử dụng tính năng đó. Các nhà cung cấp AI có thể gồm OpenAI, Google Gemini hoặc DeepSeek theo cấu hình của cửa hàng; nội dung văn bản, hình ảnh hoặc dữ liệu nghiệp vụ cần thiết cho yêu cầu có thể được gửi tới nhà cung cấp được chọn để xử lý.",
       "Tổ chức sử dụng LumaPOS chịu trách nhiệm về dữ liệu do mình nhập, quyền truy cập nhân viên và việc bật các tích hợp cho cửa hàng. Nhà cung cấp bên thứ ba xử lý dữ liệu theo điều khoản và chính sách riêng của họ.",
     ],
@@ -41,7 +42,7 @@ const sections = [
     title: "Liên hệ và cập nhật chính sách",
     paragraphs: [
       "Nếu có câu hỏi hoặc yêu cầu liên quan đến quyền riêng tư, hãy liên hệ Cao Văn Thiện qua email cvthien.dev@gmail.com hoặc số điện thoại +84 868 306 286. Vui lòng không gửi mật khẩu hoặc mã xác minh qua email.",
-      "Chính sách này được cập nhật lần cuối ngày 25 tháng 10 năm 2026. Nếu cách xử lý dữ liệu thay đổi đáng kể, nội dung chính sách sẽ được cập nhật tại trang này.",
+      "Chính sách này được cập nhật lần cuối ngày 14 tháng 11 năm 2026. Nếu cách xử lý dữ liệu thay đổi đáng kể, nội dung chính sách sẽ được cập nhật tại trang này.",
     ],
   },
 ];
@@ -54,7 +55,7 @@ export default function PrivacyPolicyPage() {
           Hải Đăng POS · LumaPOS
         </Link>
         <h1 className="mt-6 text-3xl font-black tracking-tight sm:text-4xl">Chính sách quyền riêng tư</h1>
-        <p className="mt-3 text-sm text-slate-500">Cập nhật lần cuối: 25 tháng 10 năm 2026</p>
+        <p className="mt-3 text-sm text-slate-500">Cập nhật lần cuối: 14 tháng 11 năm 2026</p>
         <p className="mt-6 leading-7 text-slate-700 dark:text-slate-300">
           Chính sách này mô tả cách Hải Đăng POS xử lý dữ liệu khi bạn đăng nhập và sử dụng ứng dụng. Ứng dụng phục vụ các cửa hàng dùng LumaPOS; tài khoản được tổ chức cấp cho nhân viên, không đăng ký công khai trong ứng dụng.
         </p>
