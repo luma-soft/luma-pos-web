@@ -141,7 +141,12 @@ bị từ chối cho đến khi snapshot được xác nhận làm nguồn chín
 được dừng. Tunnel connector vẫn dừng. Chủ sản phẩm chọn backup trên ổ cứng ngoài
 thay cho R2; lần kiểm tra ngày 2026-11-14 chưa thấy volume ngoài đang mount, nên
 đường dẫn runtime và worker backup chưa được cấu hình. Cửa sổ bảo trì 60 phút
-chưa lên lịch; cutover được để lại cho lần chốt sau.
+chưa lên lịch; cutover được để lại cho lần chốt sau. Kiểm tra lại process state
+ngày 2026-11-14 chỉ thấy PostgreSQL chạy dưới LaunchAgent của phiên người dùng;
+`cloudflared` đã có tại `/opt/homebrew/bin/cloudflared` nhưng connector và
+LaunchDaemon LumaPOS chưa chạy/cài. Release, media và secrets hiện nằm dưới
+`/Users/Shared/LumaPOS` do tài khoản tương tác sở hữu; service account chưa được
+provision hoặc cấp quyền.
 
 Chạy ứng dụng tự host trên loopback bằng `bun run start:self-hosted`. Dùng
 LaunchDaemon với service account để tự khởi động cùng máy và phục hồi khi tiến
@@ -230,8 +235,10 @@ Health check:
   migration riêng cho mỗi store. Chỉ xóa nguồn sau cửa sổ giữ lại đã duyệt.
   Các media ngoài allowlist phải được rà soát; không tải hoặc xóa chúng như
   media của cửa hàng.
-- Backup local media cùng database; đặt backup ở volume/thư mục tách biệt. Đồng
-  bộ thêm bản backup đã mã hóa tới vị trí offsite, giữ khóa mã hóa ở nơi khác.
+- Backup local media cùng database vào volume ngoài qua `LUMAPOS_BACKUP_ROOT`;
+  worker từ chối ghi nếu volume chưa mount hoặc cùng filesystem với app/media.
+  Một ổ gắn tại cửa hàng chưa phải bản offsite; cần quyết định sau liệu có tạo
+  thêm bản mã hóa ở nơi khác hay chấp nhận rủi ro mất đồng thời Mac và ổ.
 
 ## iPhone ngoài mạng cửa hàng: Cloudflare Tunnel
 
@@ -491,8 +498,8 @@ chỉ nhận bản rehearsal và chưa được mở cho người dùng.
 - Chốt account recovery/password reset và recovery administrator. Hash không
   chuyển được phải có quy trình reset hỗ trợ, không gửi mật khẩu tạm qua log.
 - Chốt role PostgreSQL runtime/DBA và cách giữ secrets trên Mac.
-- Chốt rollback window, retention offsite, RPO/RTO và thời gian phục hồi được
-  chấp nhận.
+- Chốt rollback window, retention cho ổ ngoài, có cần bản sao offsite thứ hai
+  hay không, RPO/RTO và thời gian phục hồi được chấp nhận.
 - Chốt có cần route LAN riêng cho iPhone khi WAN cửa hàng mất hay chấp nhận giữ
   command offline cho đến khi Internet trở lại.
 - Chốt các command nghiệp vụ nào được phép offline ở đợt đầu; mọi command khác
