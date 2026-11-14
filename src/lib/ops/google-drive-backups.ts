@@ -296,6 +296,6 @@ export async function downloadGoogleDriveBackupArchive(input: {
   await chmod(input.destinationPath, 0o600);
 }
 
-export function isGoogleDriveArchiveKey(value: unknown): value is string {
+export function isGoogleDriveArchiveKey(value: unknown): boolean {
   return typeof value === "string" && ARCHIVE_KEY_PATTERN.test(value);
 }
