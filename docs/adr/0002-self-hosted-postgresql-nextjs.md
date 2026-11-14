@@ -45,7 +45,7 @@ The current runtime uses Vercel and Supabase for PostgreSQL, Auth, selected Real
 
 - **Authentication lifecycle:** choose the initial account-invitation and password-reset workflow, recovery administrator, and token/session lifetime policy before implementation.
 - **File provider on VPS:** choose object storage provider and retention policy before moving beyond the local Mac provider.
-- **Second backup copy:** decide whether to periodically copy encrypted archives to a separately stored offsite destination; the initial external disk alone does not protect against loss of the store and disk together.
+- **Second backup copy:** decide whether to periodically copy encrypted Google Drive archives to a separately stored offsite destination; a single Drive account can become unavailable or reach quota.
 - **Final cutover window and rollback duration:** set after rehearsal duration and acceptable offline queue drain time are known.
 - **Store LAN during WAN outage:** decide whether the initial release accepts queued/offline work until Internet returns or also provides a private LAN HTTPS route directly to the Mac backend.
 
