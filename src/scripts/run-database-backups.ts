@@ -1,6 +1,6 @@
 import { randomBytes, createCipheriv, createHash } from "node:crypto";
 import { constants as fsConstants, createReadStream, createWriteStream } from "node:fs";
-import { access, appendFile, mkdir, mkdtemp, rename, rm, stat, writeFile } from "node:fs/promises";
+import { access, appendFile, mkdtemp, readdir, rename, rm, stat, writeFile, lstat } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import { hostname } from "node:os";
 import path from "node:path";
@@ -12,7 +12,10 @@ import {
   readMigrationDatabaseUrl,
 } from "@/db/migration-runner";
 import { assertSelfHostedDatabaseEndpoint } from "@/db/self-hosted-primary";
-import { readBackupVolumeReadiness } from "@/lib/ops/backup-volume";
+import {
+  readGoogleDriveBackupReadiness,
+  uploadGoogleDriveBackupArchive,
+} from "@/lib/ops/google-drive-backups";
 import { postgresUtilityMajorVersion, resolvePostgresUtility } from "./postgres-tools";
 
 const WORKER_LOCK_KEY = 1_280_657_220;
@@ -35,6 +38,9 @@ assertSelfHostedDatabaseEndpoint(process.env);
 if (process.env.MEDIA_WRITE_PROVIDER !== "local") {
   throw new Error("The self-hosted backup worker requires MEDIA_WRITE_PROVIDER=local");
 }
+if (process.env.LUMAPOS_BACKUP_PROVIDER !== "google-drive") {
+  throw new Error("The self-hosted backup worker requires LUMAPOS_BACKUP_PROVIDER=google-drive");
+}
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) throw new Error("DATABASE_URL is not configured");
@@ -46,26 +52,26 @@ const sessionUrl = new URL(databaseUrl);
 if (sessionUrl.hostname.endsWith(".pooler.supabase.com") && sessionUrl.port === "6543") {
   sessionUrl.port = "5432";
 }
-const backupRoot = process.env.LUMAPOS_BACKUP_ROOT?.trim();
+const stagingRoot = process.env.LUMAPOS_BACKUP_STAGING_ROOT?.trim();
 const mediaRoot = process.env.MEDIA_LOCAL_ROOT?.trim();
-if (!backupRoot || !path.isAbsolute(backupRoot)) {
-  throw new Error("LUMAPOS_BACKUP_ROOT must be an absolute path");
+if (!stagingRoot || !path.isAbsolute(stagingRoot)) {
+  throw new Error("LUMAPOS_BACKUP_STAGING_ROOT must be an absolute path");
 }
 if (!mediaRoot || !path.isAbsolute(mediaRoot)) {
   throw new Error("MEDIA_LOCAL_ROOT must be an absolute path");
 }
-const resolvedBackupRoot = path.resolve(backupRoot);
+const resolvedStagingRoot = path.resolve(stagingRoot);
 const resolvedMediaRoot = path.resolve(mediaRoot);
 const resolvedProjectRoot = path.resolve(process.cwd());
 function isPathInside(parent: string, candidate: string) {
   return candidate.startsWith(`${parent}${path.sep}`);
 }
 if (
-  resolvedBackupRoot === resolvedMediaRoot
-  || isPathInside(resolvedBackupRoot, resolvedMediaRoot)
-  || isPathInside(resolvedMediaRoot, resolvedBackupRoot)
+  resolvedStagingRoot === resolvedMediaRoot
+  || isPathInside(resolvedStagingRoot, resolvedMediaRoot)
+  || isPathInside(resolvedMediaRoot, resolvedStagingRoot)
 ) {
-  throw new Error("Backup and media directories must be separate sibling trees");
+  throw new Error("Backup staging and media directories must be separate trees");
 }
 if (
   resolvedMediaRoot === resolvedProjectRoot
@@ -75,11 +81,11 @@ if (
   throw new Error("Media directory must be outside the application directory");
 }
 if (
-  resolvedBackupRoot === resolvedProjectRoot
-  || isPathInside(resolvedProjectRoot, resolvedBackupRoot)
-  || isPathInside(resolvedBackupRoot, resolvedProjectRoot)
+  resolvedStagingRoot === resolvedProjectRoot
+  || isPathInside(resolvedProjectRoot, resolvedStagingRoot)
+  || isPathInside(resolvedStagingRoot, resolvedProjectRoot)
 ) {
-  throw new Error("Backup directory must be outside the application directory");
+  throw new Error("Backup staging directory must be outside the application directory");
 }
 const encodedKey = process.env.LUMAPOS_BACKUP_ENCRYPTION_KEY?.trim() ?? "";
 if (!/^[0-9a-f]{64}$/i.test(encodedKey)) {
@@ -101,6 +107,18 @@ async function sha256File(filePath: string) {
   const hash = createHash("sha256");
   for await (const chunk of createReadStream(filePath)) hash.update(chunk as Buffer);
   return hash.digest("hex");
+}
+
+async function cleanInterruptedBackupStages() {
+  const entries = await readdir(resolvedStagingRoot);
+  for (const entry of entries) {
+    if (!entry.startsWith(".lumapos-backup-")) continue;
+    const candidate = path.join(resolvedStagingRoot, entry);
+    const candidateStats = await lstat(candidate).catch(() => null);
+    if (candidateStats?.isDirectory() && !candidateStats.isSymbolicLink()) {
+      await rm(candidate, { recursive: true, force: true });
+    }
+  }
 }
 
 async function encryptFile(inputPath: string, outputPath: string) {
@@ -208,13 +226,12 @@ async function claimRun() {
 }
 
 async function createBackup(runId: string) {
-  const backupVolumeReadiness = await readBackupVolumeReadiness({
-    backupRoot: resolvedBackupRoot,
-    mediaRoot: resolvedMediaRoot,
+  const destinationReadiness = await readGoogleDriveBackupReadiness({
     applicationRoot: resolvedProjectRoot,
+    mediaRoot: resolvedMediaRoot,
   });
-  if (!backupVolumeReadiness.configured) {
-    throw new Error(`BACKUP_VOLUME_NOT_READY:${backupVolumeReadiness.blockers.join(",")}`);
+  if (!destinationReadiness.configured) {
+    throw new Error(`BACKUP_DESTINATION_NOT_READY:${destinationReadiness.blockers.join(",")}`);
   }
 
   const [{ mediaCount }] = await connection.unsafe(`
@@ -239,23 +256,18 @@ async function createBackup(runId: string) {
   const datePart = (type: Intl.DateTimeFormatPartTypes) =>
     dateParts.find((part) => part.type === type)?.value ?? "00";
   const finalName = `lumapos-${runId}.lumaenc`;
-  const archiveKey = `external-disk/${datePart("year")}/${datePart("month")}/${datePart("day")}/${finalName}`;
-  const finalPath = path.join(resolvedBackupRoot, archiveKey);
+  const archiveKey = `google-drive/${datePart("year")}/${datePart("month")}/${datePart("day")}/${finalName}`;
 
   const mediaRootStats = await stat(resolvedMediaRoot);
   if (!mediaRootStats.isDirectory()) throw new Error("MEDIA_ROOT_NOT_READY");
   await access(resolvedMediaRoot, fsConstants.R_OK | fsConstants.X_OK);
-  const temporaryDirectory = await mkdtemp(path.join(resolvedBackupRoot, ".lumapos-backup-"));
+  const temporaryDirectory = await mkdtemp(path.join(resolvedStagingRoot, ".lumapos-backup-"));
   const dumpPath = path.join(temporaryDirectory, "database.dump");
   const mediaArchivePath = path.join(temporaryDirectory, "media.tar.gz");
   const bundlePath = path.join(temporaryDirectory, "backup.tar.gz");
   const partialPath = path.join(temporaryDirectory, `${finalName}.partial`);
 
   try {
-    const temporaryDirectoryStats = await stat(temporaryDirectory);
-    if (temporaryDirectoryStats.dev !== backupVolumeReadiness.deviceId) {
-      throw new Error("BACKUP_VOLUME_CHANGED");
-    }
     const password = decodeURIComponent(parsedUrl.password);
     const sourceEnvironment = {
       ...process.env,
@@ -298,25 +310,21 @@ async function createBackup(runId: string) {
     );
     await run("tar", ["-czf", bundlePath, "-C", temporaryDirectory, "database.dump", "media.tar.gz", "manifest.json"]);
     await encryptFile(bundlePath, partialPath);
-    await mkdir(path.dirname(finalPath), { recursive: true, mode: 0o700 });
-    await rename(partialPath, finalPath);
-    const archiveStats = await stat(finalPath);
-    if (archiveStats.dev !== backupVolumeReadiness.deviceId) {
-      await rm(finalPath, { force: true }).catch(() => undefined);
-      throw new Error("BACKUP_VOLUME_CHANGED");
-    }
-    const archiveSha256 = await sha256File(finalPath);
-    const backupRootStats = await stat(resolvedBackupRoot);
-    if (backupRootStats.dev !== backupVolumeReadiness.deviceId) {
-      await rm(finalPath, { force: true }).catch(() => undefined);
-      throw new Error("BACKUP_VOLUME_CHANGED");
+    const archivePath = path.join(temporaryDirectory, finalName);
+    await rename(partialPath, archivePath);
+    const archiveStats = await stat(archivePath);
+    const archiveSha256 = await sha256File(archivePath);
+    const uploadedArchive = await uploadGoogleDriveBackupArchive({ localPath: archivePath, archiveKey });
+    if (uploadedArchive.sizeBytes !== archiveStats.size) {
+      throw new Error("GOOGLE_DRIVE_ARCHIVE_VERIFY_FAILED");
     }
     const storedManifest = {
       ...manifest,
       destination: {
-        provider: "external-disk",
+        provider: "google-drive",
         relativePath: archiveKey,
         archiveSha256,
+        archiveMd5: uploadedArchive.md5,
       },
     };
 
@@ -327,13 +335,13 @@ async function createBackup(runId: string) {
           archive_key = $1, archive_size_bytes = $2, sha256 = $3,
           manifest = $4::jsonb, failure_code = NULL
       WHERE id = $5::uuid AND status = 'running'
-    `, [archiveKey, archiveStats.size, archiveSha256, JSON.stringify(storedManifest), runId]);
+    `, [archiveKey, uploadedArchive.sizeBytes, archiveSha256, JSON.stringify(storedManifest), runId]);
 
     console.log(JSON.stringify({
       backupRunId: runId,
       status: "succeeded",
       archiveKey,
-      archiveSizeBytes: archiveStats.size,
+      archiveSizeBytes: uploadedArchive.sizeBytes,
       sha256: archiveSha256,
     }));
   } catch (error) {
@@ -345,7 +353,11 @@ async function createBackup(runId: string) {
       WHERE id = $2::uuid AND status = 'running'
     `, [error instanceof Error && error.message === "BACKUP_HAS_NON_LOCAL_MEDIA"
       ? "MEDIA_NOT_LOCAL"
-      : "BACKUP_FAILED", runId]);
+      : error instanceof Error && error.message.startsWith("BACKUP_DESTINATION_NOT_READY")
+        ? "BACKUP_DESTINATION_NOT_READY"
+        : error instanceof Error && error.message === "GOOGLE_DRIVE_ARCHIVE_VERIFY_FAILED"
+          ? "BACKUP_REMOTE_VERIFY_FAILED"
+          : "BACKUP_FAILED", runId]);
     console.error("Database backup failed; see backup status in LumaPOS administration.");
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
@@ -361,6 +373,7 @@ async function recoverStaleRuns() {
 }
 
 try {
+  await cleanInterruptedBackupStages();
   await writeHeartbeat("running");
   await recoverStaleRuns();
   do {

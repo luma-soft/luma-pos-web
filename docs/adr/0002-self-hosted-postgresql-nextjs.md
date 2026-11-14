@@ -21,14 +21,14 @@ The current runtime uses Vercel and Supabase for PostgreSQL, Auth, selected Real
 8. Background jobs run as supervised backend workers or protected backend tasks with durable scheduling/locking. Vercel Cron and external Supabase relay processing are not target dependencies.
 9. Cutover uses a final write freeze, final export/import, reconciliation, and a single authority switch. No prolonged dual-write is allowed. Supabase Cloud can be retired only after reconciliation, rollback-window approval, and removal of all runtime dependencies.
 10. Remote Internet traffic reaches the Mac through a named Cloudflare Tunnel and a stable public HTTPS API hostname. `cloudflared` initiates outbound connections; the store router does not expose inbound ports. The tunnel routes only to the Next.js service. LumaPOS authentication and signed webhook verification remain authoritative at the application layer; Cloudflare Access must not gate the whole API hostname. pgAdmin and PostgreSQL are never published through the tunnel.
-11. Self-hosted backups are encrypted and written to an already-mounted external disk configured by `LUMAPOS_BACKUP_ROOT`; the worker must fail closed if that volume is missing or shares a filesystem with the app/media. Do not create an R2 write token for backups. One disk kept at the store is not an offsite copy.
+11. Backup location was originally an external disk. That location decision was superseded on 2026-11-14 by [ADR-0003](0003-google-drive-backups.md): use Google Drive as the sole backup destination, with encrypted archives and a private local staging directory.
 
 ## Consequences
 
 - Every browser, mobile, webhook, payment, scheduled-job, and storage path that directly relies on Supabase must be inventoried and migrated or deliberately retired.
 - The Mac host must provide HTTPS reachability for remote iPhone use, supervised Next.js and worker processes, protected secrets, backup monitoring, and documented recovery procedures.
 - The VPS move must preserve application configuration contracts, PostgreSQL schema, object keys, and backend API behavior. Only host-specific infrastructure values such as database endpoint, public HTTPS origin, file provider, and process supervisor should change.
-- Moving from Mac to VPS changes the mounted backup-volume path, not the backup archive format or restore procedure. Losing the Mac and its attached external disk together can also lose the only backup copy until a second offsite copy is selected and configured.
+- Moving from Mac to VPS changes the local staging path and Drive OAuth configuration, not the backup archive format or restore procedure. Losing Drive account/API access or quota prevents new backups and restore access until recovered.
 - pgAdmin is an operator tool, not the LumaPOS product admin UI. User/role management, backup status, backend health, and background-job status belong in authenticated, audited LumaPOS administration pages.
 - Remote access depends on the Mac, its Internet connection, `cloudflared`, and Cloudflare availability. If the store's WAN is down, remote iPhones cannot reach the tunnel; clients keep queued work locally until connectivity returns. If the business requires server-validated transactions over the store LAN during a WAN outage, add a private LAN HTTPS route as a separate availability slice.
 

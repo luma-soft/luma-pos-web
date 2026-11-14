@@ -15,17 +15,25 @@ secret path và volume path. Chưa cài các unit này trước khi cutover kh�
 - Cloudflare Tunnel credential JSON: `/etc/lumapos/cloudflared-tunnel.json`,
   owner `lumapos_svc`, mode `600`; chuyển file qua kênh secrets được bảo vệ,
   không đưa vào repository, archive release hoặc log.
-- Media và backup: `/var/lib/lumapos/media` và `/var/lib/lumapos/backups`, trên
-  volume bền vững, tách rời release và nằm trên filesystem riêng nếu có thể.
+- Media: `/var/lib/lumapos/media` trên volume bền vững. Backup staging:
+  `/var/lib/lumapos/backup-staging`, mode `0700`, chỉ để tạo archive tạm trước upload;
+  Google Drive là destination duy nhất.
+- Rclone config: `/etc/lumapos/rclone/rclone.conf`, owner `lumapos_svc`, mode
+  `0600`; the containing directory is owned by `lumapos_svc`, mode `0700`;
+  giữ OAuth refresh token ngoài release, database và archive. Backup unit cần
+  quyền ghi file này để rclone gia hạn token.
 - Tạo `/opt/lumapos/app/.next/cache`, `/var/lib/lumapos/media` và
-  `/var/lib/lumapos/backups`; cấp quyền ghi cho `lumapos_svc` vào cache/media/
-  backup theo unit tương ứng.
+  `/var/lib/lumapos/backup-staging`; cấp quyền ghi cho `lumapos_svc` vào cache/media/
+  staging theo unit tương ứng.
 - PostgreSQL lắng nghe trên loopback hoặc socket riêng; không mở cổng 5432 ra
   Internet. `pgAdmin 4` chạy ở máy DBA qua SSH port-forward/VPN, không qua
   Cloudflare Tunnel.
-- Cập nhật `/usr/local/bin/bun`, `/usr/local/bin/cloudflared`,
-  `MEDIA_LOCAL_ROOT`, `LUMAPOS_BACKUP_ROOT` và các `ReadWritePaths` trong unit
-  nếu máy dùng đường dẫn khác.
+- Cài `/usr/local/bin/bun`, `/usr/local/bin/cloudflared`, `/usr/bin/rclone`;
+  đặt `MEDIA_LOCAL_ROOT`, `LUMAPOS_BACKUP_STAGING_ROOT`,
+  `LUMAPOS_BACKUP_REMOTE`, `LUMAPOS_RCLONE_CONFIG=/etc/lumapos/rclone/rclone.conf`
+  và các `ReadWritePaths` trong
+  unit theo cấu hình VPS. Giữ archive format/key; có thể cần cấp OAuth lại cho
+  Google account trên VPS.
 
 ## Services
 

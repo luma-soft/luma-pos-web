@@ -155,14 +155,18 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
     .map((warning) => mediaWarningLabels[warning] ?? t("mediaWarnings.unknown"));
   const backupBlockerLabels: Record<string, string> = {
     sourceConfirmation: t("backupBlockers.sourceConfirmation"),
-    volumeConfiguration: t("backupBlockers.volumeConfiguration"),
-    volumeUnavailable: t("backupBlockers.volumeUnavailable"),
-    volumeNotWritable: t("backupBlockers.volumeNotWritable"),
-    volumeSharesApplicationDisk: t("backupBlockers.volumeSharesApplicationDisk"),
-    volumeSharesMediaDisk: t("backupBlockers.volumeSharesMediaDisk"),
-    applicationVolumeUnknown: t("backupBlockers.applicationVolumeUnknown"),
-    mediaVolumeUnknown: t("backupBlockers.mediaVolumeUnknown"),
-    recentExternalBackup: t("backupBlockers.recentExternalBackup"),
+    providerConfiguration: t("backupBlockers.providerConfiguration"),
+    driveConfiguration: t("backupBlockers.driveConfiguration"),
+    rcloneConfiguration: t("backupBlockers.rcloneConfiguration"),
+    rcloneConfigurationUnavailable: t("backupBlockers.rcloneConfigurationUnavailable"),
+    rcloneUnavailable: t("backupBlockers.rcloneUnavailable"),
+    stagingRootConfiguration: t("backupBlockers.stagingRootConfiguration"),
+    stagingRootUnavailable: t("backupBlockers.stagingRootUnavailable"),
+    stagingRootNotPrivate: t("backupBlockers.stagingRootNotPrivate"),
+    stagingRootInsideApplication: t("backupBlockers.stagingRootInsideApplication"),
+    stagingRootInsideMedia: t("backupBlockers.stagingRootInsideMedia"),
+    driveUnavailable: t("backupBlockers.driveUnavailable"),
+    recentGoogleDriveBackup: t("backupBlockers.recentGoogleDriveBackup"),
   };
   const activeBackupBlockers = (operations?.readiness.backup.blockers ?? [])
     .map((blocker) => backupBlockerLabels[blocker] ?? t("backupBlockers.unknown"));

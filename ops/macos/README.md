@@ -13,8 +13,9 @@ credentials.
   Không dùng tài khoản superuser PostgreSQL làm `DATABASE_URL` của ứng dụng.
 - Giữ `/Users/Shared/LumaPOS` ở mode `0710`, group `staff`, để service account
   đi tới các đường dẫn đã biết nhưng không liệt kê thư mục gốc. Thư mục `secrets`,
-  `media`, `logs` thuộc `_lumapos_svc`; runtime env và tunnel credential dùng
-  mode `0600`. Release app phải đọc được bởi group `staff`.
+  `media`, `logs` và `backup-staging` thuộc `_lumapos_svc`; staging dùng mode
+  `0700`. Runtime env, rclone config và tunnel credential dùng mode
+  `0600`. Release app phải đọc được bởi group `staff`.
 - Đặt runtime environment tại
   `/Users/Shared/LumaPOS/secrets/runtime.env`, owner `_lumapos_svc`, mode `600`.
   Đây là file shell assignments đã được tin cậy, không phải `.env.local`; không
@@ -22,10 +23,17 @@ credentials.
 - Release không được chứa `.env`, `.env.local`, `.env.production` hoặc
   `.env.production.local`; wrapper từ chối khởi chạy nếu thấy một trong các file
   đó mà không đọc nội dung.
-- Cài Bun vào `/Users/Shared/LumaPOS/bin/bun` và giữ `cloudflared` tại đường dẫn
-  trong plist mẫu (Homebrew ARM mặc định). Tạo thư mục log trước khi nạp dịch vụ.
-- Cấp quyền `_lumapos_svc` cho thư mục media và thư mục backup riêng. Chúng phải
-  nằm ngoài app release và tách biệt nhau.
+- Cài Bun vào `/Users/Shared/LumaPOS/bin/bun`, `rclone` và giữ `cloudflared` tại
+  đường dẫn trong plist mẫu (Homebrew ARM mặc định). Tạo thư mục log trước khi
+  nạp dịch vụ.
+- Thư mục `/Users/Shared/LumaPOS/backup-staging` là staging tạm trên ổ trong, không phải
+  backup durable; service account cần quyền riêng `0700`. Staging phải nằm ngoài
+  app release và media. Archive production chỉ được tính thành công sau khi đã
+  xác minh trên Google Drive.
+- Đặt remote OAuth của rclone trong
+  `/Users/Shared/LumaPOS/secrets/rclone.conf`, owner `_lumapos_svc`, mode `600`.
+  Config cần ghi được để refresh token; không để trong repo/release, không in
+  nội dung và không route Drive credential qua Tunnel.
 
 ## Dịch vụ
 

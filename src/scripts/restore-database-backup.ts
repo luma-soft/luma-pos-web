@@ -10,7 +10,11 @@ import {
   createMigrationPostgresClient,
   readMigrationDatabaseUrl,
 } from "@/db/migration-runner";
-import { readBackupVolumeReadiness } from "@/lib/ops/backup-volume";
+import {
+  downloadGoogleDriveBackupArchive,
+  isGoogleDriveArchiveKey,
+  readGoogleDriveBackupReadiness,
+} from "@/lib/ops/google-drive-backups";
 import { postgresUtilityMajorVersion, resolvePostgresUtility } from "./postgres-tools";
 
 const MAGIC = Buffer.from("LUMABKP1");
@@ -28,22 +32,26 @@ if (!process.argv.includes("--confirm-empty-database")) {
 }
 const archiveName = argument("archive");
 if (!archiveName) {
-  throw new Error("Pass --archive <backup-file-or-relative-path.lumaenc>");
+  throw new Error("Pass --archive <google-drive/YYYY/MM/DD/lumapos-<uuid>.lumaenc>");
 }
 const supportedArchiveName = /^lumapos-[0-9a-f-]{36}(?:-[0-9]{10,13})?\.lumaenc$/i;
-const supportedExternalArchivePath = /^external-disk\/[0-9]{4}\/[0-9]{2}\/[0-9]{2}\/lumapos-[0-9a-f-]{36}\.lumaenc$/i;
+const supportedLegacyArchivePath = /^external-disk\/[0-9]{4}\/[0-9]{2}\/[0-9]{2}\/lumapos-[0-9a-f-]{36}\.lumaenc$/i;
+const remoteArchive = isGoogleDriveArchiveKey(archiveName);
 if (
   path.isAbsolute(archiveName)
   || archiveName.includes("\\")
   || archiveName.split("/").some((part) => part === "" || part === "." || part === "..")
-  || (!supportedArchiveName.test(archiveName) && !supportedExternalArchivePath.test(archiveName))
+  || (!remoteArchive && !supportedArchiveName.test(archiveName) && !supportedLegacyArchivePath.test(archiveName))
 ) {
-  throw new Error("Local archive path is not in the supported LumaPOS backup namespace");
+  throw new Error("Archive path is not in a supported LumaPOS backup namespace");
 }
 const expectedSha256 = argument("sha256")?.toLowerCase();
-const backupRoot = process.env.LUMAPOS_BACKUP_ROOT?.trim();
+if (remoteArchive && (!expectedSha256 || !/^[0-9a-f]{64}$/.test(expectedSha256))) {
+  throw new Error("Google Drive restore requires the SHA-256 value shown in LumaPOS administration");
+}
+const stagingRoot = process.env.LUMAPOS_BACKUP_STAGING_ROOT?.trim();
 const mediaRoot = process.env.MEDIA_LOCAL_ROOT?.trim();
-if (!backupRoot || !path.isAbsolute(backupRoot)) throw new Error("LUMAPOS_BACKUP_ROOT must be an absolute path");
+if (!stagingRoot || !path.isAbsolute(stagingRoot)) throw new Error("LUMAPOS_BACKUP_STAGING_ROOT must be an absolute path");
 if (!mediaRoot || !path.isAbsolute(mediaRoot)) throw new Error("MEDIA_LOCAL_ROOT must be an absolute path");
 const migrationDatabase = readMigrationDatabaseUrl(process.env);
 const databaseUrl = migrationDatabase.connectionString;
@@ -60,39 +68,29 @@ if (!/^[0-9a-f]{64}$/i.test(encodedKey)) {
   throw new Error("LUMAPOS_BACKUP_ENCRYPTION_KEY must be a 32-byte hexadecimal key");
 }
 const encryptionKey = Buffer.from(encodedKey, "hex");
-const resolvedBackupRoot = path.resolve(backupRoot);
+const resolvedStagingRoot = path.resolve(stagingRoot);
 const resolvedMediaRoot = path.resolve(mediaRoot);
 const resolvedProjectRoot = path.resolve(process.cwd());
 function isPathInside(parent: string, candidate: string) {
   return candidate.startsWith(`${parent}${path.sep}`);
 }
 if (
-  resolvedBackupRoot === resolvedMediaRoot
-  || isPathInside(resolvedBackupRoot, resolvedMediaRoot)
-  || isPathInside(resolvedMediaRoot, resolvedBackupRoot)
+  resolvedStagingRoot === resolvedMediaRoot
+  || isPathInside(resolvedStagingRoot, resolvedMediaRoot)
+  || isPathInside(resolvedMediaRoot, resolvedStagingRoot)
 ) {
-  throw new Error("Backup and media directories must be separate sibling trees");
+  throw new Error("Backup staging and media directories must be separate trees");
 }
 if (
-  resolvedBackupRoot === resolvedProjectRoot
-  || isPathInside(resolvedProjectRoot, resolvedBackupRoot)
-  || isPathInside(resolvedBackupRoot, resolvedProjectRoot)
+  resolvedStagingRoot === resolvedProjectRoot
+  || isPathInside(resolvedProjectRoot, resolvedStagingRoot)
+  || isPathInside(resolvedStagingRoot, resolvedProjectRoot)
   || resolvedMediaRoot === resolvedProjectRoot
   || isPathInside(resolvedProjectRoot, resolvedMediaRoot)
   || isPathInside(resolvedMediaRoot, resolvedProjectRoot)
 ) {
   throw new Error("Backup and media directories must be outside the application directory");
 }
-const backupVolumeReadiness = await readBackupVolumeReadiness({
-  backupRoot: resolvedBackupRoot,
-  mediaRoot: resolvedMediaRoot,
-  applicationRoot: resolvedProjectRoot,
-});
-if (!backupVolumeReadiness.configured) {
-  throw new Error(`BACKUP_VOLUME_NOT_READY:${backupVolumeReadiness.blockers.join(",")}`);
-}
-const archivePath = path.join(resolvedBackupRoot, ...archiveName.split("/"));
-
 function run(command: string, args: string[], env: NodeJS.ProcessEnv = process.env) {
   return new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, { env, stdio: ["ignore", "ignore", "ignore"] });
@@ -133,12 +131,22 @@ try {
   });
   if (mediaEntries.length > 0) throw new Error("Restore stopped because the media directory is not empty");
 
+  const archivePath = remoteArchive
+    ? path.join(staging, "google-drive-backup.lumaenc")
+    : path.join(resolvedStagingRoot, ...archiveName.split("/"));
+  if (remoteArchive) {
+    const driveReadiness = await readGoogleDriveBackupReadiness({
+      applicationRoot: resolvedProjectRoot,
+      mediaRoot: resolvedMediaRoot,
+    });
+    if (!driveReadiness.configured) {
+      throw new Error(`GOOGLE_DRIVE_NOT_READY:${driveReadiness.blockers.join(",")}`);
+    }
+    await downloadGoogleDriveBackupArchive({ archiveKey: archiveName, destinationPath: archivePath });
+  }
   const archiveStats = await lstat(archivePath);
   if (!archiveStats.isFile() || archiveStats.isSymbolicLink() || archiveStats.size < MAGIC.byteLength + 12 + 16) {
     throw new Error("Backup archive is missing or incomplete");
-  }
-  if (archiveStats.dev !== backupVolumeReadiness.deviceId) {
-    throw new Error("Backup archive is not on the configured external volume");
   }
   const archiveSha256 = await sha256File(archivePath);
   if (expectedSha256 && archiveSha256 !== expectedSha256) {

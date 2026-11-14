@@ -21,9 +21,10 @@ export type DatabaseBackupManifest = {
   excluded: string[];
   files: Array<{ name: string; sizeBytes: number; sha256: string }>;
   destination?: {
-    provider: "external-disk";
+    provider: "external-disk" | "google-drive";
     relativePath: string;
     archiveSha256: string;
+    archiveMd5?: string;
   };
   version?: 1;
   createdAt?: string;

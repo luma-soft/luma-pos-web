@@ -18,7 +18,8 @@ flowchart LR
   Sync[Sync worker] --> PG
   Notify[Notification worker] --> PG
   Backup[Backup worker] --> PG
-  Backup -->|gói mã hóa| BackupDisk[(Ổ backup riêng)]
+  Backup -->|archive AES-256-GCM + upload resumable| Drive[(Google Drive riêng)]
+  Backup -->|staging tạm 0700| Staging[(Mac/VPS local scratch)]
   Admin[pgAdmin 4 Desktop] -->|loopback| PG
 ```
 
@@ -169,10 +170,13 @@ service account. `runtime.env`, `cloudflared.yml` và tunnel credential thuộc
 `/Users/Shared/LumaPOS/bin/bun`; các plist mẫu dùng service account này. Chưa
 cài hoặc nạp LaunchDaemon cho backend/worker; Next.js và Tunnel vẫn dừng.
 PostgreSQL tiếp tục chạy dưới LaunchAgent của phiên người dùng; không chuyển
-PostgreSQL sang user khác khi chưa có cửa sổ bảo trì. Chủ sản phẩm chọn backup
-trên ổ cứng ngoài thay cho R2; lần kiểm tra ngày 2026-11-14 chưa thấy volume
-ngoài đang mount, nên đường dẫn runtime và worker backup chưa được cấu hình.
-Cửa sổ bảo trì 60 phút chưa lên lịch; cutover được để lại cho lần chốt sau.
+PostgreSQL sang user khác khi chưa có cửa sổ bảo trì. Chủ sản phẩm đổi quyết
+định backup ngày 2026-11-14: Google Drive thay hoàn toàn ổ cứng ngoài. Rclone
+chưa được cài và chưa có OAuth remote/config; worker, readiness và restore đang
+được chuyển sang đích Drive. Rclone đã được cài qua Homebrew trên Mac nhưng
+OAuth remote/config chưa được tạo. `/Users/Shared/LumaPOS/backups` hiện chứa một
+archive rehearsal mã hóa cũ và còn thuộc tài khoản tương tác; không dùng archive
+này làm nguồn backup production. Cửa sổ bảo trì 60 phút vẫn để sau; chưa cutover.
 `cloudflared` đã có tại `/opt/homebrew/bin/cloudflared`; connector vẫn dừng.
 Release app thuộc tài khoản tương tác và đọc được qua group `staff`.
 
@@ -263,10 +267,12 @@ Health check:
   migration riêng cho mỗi store. Chỉ xóa nguồn sau cửa sổ giữ lại đã duyệt.
   Các media ngoài allowlist phải được rà soát; không tải hoặc xóa chúng như
   media của cửa hàng.
-- Backup local media cùng database vào volume ngoài qua `LUMAPOS_BACKUP_ROOT`;
-  worker từ chối ghi nếu volume chưa mount hoặc cùng filesystem với app/media.
-  Một ổ gắn tại cửa hàng chưa phải bản offsite; cần quyết định sau liệu có tạo
-  thêm bản mã hóa ở nơi khác hay chấp nhận rủi ro mất đồng thời Mac và ổ.
+- Backup database và media local thành archive AES-256-GCM; upload archive lên
+  Google Drive qua rclone. `LUMAPOS_BACKUP_STAGING_ROOT` chỉ giữ bản tạm trong
+  lúc tạo/upload, phải nằm ngoài app/media và dùng quyền `0700`; staging không
+  được tính là bản backup thành công. Readiness yêu cầu remote Drive truy cập
+  được và archive gần nhất đã được xác minh. Một backup Drive duy nhất vẫn phụ
+  thuộc quota, tài khoản và kết nối Internet; khóa mã hóa phải được cất riêng.
 
 ## iPhone ngoài mạng cửa hàng: Cloudflare Tunnel
 
@@ -319,12 +325,47 @@ khi final snapshot được xác nhận:
 | `MEDIA_LOCAL_ROOT` | Volume dữ liệu Mac | Volume dữ liệu VPS |
 | `LUMAPOS_PUBLIC_URL` | `https://pos.haidangshop.com` | Giữ hostname nếu tunnel chuyển cùng domain |
 | `LUMAPOS_INTERNAL_URL` | `http://127.0.0.1:3000` | Origin loopback của Next.js trên VPS |
-| `LUMAPOS_BACKUP_ROOT` | Thư mục trên ổ cứng ngoài đã mount, tách filesystem với app và media | Thư mục trên volume backup riêng đã mount; đổi cấu hình mountpoint, không đổi schema/API |
+| `LUMAPOS_BACKUP_PROVIDER` | `google-drive` | Giữ nguyên |
+| `LUMAPOS_BACKUP_STAGING_ROOT` | Thư mục scratch local, ví dụ `/Users/Shared/LumaPOS/backup-staging` | Thư mục scratch local của VPS; archive thành công vẫn nằm trên Drive |
+| `LUMAPOS_BACKUP_REMOTE` | Remote/folder rclone, ví dụ `lumapos:Backups/LumaPOS` | Giữ cùng remote/folder hoặc cấp OAuth lại cho VPS |
+| `LUMAPOS_RCLONE_CONFIG` | `/Users/Shared/LumaPOS/secrets/rclone.conf` | Đường dẫn secret riêng trên VPS; không đổi archive key/schema |
+| `LUMAPOS_RCLONE_BIN` | Tùy chọn; để `rclone` nếu đã có trong `PATH` | Tùy chọn; để `rclone` nếu đã có trong `PATH` |
 | `LUMAPOS_BACKUP_ENCRYPTION_KEY` | Khóa 32 byte dạng hex | Giữ qua secret manager, không đặt cùng backup |
 
 Self-hosted runtime phải đặt tường minh `MEDIA_WRITE_PROVIDER`; trên Mac dùng
 `local`. Nếu bỏ trống khi Auth provider là `lumapos`, backend từ chối khởi tạo
 media thay vì âm thầm ghi sang R2 theo mặc định legacy.
+
+### Google Drive backup
+
+- Cài rclone trên Mac/VPS và tạo OAuth remote bằng một Google account chuyên
+  backup. Tạo OAuth client riêng trong Google Cloud Console; không dựa vào client
+  dùng chung của rclone vì tài liệu rclone hiện cảnh báo client đó bị retirement
+  trong năm 2026. Dùng scope `drive.file` và để rclone tạo thư mục backup; scope
+  này giới hạn app vào file/thư mục do chính app tạo. Không bật link chia sẻ công
+  khai. Tài liệu: [rclone Google Drive](https://rclone.org/drive/) và
+  [Google Drive OAuth scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth).
+- Với Gmail cá nhân, dùng OAuth user flow. Service account không có quota Drive
+  và không thể sở hữu file; chỉ dùng service account khi đã có Google Workspace
+  Shared Drive phù hợp.
+- Đặt file rclone config tại `LUMAPOS_RCLONE_CONFIG`, owner service account,
+  mode `0600`. File chứa refresh token nên không để trong repo, app release,
+  backup archive hoặc log. Đặt `LUMAPOS_BACKUP_REMOTE` tới thư mục đã được tạo
+  bởi chính remote rclone. Nếu mã hóa file config bằng passphrase rclone, đưa
+  passphrase vào secret runtime riêng; không đặt trong plist.
+- Backup worker tạo dump/media tạm trong thư mục staging mode `0700`, đóng gói
+  AES-256-GCM rồi dùng upload resumable của rclone để gửi một file `.lumaenc` có
+  tên duy nhất. Worker chỉ ghi `succeeded` sau khi Drive trả đúng kích thước và
+  MD5. Health check kiểm tra remote archive mới nhất theo metadata; restore tải
+  archive về staging, bắt buộc đối chiếu SHA-256 đã hiển thị trong admin, xác
+  minh tag AES-GCM và checksum từng thành phần trước khi sửa database rỗng.
+- Staging chỉ là nơi tạm tạo file; backup không thành công nếu remote Drive không
+  nhận/xác minh file. Worker xóa staging khi xong và xóa thư mục tạm còn sót sau
+  lần khởi động lại. Khóa AES không nằm trên Drive và phải cất độc lập với OAuth
+  config.
+- Worker hiện không tự xóa archive Drive. Chốt retention và dung lượng tài khoản
+  trước go-live; khi hết quota, backup lỗi và readiness chuyển `not_ready`.
+  Không dùng `rclone sync` hoặc lệnh có xóa file để quản lý backup.
 
 `DATABASE_URL`, `CRON_SECRET`, `MEDIA_LOCAL_SIGNING_SECRET`, khóa backup, khóa
 mobile và credentials của webhook/provider chỉ có ở server. `MIGRATION_DATABASE_URL`
@@ -380,28 +421,24 @@ Script cũ `scripts/database-backup-worker.sh` vẫn dump Supabase và ghi vào 
 đây không phải worker self-hosted trong runbook này. Không cài script đó cho
 PostgreSQL local; dừng lịch legacy cùng Vercel Cron trước cutover.
 
-Backup worker mã hóa PostgreSQL và media bằng AES-256-GCM rồi lưu archive trực
-tiếp trên ổ cứng ngoài tại `LUMAPOS_BACKUP_ROOT/external-disk/YYYY/MM/DD/`.
-`LUMAPOS_BACKUP_ROOT` phải là thư mục đã tồn tại trên volume đã mount; worker
-không tự tạo thư mục gốc. Readiness kiểm tra thư mục đọc/ghi được và filesystem
-khác với ứng dụng cùng media để khi tháo ổ worker không vô tình ghi archive lên
-ổ trong Mac; worker kiểm tra lại filesystem trước và sau khi ghi. Trên VPS chỉ
-đổi mountpoint trong runtime config, không đổi archive format hay schema.
-`/admin/operations` hiển thị trạng thái, đường dẫn tương đối,
-checksum và dung lượng. Không có bản sao offsite khi chỉ dùng một ổ đang cắm tại
-cửa hàng; cần tính đến rủi ro mất đồng thời Mac và ổ ngoài.
+Backup worker mã hóa PostgreSQL và media bằng AES-256-GCM rồi tải archive lên
+`LUMAPOS_BACKUP_REMOTE/YYYY/MM/DD/` trên Google Drive. `archive_key` bắt đầu bằng
+`google-drive/`; key không chứa đường dẫn Mac nên giữ nguyên khi chuyển VPS.
+`/admin/operations` hiển thị trạng thái, key Drive, SHA-256, kích thước và lỗi.
+Rclone dùng upload resumable; worker xác nhận kích thước và MD5 phía Drive trước
+khi đánh dấu thành công. Restore tải file từ Drive về staging local và kiểm tra
+SHA-256 cùng tag AES-GCM.
 
-1. Worker tạo archive mã hóa mỗi ngày và giữ bản thành công trên ổ riêng.
-   Readiness yêu cầu volume đúng filesystem và một bản backup trong 26 giờ; nếu
-   ổ bị tháo, backup mới báo lỗi và không mở traffic self-hosted. Worker dài hạn
-   sẽ thử lại lịch backup bị lỗi sau 15 phút khi volume hoạt động trở lại.
-2. Worker không tự xóa archive. Chốt retention, cảnh báo dung lượng volume,
-   quy trình cất giữ định kỳ một bản ở nơi khác và lưu khóa mã hóa độc lập trước
-   go-live.
+1. Worker tạo archive mã hóa mỗi ngày; readiness yêu cầu Drive truy cập được và
+   có archive vừa xác minh trong 26 giờ. Khi mất mạng, quota hoặc quyền truy cập,
+   worker báo lỗi, không tính staging local là backup thành công; worker dài hạn
+   thử lại backup lỗi sau 15 phút khi Drive khả dụng.
+2. Worker không tự xóa archive. Chốt retention và quota, bảo vệ OAuth config
+   khỏi backup/repo, và cất khóa mã hóa độc lập trước go-live.
 3. Diễn tập restore vào database mới, rỗng và thư mục media rỗng bằng
-   `bun run db:restore -- --confirm-empty-database --archive external-disk/YYYY/MM/DD/lumapos-<uuid>.lumaenc --sha256 <sha256>`.
-   Lấy đường dẫn tương đối/checksum từ `/admin/operations`. Restore đọc archive
-   trực tiếp trên ổ ngoài, không tải lên cloud. Tiến trình bắt buộc nhận
+   `bun run db:restore -- --confirm-empty-database --archive google-drive/YYYY/MM/DD/lumapos-<uuid>.lumaenc --sha256 <sha256>`.
+   Lấy key/checksum từ `/admin/operations`. Restore tải archive về staging và
+   kiểm tra SHA-256/tag AES-GCM trước khi giải nén. Tiến trình bắt buộc nhận
    `MIGRATION_DATABASE_URL` của DBA/migration owner; không dùng role
    `lumapos_runtime`. Dừng app trước restore; không restore đè database đang chạy.
 4. Nếu restore dừng giữa chừng, giữ app dừng, bỏ database/media staging bị lỗi,
@@ -412,21 +449,23 @@ cửa hàng; cần tính đến rủi ro mất đồng thời Mac và ổ ngoài
 database rỗng khác thành công; checksum archive khớp. Database nguồn và bản
 restore có cùng 151 bảng public, 3 cửa hàng, 3 hồ sơ, 3.293 sản phẩm, 3.158 đơn,
 469 media object và 454 media ready local. Media archive khôi phục 1.056 file
-(152 MB). Archive rehearsal vẫn nằm trên cùng volume APFS với database/media;
-kiểm tra ngày 2026-11-14 không thấy volume vật lý ngoài đang gắn và chưa có bản
-offsite, vì vậy đây chưa phải cổng backup go-live.
+(152 MB). Archive rehearsal cũ nằm trong `/Users/Shared/LumaPOS/backups` trên
+cùng volume APFS với database/media; nó chưa được upload lên Drive và không phải
+backup production. Sau khi chuyển sang Drive, cần lặp lại rehearsal
+upload/download/restore qua OAuth remote thực tế trước khi cổng backup go-live đạt.
 
 Worker backup cần `LUMAPOS_BACKUP_SOURCE_CONFIRMED=true`, Auth provider
 `lumapos`, endpoint PostgreSQL không phải Supabase, media provider local,
-`pg_dump`, tar, khóa mã hóa và ổ backup ngoài đang mount. Gate source này tách
+`pg_dump`, tar, khóa mã hóa, rclone config và Google Drive remote truy cập được.
+Gate source này tách
 khỏi cờ primary: operator có thể backup và kiểm tra archive của final snapshot trong khi
 backend vẫn khóa ghi. Chỉ xác nhận source sau khi kiểm tra `DATABASE_URL` và
 `MEDIA_LOCAL_ROOT` cùng thuộc final target; worker không ghi bảng nghiệp vụ. Vì
 database gate vẫn khóa API ứng dụng, tạo archive cutover ban đầu bằng
 `bun run db:backup:worker -- --scheduled --once` trong service wrapper để worker
 tạo khóa lịch ngày, thực hiện một backup rồi thoát. Target final mới không có
-lịch sử `database_backup_runs` từ nguồn; xác minh worker báo thành công và object
-archive trên ổ ngoài khớp checksum trước khi bật primary.
+lịch sử `database_backup_runs` từ nguồn; xác minh worker báo thành công và archive
+Drive khớp kích thước/MD5 cùng SHA-256 trước khi bật primary.
 
 ## Data rehearsal, cutover và rollback
 
@@ -509,7 +548,8 @@ chỉ nhận bản rehearsal và chưa được mở cho người dùng.
 2. Dừng ghi trên Mac, tạo encrypted backup, restore vào database/media volume
    rỗng của VPS, reconcile counts và checksums.
 3. Chuyển server-side runtime configuration: database private endpoint, media
-   volume, backup volume, secrets manager và process supervisor (systemd). Giữ
+   volume, Google Drive OAuth/config, local backup staging, secrets manager và
+   process supervisor (systemd). Giữ
    Auth provider, queue provider, schema, object keys, API contract và hostname.
    Mẫu unit nằm trong [`ops/systemd`](../ops/systemd/README.md).
 4. Chuyển Cloudflare Tunnel connector sang VPS, kiểm tra `/api/health/ready`,

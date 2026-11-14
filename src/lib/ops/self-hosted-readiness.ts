@@ -8,9 +8,9 @@ import { systemWorkerHeartbeats } from "@/db/schema";
 import { authProvider } from "@/lib/auth/provider";
 import { getLocalMediaConfig, getMediaWriteProvider } from "@/lib/media/config";
 import {
-  isExternalBackupArchivePresent,
-  readBackupVolumeReadiness,
-} from "@/lib/ops/backup-volume";
+  readGoogleDriveBackupReadiness,
+  verifyGoogleDriveBackupArchive,
+} from "@/lib/ops/google-drive-backups";
 
 type WorkerKey = "sync-inbox" | "notification-outbox" | "database-backup";
 type WorkerStatus = { status: "online" | "offline"; lastSeenAt: string | null };
@@ -216,10 +216,12 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     db.execute(sql`
       SELECT archive_key AS "archiveKey",
         archive_size_bytes AS "archiveSizeBytes",
+        sha256,
+        manifest,
         finished_at AS "lastSuccessfulAt"
       FROM public.database_backup_runs
       WHERE status = 'succeeded'
-        AND archive_key LIKE 'external-disk/%'
+        AND archive_key LIKE 'google-drive/%'
         AND finished_at >= now() - interval '26 hours'
       ORDER BY finished_at DESC
       LIMIT 1
@@ -254,20 +256,26 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     };
   }
   const missingWorkers = workerKeys.filter((workerKey) => workers[workerKey].status !== "online");
-  const backupVolumeReadiness = await readBackupVolumeReadiness({
-    backupRoot: process.env.LUMAPOS_BACKUP_ROOT,
+  const backupDestinationReadiness = await readGoogleDriveBackupReadiness({
+    env: process.env,
     mediaRoot: localMediaReadiness?.root,
     applicationRoot: process.cwd(),
   });
-  const backupDestinationConfigured = backupVolumeReadiness.configured;
+  const backupDestinationConfigured = backupDestinationReadiness.configured;
   const lastSuccessfulBackup = resultRows(backupRows)[0] ?? {};
-  const backupArchivePresent = await isExternalBackupArchivePresent({
-    backupRoot: process.env.LUMAPOS_BACKUP_ROOT,
+  const backupManifest = lastSuccessfulBackup.manifest && typeof lastSuccessfulBackup.manifest === "object"
+    ? lastSuccessfulBackup.manifest as Record<string, unknown>
+    : {};
+  const backupDestination = backupManifest.destination && typeof backupManifest.destination === "object"
+    ? backupManifest.destination as Record<string, unknown>
+    : {};
+  const backupArchivePresent = backupDestinationConfigured && await verifyGoogleDriveBackupArchive({
     archiveKey: lastSuccessfulBackup.archiveKey,
     archiveSizeBytes: lastSuccessfulBackup.archiveSizeBytes,
     archiveSha256: lastSuccessfulBackup.sha256,
+    archiveMd5: backupDestination.archiveMd5,
   });
-  const recentExternalBackupAt = backupArchivePresent
+  const recentGoogleDriveBackupAt = backupArchivePresent
     ? lastSuccessfulBackup.lastSuccessfulAt instanceof Date
       ? lastSuccessfulBackup.lastSuccessfulAt.toISOString()
       : typeof lastSuccessfulBackup.lastSuccessfulAt === "string"
@@ -276,8 +284,8 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     : null;
   const missingBackup = [
     ...(backupSourceConfirmed ? [] : ["sourceConfirmation"]),
-    ...backupVolumeReadiness.blockers,
-    ...(recentExternalBackupAt ? [] : ["recentExternalBackup"]),
+    ...backupDestinationReadiness.blockers,
+    ...(recentGoogleDriveBackupAt ? [] : ["recentGoogleDriveBackup"]),
   ];
   const mediaState = resultRows(mediaRows)[0] ?? {};
   const blockers: Record<string, boolean> = {
@@ -321,7 +329,7 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     backup: {
       status: missingBackup.length === 0 ? "ready" : "not_ready",
       destinationConfigured: backupDestinationConfigured,
-      lastSuccessfulAt: recentExternalBackupAt,
+      lastSuccessfulAt: recentGoogleDriveBackupAt,
       blockers: missingBackup,
     },
     media: {
