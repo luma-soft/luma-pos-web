@@ -8,12 +8,11 @@ credentials.
 
 - Đặt release đã build tại `/Users/Shared/LumaPOS/app`, ngoài thư mục checkout
   của developer.
-- Tạo service account không có quyền admin, ví dụ `lumapos_svc`, và cấp quyền
-  tối thiểu cần thiết trên app,
-  media, backup, log và PostgreSQL. Không dùng tài khoản superuser PostgreSQL
-  làm `DATABASE_URL` của ứng dụng.
+- Dùng service account ẩn `_lumapos_svc`, không thuộc nhóm `admin`, có shell
+  `/usr/bin/false`; cấp quyền tối thiểu trên secrets, media, backup và log.
+  Không dùng tài khoản superuser PostgreSQL làm `DATABASE_URL` của ứng dụng.
 - Đặt runtime environment tại
-  `/Users/Shared/LumaPOS/secrets/runtime.env`, owner `lumapos_svc`, mode `600`.
+  `/Users/Shared/LumaPOS/secrets/runtime.env`, owner `_lumapos_svc`, mode `600`.
   Đây là file shell assignments đã được tin cậy, không phải `.env.local`; không
   ghi secrets vào plist hoặc log. Chỉ tiến trình launchd đọc file này.
 - Release không được chứa `.env`, `.env.local`, `.env.production` hoặc
@@ -21,7 +20,7 @@ credentials.
   đó mà không đọc nội dung.
 - Cài Bun và `cloudflared` tại đường dẫn trong plist mẫu hoặc sửa đường dẫn cho
   đúng máy. Tạo thư mục log trước khi nạp dịch vụ.
-- Cấp quyền `lumapos_svc` cho thư mục media và thư mục backup riêng. Chúng phải
+- Cấp quyền `_lumapos_svc` cho thư mục media và thư mục backup riêng. Chúng phải
   nằm ngoài app release và tách biệt nhau.
 
 ## Dịch vụ
@@ -44,7 +43,7 @@ Plist dùng cú pháp tunnel locally managed:
 [Cloudflare Tunnel run parameters](https://developers.cloudflare.com/tunnel/reference/run-parameters/).
 Thay UUID mẫu trong cả `cloudflared.yml` và plist bằng cùng tunnel UUID/name;
 hostname trong YAML mẫu đã đặt thành `pos.haidangshop.com`.
-Giữ file config và tunnel credentials ngoài repo, owner `lumapos_svc`, mode
+Giữ file config và tunnel credentials ngoài repo, owner `_lumapos_svc`, mode
 `600`; credential JSON không được đưa vào log hoặc plist.
 
 `com.lumapos.media-cleanup.plist.example` giữ lịch hiện tại 09:15 giờ địa

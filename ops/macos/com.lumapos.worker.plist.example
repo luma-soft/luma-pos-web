@@ -5,7 +5,7 @@
 	<key>Label</key>
 	<string>com.lumapos.sync</string>
 	<key>UserName</key>
-	<string>lumapos_svc</string>
+	<string>_lumapos_svc</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/bin/bash</string>
