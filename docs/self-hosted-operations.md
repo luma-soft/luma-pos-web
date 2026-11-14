@@ -109,7 +109,7 @@ chính. Các số liệu là ảnh chụp ngày 2026-11-13.
 **Trạng thái ngày 2026-11-14:** bản production đã build trong
 `/Users/Shared/LumaPOS/app`, nhưng Next.js và tunnel connector hiện đã dừng.
 `LUMAPOS_PRIMARY_DATABASE_CONFIRMED` vẫn `false`; app chưa nhận traffic nghiệp
-vụ. Kiểm tra loopback ngày 2026-11-13 cho thấy `/api/health/live` trả 200 và
+vụ. Kiểm tra loopback ngày 2026-11-14 cho thấy `/api/health/live` trả 200 và
 `/api/health/ready` trả 503 `not_ready` khi gate này còn khóa. pgAdmin 4 đã cài
 và profile `LumaPOS Mac - DBA` đã kết nối qua Unix socket local; profile không
 lưu mật khẩu và không được publish qua Tunnel. Credential role runtime được
@@ -328,7 +328,8 @@ database rỗng khác thành công; checksum archive khớp. Database nguồn v�
 restore có cùng 151 bảng public, 3 cửa hàng, 3 hồ sơ, 3.293 sản phẩm, 3.158 đơn,
 469 media object và 454 media ready local. Media archive khôi phục 1.056 file
 (152 MB). Archive rehearsal vẫn nằm trên cùng volume APFS với database/media;
-chưa có ổ backup riêng hoặc bản offsite, vì vậy đây chưa phải cổng backup go-live.
+kiểm tra ngày 2026-11-14 không thấy volume vật lý ngoài đang gắn và chưa có bản
+offsite, vì vậy đây chưa phải cổng backup go-live.
 
 Worker backup cần `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true`, Auth provider
 `lumapos`, media provider local, `pg_dump`, tar và khóa backup. Đây là điều kiện
