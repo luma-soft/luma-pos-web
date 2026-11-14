@@ -155,6 +155,12 @@ vụ. Kiểm tra loopback ngày 2026-11-14 cho thấy `/api/health/live` trả 2
 và profile `LumaPOS Mac - DBA` đã kết nối qua Unix socket local; profile không
 lưu mật khẩu và không được publish qua Tunnel. Credential role runtime được
 luân chuyển ngày 2026-11-14; giá trị chỉ nằm trong tệp cấu hình bảo vệ mode 600.
+Trên `lumapos_rehearsal_20261114_b`, script grant cấp quyền DML cho
+`lumapos_runtime`; kiểm tra xác nhận role không có quyền tạo database/schema và
+không sở hữu database/schema/object. Bản production được chạy tạm trên loopback
+cổng 3001 với Auth LumaPOS, media provider local, `DATABASE_URL` nhắm `_b` và
+primary gate vẫn `false`: `/api/health/live` trả 200, `/api/health/ready` trả
+503 `not_ready`. Tiến trình đã dừng, cổng 3001 đã đóng và Tunnel chưa được chạy.
 Chưa cài LaunchDaemon/service account cho backend và worker. Một lần khởi động
 tạm thời trên loopback với snapshot rehearsal mới giữ nguyên gate; route media API
 bị từ chối cho đến khi snapshot được xác nhận làm nguồn chính, rồi tiến trình
