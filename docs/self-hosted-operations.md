@@ -259,8 +259,12 @@ Health check:
   nếu các điều kiện khác đạt và trang quản trị hiện cảnh báo thiết bị cần
   Internet cùng domain nguồn còn hoạt động. Chính sách này không xác nhận
   quyền sử dụng hay cho phép tải/allowlist URL.
-- Trang `/admin` hiển thị quản lý tài khoản cùng trạng thái backend, workers,
-  hàng đợi sync, backup, provider lưu file và các blocker media cutover cho owner.
+- Trang `/admin` tách khu tài khoản và tab **Backend local** dành cho owner. Tab
+  này tự làm mới mỗi 30 giây, hiển thị uptime, heartbeat worker (cửa sổ 45 giây),
+  hàng đợi sync, trạng thái database/media/backup cùng từng blocker, và lịch sử
+  backup với thời điểm, dung lượng, checksum hoặc mã lỗi. Owner có thể xếp một
+  yêu cầu backup thủ công; UI không khởi động hay dừng tiến trình hệ điều hành,
+  việc đó vẫn do `launchd` quản lý trên Mac.
 
 ### File, URL và quyền truy cập
 

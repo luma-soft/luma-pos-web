@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { RefreshCw, ShieldCheck, UserPlus } from "lucide-react";
+import { RefreshCw, ServerCog, UserPlus, UsersRound } from "lucide-react";
 import { STAFF_ROLES, type Role } from "@/lib/auth/roles";
+import { AdminOperationsPanel } from "@/components/admin/admin-operations-panel";
 
 type Account = {
   id: string;
@@ -16,61 +17,17 @@ type Account = {
   activeSessions: number;
 };
 
-type Operations = {
-  backend: { status: string; uptimeSeconds: number };
-  readiness: {
-    status: string;
-    primaryDatabase: { status: string; confirmed: boolean };
-    missingPrimary: string[];
-    missingDatabasePrivileges: string[];
-    missingWorkers: string[];
-    backup: { status: string; destinationConfigured: boolean; lastSuccessfulAt: string | null; blockers: string[] };
-    missingBackup: string[];
-    missingMedia: string[];
-  };
-  database: { status: string; blockers: string[] };
-  media: { status: string; provider: "local" | "r2" | null; blockers: Record<string, boolean>; warnings: string[] };
-  sync: { worker: { status: string; lastSeenAt: string | null }; queue: Record<string, number> };
-  workers: {
-    notifications: { status: string; lastSeenAt: string | null };
-    backups: { status: string; lastSeenAt: string | null };
-  };
-  backups: Array<{
-    id: string;
-    status: string;
-    triggerType: string;
-    requestedAt: string;
-    startedAt: string | null;
-    finishedAt: string | null;
-    archiveKey: string | null;
-    archiveSizeBytes: number | null;
-    sha256: string | null;
-    failureCode: string | null;
-  }>;
-};
-
 async function readEnvelope<T>(response: Response): Promise<T> {
   const body = await response.json() as { ok?: boolean; data?: T };
   if (!response.ok || !body.ok || body.data === undefined) throw new Error("REQUEST_FAILED");
   return body.data;
 }
 
-function formatBytes(value: number | null) {
-  if (value === null) return "—";
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatDate(value: string | null) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
-
 export function AdminClient({ canManageOperations }: { canManageOperations: boolean }) {
   const t = useTranslations("admin");
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [operations, setOperations] = useState<Operations | null>(null);
+  const [section, setSection] = useState<"operations" | "accounts">(canManageOperations ? "operations" : "accounts");
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState(false);
@@ -80,19 +37,21 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
 
   const load = useCallback(async () => {
     setError(false);
+    setLoading(true);
     try {
       const accountResult = await fetch("/api/admin/accounts", { cache: "no-store" });
       setAccounts(await readEnvelope<Account[]>(accountResult));
-      if (canManageOperations) {
-        const operationsResult = await fetch("/api/admin/operations", { cache: "no-store" });
-        setOperations(await readEnvelope<Operations>(operationsResult));
-      }
     } catch {
       setError(true);
+    } finally {
+      setLoading(false);
     }
-  }, [canManageOperations]);
+  }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const initialLoad = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(initialLoad);
+  }, [load]);
 
   const mutate = async (path: string, method: string, body?: unknown) => {
     setBusy(true);
@@ -128,84 +87,35 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
   };
 
   const displayRole = (role: Role) => t(`roles.${role}`);
-  const displayStatus = (status: string) => {
-    const known = ["online", "offline", "ready", "not_ready", "not_required", "pending", "processing", "accepted", "rejected", "conflict", "queued", "running", "succeeded", "failed"] as const;
-    return t(`statuses.${known.includes(status as typeof known[number]) ? status : "offline"}` as "statuses.online");
-  };
-  const mediaBlockerLabels: Record<string, string> = {
-    externalMediaReview: t("mediaBlockers.externalMediaReview"),
-    supabaseManagedMedia: t("mediaBlockers.supabaseManagedMedia"),
-    legacyServiceAttachments: t("mediaBlockers.legacyServiceAttachments"),
-    legacyCustomerRequestAttachments: t("mediaBlockers.legacyCustomerRequestAttachments"),
-    pendingRemoteRequestCleanup: t("mediaBlockers.pendingRemoteRequestCleanup"),
-    legacyAiAttachments: t("mediaBlockers.legacyAiAttachments"),
-    nonLocalManagedMedia: t("mediaBlockers.nonLocalManagedMedia"),
-    unfinishedLocalMediaMigration: t("mediaBlockers.unfinishedLocalMediaMigration"),
-    localMediaConfiguration: t("mediaBlockers.localMediaConfiguration"),
-    localMediaRoot: t("mediaBlockers.localMediaRoot"),
-    externalMediaPolicyInvalid: t("mediaBlockers.externalMediaPolicyInvalid"),
-  };
-  const activeMediaBlockers = Object.entries(operations?.media.blockers ?? {})
-    .filter(([, blocked]) => blocked)
-    .map(([key]) => mediaBlockerLabels[key] ?? t("mediaBlockers.unknown"));
-  const mediaWarningLabels: Record<string, string> = {
-    externalMediaPreservedUntilReview: t("mediaWarnings.externalMediaPreservedUntilReview"),
-  };
-  const activeMediaWarnings = (operations?.media.warnings ?? [])
-    .map((warning) => mediaWarningLabels[warning] ?? t("mediaWarnings.unknown"));
-  const backupBlockerLabels: Record<string, string> = {
-    sourceConfirmation: t("backupBlockers.sourceConfirmation"),
-    providerConfiguration: t("backupBlockers.providerConfiguration"),
-    driveConfiguration: t("backupBlockers.driveConfiguration"),
-    rcloneConfiguration: t("backupBlockers.rcloneConfiguration"),
-    rcloneConfigurationUnavailable: t("backupBlockers.rcloneConfigurationUnavailable"),
-    rcloneUnavailable: t("backupBlockers.rcloneUnavailable"),
-    stagingRootConfiguration: t("backupBlockers.stagingRootConfiguration"),
-    stagingRootUnavailable: t("backupBlockers.stagingRootUnavailable"),
-    stagingRootNotPrivate: t("backupBlockers.stagingRootNotPrivate"),
-    stagingRootInsideApplication: t("backupBlockers.stagingRootInsideApplication"),
-    stagingRootInsideMedia: t("backupBlockers.stagingRootInsideMedia"),
-    driveUnavailable: t("backupBlockers.driveUnavailable"),
-    recentGoogleDriveBackup: t("backupBlockers.recentGoogleDriveBackup"),
-  };
-  const activeBackupBlockers = (operations?.readiness.backup.blockers ?? [])
-    .map((blocker) => backupBlockerLabels[blocker] ?? t("backupBlockers.unknown"));
-  const primaryBlockerLabels: Record<string, string> = {
-    notConfirmed: t("primaryDatabaseBlockers.notConfirmed"),
-  };
-  const activePrimaryBlockers = (operations?.readiness.missingPrimary ?? [])
-    .map((blocker) => primaryBlockerLabels[blocker] ?? t("primaryDatabaseBlockers.unknown"));
-  const databaseBlockerLabels: Record<string, string> = {
-    superuser: t("databaseBlockers.superuser"),
-    createDatabase: t("databaseBlockers.createDatabase"),
-    createRoles: t("databaseBlockers.createRoles"),
-    replication: t("databaseBlockers.replication"),
-    bypassRls: t("databaseBlockers.bypassRls"),
-    databaseCreate: t("databaseBlockers.databaseCreate"),
-    publicSchemaCreate: t("databaseBlockers.publicSchemaCreate"),
-    ownsDatabase: t("databaseBlockers.ownsDatabase"),
-    ownsPublicSchema: t("databaseBlockers.ownsPublicSchema"),
-    ownsPublicObjects: t("databaseBlockers.ownsPublicObjects"),
-  };
-  const activeDatabaseBlockers = (operations?.database.blockers ?? [])
-    .map((key) => databaseBlockerLabels[key] ?? t("databaseBlockers.unknown"));
-
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto max-w-6xl space-y-6 p-4 pb-8 sm:p-6">
       <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{t("title")}</h1>
           <p className="mt-1 text-sm text-slate-500">{t("subtitle")}</p>
         </div>
-        <button type="button" onClick={() => void load()} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
-          <RefreshCw className="h-4 w-4" />{t("refresh")}
-        </button>
+        {section === "accounts" && <button type="button" onClick={() => void load()} disabled={busy || loading} className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium transition hover:bg-surface-2 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50">
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />{t("refresh")}
+        </button>}
       </header>
 
-      {error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{t("genericError")}</p>}
-      {notice && <p role="status" className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">{notice}</p>}
+      {canManageOperations && (
+        <nav aria-label={t("adminSections")} className="flex w-fit max-w-full items-center gap-1 rounded-xl border border-border bg-surface p-1">
+          {([
+            { id: "operations" as const, label: t("backendLocalTitle"), Icon: ServerCog },
+            { id: "accounts" as const, label: t("accounts"), Icon: UsersRound },
+          ]).map(({ id, label, Icon }) => (
+            <button key={id} type="button" aria-pressed={section === id} onClick={() => setSection(id)} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${section === id ? "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300" : "text-slate-500 hover:bg-surface-2 hover:text-slate-900 dark:hover:text-slate-100"}`}>
+              <Icon className="h-4 w-4" />{label}
+            </button>
+          ))}
+        </nav>
+      )}
 
-      <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+      {section === "accounts" && error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{t("genericError")}</p>}
+      {section === "accounts" && notice && <p role="status" className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">{notice}</p>}
+
+      {section === "accounts" ? <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
         <div className="mb-4 flex items-center gap-2">
           <UserPlus className="h-5 w-5 text-primary-600" />
           <h2 className="text-lg font-semibold">{t("accounts")}</h2>
@@ -245,7 +155,7 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
         </form>
 
         <div className="mt-4 divide-y divide-border">
-          {accounts.length === 0 ? <p className="py-5 text-sm text-slate-500">{t("emptyAccounts")}</p> : accounts.map((account) => (
+          {loading ? <div className="space-y-3 py-5" aria-label={t("loading")}><div className="h-4 w-1/3 animate-pulse rounded bg-surface-2" /><div className="h-4 w-2/3 animate-pulse rounded bg-surface-2" /></div> : accounts.length === 0 ? <p className="py-5 text-sm text-slate-500">{t("emptyAccounts")}</p> : accounts.map((account) => (
             <article key={account.id} className="grid gap-3 py-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -298,110 +208,7 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
             </article>
           ))}
         </div>
-      </section>
-
-      {canManageOperations && (
-        <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-primary-600" />
-            <h2 className="text-lg font-semibold">{t("operations")}</h2>
-          </div>
-          {!operations ? <p className="text-sm text-slate-500">{t("loading")}</p> : (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {[
-                  [t("backend"), operations.backend.status],
-                  [t("readiness"), operations.readiness.status],
-                  [t("database"), operations.database.status],
-                  [t("primaryDatabase"), operations.readiness.primaryDatabase.status],
-                  [t("syncWorker"), operations.sync.worker.status],
-                  [t("notificationWorker"), operations.workers.notifications.status],
-                  [t("backupWorker"), operations.workers.backups.status],
-                  [t("backupStorage"), operations.readiness.backup.status],
-                  [t("mediaStorage"), operations.media.status],
-                ].map(([label, status]) => (
-                  <div key={label} className="rounded-xl bg-surface-2 p-4">
-                    <p className="text-xs text-slate-500">{label}</p>
-                    <p className="mt-1 font-semibold">{displayStatus(status)}</p>
-                  </div>
-                ))}
-                <div className="rounded-xl bg-surface-2 p-4">
-                  <p className="text-xs text-slate-500">{t("queue")}</p>
-                  <p className="mt-1 font-semibold">{Object.entries(operations.sync.queue).map(([status, count]) => `${displayStatus(status)}: ${count}`).join(" · ") || "0"}</p>
-                </div>
-                <div className="rounded-xl bg-surface-2 p-4">
-                  <p className="text-xs text-slate-500">{t("mediaProvider")}</p>
-                  <p className="mt-1 font-semibold">
-                    {operations.media.provider === "local"
-                      ? t("mediaProviders.local")
-                      : operations.media.provider === "r2"
-                        ? t("mediaProviders.r2")
-                        : "—"}
-                  </p>
-                </div>
-              </div>
-              {activeDatabaseBlockers.length > 0 && (
-                <div role="status" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                  <p className="font-semibold">{t("databaseRoleNotReady")}</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    {activeDatabaseBlockers.map((label) => <li key={label}>{label}</li>)}
-                  </ul>
-                </div>
-              )}
-              {activePrimaryBlockers.length > 0 && (
-                <div role="status" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                  <p className="font-semibold">{t("mediaCutoverPending")}</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    {activePrimaryBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
-                  </ul>
-                </div>
-              )}
-              {activeMediaBlockers.length > 0 && (
-                <div role="status" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                  <p className="font-semibold">{t("mediaCutoverPending")}</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    {activeMediaBlockers.map((label) => <li key={label}>{label}</li>)}
-                  </ul>
-                </div>
-              )}
-              {activeMediaWarnings.length > 0 && (
-                <div role="note" className="mt-4 rounded-xl border border-sky-300 bg-sky-50 p-4 text-sm text-sky-950 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100">
-                  <p className="font-semibold">{t("mediaWarnings.title")}</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    {activeMediaWarnings.map((warning) => <li key={warning}>{warning}</li>)}
-                  </ul>
-                </div>
-              )}
-              {activeBackupBlockers.length > 0 && (
-                <div role="status" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                  <p className="font-semibold">{t("mediaCutoverPending")}</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    {activeBackupBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
-                  </ul>
-                </div>
-              )}
-              <div className="mt-5 flex items-center justify-between gap-3">
-                <h3 className="font-semibold">{t("backup")}</h3>
-                <button type="button" disabled={busy} onClick={() => void mutate("/api/admin/operations", "POST")} className="h-9 rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white disabled:opacity-50">
-                  {t("requestBackup")}
-                </button>
-              </div>
-              <div className="mt-3 divide-y divide-border">
-                {(operations.backups ?? []).map((backup) => (
-                  <div key={backup.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                    <div className="min-w-0">
-                      <div><span className="font-medium">{displayStatus(backup.status)}</span><span className="ml-2 text-slate-500">{formatDate(backup.requestedAt)}</span></div>
-                      {backup.archiveKey && <code className="mt-1 block break-all text-xs text-slate-500">{backup.archiveKey}</code>}
-                      {backup.sha256 && <code className="mt-1 block break-all text-xs text-slate-500">SHA-256: {backup.sha256}</code>}
-                    </div>
-                    <span className="text-slate-500">{formatBytes(backup.archiveSizeBytes)}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </section>
-      )}
+      </section> : <AdminOperationsPanel />}
     </div>
   );
 }
