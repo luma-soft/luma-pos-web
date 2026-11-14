@@ -52,9 +52,10 @@ flowchart LR
    `127.0.0.1:5432`/localhost. Các script hiện có là
    [`scripts/setup-local-postgres-macos.sh`](../scripts/setup-local-postgres-macos.sh)
    và [`scripts/migrate-local-postgres-macos.sh`](../scripts/migrate-local-postgres-macos.sh).
-2. Trong pgAdmin 4 Desktop, đăng ký server với host `127.0.0.1`, port `5432`,
-   maintenance database `lumapos_local` và tài khoản quản trị DB riêng.
-   pgAdmin không chạy trong Next.js và không được xuất bản qua tunnel.
+2. Trong pgAdmin 4 Desktop, đăng ký server local. Profile Mac hiện dùng host
+   `/tmp` (Unix socket), port `5432`, maintenance database `postgres` và tài khoản
+   DBA local; tùy chọn lưu mật khẩu đang tắt. pgAdmin không chạy trong Next.js
+   và không được xuất bản qua tunnel.
 3. Tạo role đăng nhập `lumapos_runtime` trong pgAdmin: bật Login, Bypass RLS;
    tắt Superuser, Create roles, Create databases và Replication. Đặt mật khẩu
    mạnh riêng cho role này. Chọn target database rồi chạy
@@ -91,6 +92,17 @@ R2. Ba hồ sơ có ba Auth credentials khớp, không có tài khoản cần re
 thái sync receipt hai bên đều rỗng và khớp. Đây vẫn là rehearsal, chưa được tuyên
 bố làm nguồn dữ liệu chính.
 
+Ngày 2026-11-14, một snapshot rehearsal mới được nhập riêng vào
+`lumapos_rehearsal_20261114_a`; không sửa `lumapos_local` hay ghi vào Supabase.
+Target có 178 migration, trong khi nguồn có 177; migration bổ sung duy nhất là
+`0166_media_migration_library_assets.sql`. Đối soát chỉ đọc trên 140 bảng không
+thấy bảng/cột thiếu, lệch row count, checksum dữ liệu hay tổng hợp tài chính.
+Snapshot có 3 cửa hàng, 3 hồ sơ, 3 Auth credentials, 3.293 sản phẩm, 3.158 đơn,
+không có sync receipt và không có tài khoản cần reset. Hai timestamp
+`email_verified_at` lệch dưới một millisecond; các trường Auth còn lại khớp.
+Đây vẫn là snapshot rehearsal trong lúc nguồn tiếp tục hoạt động, chưa phải
+snapshot cuối hoặc nguồn dữ liệu chính.
+
 Preview media trên rehearsal phát hiện 2.476 tham chiếu: 454 owned theo host và
 bucket allowlist hiện tại, 2.022 `external_url` ngoài allowlist Supabase hiện tại;
 cần rà soát domain trước cutover, không tải hoặc viết lại nhóm này. Trong 469
@@ -104,6 +116,15 @@ riêng dùng cho backup rehearsal đã cutover media local. Các bước này kh
 Supabase Cloud, không xóa object R2 và không xác nhận snapshot cuối là nguồn
 chính. Các số liệu là ảnh chụp ngày 2026-11-13.
 
+Với snapshot ngày 2026-11-14, media run
+`a7d538f1-254c-4500-8da2-995ddb52d9a7` đã copy và verify SHA-256 đủ 454 object
+managed vào thư mục media local. Inventory ghi nhận 1.349 mục `skipped`; 2.022
+URL ngoài allowlist vẫn không bị tải hoặc viết lại. Thử cutover chỉ trong
+database rehearsal rồi rollback ngay sau khi backend gate chặn API vì snapshot
+chưa được tuyên bố authoritative. Candidate hiện giữ provider R2 cho 469 rows;
+454 object đã verify vẫn còn local, 15 object deleted không được tải. Không xóa
+source R2.
+
 ### Next.js và workers
 
 **Trạng thái ngày 2026-11-14:** bản production đã build trong
@@ -114,7 +135,10 @@ vụ. Kiểm tra loopback ngày 2026-11-14 cho thấy `/api/health/live` trả 2
 và profile `LumaPOS Mac - DBA` đã kết nối qua Unix socket local; profile không
 lưu mật khẩu và không được publish qua Tunnel. Credential role runtime được
 luân chuyển ngày 2026-11-14; giá trị chỉ nằm trong tệp cấu hình bảo vệ mode 600.
-Chưa cài LaunchDaemon/service account cho backend và worker.
+Chưa cài LaunchDaemon/service account cho backend và worker. Một lần khởi động
+tạm thời trên loopback với snapshot rehearsal mới giữ nguyên gate; route media API
+bị từ chối cho đến khi snapshot được xác nhận làm nguồn chính, rồi tiến trình
+được dừng. Tunnel connector vẫn dừng.
 
 Chạy ứng dụng tự host trên loopback bằng `bun run start:self-hosted`. Dùng
 LaunchDaemon với service account để tự khởi động cùng máy và phục hồi khi tiến

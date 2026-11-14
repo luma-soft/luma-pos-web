@@ -127,6 +127,17 @@ no object failed or was quarantined. The clone still stores provider `r2`, so
 this stage did not change business media references. The 2,022 external URLs
 remain unchanged and were not downloaded.
 
+**Fresh target rehearsal (2026-11-14):** snapshot
+`lumapos_rehearsal_20261114_a` used media run
+`a7d538f1-254c-4500-8da2-995ddb52d9a7`. Copy and SHA-256 verification succeeded
+for 454 managed objects (including available thumbnails); the inventory kept
+1,349 non-copy items skipped and did not fetch or rewrite any of the 2,022
+external URLs. A rehearsal-only cutover was rolled back after the Next.js
+runtime gate correctly blocked the local media route while the snapshot was not
+authoritative. The database is back to 469 R2 provider rows; the verified local
+files remain staged and no R2 source object was deleted. This confirms media
+copy/verify and rollback mechanics, not end-to-end HTTP or production readiness.
+
 A separate backup rehearsal clone used the verified media to exercise media
 cutover, encrypted backup, and restore into an empty database/media root. Restore
 completed with matching archive checksum and all 1,056 local files. This does
