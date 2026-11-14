@@ -16,7 +16,7 @@ import {
   createMigrationPostgresClient,
   readMigrationDatabaseUrl,
 } from "@/db/migration-runner";
-import { assertSelfHostedPrimaryDatabase } from "@/db/self-hosted-primary";
+import { assertSelfHostedDatabaseEndpoint } from "@/db/self-hosted-primary";
 import { postgresUtilityMajorVersion, resolvePostgresUtility } from "./postgres-tools";
 
 const WORKER_LOCK_KEY = 1_280_657_220;
@@ -32,10 +32,10 @@ const pgDumpPath = resolvePostgresUtility("pg_dump");
 if (process.env.LUMAPOS_AUTH_PROVIDER !== "lumapos") {
   throw new Error("The database backup worker requires LUMAPOS_AUTH_PROVIDER=lumapos");
 }
-if (process.env.LUMAPOS_PRIMARY_DATABASE_CONFIRMED !== "true") {
-  throw new Error("Backups are disabled until the PostgreSQL snapshot is reconciled and declared authoritative");
+if (process.env.LUMAPOS_BACKUP_SOURCE_CONFIRMED !== "true") {
+  throw new Error("Backups are disabled until the operator confirms the selected self-hosted snapshot source");
 }
-assertSelfHostedPrimaryDatabase(process.env);
+assertSelfHostedDatabaseEndpoint(process.env);
 if (process.env.MEDIA_WRITE_PROVIDER !== "local") {
   throw new Error("The self-hosted backup worker requires MEDIA_WRITE_PROVIDER=local");
 }

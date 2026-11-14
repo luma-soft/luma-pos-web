@@ -257,6 +257,11 @@
       "ownsPublicObjects": "The runtime account must not own tables, functions, or objects in public.",
       "unknown": "The runtime account does not meet a database privilege requirement."
     },
+    "primaryDatabase": "Primary data source",
+    "primaryDatabaseBlockers": {
+      "notConfirmed": "The PostgreSQL snapshot has not been declared authoritative yet.",
+      "unknown": "The primary data source has not passed its cutover gate."
+    },
     "mediaStorage": "File storage",
     "mediaProvider": "Media provider",
     "mediaProviders": {
@@ -288,6 +293,7 @@
     "backupWorker": "Backup worker",
     "backupStorage": "Off-site backup",
     "backupBlockers": {
+      "sourceConfirmation": "The operator has not confirmed which self-hosted snapshot the backup worker will read.",
       "r2Configuration": "The dedicated R2 backup bucket credentials are missing or invalid.",
       "recentRemoteBackup": "No verified R2 backup has completed in the last 26 hours.",
       "unknown": "An off-site backup requirement is still unmet."

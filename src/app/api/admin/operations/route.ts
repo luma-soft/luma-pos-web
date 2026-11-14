@@ -46,6 +46,8 @@ export async function GET() {
         backend: { status: "online", uptimeSeconds: Math.floor(process.uptime()) },
         readiness: {
           status: readiness.status,
+          primaryDatabase: readiness.primaryDatabase,
+          missingPrimary: readiness.missingPrimary,
           missingDatabasePrivileges: readiness.missingDatabasePrivileges,
           missingWorkers: readiness.missingWorkers,
           backup: readiness.backup,

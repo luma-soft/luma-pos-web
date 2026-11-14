@@ -20,6 +20,10 @@ const externalMediaPolicies: readonly ExternalMediaPolicy[] = [
 export type SelfHostedReadiness = {
   status: "ready" | "not_ready";
   database: "ready" | "not_ready";
+  primaryDatabase: {
+    status: "ready" | "not_ready" | "not_required";
+    confirmed: boolean;
+  };
   missingDatabasePrivileges: string[];
   workers: Partial<Record<WorkerKey, WorkerStatus>>;
   backup: {
@@ -35,6 +39,7 @@ export type SelfHostedReadiness = {
     warnings: string[];
   };
   missingWorkers: WorkerKey[];
+  missingPrimary: string[];
   missingBackup: string[];
   missingMedia: string[];
 };
@@ -74,6 +79,7 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     return {
       status: "ready",
       database: "ready",
+      primaryDatabase: { status: "not_required", confirmed: false },
       missingDatabasePrivileges: [],
       workers: {},
       backup: {
@@ -84,12 +90,16 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
       },
       media: { status: "not_required", provider: null, blockers: {}, warnings: [] },
       missingWorkers: [],
+      missingPrimary: [],
       missingBackup: [],
       missingMedia: [],
     };
   }
 
   const mediaWriteProvider = getMediaWriteProvider();
+  const primaryDatabaseConfirmed = process.env.LUMAPOS_PRIMARY_DATABASE_CONFIRMED === "true";
+  const missingPrimary = primaryDatabaseConfirmed ? [] : ["notConfirmed"];
+  const backupSourceConfirmed = process.env.LUMAPOS_BACKUP_SOURCE_CONFIRMED === "true";
   const configuredExternalMediaPolicy = process.env.LUMAPOS_EXTERNAL_MEDIA_POLICY?.trim()
     || "block_until_review";
   const externalMediaPolicyValid = externalMediaPolicies.includes(
@@ -245,6 +255,7 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
       ? new Date(lastSuccessfulBackupAt).toISOString()
       : null;
   const missingBackup = [
+    ...(backupSourceConfirmed ? [] : ["sourceConfirmation"]),
     ...(backupDestinationConfigured ? [] : ["r2Configuration"]),
     ...(recentRemoteBackupAt ? [] : ["recentRemoteBackup"]),
   ];
@@ -276,10 +287,15 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
 
   return {
     status: missingDatabasePrivileges.length === 0
+      && missingPrimary.length === 0
       && missingWorkers.length === 0
       && missingBackup.length === 0
       && missingMedia.length === 0 ? "ready" : "not_ready",
     database: missingDatabasePrivileges.length === 0 ? "ready" : "not_ready",
+    primaryDatabase: {
+      status: primaryDatabaseConfirmed ? "ready" : "not_ready",
+      confirmed: primaryDatabaseConfirmed,
+    },
     missingDatabasePrivileges,
     workers,
     backup: {
@@ -295,6 +311,7 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
       warnings: mediaWarnings,
     },
     missingWorkers,
+    missingPrimary,
     missingBackup,
     missingMedia,
   };

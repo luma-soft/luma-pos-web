@@ -186,9 +186,13 @@ Health check:
 - `/api/health/live` xác nhận tiến trình Next.js.
 - `/api/health/ready` kiểm tra PostgreSQL, quyền runtime role và heartbeat mới
   hơn 45 giây của sync, notification, backup worker. Khi Auth provider là
-  `lumapos`, route trả 503 nếu role còn quyền superuser/DDL/replication, sở hữu
-  database/schema/object, thiếu `BYPASSRLS`, worker bắt buộc hoặc cổng media
-  cutover chưa sẵn sàng. Với media local, route còn kiểm tra cấu hình hợp lệ và
+  `lumapos`, route trả 503 với blocker nguồn dữ liệu cụ thể nếu database chưa
+  được xác nhận là primary. Sau đó route trả 503 nếu role còn
+  quyền superuser/DDL/replication, sở hữu database/schema/object, thiếu
+  `BYPASSRLS`, worker bắt buộc, backup R2 hợp lệ/mới trong 26 giờ hoặc cổng
+  media cutover chưa sẵn sàng. Backup worker có gate riêng xác nhận đúng snapshot
+  nguồn để có thể tạo và xác minh bản backup cuối trước khi bật primary. Với
+  media local, route còn kiểm tra cấu hình hợp lệ và
   thư mục root tồn tại, là thư mục, có quyền đọc/ghi/truy cập cho service
   account; kiểm tra này chỉ dùng `stat`/`access`, không tạo file. Ở runtime
   legacy, chỉ yêu cầu PostgreSQL. Với media local, route chặn khi còn managed
@@ -266,6 +270,7 @@ khi final snapshot được xác nhận:
 | `MIGRATION_DATABASE_URL` | Chỉ truyền cho tiến trình migration/restore; kết nối trực tiếp bằng DBA/migration owner | Chỉ truyền cho tiến trình migration/restore qua secret operator riêng |
 | `LUMAPOS_AUTH_PROVIDER` | `lumapos` | Giữ nguyên |
 | `LUMAPOS_PRIMARY_DATABASE_CONFIRMED` | `true` sau đối soát | Giữ nguyên |
+| `LUMAPOS_BACKUP_SOURCE_CONFIRMED` | `true` riêng sau khi `DATABASE_URL` trỏ đúng snapshot cần backup | Giữ nguyên |
 | `LUMAPOS_SYNC_INBOX_ENABLED` | `true` sau rehearsal sync POS | Giữ nguyên |
 | `LUMAPOS_SERVICE_FIELD_SYNC_ENABLED` | `true` chỉ khi slice service đã đạt gate | Giữ nguyên |
 | `NOTIFICATION_QUEUE_PROVIDER` | `database` | Giữ nguyên |
@@ -375,10 +380,17 @@ restore có cùng 151 bảng public, 3 cửa hàng, 3 hồ sơ, 3.293 sản ph�
 kiểm tra ngày 2026-11-14 không thấy volume vật lý ngoài đang gắn và chưa có bản
 offsite, vì vậy đây chưa phải cổng backup go-live.
 
-Worker backup cần `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true`, Auth provider
-`lumapos`, media provider local, `pg_dump`, tar, khóa mã hóa và token R2 riêng.
-Đây là điều kiện để worker không tạo snapshot nhầm từ Supabase hoặc bỏ sót media
-chưa local.
+Worker backup cần `LUMAPOS_BACKUP_SOURCE_CONFIRMED=true`, Auth provider
+`lumapos`, endpoint PostgreSQL không phải Supabase, media provider local,
+`pg_dump`, tar, khóa mã hóa và token R2 riêng. Gate source này tách khỏi cờ
+primary: operator có thể backup và kiểm tra archive của final snapshot trong khi
+backend vẫn khóa ghi. Chỉ xác nhận source sau khi kiểm tra `DATABASE_URL` và
+`MEDIA_LOCAL_ROOT` cùng thuộc final target; worker không ghi bảng nghiệp vụ. Vì
+database gate vẫn khóa API ứng dụng, tạo archive cutover ban đầu bằng
+`bun run db:backup:worker -- --scheduled --once` trong service wrapper để worker
+tạo khóa lịch ngày, thực hiện một backup rồi thoát. Target final mới không có
+lịch sử `database_backup_runs` từ nguồn; xác minh worker báo thành công và object
+R2 đọc lại khớp checksum trước khi bật primary.
 
 ## Data rehearsal, cutover và rollback
 
@@ -422,13 +434,18 @@ chỉ nhận bản rehearsal và chưa được mở cho người dùng.
    aggregates, Auth reset count, sync receipts, media references và checksums.
    Giữ nguyên các database snapshot cũ để rollback và điều tra; không ghi đè
    database đã có dữ liệu.
-4. Tạo encrypted backup của target. Đặt target env sang
-   `LUMAPOS_AUTH_PROVIDER=lumapos`, `NOTIFICATION_QUEUE_PROVIDER=database`,
-   `MEDIA_WRITE_PROVIDER=local` và `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true`.
-   Bật `LUMAPOS_SYNC_INBOX_ENABLED=true` cho POS sync; chỉ bật
-   `LUMAPOS_SERVICE_FIELD_SYNC_ENABLED=true` nếu slice service đã vượt
-   rehearsal. Khởi động backend/workers, xác nhận `/api/health/ready`, login,
-   upload/download private file, sync và webhook.
+4. Đặt target env sang `LUMAPOS_AUTH_PROVIDER=lumapos`,
+   `NOTIFICATION_QUEUE_PROVIDER=database`, `MEDIA_WRITE_PROVIDER=local`, giữ
+   `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=false`, và chỉ đặt
+   `LUMAPOS_BACKUP_SOURCE_CONFIRMED=true` sau khi kiểm tra `DATABASE_URL` cùng
+   `MEDIA_LOCAL_ROOT` trỏ đúng final target. Khởi động riêng backup worker, tạo
+   archive mã hóa, tải lên R2 và xác minh nội dung/checksum từ object thực tế.
+   Chỉ sau khi backup thành công mới bật `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true`;
+   bật `LUMAPOS_SYNC_INBOX_ENABLED=true` cho POS sync và chỉ bật
+   `LUMAPOS_SERVICE_FIELD_SYNC_ENABLED=true` nếu slice service đã vượt rehearsal.
+   Khởi động backend cùng workers còn lại, xác nhận `/api/health/ready`, login,
+   upload/download private file, sync và webhook. Giữ Tunnel đóng đến khi readiness
+   trả 200.
 5. Chuyển hostname Cloudflare Tunnel tới Next.js Mac, mở traffic, kiểm tra phiên
    browser và iPhone, theo dõi pending queue, rejected/conflict, health, disk,
    worker và backup. Không bật lại Vercel Cron hoặc ghi business vào Supabase.

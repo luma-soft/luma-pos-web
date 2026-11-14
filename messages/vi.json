@@ -257,6 +257,11 @@
       "ownsPublicObjects": "Tài khoản runtime không được sở hữu table, function hoặc object trong public.",
       "unknown": "Quyền tài khoản runtime chưa đáp ứng yêu cầu."
     },
+    "primaryDatabase": "Nguồn dữ liệu chính",
+    "primaryDatabaseBlockers": {
+      "notConfirmed": "Snapshot PostgreSQL chưa được xác nhận là nguồn dữ liệu chính.",
+      "unknown": "Nguồn dữ liệu chính chưa đạt điều kiện cutover."
+    },
     "mediaStorage": "Kho file",
     "mediaProvider": "Provider lưu file",
     "mediaProviders": {
@@ -288,6 +293,7 @@
     "backupWorker": "Worker sao lưu",
     "backupStorage": "Bản sao lưu ngoài máy",
     "backupBlockers": {
+      "sourceConfirmation": "Chưa xác nhận snapshot self-hosted mà worker backup sẽ đọc.",
       "r2Configuration": "Thiếu hoặc sai cấu hình token cho bucket backup R2 riêng.",
       "recentRemoteBackup": "Chưa có backup R2 được xác minh trong 26 giờ gần nhất.",
       "unknown": "Còn điều kiện backup ngoài máy chưa đạt."

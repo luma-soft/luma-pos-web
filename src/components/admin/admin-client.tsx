@@ -20,6 +20,8 @@ type Operations = {
   backend: { status: string; uptimeSeconds: number };
   readiness: {
     status: string;
+    primaryDatabase: { status: string; confirmed: boolean };
+    missingPrimary: string[];
     missingDatabasePrivileges: string[];
     missingWorkers: string[];
     backup: { status: string; destinationConfigured: boolean; lastSuccessfulAt: string | null; blockers: string[] };
@@ -152,11 +154,17 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
   const activeMediaWarnings = (operations?.media.warnings ?? [])
     .map((warning) => mediaWarningLabels[warning] ?? t("mediaWarnings.unknown"));
   const backupBlockerLabels: Record<string, string> = {
+    sourceConfirmation: t("backupBlockers.sourceConfirmation"),
     r2Configuration: t("backupBlockers.r2Configuration"),
     recentRemoteBackup: t("backupBlockers.recentRemoteBackup"),
   };
   const activeBackupBlockers = (operations?.readiness.backup.blockers ?? [])
     .map((blocker) => backupBlockerLabels[blocker] ?? t("backupBlockers.unknown"));
+  const primaryBlockerLabels: Record<string, string> = {
+    notConfirmed: t("primaryDatabaseBlockers.notConfirmed"),
+  };
+  const activePrimaryBlockers = (operations?.readiness.missingPrimary ?? [])
+    .map((blocker) => primaryBlockerLabels[blocker] ?? t("primaryDatabaseBlockers.unknown"));
   const databaseBlockerLabels: Record<string, string> = {
     superuser: t("databaseBlockers.superuser"),
     createDatabase: t("databaseBlockers.createDatabase"),
@@ -295,6 +303,7 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
                   [t("backend"), operations.backend.status],
                   [t("readiness"), operations.readiness.status],
                   [t("database"), operations.database.status],
+                  [t("primaryDatabase"), operations.readiness.primaryDatabase.status],
                   [t("syncWorker"), operations.sync.worker.status],
                   [t("notificationWorker"), operations.workers.notifications.status],
                   [t("backupWorker"), operations.workers.backups.status],
@@ -326,6 +335,14 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
                   <p className="font-semibold">{t("databaseRoleNotReady")}</p>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
                     {activeDatabaseBlockers.map((label) => <li key={label}>{label}</li>)}
+                  </ul>
+                </div>
+              )}
+              {activePrimaryBlockers.length > 0 && (
+                <div role="status" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                  <p className="font-semibold">{t("mediaCutoverPending")}</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {activePrimaryBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
                   </ul>
                 </div>
               )}
