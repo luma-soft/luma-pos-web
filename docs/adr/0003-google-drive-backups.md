@@ -25,11 +25,12 @@ Mac and later on a VPS without changing PostgreSQL schema or backend behavior.
    and retain the archive SHA-256 in PostgreSQL/admin status. Restore downloads
    to private staging and verifies SHA-256, AES-GCM authentication, and each
    manifest file before changing an empty database/media target.
-4. Use OAuth for a dedicated Google user account with a dedicated OAuth client
-   and the narrow `drive.file` scope where supported. The app creates and owns
-   the backup folder/files. Do not use a Google service account with personal
-   Gmail storage; service accounts need an eligible Workspace Shared Drive or
-   user impersonation.
+4. Use OAuth for the Google account selected by the product owner with a
+   dedicated OAuth client and the narrow `drive.file` scope where supported.
+   The app creates and owns the backup folder/files. The initial Mac setup uses
+   the account already signed in to Chrome; it is not a backup-only account.
+   Do not use a Google service account with personal Gmail storage; service
+   accounts need an eligible Workspace Shared Drive or user impersonation.
 5. Store the OAuth config under the service account with mode `0600`. Keep the
    AES encryption key outside Drive and outside the archive. Never expose a
    public Drive link or include credentials in the database backup.
@@ -62,8 +63,9 @@ Mac and later on a VPS without changing PostgreSQL schema or backend behavior.
 
 ## Go-live gates
 
-- Configure a dedicated OAuth client/account and protected rclone config on the
-  Mac; confirm remote folder access without printing credentials.
+- [x] Configure the selected OAuth account, dedicated OAuth client, and
+  protected rclone config on the Mac; verify access to `Backups/LumaPOS` without
+  printing credentials.
 - Upload a new encrypted rehearsal archive, verify remote size/hash, download it,
   restore it to empty database/media targets, and reconcile the restored data.
 - Confirm account quota and agree a retention process before enabling the

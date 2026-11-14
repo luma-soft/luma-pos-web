@@ -338,12 +338,14 @@ media thay vì âm thầm ghi sang R2 theo mặc định legacy.
 
 ### Google Drive backup
 
-- Cài rclone trên Mac/VPS và tạo OAuth remote bằng một Google account chuyên
-  backup. Tạo OAuth client riêng trong Google Cloud Console; không dựa vào client
-  dùng chung của rclone vì tài liệu rclone hiện cảnh báo client đó bị retirement
-  trong năm 2026. Dùng scope `drive.file` và để rclone tạo thư mục backup; scope
-  này giới hạn app vào file/thư mục do chính app tạo. Không bật link chia sẻ công
-  khai. Tài liệu: [rclone Google Drive](https://rclone.org/drive/) và
+- Cài rclone trên Mac/VPS và tạo OAuth remote bằng Google account do chủ sản
+  phẩm chọn. Mac hiện dùng account đã đăng nhập trong Chrome; đây không phải
+  account chỉ dành cho backup. Tạo OAuth client riêng trong Google Cloud
+  Console; không dựa vào client dùng chung của rclone vì tài liệu rclone hiện
+  cảnh báo client đó bị retirement trong năm 2026. Dùng scope `drive.file` và
+  để rclone tạo thư mục backup; scope này giới hạn app vào file/thư mục do chính
+  app tạo. Không bật link chia sẻ công khai. Tài liệu:
+  [rclone Google Drive](https://rclone.org/drive/) và
   [Google Drive OAuth scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth).
 - Với Gmail cá nhân, dùng OAuth user flow. Service account không có quota Drive
   và không thể sở hữu file; chỉ dùng service account khi đã có Google Workspace
