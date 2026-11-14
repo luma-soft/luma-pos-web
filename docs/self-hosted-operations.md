@@ -183,11 +183,15 @@ Homebrew; remote OAuth `lumapos` đã được cấu hình bằng OAuth client r
 scope `drive.file`, account đang đăng nhập trong Chrome. Helper xác nhận thư mục
 `Backups/LumaPOS` truy cập được. Config nằm tại
 `/Users/Shared/LumaPOS/secrets/rclone.conf`, owner `_lumapos_svc`, mode `0600`.
-Chưa upload archive hoặc diễn tập download/restore từ Drive. Archive rehearsal
-cũ trong `/Users/Shared/LumaPOS/backups` vẫn chỉ là bản cục bộ trên cùng volume
-APFS, không phải backup production. `backup-staging` chưa tồn tại và worker
-chưa được cài/nạp; khóa AES runtime, quota và quy trình retention chưa được
-xác minh. Cửa sổ bảo trì và cutover vẫn để sau.
+Ngày 2026-11-14, một archive rehearsal đã upload lên Drive, tải về và restore
+thành công vào database cô lập `lumapos_drive_restore_20261114_173914`. Verifier
+đối chiếu 150 bảng public và ghi nhận 4.544 mục media có checksum khớp. Đây là
+rehearsal, không phải backup của nguồn production hoặc final snapshot. Thư mục
+`backup-staging` hiện tồn tại với owner `_lumapos_svc`, mode `0700`. Chưa cài
+hoặc nạp LaunchDaemon backup; vì vậy chưa xác minh lịch chạy tự động sau reboot.
+Quota Drive và chính sách retention chưa được chốt. Archive rehearsal cũ trong
+`/Users/Shared/LumaPOS/backups` vẫn chỉ là bản cục bộ trên cùng volume APFS,
+không được tính là bản sao offsite. Cửa sổ bảo trì và cutover vẫn để sau.
 `cloudflared` đã có tại `/opt/homebrew/bin/cloudflared`; connector vẫn dừng.
 Release app thuộc tài khoản tương tác và đọc được qua group `staff`.
 
@@ -464,9 +468,16 @@ restore có cùng 151 bảng public, 3 cửa hàng, 3 hồ sơ, 3.293 sản ph�
 469 media object và 454 media ready local. Media archive khôi phục 1.056 file
 (152 MB). Archive rehearsal cũ nằm trong `/Users/Shared/LumaPOS/backups` trên
 cùng volume APFS với database/media; nó chưa được upload lên Drive và không phải
-backup production. OAuth remote Drive đã được xác minh ngày 2026-11-14; cần lặp
-lại rehearsal upload/download/restore qua remote này trước khi cổng backup
-go-live đạt.
+backup production. Một archive rehearsal Drive riêng đã được upload, tải về và
+restore thành công ngày 2026-11-14; kết quả chi tiết được ghi ngay dưới đây.
+
+**Google Drive restore rehearsal ngày 2026-11-14:** archive rehearsal đã được
+restore vào database cô lập `lumapos_drive_restore_20261114_173914`. Verifier
+ghi nhận 150 bảng public được so sánh và 4.544 mục media có checksum khớp. Lần
+xác minh cuối chỉ đọc database restore đã có; không chạy lại backup hoặc restore.
+Kết quả chứng minh đường archive/restore Drive cho rehearsal, nhưng chưa xác
+minh backup tự động sau reboot, quota/retention, final snapshot hoặc readiness
+production.
 
 Worker backup cần `LUMAPOS_BACKUP_SOURCE_CONFIRMED=true`, Auth provider
 `lumapos`, endpoint PostgreSQL không phải Supabase, media provider local,

@@ -66,8 +66,13 @@ Mac and later on a VPS without changing PostgreSQL schema or backend behavior.
 - [x] Configure the selected OAuth account, dedicated OAuth client, and
   protected rclone config on the Mac; verify access to `Backups/LumaPOS` without
   printing credentials.
-- Upload a new encrypted rehearsal archive, verify remote size/hash, download it,
-  restore it to empty database/media targets, and reconcile the restored data.
+- [x] Upload an encrypted rehearsal archive, verify remote size/hash, download
+  it, restore it to an isolated database/media target, and reconcile the result.
+  The 2026-11-14 Drive rehearsal restored to
+  `lumapos_drive_restore_20261114_173914`; the verifier compared 150 public
+  tables and found 4,544 media entries with matching checksums. This is not the
+  final production snapshot and does not prove the scheduled worker survives a
+  reboot.
 - Confirm account quota and agree a retention process before enabling the
   primary database gate.
 - Repeat upload/download/restore after moving to VPS using the same archive and
