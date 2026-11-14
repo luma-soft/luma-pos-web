@@ -1,7 +1,8 @@
 import "server-only";
 
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { constants as fsConstants, createReadStream, spawn } from "node:fs";
+import { constants as fsConstants, createReadStream } from "node:fs";
 import { access, chmod, lstat, realpath } from "node:fs/promises";
 import path from "node:path";
 
