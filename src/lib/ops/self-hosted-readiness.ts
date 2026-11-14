@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { systemWorkerHeartbeats } from "@/db/schema";
 import { authProvider } from "@/lib/auth/provider";
 import { getLocalMediaConfig, getMediaWriteProvider } from "@/lib/media/config";
+import { isBackupR2Configured } from "@/lib/ops/backup-r2";
 
 type WorkerKey = "sync-inbox" | "notification-outbox" | "database-backup";
 type WorkerStatus = { status: "online" | "offline"; lastSeenAt: string | null };
@@ -21,6 +22,12 @@ export type SelfHostedReadiness = {
   database: "ready" | "not_ready";
   missingDatabasePrivileges: string[];
   workers: Partial<Record<WorkerKey, WorkerStatus>>;
+  backup: {
+    status: "ready" | "not_ready" | "not_required";
+    destinationConfigured: boolean;
+    lastSuccessfulAt: string | null;
+    blockers: string[];
+  };
   media: {
     status: "ready" | "not_ready" | "not_required";
     provider: "local" | "r2" | null;
@@ -28,6 +35,7 @@ export type SelfHostedReadiness = {
     warnings: string[];
   };
   missingWorkers: WorkerKey[];
+  missingBackup: string[];
   missingMedia: string[];
 };
 
@@ -68,8 +76,15 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
       database: "ready",
       missingDatabasePrivileges: [],
       workers: {},
+      backup: {
+        status: "not_required",
+        destinationConfigured: false,
+        lastSuccessfulAt: null,
+        blockers: [],
+      },
       media: { status: "not_required", provider: null, blockers: {}, warnings: [] },
       missingWorkers: [],
+      missingBackup: [],
       missingMedia: [],
     };
   }
@@ -92,7 +107,7 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     "notification-outbox",
     "database-backup",
   ];
-  const [roleRows, workerRows, mediaRows] = await Promise.all([
+  const [roleRows, workerRows, mediaRows, backupRows] = await Promise.all([
     db.execute(sql`
       SELECT
         runtime_account.rolsuper AS "superuser",
@@ -185,6 +200,13 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
             AND status IN ('inventoried', 'copied', 'verified', 'failed', 'quarantined')
         ) AS "unfinishedLocalMediaMigration"
     `),
+    db.execute(sql`
+      SELECT max(finished_at) AS "lastSuccessfulAt"
+      FROM public.database_backup_runs
+      WHERE status = 'succeeded'
+        AND archive_key LIKE 'database-backups/%'
+        AND finished_at >= now() - interval '26 hours'
+    `),
   ]);
 
   const roleState = resultRows(roleRows)[0] ?? {};
@@ -215,6 +237,17 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     };
   }
   const missingWorkers = workerKeys.filter((workerKey) => workers[workerKey].status !== "online");
+  const backupDestinationConfigured = isBackupR2Configured(process.env);
+  const lastSuccessfulBackupAt = resultRows(backupRows)[0]?.lastSuccessfulAt;
+  const recentRemoteBackupAt = lastSuccessfulBackupAt instanceof Date
+    ? lastSuccessfulBackupAt.toISOString()
+    : typeof lastSuccessfulBackupAt === "string"
+      ? new Date(lastSuccessfulBackupAt).toISOString()
+      : null;
+  const missingBackup = [
+    ...(backupDestinationConfigured ? [] : ["r2Configuration"]),
+    ...(recentRemoteBackupAt ? [] : ["recentRemoteBackup"]),
+  ];
   const mediaState = resultRows(mediaRows)[0] ?? {};
   const blockers: Record<string, boolean> = {
     externalMediaReview: !externalMediaReviewed && !preserveExternalMedia,
@@ -244,10 +277,17 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
   return {
     status: missingDatabasePrivileges.length === 0
       && missingWorkers.length === 0
+      && missingBackup.length === 0
       && missingMedia.length === 0 ? "ready" : "not_ready",
     database: missingDatabasePrivileges.length === 0 ? "ready" : "not_ready",
     missingDatabasePrivileges,
     workers,
+    backup: {
+      status: missingBackup.length === 0 ? "ready" : "not_ready",
+      destinationConfigured: backupDestinationConfigured,
+      lastSuccessfulAt: recentRemoteBackupAt,
+      blockers: missingBackup,
+    },
     media: {
       status: missingMedia.length === 0 ? "ready" : "not_ready",
       provider: mediaWriteProvider,
@@ -255,6 +295,7 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
       warnings: mediaWarnings,
     },
     missingWorkers,
+    missingBackup,
     missingMedia,
   };
 }

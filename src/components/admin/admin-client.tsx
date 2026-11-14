@@ -18,7 +18,14 @@ type Account = {
 
 type Operations = {
   backend: { status: string; uptimeSeconds: number };
-  readiness: { status: string; missingDatabasePrivileges: string[]; missingWorkers: string[]; missingMedia: string[] };
+  readiness: {
+    status: string;
+    missingDatabasePrivileges: string[];
+    missingWorkers: string[];
+    backup: { status: string; destinationConfigured: boolean; lastSuccessfulAt: string | null; blockers: string[] };
+    missingBackup: string[];
+    missingMedia: string[];
+  };
   database: { status: string; blockers: string[] };
   media: { status: string; provider: "local" | "r2" | null; blockers: Record<string, boolean>; warnings: string[] };
   sync: { worker: { status: string; lastSeenAt: string | null }; queue: Record<string, number> };
@@ -33,7 +40,9 @@ type Operations = {
     requestedAt: string;
     startedAt: string | null;
     finishedAt: string | null;
+    archiveKey: string | null;
     archiveSizeBytes: number | null;
+    sha256: string | null;
     failureCode: string | null;
   }>;
 };
@@ -142,6 +151,12 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
   };
   const activeMediaWarnings = (operations?.media.warnings ?? [])
     .map((warning) => mediaWarningLabels[warning] ?? t("mediaWarnings.unknown"));
+  const backupBlockerLabels: Record<string, string> = {
+    r2Configuration: t("backupBlockers.r2Configuration"),
+    recentRemoteBackup: t("backupBlockers.recentRemoteBackup"),
+  };
+  const activeBackupBlockers = (operations?.readiness.backup.blockers ?? [])
+    .map((blocker) => backupBlockerLabels[blocker] ?? t("backupBlockers.unknown"));
   const databaseBlockerLabels: Record<string, string> = {
     superuser: t("databaseBlockers.superuser"),
     createDatabase: t("databaseBlockers.createDatabase"),
@@ -283,6 +298,7 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
                   [t("syncWorker"), operations.sync.worker.status],
                   [t("notificationWorker"), operations.workers.notifications.status],
                   [t("backupWorker"), operations.workers.backups.status],
+                  [t("backupStorage"), operations.readiness.backup.status],
                   [t("mediaStorage"), operations.media.status],
                 ].map(([label, status]) => (
                   <div key={label} className="rounded-xl bg-surface-2 p-4">
@@ -329,6 +345,14 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
                   </ul>
                 </div>
               )}
+              {activeBackupBlockers.length > 0 && (
+                <div role="status" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                  <p className="font-semibold">{t("mediaCutoverPending")}</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {activeBackupBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+                  </ul>
+                </div>
+              )}
               <div className="mt-5 flex items-center justify-between gap-3">
                 <h3 className="font-semibold">{t("backup")}</h3>
                 <button type="button" disabled={busy} onClick={() => void mutate("/api/admin/operations", "POST")} className="h-9 rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white disabled:opacity-50">
@@ -338,7 +362,11 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
               <div className="mt-3 divide-y divide-border">
                 {(operations.backups ?? []).map((backup) => (
                   <div key={backup.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                    <div><span className="font-medium">{displayStatus(backup.status)}</span><span className="ml-2 text-slate-500">{formatDate(backup.requestedAt)}</span></div>
+                    <div className="min-w-0">
+                      <div><span className="font-medium">{displayStatus(backup.status)}</span><span className="ml-2 text-slate-500">{formatDate(backup.requestedAt)}</span></div>
+                      {backup.archiveKey && <code className="mt-1 block break-all text-xs text-slate-500">{backup.archiveKey}</code>}
+                      {backup.sha256 && <code className="mt-1 block break-all text-xs text-slate-500">SHA-256: {backup.sha256}</code>}
+                    </div>
                     <span className="text-slate-500">{formatBytes(backup.archiveSizeBytes)}</span>
                   </div>
                 ))}

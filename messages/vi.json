@@ -286,6 +286,12 @@
     "syncWorker": "Worker đồng bộ",
     "notificationWorker": "Worker thông báo",
     "backupWorker": "Worker sao lưu",
+    "backupStorage": "Bản sao lưu ngoài máy",
+    "backupBlockers": {
+      "r2Configuration": "Thiếu hoặc sai cấu hình token cho bucket backup R2 riêng.",
+      "recentRemoteBackup": "Chưa có backup R2 được xác minh trong 26 giờ gần nhất.",
+      "unknown": "Còn điều kiện backup ngoài máy chưa đạt."
+    },
     "queue": "Lệnh đồng bộ",
     "backup": "Sao lưu database và file",
     "requestBackup": "Sao lưu ngay",

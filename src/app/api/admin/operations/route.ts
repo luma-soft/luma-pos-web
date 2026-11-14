@@ -34,7 +34,9 @@ export async function GET() {
         requestedAt: databaseBackupRuns.requestedAt,
         startedAt: databaseBackupRuns.startedAt,
         finishedAt: databaseBackupRuns.finishedAt,
+        archiveKey: databaseBackupRuns.archiveKey,
         archiveSizeBytes: databaseBackupRuns.archiveSizeBytes,
+        sha256: databaseBackupRuns.sha256,
         failureCode: databaseBackupRuns.failureCode,
       }).from(databaseBackupRuns).orderBy(desc(databaseBackupRuns.requestedAt)).limit(10),
     ]);
@@ -46,6 +48,8 @@ export async function GET() {
           status: readiness.status,
           missingDatabasePrivileges: readiness.missingDatabasePrivileges,
           missingWorkers: readiness.missingWorkers,
+          backup: readiness.backup,
+          missingBackup: readiness.missingBackup,
           missingMedia: readiness.missingMedia,
         },
         database: {

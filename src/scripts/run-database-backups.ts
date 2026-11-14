@@ -8,6 +8,11 @@ import { spawn } from "node:child_process";
 import { pipeline } from "node:stream/promises";
 import { loadEnvConfig } from "@next/env";
 import {
+  createBackupR2Client,
+  getBackupR2Config,
+  uploadEncryptedBackup,
+} from "@/lib/ops/backup-r2";
+import {
   createMigrationPostgresClient,
   readMigrationDatabaseUrl,
 } from "@/db/migration-runner";
@@ -34,6 +39,8 @@ assertSelfHostedPrimaryDatabase(process.env);
 if (process.env.MEDIA_WRITE_PROVIDER !== "local") {
   throw new Error("The self-hosted backup worker requires MEDIA_WRITE_PROVIDER=local");
 }
+const backupR2Config = getBackupR2Config(process.env);
+const backupR2Client = createBackupR2Client(backupR2Config);
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) throw new Error("DATABASE_URL is not configured");
@@ -122,6 +129,7 @@ const [{ locked }] = await connection.unsafe(
 ) as Array<{ locked: boolean }>;
 if (!locked) {
   console.log("Another LumaPOS database backup worker already holds the worker lock.");
+  backupR2Client.destroy();
   await connection.end({ timeout: 5 });
   process.exit(0);
 }
@@ -211,7 +219,7 @@ async function createBackup(runId: string) {
   const dumpPath = path.join(temporaryDirectory, "database.dump");
   const mediaArchivePath = path.join(temporaryDirectory, "media.tar.gz");
   const bundlePath = path.join(temporaryDirectory, "backup.tar.gz");
-  const finalName = `lumapos-${runId}.lumaenc`;
+  const finalName = `lumapos-${runId}-${Date.now()}.lumaenc`;
   const partialPath = path.join(temporaryDirectory, `${finalName}.partial`);
   const finalPath = path.join(resolvedBackupRoot, finalName);
 
@@ -261,6 +269,32 @@ async function createBackup(runId: string) {
     await rename(partialPath, finalPath);
     const archiveStats = await stat(finalPath);
     const archiveSha256 = await sha256File(finalPath);
+    const dateParts = new Intl.DateTimeFormat("en", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const datePart = (type: Intl.DateTimeFormatPartTypes) =>
+      dateParts.find((part) => part.type === type)?.value ?? "00";
+    const archiveKey = `database-backups/${datePart("year")}/${datePart("month")}/${datePart("day")}/lumapos-${runId}.lumaenc`;
+    await uploadEncryptedBackup({
+      client: backupR2Client,
+      config: backupR2Config,
+      filePath: finalPath,
+      objectKey: archiveKey,
+      sizeBytes: archiveStats.size,
+      sha256: archiveSha256,
+    });
+    const storedManifest = {
+      ...manifest,
+      remote: {
+        provider: "cloudflare-r2",
+        bucket: backupR2Config.bucket,
+        objectKey: archiveKey,
+        archiveSha256,
+      },
+    };
 
     await connection.unsafe(`
       UPDATE public.database_backup_runs
@@ -269,17 +303,16 @@ async function createBackup(runId: string) {
           archive_key = $1, archive_size_bytes = $2, sha256 = $3,
           manifest = $4::jsonb, failure_code = NULL
       WHERE id = $5::uuid AND status = 'running'
-    `, [finalName, archiveStats.size, archiveSha256, JSON.stringify(manifest), runId]);
+    `, [archiveKey, archiveStats.size, archiveSha256, JSON.stringify(storedManifest), runId]);
 
     console.log(JSON.stringify({
       backupRunId: runId,
       status: "succeeded",
-      archiveKey: finalName,
+      archiveKey,
       archiveSizeBytes: archiveStats.size,
       sha256: archiveSha256,
     }));
   } catch (error) {
-    await rm(finalPath, { force: true }).catch(() => undefined);
     await connection.unsafe(`
       UPDATE public.database_backup_runs
       SET status = 'failed', finished_at = now(),
@@ -318,4 +351,5 @@ try {
   await writeHeartbeat("stopped").catch(() => undefined);
   await connection.unsafe("select pg_advisory_unlock($1)", [WORKER_LOCK_KEY]).catch(() => undefined);
   await connection.end({ timeout: 5 });
+  backupR2Client.destroy();
 }

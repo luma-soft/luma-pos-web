@@ -277,6 +277,7 @@ khi final snapshot được xác nhận:
 | `LUMAPOS_INTERNAL_URL` | `http://127.0.0.1:3000` | Origin loopback của Next.js trên VPS |
 | `LUMAPOS_BACKUP_ROOT` | Volume backup riêng | Volume backup riêng hoặc agent offsite |
 | `LUMAPOS_BACKUP_ENCRYPTION_KEY` | Khóa 32 byte dạng hex | Giữ qua secret manager, không đặt cùng backup |
+| `LUMAPOS_BACKUP_R2_*` | Bucket riêng `lumapos-production-backups`, token Object Read & Write chỉ scope bucket này | Giữ bucket và quyền hạn, đổi secret manager theo môi trường |
 
 Self-hosted runtime phải đặt tường minh `MEDIA_WRITE_PROVIDER`; trên Mac dùng
 `local`. Nếu bỏ trống khi Auth provider là `lumapos`, backend từ chối khởi tạo
@@ -332,17 +333,36 @@ Homebrew PostgreSQL 17 trên Mac hoặc trong `PATH` trên VPS và từ chối c
 major version công cụ khác PostgreSQL server. Có thể đặt
 `LUMAPOS_POSTGRES_BIN_DIR` khi binary nằm ở đường dẫn tùy chỉnh.
 
-1. Mỗi ngày tạo backup vào `LUMAPOS_BACKUP_ROOT`; kiểm tra trạng thái tại
-   `/admin/operations` và cảnh báo khi worker quá hạn/backup lỗi.
-2. Copy gói mã hóa sang nơi offsite; đề xuất giữ 30 bản/ngày cùng bản cuối tháng.
-   Không xóa bản gần nhất thành công; giới hạn lưu trữ và cảnh báo dung lượng ổ
-   là việc vận hành bắt buộc trước go-live.
-3. Diễn tập restore vào database mới, rỗng và thư mục media rỗng bằng
-   `bun run db:restore -- --confirm-empty-database --archive lumapos-<uuid>.lumaenc`.
-   Tiến trình này bắt buộc nhận `MIGRATION_DATABASE_URL` của DBA/migration
-   owner; không dùng role `lumapos_runtime` để restore.
-   Có thể truyền `--sha256 <checksum>` để đối chiếu checksum ngoài. Dừng app
-   trước restore; không restore đè database đang chạy.
+Mỗi gói mã hóa được giữ tại `LUMAPOS_BACKUP_ROOT` rồi tải lên bucket R2 riêng
+`lumapos-production-backups` dưới prefix `database-backups/YYYY/MM/DD/`. Worker
+chỉ ghi trạng thái thành công sau khi `HeadObject` xác nhận kích thước/metadata
+và đọc luồng object về để tính lại SHA-256 trên bytes thực tế. Bucket không gắn
+custom domain và không public. Tạo token
+R2 với quyền `Object Read & Write`, chỉ áp dụng bucket backup; quyền này cho phép
+đọc, ghi, liệt kê và xóa object bên trong bucket, không có quyền quản trị bucket/
+tài khoản. Nếu token bị lộ, người giữ token có thể xóa archive trong bucket; mã
+nguồn LumaPOS không gọi thao tác xóa. Không tái dùng token media. Lệnh
+`bash scripts/configure-backup-r2-credentials.sh` nhận account ID và hai trường
+token qua prompt không echo, rồi ghi các biến `LUMAPOS_BACKUP_R2_*` vào runtime
+env mode `0600`; không dán giá trị token vào chat, shell command hay repository.
+Mã nguồn chỉ gọi Put/Head khi backup và Get khi restore. Không có chính sách tự
+xóa object; cần chốt retention và theo dõi dung lượng bucket trước go-live.
+
+1. Mỗi ngày tạo archive mã hóa local và replicate lên R2; `/admin/operations`
+   hiển thị trạng thái backup ngoài máy, object key, checksum và dung lượng.
+   Readiness yêu cầu có cấu hình R2 hợp lệ và một bản remote thành công trong
+   vòng 26 giờ; nếu R2 ngừng hoạt động, backup mới báo lỗi và không được mở
+   traffic self-hosted.
+2. Không xóa bản local hoặc object R2 tự động. Chốt chính sách retention, cảnh
+   báo dung lượng volume và bucket, cùng quy trình lưu khóa mã hóa độc lập trước
+   go-live; bản gần nhất thành công phải luôn có thể khôi phục.
+3. Diễn tập restore từ R2 vào database mới, rỗng và thư mục media rỗng bằng
+   `bun run db:restore -- --confirm-empty-database --archive-key database-backups/YYYY/MM/DD/lumapos-<uuid>.lumaenc --sha256 <sha256>`.
+   Lấy object key/checksum từ `/admin/operations`. Archive tải về được giữ trong
+   `LUMAPOS_BACKUP_ROOT`. Restore cũng nhận file local bằng
+   `--archive lumapos-<uuid>-<timestamp>.lumaenc`. Tiến trình bắt buộc nhận
+   `MIGRATION_DATABASE_URL` của DBA/migration owner; không dùng role
+   `lumapos_runtime`. Dừng app trước restore; không restore đè database đang chạy.
 4. Nếu restore dừng giữa chừng, giữ app dừng, bỏ database/media staging bị lỗi,
    tạo target rỗng mới rồi chạy lại. Kiểm tra row/financial aggregates, file
    checksum và `/api/health/ready` trước khi mở traffic.
@@ -356,8 +376,9 @@ kiểm tra ngày 2026-11-14 không thấy volume vật lý ngoài đang gắn v�
 offsite, vì vậy đây chưa phải cổng backup go-live.
 
 Worker backup cần `LUMAPOS_PRIMARY_DATABASE_CONFIRMED=true`, Auth provider
-`lumapos`, media provider local, `pg_dump`, tar và khóa backup. Đây là điều kiện
-để worker không tạo snapshot nhầm từ Supabase hoặc bỏ sót media chưa local.
+`lumapos`, media provider local, `pg_dump`, tar, khóa mã hóa và token R2 riêng.
+Đây là điều kiện để worker không tạo snapshot nhầm từ Supabase hoặc bỏ sót media
+chưa local.
 
 ## Data rehearsal, cutover và rollback
 

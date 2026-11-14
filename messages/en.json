@@ -286,6 +286,12 @@
     "syncWorker": "Sync worker",
     "notificationWorker": "Notification worker",
     "backupWorker": "Backup worker",
+    "backupStorage": "Off-site backup",
+    "backupBlockers": {
+      "r2Configuration": "The dedicated R2 backup bucket credentials are missing or invalid.",
+      "recentRemoteBackup": "No verified R2 backup has completed in the last 26 hours.",
+      "unknown": "An off-site backup requirement is still unmet."
+    },
     "queue": "Sync commands",
     "backup": "Database and file backup",
     "requestBackup": "Back up now",
