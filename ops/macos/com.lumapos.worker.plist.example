@@ -21,9 +21,9 @@
 		<key>LUMAPOS_ENV_FILE</key>
 		<string>/Users/Shared/LumaPOS/secrets/runtime.env</string>
 		<key>LUMAPOS_BUN_BIN</key>
-		<string>/opt/homebrew/bin/bun</string>
+		<string>/Users/Shared/LumaPOS/bin/bun</string>
 		<key>PATH</key>
-		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<string>/Users/Shared/LumaPOS/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
 	</dict>
 	<key>RunAtLoad</key>
 	<true/>

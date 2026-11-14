@@ -161,18 +161,20 @@ không sở hữu database/schema/object. Bản production được chạy tạm
 cổng 3001 với Auth LumaPOS, media provider local, `DATABASE_URL` nhắm `_b` và
 primary gate vẫn `false`: `/api/health/live` trả 200, `/api/health/ready` trả
 503 `not_ready`. Tiến trình đã dừng, cổng 3001 đã đóng và Tunnel chưa được chạy.
-Chưa cài LaunchDaemon/service account cho backend và worker. Một lần khởi động
-tạm thời trên loopback với snapshot rehearsal mới giữ nguyên gate; route media API
-bị từ chối cho đến khi snapshot được xác nhận làm nguồn chính, rồi tiến trình
-được dừng. Tunnel connector vẫn dừng. Chủ sản phẩm chọn backup trên ổ cứng ngoài
-thay cho R2; lần kiểm tra ngày 2026-11-14 chưa thấy volume ngoài đang mount, nên
-đường dẫn runtime và worker backup chưa được cấu hình. Cửa sổ bảo trì 60 phút
-chưa lên lịch; cutover được để lại cho lần chốt sau. Kiểm tra lại process state
-ngày 2026-11-14 chỉ thấy PostgreSQL chạy dưới LaunchAgent của phiên người dùng;
-`cloudflared` đã có tại `/opt/homebrew/bin/cloudflared` nhưng connector và
-LaunchDaemon LumaPOS chưa chạy/cài. Release, media và secrets hiện nằm dưới
-`/Users/Shared/LumaPOS` do tài khoản tương tác sở hữu; service account chưa được
-provision hoặc cấp quyền.
+Tài khoản dịch vụ ẩn `_lumapos_svc` đã được tạo, không thuộc nhóm admin và dùng
+shell `/usr/bin/false`. `/Users/Shared/LumaPOS` có group `staff`, mode `0710` để
+service account đi tới đường dẫn đã biết; `secrets`, `logs` và `media` thuộc
+service account. `runtime.env`, `cloudflared.yml` và tunnel credential thuộc
+`_lumapos_svc`, mode `0600`. Bun 1.3.12 đã được đặt ở
+`/Users/Shared/LumaPOS/bin/bun`; các plist mẫu dùng service account này. Chưa
+cài hoặc nạp LaunchDaemon cho backend/worker; Next.js và Tunnel vẫn dừng.
+PostgreSQL tiếp tục chạy dưới LaunchAgent của phiên người dùng; không chuyển
+PostgreSQL sang user khác khi chưa có cửa sổ bảo trì. Chủ sản phẩm chọn backup
+trên ổ cứng ngoài thay cho R2; lần kiểm tra ngày 2026-11-14 chưa thấy volume
+ngoài đang mount, nên đường dẫn runtime và worker backup chưa được cấu hình.
+Cửa sổ bảo trì 60 phút chưa lên lịch; cutover được để lại cho lần chốt sau.
+`cloudflared` đã có tại `/opt/homebrew/bin/cloudflared`; connector vẫn dừng.
+Release app thuộc tài khoản tương tác và đọc được qua group `staff`.
 
 Chạy ứng dụng tự host trên loopback bằng `bun run start:self-hosted`. Dùng
 LaunchDaemon với service account để tự khởi động cùng máy và phục hồi khi tiến

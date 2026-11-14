@@ -11,6 +11,10 @@ credentials.
 - Dùng service account ẩn `_lumapos_svc`, không thuộc nhóm `admin`, có shell
   `/usr/bin/false`; cấp quyền tối thiểu trên secrets, media, backup và log.
   Không dùng tài khoản superuser PostgreSQL làm `DATABASE_URL` của ứng dụng.
+- Giữ `/Users/Shared/LumaPOS` ở mode `0710`, group `staff`, để service account
+  đi tới các đường dẫn đã biết nhưng không liệt kê thư mục gốc. Thư mục `secrets`,
+  `media`, `logs` thuộc `_lumapos_svc`; runtime env và tunnel credential dùng
+  mode `0600`. Release app phải đọc được bởi group `staff`.
 - Đặt runtime environment tại
   `/Users/Shared/LumaPOS/secrets/runtime.env`, owner `_lumapos_svc`, mode `600`.
   Đây là file shell assignments đã được tin cậy, không phải `.env.local`; không
@@ -18,8 +22,8 @@ credentials.
 - Release không được chứa `.env`, `.env.local`, `.env.production` hoặc
   `.env.production.local`; wrapper từ chối khởi chạy nếu thấy một trong các file
   đó mà không đọc nội dung.
-- Cài Bun và `cloudflared` tại đường dẫn trong plist mẫu hoặc sửa đường dẫn cho
-  đúng máy. Tạo thư mục log trước khi nạp dịch vụ.
+- Cài Bun vào `/Users/Shared/LumaPOS/bin/bun` và giữ `cloudflared` tại đường dẫn
+  trong plist mẫu (Homebrew ARM mặc định). Tạo thư mục log trước khi nạp dịch vụ.
 - Cấp quyền `_lumapos_svc` cho thư mục media và thư mục backup riêng. Chúng phải
   nằm ngoài app release và tách biệt nhau.
 
