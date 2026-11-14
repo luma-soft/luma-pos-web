@@ -217,9 +217,9 @@ Vercel trong build hiện tại. Mẫu không chứa tunnel credential ở
   xác minh chữ ký webhook được thực hiện tại backend.
 - Cấu hình `LUMAPOS_PUBLIC_URL` bằng origin HTTPS công khai này. iOS lấy API
   origin từ build setting `LUMA_API_BASE_URL` trong
-  [`Info.plist`](../../luma-pos-mobile/native-ios/LumaPOSNative/Info.plist); cấu
-  hình mặc định hiện tại vẫn là Vercel. Chỉ phát hành build trỏ tới hostname
-  đã xác nhận sau khi backend, tunnel và khôi phục đã được diễn tập.
+  [`Info.plist`](../../luma-pos-mobile/native-ios/LumaPOSNative/Info.plist); mã
+  nguồn vẫn fallback về Vercel nếu build không đặt override. Chỉ phát hành build
+  trỏ tới hostname này sau khi backend, tunnel và khôi phục đã được diễn tập.
 - Khi chuyển lên VPS, đưa tunnel connector sang VPS hoặc cập nhật origin phía
   tunnel; giữ hostname để web và iPhone không phải đổi endpoint. Nếu WAN hoặc
   tunnel mất kết nối, thiết bị giữ việc ở local và gửi lại khi có mạng. Truy cập
@@ -414,9 +414,10 @@ chỉ nhận bản rehearsal và chưa được mở cho người dùng.
 
 ## Các quyết định trước go-live
 
-- Cấu hình DNS và Cloudflare Tunnel cho hostname đã chọn
-  `pos.lumapos.shop`; chưa phát hành build iPhone hoặc mở traffic trước khi
-  hostname phân giải được và tunnel đạt rehearsal.
+- DNS route Cloudflare Tunnel đã cấu hình cho hostname đã chọn
+  `pos.haidangshop.com`; lần kiểm tra 2026-11-13 cho thấy connector và Next.js
+  đang dừng. Chưa phát hành build iPhone hoặc mở traffic trước khi connector,
+  backend và khôi phục đạt rehearsal.
 - Chốt account recovery/password reset và recovery administrator. Hash không
   chuyển được phải có quy trình reset hỗ trợ, không gửi mật khẩu tạm qua log.
 - Chốt role PostgreSQL runtime/DBA và cách giữ secrets trên Mac.

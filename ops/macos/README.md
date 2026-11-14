@@ -43,7 +43,7 @@ Plist dùng cú pháp tunnel locally managed:
 `cloudflared tunnel --config <PATH> run <UUID-or-name>` theo
 [Cloudflare Tunnel run parameters](https://developers.cloudflare.com/tunnel/reference/run-parameters/).
 Thay UUID mẫu trong cả `cloudflared.yml` và plist bằng cùng tunnel UUID/name;
-hostname trong YAML mẫu đã đặt thành `pos.lumapos.shop`.
+hostname trong YAML mẫu đã đặt thành `pos.haidangshop.com`.
 Giữ file config và tunnel credentials ngoài repo, owner `lumapos_svc`, mode
 `600`; credential JSON không được đưa vào log hoặc plist.
 

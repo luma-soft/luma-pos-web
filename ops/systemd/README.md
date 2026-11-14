@@ -41,7 +41,7 @@ Sao chép các file `.service.example` thành unit files trong
 | `lumapos-media-cleanup.service.example` | Gọi tác vụ media cleanup qua origin loopback |
 | `lumapos-cloudflared.service.example` | Chỉ publish Next.js qua Cloudflare Tunnel |
 
-Mẫu Tunnel dùng cùng hostname `pos.lumapos.shop` và cùng origin
+Mẫu Tunnel dùng cùng hostname `pos.haidangshop.com` và cùng origin
 `http://127.0.0.1:3000`. Không thêm PostgreSQL, pgAdmin, SSH hoặc thư mục media
 vào ingress. Dùng cùng Tunnel ID khi chuyển từ Mac lên VPS; chỉ đổi connector và
 đường dẫn cấu hình/credential.
