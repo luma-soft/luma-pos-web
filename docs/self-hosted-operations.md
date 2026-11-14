@@ -106,13 +106,15 @@ chính. Các số liệu là ảnh chụp ngày 2026-11-13.
 
 ### Next.js và workers
 
-**Trạng thái ngày 2026-11-13:** bản production đã build trong
+**Trạng thái ngày 2026-11-14:** bản production đã build trong
 `/Users/Shared/LumaPOS/app`, nhưng Next.js và tunnel connector hiện đã dừng.
 `LUMAPOS_PRIMARY_DATABASE_CONFIRMED` vẫn `false`; app chưa nhận traffic nghiệp
-vụ. Kiểm tra loopback cho thấy `/api/health/live` trả 200 và
-`/api/health/ready` trả 503 `not_ready` khi gate này còn khóa. pgAdmin 4 đã cài,
-nhưng profile server trong pgAdmin chưa đăng ký. Chưa cài LaunchDaemon/service
-account cho backend và worker.
+vụ. Kiểm tra loopback ngày 2026-11-13 cho thấy `/api/health/live` trả 200 và
+`/api/health/ready` trả 503 `not_ready` khi gate này còn khóa. pgAdmin 4 đã cài
+và profile `LumaPOS Mac - DBA` đã kết nối qua Unix socket local; profile không
+lưu mật khẩu và không được publish qua Tunnel. Credential role runtime được
+luân chuyển ngày 2026-11-14; giá trị chỉ nằm trong tệp cấu hình bảo vệ mode 600.
+Chưa cài LaunchDaemon/service account cho backend và worker.
 
 Chạy ứng dụng tự host trên loopback bằng `bun run start:self-hosted`. Dùng
 LaunchDaemon với service account để tự khởi động cùng máy và phục hồi khi tiến
@@ -206,8 +208,10 @@ chốt là `pos.haidangshop.com`; DNS route trong zone `haidangshop.com` trỏ r
 hostname này tới tunnel, ingress chỉ tới `http://127.0.0.1:3000`, catch-all trả
 404. Root domain và `www` vẫn ở Vercel; `media.haidangshop.com` vẫn là custom
 domain của R2. Tại lần kiểm tra 2026-11-13, DNS đã cấu hình nhưng connector và
-Next.js chưa chạy nên chưa có backend phục vụ hostname. iOS vẫn dùng API origin
-Vercel trong build hiện tại. Mẫu không chứa tunnel credential ở
+Next.js chưa chạy nên chưa có backend phục vụ hostname. Workspace iOS (fallback
+trong `AuthAPIClient` và cấu hình Debug/Release) hiện dùng API origin
+`https://pos.haidangshop.com`; build đã cài trên iPhone 17 Simulator ngày
+2026-11-14 nhưng chưa phát hành cho người dùng. Mẫu không chứa tunnel credential ở
 [`ops/cloudflared/config.yml.example`](../ops/cloudflared/config.yml.example).
 
 - Tunnel tạo kết nối outbound; router không mở cổng inbound tới Mac. Chỉ route
@@ -218,8 +222,9 @@ Vercel trong build hiện tại. Mẫu không chứa tunnel credential ở
 - Cấu hình `LUMAPOS_PUBLIC_URL` bằng origin HTTPS công khai này. iOS lấy API
   origin từ build setting `LUMA_API_BASE_URL` trong
   [`Info.plist`](../../luma-pos-mobile/native-ios/LumaPOSNative/Info.plist); mã
-  nguồn vẫn fallback về Vercel nếu build không đặt override. Chỉ phát hành build
-  trỏ tới hostname này sau khi backend, tunnel và khôi phục đã được diễn tập.
+  nguồn và cấu hình Xcode Debug/Release đều mặc định trỏ tới hostname này.
+  Build hiện tại chỉ mới cài trên Simulator; chỉ phát hành cho người dùng sau
+  khi backend, tunnel và khôi phục đã được diễn tập.
 - Khi chuyển lên VPS, đưa tunnel connector sang VPS hoặc cập nhật origin phía
   tunnel; giữ hostname để web và iPhone không phải đổi endpoint. Nếu WAN hoặc
   tunnel mất kết nối, thiết bị giữ việc ở local và gửi lại khi có mạng. Truy cập
