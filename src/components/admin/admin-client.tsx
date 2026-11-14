@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { RefreshCw, ServerCog, UserPlus, UsersRound } from "lucide-react";
+import { RefreshCw, ServerCog, UsersRound } from "lucide-react";
 import { STAFF_ROLES, type Role } from "@/lib/auth/roles";
 import { AdminOperationsPanel } from "@/components/admin/admin-operations-panel";
 
@@ -33,7 +33,6 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
   const [error, setError] = useState(false);
   const [roleTarget, setRoleTarget] = useState<string | null>(null);
   const [passwords, setPasswords] = useState<Record<string, string>>({});
-  const [newRole, setNewRole] = useState<Role>("cashier");
 
   const load = useCallback(async () => {
     setError(false);
@@ -74,18 +73,6 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
     }
   };
 
-  const createAccount = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formElement = event.currentTarget;
-    const form = new FormData(formElement);
-    const body = Object.fromEntries(form.entries());
-    if (await mutate("/api/admin/accounts", "POST", { ...body, role: newRole })) {
-      formElement.reset();
-      setNewRole("cashier");
-      setNotice(t("created"));
-    }
-  };
-
   const displayRole = (role: Role) => t(`roles.${role}`);
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 pb-8 sm:p-6">
@@ -117,42 +104,9 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
 
       {section === "accounts" ? <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
         <div className="mb-4 flex items-center gap-2">
-          <UserPlus className="h-5 w-5 text-primary-600" />
+          <UsersRound className="h-5 w-5 text-primary-600" />
           <h2 className="text-lg font-semibold">{t("accounts")}</h2>
         </div>
-
-        <form onSubmit={createAccount} className="grid gap-3 rounded-xl bg-surface-2 p-4 md:grid-cols-2">
-          <label className="grid gap-1 text-sm font-medium">
-            {t("fullName")}
-            <input name="fullName" required minLength={2} maxLength={120} className="h-10 rounded-lg border border-border bg-surface px-3" />
-          </label>
-          <label className="grid gap-1 text-sm font-medium">
-            {t("email")}
-            <input name="email" type="email" autoComplete="off" className="h-10 rounded-lg border border-border bg-surface px-3" />
-          </label>
-          <label className="grid gap-1 text-sm font-medium">
-            {t("phone")}
-            <input name="phone" type="tel" autoComplete="off" className="h-10 rounded-lg border border-border bg-surface px-3" />
-          </label>
-          <label className="grid gap-1 text-sm font-medium">
-            {t("password")}
-            <input name="password" type="password" minLength={8} required autoComplete="new-password" className="h-10 rounded-lg border border-border bg-surface px-3" />
-          </label>
-          <div className="md:col-span-2">
-            <p className="mb-2 text-sm font-medium">{t("role")}</p>
-            <div className="flex flex-wrap gap-2">
-              {STAFF_ROLES.filter((role) => canManageOperations || role !== "owner").map((role) => (
-                <button key={role} type="button" aria-pressed={newRole === role} onClick={() => setNewRole(role)} className={`rounded-full border px-3 py-1.5 text-sm ${newRole === role ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300" : "border-border text-slate-600 dark:text-slate-300"}`}>
-                  {displayRole(role)}
-                </button>
-              ))}
-            </div>
-          </div>
-          <p className="text-xs text-slate-500 md:col-span-2">{t("contactHint")}</p>
-          <div className="md:col-span-2">
-            <button disabled={busy} className="h-10 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">{t("createAccount")}</button>
-          </div>
-        </form>
 
         <div className="mt-4 divide-y divide-border">
           {loading ? <div className="space-y-3 py-5" aria-label={t("loading")}><div className="h-4 w-1/3 animate-pulse rounded bg-surface-2" /><div className="h-4 w-2/3 animate-pulse rounded bg-surface-2" /></div> : accounts.length === 0 ? <p className="py-5 text-sm text-slate-500">{t("emptyAccounts")}</p> : accounts.map((account) => (
