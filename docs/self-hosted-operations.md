@@ -115,6 +115,14 @@ Hai `email_verified_at` vẫn chỉ lệch dưới một millisecond. Cả hai p
 media object provider `r2`; sync receipt rỗng và khớp. Đây là rehearsal mới nhất
 đã xác minh, không thay thế final snapshot sau khi cửa hàng dừng ghi.
 
+Trên database `_20261114_b`, media run
+`2acca2a0-168d-4b9e-918a-5b8c30be8724` đã copy và đọc lại SHA-256 của đủ 454
+managed media tại `/Users/Shared/LumaPOS/media`, không có mục quarantine. Run
+giữ 1.349 item `skipped`, tương ứng 2.022 external URL; không tải hoặc viết lại
+các URL đó. `media_objects` vẫn có 469 provider `r2`, tức provider chưa đổi và
+R2 source chưa bị xóa. Chỉ chuyển provider sau khi HTTP media route, backup/
+restore trên volume riêng và HTTPS đều qua rehearsal.
+
 Preview media trên rehearsal phát hiện 2.476 tham chiếu: 454 owned theo host và
 bucket allowlist hiện tại, 2.022 `external_url` ngoài allowlist Supabase hiện tại;
 cần rà soát domain trước cutover, không tải hoặc viết lại nhóm này. Trong 469

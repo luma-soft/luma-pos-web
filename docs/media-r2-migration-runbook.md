@@ -138,6 +138,16 @@ authoritative. The database is back to 469 R2 provider rows; the verified local
 files remain staged and no R2 source object was deleted. This confirms media
 copy/verify and rollback mechanics, not end-to-end HTTP or production readiness.
 
+**Latest snapshot media verification (2026-11-14):** on database
+`lumapos_rehearsal_20261114_b`, run
+`2acca2a0-168d-4b9e-918a-5b8c30be8724` copied and SHA-256 verified all 454
+managed items against the local filesystem. No item was quarantined. The run
+kept 1,349 migration items skipped, representing 2,022 unchanged external URLs.
+All 469 `media_objects` still use provider `r2`; this run did not cut over
+references or delete any R2 source object. Complete HTTP media-route and
+external-volume backup/restore rehearsal before local provider cutover. Read-only
+inventory dry-runs for the other two stores found zero media references.
+
 A separate backup rehearsal clone used the verified media to exercise media
 cutover, encrypted backup, and restore into an empty database/media root. Restore
 completed with matching archive checksum and all 1,056 local files. This does
