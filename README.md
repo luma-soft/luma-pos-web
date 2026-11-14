@@ -61,6 +61,13 @@ local bổ sung `0166_media_migration_library_assets.sql`; migration nguồn v�
 177 bước. DB này chỉ là bản rehearsal; chưa bật Auth/backend mới và chưa nhận ghi
 từ client.
 
+**Rehearsal mới nhất ngày 2026-11-14:** sau khi `_20261114_a` có khác biệt mới
+ở catalog và media, đã tạo `lumapos_rehearsal_20261114_b` riêng, import lại
+snapshot và đối soát thành công 140 bảng, gồm checksum, row count và tổng hợp
+tài chính. Auth credentials 3/3 khớp, không tài khoản nào cần reset. Đây vẫn là
+snapshot rehearsal khi nguồn đang hoạt động; cutover cần final snapshot riêng
+sau khi dừng ghi.
+
 **Media rehearsal ngày 2026-11-13:** snapshot có 469 `media_objects` trên R2,
 gồm 454 `ready` và 15 `deleted`. Preview tìm 2.476 tham chiếu; 454 được nhận diện
 là LumaPOS-owned theo host và bucket allowlist, còn 2.022 bị phân loại

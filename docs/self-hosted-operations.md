@@ -103,6 +103,18 @@ không có sync receipt và không có tài khoản cần reset. Hai timestamp
 Đây vẫn là snapshot rehearsal trong lúc nguồn tiếp tục hoạt động, chưa phải
 snapshot cuối hoặc nguồn dữ liệu chính.
 
+Đối soát chỉ đọc lại `_20261114_a` sau đó phát hiện nguồn đã tiến thêm ở
+`catalog_delta_events` (nguồn 11.281 dòng, rehearsal 12.189 dòng), đồng thời
+checksum của `catalog_sync_state` và `media_objects` khác nhau; tổng hợp tài
+chính và Auth vẫn khớp. Không sửa database rehearsal cũ. Ngày 2026-11-14, tạo
+database rỗng riêng `lumapos_rehearsal_20261114_b`, chạy đủ 178 migration rồi
+nhập snapshot mới; nguồn Supabase và `lumapos_local` không bị ghi. Đối soát lại
+trên 140 bảng trả `reconciled`: không thiếu bảng/cột, không lệch dòng, checksum
+hay tổng hợp tài chính; 3 Auth credentials khớp và không có tài khoản cần reset.
+Hai `email_verified_at` vẫn chỉ lệch dưới một millisecond. Cả hai phía có 469
+media object provider `r2`; sync receipt rỗng và khớp. Đây là rehearsal mới nhất
+đã xác minh, không thay thế final snapshot sau khi cửa hàng dừng ghi.
+
 Preview media trên rehearsal phát hiện 2.476 tham chiếu: 454 owned theo host và
 bucket allowlist hiện tại, 2.022 `external_url` ngoài allowlist Supabase hiện tại;
 cần rà soát domain trước cutover, không tải hoặc viết lại nhóm này. Trong 469
