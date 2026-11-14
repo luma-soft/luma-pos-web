@@ -10,11 +10,7 @@ import {
   createMigrationPostgresClient,
   readMigrationDatabaseUrl,
 } from "@/db/migration-runner";
-import {
-  createBackupR2Client,
-  downloadEncryptedBackup,
-  getBackupR2Config,
-} from "@/lib/ops/backup-r2";
+import { readBackupVolumeReadiness } from "@/lib/ops/backup-volume";
 import { postgresUtilityMajorVersion, resolvePostgresUtility } from "./postgres-tools";
 
 const MAGIC = Buffer.from("LUMABKP1");
@@ -31,23 +27,20 @@ if (!process.argv.includes("--confirm-empty-database")) {
   throw new Error("Restore requires --confirm-empty-database and a stopped LumaPOS application");
 }
 const archiveName = argument("archive");
-const archiveKey = argument("archive-key");
-if (Boolean(archiveName) === Boolean(archiveKey)) {
-  throw new Error("Pass exactly one of --archive <local-file.lumaenc> or --archive-key <R2-object-key>");
+if (!archiveName) {
+  throw new Error("Pass --archive <backup-file-or-relative-path.lumaenc>");
 }
-if (archiveName && (
-  path.basename(archiveName) !== archiveName
-  || !/^lumapos-[0-9a-f-]{36}(?:-[0-9]{10,13})?\.lumaenc$/i.test(archiveName)
-)) {
-  throw new Error("Local archive name is not a supported LumaPOS backup filename");
-}
-if (archiveKey && !/^database-backups\/[0-9]{4}\/[0-9]{2}\/[0-9]{2}\/lumapos-[0-9a-f-]{36}\.lumaenc$/i.test(archiveKey)) {
-  throw new Error("R2 archive key is not in the supported LumaPOS backup namespace");
+const supportedArchiveName = /^lumapos-[0-9a-f-]{36}(?:-[0-9]{10,13})?\.lumaenc$/i;
+const supportedExternalArchivePath = /^external-disk\/[0-9]{4}\/[0-9]{2}\/[0-9]{2}\/lumapos-[0-9a-f-]{36}\.lumaenc$/i;
+if (
+  path.isAbsolute(archiveName)
+  || archiveName.includes("\\")
+  || archiveName.split("/").some((part) => part === "" || part === "." || part === "..")
+  || (!supportedArchiveName.test(archiveName) && !supportedExternalArchivePath.test(archiveName))
+) {
+  throw new Error("Local archive path is not in the supported LumaPOS backup namespace");
 }
 const expectedSha256 = argument("sha256")?.toLowerCase();
-if (archiveKey && !expectedSha256) {
-  throw new Error("R2 restore requires --sha256 from the LumaPOS backup history");
-}
 const backupRoot = process.env.LUMAPOS_BACKUP_ROOT?.trim();
 const mediaRoot = process.env.MEDIA_LOCAL_ROOT?.trim();
 if (!backupRoot || !path.isAbsolute(backupRoot)) throw new Error("LUMAPOS_BACKUP_ROOT must be an absolute path");
@@ -90,11 +83,15 @@ if (
 ) {
   throw new Error("Backup and media directories must be outside the application directory");
 }
-const runIdFromRemoteKey = archiveKey?.match(/\/lumapos-([0-9a-f-]{36})\.lumaenc$/i)?.[1];
-const restoreDownloadName = runIdFromRemoteKey
-  ? `lumapos-${runIdFromRemoteKey}-${Date.now()}.lumaenc`
-  : null;
-const archivePath = path.join(resolvedBackupRoot, restoreDownloadName ?? archiveName!);
+const backupVolumeReadiness = await readBackupVolumeReadiness({
+  backupRoot: resolvedBackupRoot,
+  mediaRoot: resolvedMediaRoot,
+  applicationRoot: resolvedProjectRoot,
+});
+if (!backupVolumeReadiness.configured) {
+  throw new Error(`BACKUP_VOLUME_NOT_READY:${backupVolumeReadiness.blockers.join(",")}`);
+}
+const archivePath = path.join(resolvedBackupRoot, ...archiveName.split("/"));
 
 function run(command: string, args: string[], env: NodeJS.ProcessEnv = process.env) {
   return new Promise<void>((resolve, reject) => {
@@ -112,8 +109,6 @@ async function sha256File(filePath: string) {
   return hash.digest("hex");
 }
 
-const backupR2Config = archiveKey ? getBackupR2Config(process.env) : null;
-const backupR2Client = backupR2Config ? createBackupR2Client(backupR2Config) : null;
 const connection = createMigrationPostgresClient(migrationDatabase);
 const staging = await mkdtemp(path.join(os.tmpdir(), "lumapos-restore-"));
 const bundlePath = path.join(staging, "backup.tar.gz");
@@ -138,25 +133,12 @@ try {
   });
   if (mediaEntries.length > 0) throw new Error("Restore stopped because the media directory is not empty");
 
-  let remoteArchiveSize: number | null = null;
-  if (archiveKey && backupR2Client && backupR2Config) {
-    const remote = await downloadEncryptedBackup({
-      client: backupR2Client,
-      config: backupR2Config,
-      objectKey: archiveKey,
-      destinationPath: archivePath,
-    });
-    if (remote.sha256 !== expectedSha256) {
-      throw new Error("R2 backup metadata checksum does not match the supplied checksum");
-    }
-    remoteArchiveSize = remote.sizeBytes;
-  }
   const archiveStats = await lstat(archivePath);
   if (!archiveStats.isFile() || archiveStats.isSymbolicLink() || archiveStats.size < MAGIC.byteLength + 12 + 16) {
     throw new Error("Backup archive is missing or incomplete");
   }
-  if (remoteArchiveSize !== null && remoteArchiveSize !== archiveStats.size) {
-    throw new Error("R2 backup content length does not match the downloaded archive");
+  if (archiveStats.dev !== backupVolumeReadiness.deviceId) {
+    throw new Error("Backup archive is not on the configured external volume");
   }
   const archiveSha256 = await sha256File(archivePath);
   if (expectedSha256 && archiveSha256 !== expectedSha256) {
@@ -361,6 +343,5 @@ try {
   }));
 } finally {
   await connection.end({ timeout: 5 });
-  backupR2Client?.destroy();
   await rm(staging, { recursive: true, force: true });
 }

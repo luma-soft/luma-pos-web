@@ -155,8 +155,14 @@ export function AdminClient({ canManageOperations }: { canManageOperations: bool
     .map((warning) => mediaWarningLabels[warning] ?? t("mediaWarnings.unknown"));
   const backupBlockerLabels: Record<string, string> = {
     sourceConfirmation: t("backupBlockers.sourceConfirmation"),
-    r2Configuration: t("backupBlockers.r2Configuration"),
-    recentRemoteBackup: t("backupBlockers.recentRemoteBackup"),
+    volumeConfiguration: t("backupBlockers.volumeConfiguration"),
+    volumeUnavailable: t("backupBlockers.volumeUnavailable"),
+    volumeNotWritable: t("backupBlockers.volumeNotWritable"),
+    volumeSharesApplicationDisk: t("backupBlockers.volumeSharesApplicationDisk"),
+    volumeSharesMediaDisk: t("backupBlockers.volumeSharesMediaDisk"),
+    applicationVolumeUnknown: t("backupBlockers.applicationVolumeUnknown"),
+    mediaVolumeUnknown: t("backupBlockers.mediaVolumeUnknown"),
+    recentExternalBackup: t("backupBlockers.recentExternalBackup"),
   };
   const activeBackupBlockers = (operations?.readiness.backup.blockers ?? [])
     .map((blocker) => backupBlockerLabels[blocker] ?? t("backupBlockers.unknown"));

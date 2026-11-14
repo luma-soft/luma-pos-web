@@ -291,12 +291,18 @@
     "syncWorker": "Worker đồng bộ",
     "notificationWorker": "Worker thông báo",
     "backupWorker": "Worker sao lưu",
-    "backupStorage": "Bản sao lưu ngoài máy",
+    "backupStorage": "Ổ cứng sao lưu riêng",
     "backupBlockers": {
       "sourceConfirmation": "Chưa xác nhận snapshot self-hosted mà worker backup sẽ đọc.",
-      "r2Configuration": "Thiếu hoặc sai cấu hình token cho bucket backup R2 riêng.",
-      "recentRemoteBackup": "Chưa có backup R2 được xác minh trong 26 giờ gần nhất.",
-      "unknown": "Còn điều kiện backup ngoài máy chưa đạt."
+      "volumeConfiguration": "Thiếu hoặc sai đường dẫn ổ cứng sao lưu riêng.",
+      "volumeUnavailable": "Ổ cứng ngoài chưa được gắn hoặc chưa có thư mục backup.",
+      "volumeNotWritable": "Backend không thể đọc và ghi ổ cứng sao lưu.",
+      "volumeSharesApplicationDisk": "Ổ backup đang cùng filesystem với ứng dụng.",
+      "volumeSharesMediaDisk": "Ổ backup đang cùng filesystem với file media.",
+      "applicationVolumeUnknown": "Không xác định được filesystem của ứng dụng.",
+      "mediaVolumeUnknown": "Không xác định được filesystem của media.",
+      "recentExternalBackup": "Không có file backup gần đây trên ổ riêng trong 26 giờ qua.",
+      "unknown": "Còn điều kiện ổ backup riêng chưa đạt."
     },
     "queue": "Lệnh đồng bộ",
     "backup": "Sao lưu database và file",

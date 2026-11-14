@@ -1,6 +1,6 @@
 import { randomBytes, createCipheriv, createHash } from "node:crypto";
-import { createReadStream, createWriteStream } from "node:fs";
-import { appendFile, mkdir, mkdtemp, rename, rm, stat, writeFile } from "node:fs/promises";
+import { constants as fsConstants, createReadStream, createWriteStream } from "node:fs";
+import { access, appendFile, mkdir, mkdtemp, rename, rm, stat, writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import { hostname } from "node:os";
 import path from "node:path";
@@ -8,15 +8,11 @@ import { spawn } from "node:child_process";
 import { pipeline } from "node:stream/promises";
 import { loadEnvConfig } from "@next/env";
 import {
-  createBackupR2Client,
-  getBackupR2Config,
-  uploadEncryptedBackup,
-} from "@/lib/ops/backup-r2";
-import {
   createMigrationPostgresClient,
   readMigrationDatabaseUrl,
 } from "@/db/migration-runner";
 import { assertSelfHostedDatabaseEndpoint } from "@/db/self-hosted-primary";
+import { readBackupVolumeReadiness } from "@/lib/ops/backup-volume";
 import { postgresUtilityMajorVersion, resolvePostgresUtility } from "./postgres-tools";
 
 const WORKER_LOCK_KEY = 1_280_657_220;
@@ -39,8 +35,6 @@ assertSelfHostedDatabaseEndpoint(process.env);
 if (process.env.MEDIA_WRITE_PROVIDER !== "local") {
   throw new Error("The self-hosted backup worker requires MEDIA_WRITE_PROVIDER=local");
 }
-const backupR2Config = getBackupR2Config(process.env);
-const backupR2Client = createBackupR2Client(backupR2Config);
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) throw new Error("DATABASE_URL is not configured");
@@ -87,7 +81,6 @@ if (
 ) {
   throw new Error("Backup directory must be outside the application directory");
 }
-
 const encodedKey = process.env.LUMAPOS_BACKUP_ENCRYPTION_KEY?.trim() ?? "";
 if (!/^[0-9a-f]{64}$/i.test(encodedKey)) {
   throw new Error("LUMAPOS_BACKUP_ENCRYPTION_KEY must be a 32-byte hexadecimal key");
@@ -129,7 +122,6 @@ const [{ locked }] = await connection.unsafe(
 ) as Array<{ locked: boolean }>;
 if (!locked) {
   console.log("Another LumaPOS database backup worker already holds the worker lock.");
-  backupR2Client.destroy();
   await connection.end({ timeout: 5 });
   process.exit(0);
 }
@@ -156,9 +148,25 @@ async function writeHeartbeat(state: "running" | "stopped") {
 async function requestScheduledBackup() {
   const scheduleKey = `daily-${new Date().toISOString().slice(0, 10)}`;
   const [existingSchedule] = await connection.unsafe(`
-    SELECT id::text FROM public.database_backup_runs WHERE schedule_key = $1 LIMIT 1
-  `, [scheduleKey]) as Array<{ id: string }>;
-  if (existingSchedule) return;
+    SELECT id::text, status FROM public.database_backup_runs WHERE schedule_key = $1 LIMIT 1
+  `, [scheduleKey]) as Array<{ id: string; status: string }>;
+  if (existingSchedule) {
+    if (existingSchedule.status === "failed") {
+      await connection.unsafe(`
+        UPDATE public.database_backup_runs failed_run
+        SET status = 'queued', requested_at = now(), started_at = NULL,
+            finished_at = NULL, duration_milliseconds = NULL, failure_code = NULL,
+            archive_key = NULL, archive_size_bytes = NULL, sha256 = NULL, manifest = '{}'::jsonb
+        WHERE failed_run.id = $1::uuid
+          AND ($2::boolean OR failed_run.finished_at < now() - interval '15 minutes')
+          AND NOT EXISTS (
+            SELECT 1 FROM public.database_backup_runs active_run
+            WHERE active_run.status IN ('queued', 'running')
+          )
+      `, [existingSchedule.id, once]);
+    }
+    return;
+  }
   const [activeRun] = await connection.unsafe(`
     SELECT id::text FROM public.database_backup_runs
     WHERE status IN ('queued', 'running')
@@ -200,6 +208,15 @@ async function claimRun() {
 }
 
 async function createBackup(runId: string) {
+  const backupVolumeReadiness = await readBackupVolumeReadiness({
+    backupRoot: resolvedBackupRoot,
+    mediaRoot: resolvedMediaRoot,
+    applicationRoot: resolvedProjectRoot,
+  });
+  if (!backupVolumeReadiness.configured) {
+    throw new Error(`BACKUP_VOLUME_NOT_READY:${backupVolumeReadiness.blockers.join(",")}`);
+  }
+
   const [{ mediaCount }] = await connection.unsafe(`
     SELECT count(*)::int AS "mediaCount"
     FROM public.media_objects
@@ -213,17 +230,32 @@ async function createBackup(runId: string) {
     throw new Error("PG_DUMP_VERSION_MISMATCH");
   }
 
-  await mkdir(resolvedBackupRoot, { recursive: true, mode: 0o700 });
-  await mkdir(resolvedMediaRoot, { recursive: true, mode: 0o700 });
+  const dateParts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const datePart = (type: Intl.DateTimeFormatPartTypes) =>
+    dateParts.find((part) => part.type === type)?.value ?? "00";
+  const finalName = `lumapos-${runId}.lumaenc`;
+  const archiveKey = `external-disk/${datePart("year")}/${datePart("month")}/${datePart("day")}/${finalName}`;
+  const finalPath = path.join(resolvedBackupRoot, archiveKey);
+
+  const mediaRootStats = await stat(resolvedMediaRoot);
+  if (!mediaRootStats.isDirectory()) throw new Error("MEDIA_ROOT_NOT_READY");
+  await access(resolvedMediaRoot, fsConstants.R_OK | fsConstants.X_OK);
   const temporaryDirectory = await mkdtemp(path.join(resolvedBackupRoot, ".lumapos-backup-"));
   const dumpPath = path.join(temporaryDirectory, "database.dump");
   const mediaArchivePath = path.join(temporaryDirectory, "media.tar.gz");
   const bundlePath = path.join(temporaryDirectory, "backup.tar.gz");
-  const finalName = `lumapos-${runId}-${Date.now()}.lumaenc`;
   const partialPath = path.join(temporaryDirectory, `${finalName}.partial`);
-  const finalPath = path.join(resolvedBackupRoot, finalName);
 
   try {
+    const temporaryDirectoryStats = await stat(temporaryDirectory);
+    if (temporaryDirectoryStats.dev !== backupVolumeReadiness.deviceId) {
+      throw new Error("BACKUP_VOLUME_CHANGED");
+    }
     const password = decodeURIComponent(parsedUrl.password);
     const sourceEnvironment = {
       ...process.env,
@@ -266,32 +298,24 @@ async function createBackup(runId: string) {
     );
     await run("tar", ["-czf", bundlePath, "-C", temporaryDirectory, "database.dump", "media.tar.gz", "manifest.json"]);
     await encryptFile(bundlePath, partialPath);
+    await mkdir(path.dirname(finalPath), { recursive: true, mode: 0o700 });
     await rename(partialPath, finalPath);
     const archiveStats = await stat(finalPath);
+    if (archiveStats.dev !== backupVolumeReadiness.deviceId) {
+      await rm(finalPath, { force: true }).catch(() => undefined);
+      throw new Error("BACKUP_VOLUME_CHANGED");
+    }
     const archiveSha256 = await sha256File(finalPath);
-    const dateParts = new Intl.DateTimeFormat("en", {
-      timeZone: "Asia/Ho_Chi_Minh",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).formatToParts(new Date());
-    const datePart = (type: Intl.DateTimeFormatPartTypes) =>
-      dateParts.find((part) => part.type === type)?.value ?? "00";
-    const archiveKey = `database-backups/${datePart("year")}/${datePart("month")}/${datePart("day")}/lumapos-${runId}.lumaenc`;
-    await uploadEncryptedBackup({
-      client: backupR2Client,
-      config: backupR2Config,
-      filePath: finalPath,
-      objectKey: archiveKey,
-      sizeBytes: archiveStats.size,
-      sha256: archiveSha256,
-    });
+    const backupRootStats = await stat(resolvedBackupRoot);
+    if (backupRootStats.dev !== backupVolumeReadiness.deviceId) {
+      await rm(finalPath, { force: true }).catch(() => undefined);
+      throw new Error("BACKUP_VOLUME_CHANGED");
+    }
     const storedManifest = {
       ...manifest,
-      remote: {
-        provider: "cloudflare-r2",
-        bucket: backupR2Config.bucket,
-        objectKey: archiveKey,
+      destination: {
+        provider: "external-disk",
+        relativePath: archiveKey,
         archiveSha256,
       },
     };
@@ -351,5 +375,4 @@ try {
   await writeHeartbeat("stopped").catch(() => undefined);
   await connection.unsafe("select pg_advisory_unlock($1)", [WORKER_LOCK_KEY]).catch(() => undefined);
   await connection.end({ timeout: 5 });
-  backupR2Client.destroy();
 }

@@ -291,12 +291,18 @@
     "syncWorker": "Sync worker",
     "notificationWorker": "Notification worker",
     "backupWorker": "Backup worker",
-    "backupStorage": "Off-site backup",
+    "backupStorage": "External backup disk",
     "backupBlockers": {
       "sourceConfirmation": "The operator has not confirmed which self-hosted snapshot the backup worker will read.",
-      "r2Configuration": "The dedicated R2 backup bucket credentials are missing or invalid.",
-      "recentRemoteBackup": "No verified R2 backup has completed in the last 26 hours.",
-      "unknown": "An off-site backup requirement is still unmet."
+      "volumeConfiguration": "The external backup disk path is missing or invalid.",
+      "volumeUnavailable": "The external backup disk is not mounted or its backup folder is missing.",
+      "volumeNotWritable": "The backend cannot read and write the external backup disk.",
+      "volumeSharesApplicationDisk": "The backup disk is on the same filesystem as the application.",
+      "volumeSharesMediaDisk": "The backup disk is on the same filesystem as media files.",
+      "applicationVolumeUnknown": "The application filesystem could not be checked.",
+      "mediaVolumeUnknown": "The media filesystem could not be checked.",
+      "recentExternalBackup": "No recent external-disk backup archive is available from the last 26 hours.",
+      "unknown": "An external backup requirement is still unmet."
     },
     "queue": "Sync commands",
     "backup": "Database and file backup",

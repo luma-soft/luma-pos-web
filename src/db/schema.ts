@@ -20,6 +20,11 @@ export type DatabaseBackupManifest = {
   included: string[];
   excluded: string[];
   files: Array<{ name: string; sizeBytes: number; sha256: string }>;
+  destination?: {
+    provider: "external-disk";
+    relativePath: string;
+    archiveSha256: string;
+  };
   version?: 1;
   createdAt?: string;
   databaseMajorVersion?: number;

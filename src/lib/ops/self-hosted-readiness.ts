@@ -7,7 +7,10 @@ import { db } from "@/db";
 import { systemWorkerHeartbeats } from "@/db/schema";
 import { authProvider } from "@/lib/auth/provider";
 import { getLocalMediaConfig, getMediaWriteProvider } from "@/lib/media/config";
-import { isBackupR2Configured } from "@/lib/ops/backup-r2";
+import {
+  isExternalBackupArchivePresent,
+  readBackupVolumeReadiness,
+} from "@/lib/ops/backup-volume";
 
 type WorkerKey = "sync-inbox" | "notification-outbox" | "database-backup";
 type WorkerStatus = { status: "online" | "offline"; lastSeenAt: string | null };
@@ -58,18 +61,18 @@ async function readLocalMediaReadiness() {
   try {
     root = getLocalMediaConfig().root;
   } catch {
-    return { configurationValid: false, rootAccessible: false };
+    return { configurationValid: false, rootAccessible: false, root: null };
   }
 
   try {
     const rootStats = await stat(root);
     if (!rootStats.isDirectory()) {
-      return { configurationValid: true, rootAccessible: false };
+      return { configurationValid: true, rootAccessible: false, root };
     }
     await access(root, fsConstants.R_OK | fsConstants.W_OK | fsConstants.X_OK);
-    return { configurationValid: true, rootAccessible: true };
+    return { configurationValid: true, rootAccessible: true, root };
   } catch {
-    return { configurationValid: true, rootAccessible: false };
+    return { configurationValid: true, rootAccessible: false, root };
   }
 }
 
@@ -211,11 +214,15 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
         ) AS "unfinishedLocalMediaMigration"
     `),
     db.execute(sql`
-      SELECT max(finished_at) AS "lastSuccessfulAt"
+      SELECT archive_key AS "archiveKey",
+        archive_size_bytes AS "archiveSizeBytes",
+        finished_at AS "lastSuccessfulAt"
       FROM public.database_backup_runs
       WHERE status = 'succeeded'
-        AND archive_key LIKE 'database-backups/%'
+        AND archive_key LIKE 'external-disk/%'
         AND finished_at >= now() - interval '26 hours'
+      ORDER BY finished_at DESC
+      LIMIT 1
     `),
   ]);
 
@@ -247,17 +254,30 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     };
   }
   const missingWorkers = workerKeys.filter((workerKey) => workers[workerKey].status !== "online");
-  const backupDestinationConfigured = isBackupR2Configured(process.env);
-  const lastSuccessfulBackupAt = resultRows(backupRows)[0]?.lastSuccessfulAt;
-  const recentRemoteBackupAt = lastSuccessfulBackupAt instanceof Date
-    ? lastSuccessfulBackupAt.toISOString()
-    : typeof lastSuccessfulBackupAt === "string"
-      ? new Date(lastSuccessfulBackupAt).toISOString()
-      : null;
+  const backupVolumeReadiness = await readBackupVolumeReadiness({
+    backupRoot: process.env.LUMAPOS_BACKUP_ROOT,
+    mediaRoot: localMediaReadiness?.root,
+    applicationRoot: process.cwd(),
+  });
+  const backupDestinationConfigured = backupVolumeReadiness.configured;
+  const lastSuccessfulBackup = resultRows(backupRows)[0] ?? {};
+  const backupArchivePresent = await isExternalBackupArchivePresent({
+    backupRoot: process.env.LUMAPOS_BACKUP_ROOT,
+    archiveKey: lastSuccessfulBackup.archiveKey,
+    archiveSizeBytes: lastSuccessfulBackup.archiveSizeBytes,
+    archiveSha256: lastSuccessfulBackup.sha256,
+  });
+  const recentExternalBackupAt = backupArchivePresent
+    ? lastSuccessfulBackup.lastSuccessfulAt instanceof Date
+      ? lastSuccessfulBackup.lastSuccessfulAt.toISOString()
+      : typeof lastSuccessfulBackup.lastSuccessfulAt === "string"
+        ? new Date(lastSuccessfulBackup.lastSuccessfulAt).toISOString()
+        : null
+    : null;
   const missingBackup = [
     ...(backupSourceConfirmed ? [] : ["sourceConfirmation"]),
-    ...(backupDestinationConfigured ? [] : ["r2Configuration"]),
-    ...(recentRemoteBackupAt ? [] : ["recentRemoteBackup"]),
+    ...backupVolumeReadiness.blockers,
+    ...(recentExternalBackupAt ? [] : ["recentExternalBackup"]),
   ];
   const mediaState = resultRows(mediaRows)[0] ?? {};
   const blockers: Record<string, boolean> = {
@@ -301,7 +321,7 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     backup: {
       status: missingBackup.length === 0 ? "ready" : "not_ready",
       destinationConfigured: backupDestinationConfigured,
-      lastSuccessfulAt: recentRemoteBackupAt,
+      lastSuccessfulAt: recentExternalBackupAt,
       blockers: missingBackup,
     },
     media: {
