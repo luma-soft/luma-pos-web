@@ -9,8 +9,8 @@ import {
 
 const SUPPLIER_CODE = "Mã nhà cung cấp";
 const UNKNOWN_SUPPLIER_EXTERNAL_ID = "__kiotviet_unknown_supplier__";
-const REVIEWED_SUPPLIER_DEBT_TOTAL = 53_253_051;
-const REVIEWED_SUPPLIER_NET_PURCHASES_TOTAL = 4_068_234_429;
+const REVIEWED_SUPPLIER_DEBT_TOTAL = 92_266_744;
+const REVIEWED_SUPPLIER_NET_PURCHASES_TOTAL = 4_227_045_932;
 const LEGACY_SUPPLIER_MARKER = "Tạo từ import lịch sử KiotViet";
 
 export function hasKiotVietLegacySupplierMarker(note: string | null | undefined): boolean {
