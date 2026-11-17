@@ -43,6 +43,7 @@ export function ProductCreateMenu({
   showLabel = true,
   additionalActions = [],
   nativeMobile = false,
+  nativeMobileIcon = "plus",
 }: {
   label: string;
   items: ProductCreateMenuItem[];
@@ -51,6 +52,8 @@ export function ProductCreateMenu({
   additionalActions?: ProductCreateMenuAction[];
   /** Phones: inline iOS "+" square beside search/filter instead of a floating button. */
   nativeMobile?: boolean;
+  /** Use the package glyph where a "+" would be confused with another create action. */
+  nativeMobileIcon?: "plus" | "package";
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -96,8 +99,8 @@ export function ProductCreateMenu({
           nativeMobile && "max-lg:size-12 max-lg:rounded-2xl max-lg:border max-lg:border-ios-stroke/60 max-lg:bg-surface max-lg:px-0 max-lg:text-ios-accent max-lg:shadow-none",
         )}
       >
-        <PackagePlus className={cn("h-4 w-4", nativeMobile && "max-lg:hidden")} />
-        {nativeMobile && <Plus className="!size-6 lg:hidden" strokeWidth={2.2} aria-hidden="true" />}
+        <PackagePlus className={cn("h-4 w-4", nativeMobile && nativeMobileIcon === "plus" && "max-lg:hidden", nativeMobile && nativeMobileIcon === "package" && "max-lg:!size-[22px]")} />
+        {nativeMobile && nativeMobileIcon === "plus" && <Plus className="!size-6 lg:hidden" strokeWidth={2.2} aria-hidden="true" />}
         {showLabel && <span className={cn(nativeMobile && "max-lg:sr-only")}>{label}</span>}
       </Button>
       {open && (

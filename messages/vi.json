@@ -1301,6 +1301,7 @@
       "filters": "Bộ lọc đơn hàng"
     },
     "pos": {
+      "itemCount": "{count} sản phẩm",
       "subtitle": "Tìm hàng, tạo giỏ và thanh toán",
       "orderSource": {
         "edit": "Sửa đơn theo đơn {code}",

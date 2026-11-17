@@ -1301,6 +1301,7 @@
       "filters": "Order filters"
     },
     "pos": {
+      "itemCount": "{count, plural, one {# item} other {# items}}",
       "subtitle": "Find items, build the cart, and checkout",
       "orderSource": {
         "edit": "Edit order from {code}",

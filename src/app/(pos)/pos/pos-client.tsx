@@ -1169,8 +1169,8 @@ export function PosClient({
     window.setTimeout(() => setHeldSaved(false), 3500);
   }
 
-  function toggleAddMenu() {
-    const rect = addMenuButtonRef.current?.getBoundingClientRect();
+  function toggleAddMenu(anchor?: HTMLElement | null) {
+    const rect = (anchor ?? addMenuButtonRef.current)?.getBoundingClientRect();
     if (rect) {
       // A draft menu opened from the mobile bottom sheet must remain in view.
       const menuHeight = 4 * 44 + 16;
@@ -2754,23 +2754,37 @@ export function PosClient({
   // draft list and action menus in its sheet, while retaining desktop tabs.
   const invoiceTabs = (
     <>
-      <button
-        type="button"
-        onClick={() => setMobileInvoicePickerOpen(true)}
-        aria-haspopup="dialog"
-        aria-expanded={mobileInvoicePickerOpen}
-        className="flex min-h-12 w-full items-center gap-3 rounded-[15px] border border-border bg-surface px-3 text-left shadow-sm lg:hidden"
-      >
-        <span className="min-w-0 flex-1 truncate text-base font-bold">
-          {draftDisplayLabel(active, Math.max(0, invoices.findIndex((inv) => inv.id === activeId)))}
-        </span>
-        {invoices.length > 1 && (
-          <span className="shrink-0 rounded-full bg-primary-600 px-2 py-0.5 text-xs font-bold tabular-nums text-white">
-            {invoices.length}
+      {/* iOS: current-order picker capsule with a "+" new-order button beside it. */}
+      <div className="flex items-center gap-3 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileInvoicePickerOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={mobileInvoicePickerOpen}
+          className="flex h-[52px] min-w-0 flex-1 items-center gap-3 rounded-[22px] border border-ios-stroke/50 bg-surface px-4 text-left"
+        >
+          <span className="min-w-0 flex-1 truncate text-[17px] font-bold">
+            {draftDisplayLabel(active, Math.max(0, invoices.findIndex((inv) => inv.id === activeId)))}
           </span>
-        )}
-        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
-      </button>
+          {invoices.length > 1 && (
+            <span className="shrink-0 rounded-full bg-primary-600 px-2 py-0.5 text-xs font-bold tabular-nums text-white">
+              {invoices.length}
+            </span>
+          )}
+          <ChevronDown className="size-5 shrink-0 text-ios-label-secondary" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={(event) => toggleAddMenu(event.currentTarget)}
+          aria-label={t("pos.draftTabs.addLabel")}
+          aria-haspopup="menu"
+          aria-expanded={addMenuOpen}
+          data-button-radius="pill"
+          className="grid size-[52px] shrink-0 place-items-center rounded-[22px] border border-ios-stroke/50 bg-surface text-ios-accent active:opacity-60"
+        >
+          <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
+        </button>
+      </div>
       {mobileInvoicePickerOpen && (
         <button
           type="button"
@@ -3216,10 +3230,17 @@ export function PosClient({
           type="button"
           disabled={cart.length === 0}
           onClick={() => setMobileView("cart")}
-          className={cn("fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 flex h-12 items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 font-semibold text-white shadow-e2 disabled:bg-primary-200 disabled:text-primary-700/60 disabled:shadow-none lg:hidden", keyboardInset > 0 && "hidden")}
+          aria-label={`${isQuoteDraft ? t("common.confirm") : primaryActionLabel} · ${formatCurrency(total)}`}
+          className={cn("group fixed inset-x-0 bottom-(--mobile-tabbar-space) z-50 flex items-center gap-3 border-t border-border bg-surface px-4 py-3 text-left lg:hidden", keyboardInset > 0 && "hidden")}
         >
-          <ShoppingCart className="h-4 w-4" />
-          {isQuoteDraft ? t("common.confirm") : primaryActionLabel} ({cart.reduce((sum, line) => sum + line.quantity, 0)}) · {formatCurrency(total)}
+          {/* iOS checkout bar: item count and total on the left, primary action on the right. */}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[15px] text-ios-label-secondary">{t("mobile.pos.itemCount", { count: cart.length })}</span>
+            <span className="block truncate text-[22px] font-bold leading-7 tabular-nums">{formatCurrency(total)}</span>
+          </span>
+          <span className="flex h-[52px] min-w-[44%] items-center justify-center rounded-[14px] bg-ios-accent px-5 text-[17px] font-semibold text-white group-disabled:bg-black/[0.06] group-disabled:text-ios-label-tertiary dark:group-disabled:bg-white/[0.1]">
+            {isQuoteDraft ? t("common.confirm") : primaryActionLabel}
+          </span>
         </button>
         <div className="mb-3 space-y-2">
           {invoiceTabs}
@@ -3474,6 +3495,8 @@ export function PosClient({
             <ProductCreateMenu
               label={t("pos.addProduct")}
               showLabel={false}
+              nativeMobile
+              nativeMobileIcon="package"
               onSelect={openProductCreator}
               items={[
                 { kind: "product", label: t("products.kind.labels.product"), hint: t("products.kind.hints.product") },

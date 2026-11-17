@@ -166,20 +166,8 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
     : baseInitialContext;
   return (
     <>
-    <div className="h-full flex flex-col">
-      <header className="flex h-[58px] shrink-0 items-center justify-between border-b border-border bg-surface px-4 lg:hidden">
-        <div className="min-w-0">
-          <div className="truncate text-lg font-black tracking-[-0.01em]">{t("nav.mobileSales")}</div>
-          <div className="truncate text-[10px] font-semibold text-slate-400">{t("mobile.pos.subtitle")}</div>
-        </div>
-        <Link
-          href={Routes.Dashboard}
-          aria-label={t("nav.dashboard")}
-          className="grid h-11 w-11 place-items-center rounded-xl text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300"
-        >
-          <LayoutDashboard className="h-5 w-5" />
-        </Link>
-      </header>
+    {/* Phones: no title bar, like the native Sales tab; content starts below the status bar. */}
+    <div className="h-full flex flex-col max-lg:pt-[env(safe-area-inset-top)]">
       {/* top bar gọn — thay cho sidebar admin (giống KiotViet) */}
       <header className="hidden shrink-0 h-[58px] px-4 sm:px-6 lg:flex items-center justify-between bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
         <Link
