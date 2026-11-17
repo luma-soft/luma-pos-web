@@ -73,9 +73,15 @@ phương Việt Nam. Chỉ cài khi timezone macOS là `Asia/Ho_Chi_Minh`; nếu
    `644`, rồi nạp bằng `launchctl bootstrap system <plist>`.
 4. Xem trạng thái bằng `launchctl print system/<label>` và log riêng của tiến
    trình. `/api/health/ready` phải trả 200 trước khi mở tunnel.
-5. Nâng cấp release bằng cách dừng dịch vụ, thay release tại cùng đường dẫn,
-   khởi động lại và kiểm tra readiness. Giữ release trước đó để rollback app
-   trên cùng PostgreSQL.
+5. Nâng cấp release: `ops/macos/build-release.sh` build commit `HEAD` vào
+   `/Users/Shared/LumaPOS/app-next` (không cần quyền admin), rồi
+   `sudo /Users/Shared/LumaPOS/app-next/ops/macos/deploy-release.sh` dừng
+   web/sync/notifications, thay release, khởi động lại và chờ
+   `/api/health/live`; nếu bản mới không lên thì tự khôi phục bản trước. Hai
+   release trước được giữ lại tại `app-prev-*` để rollback thủ công trên cùng
+   PostgreSQL. App Mac (Dịch vụ nền → **Cập nhật web**) chạy đúng hai bước
+   này. Readiness có thể vẫn là `not_ready` vì điều kiện sao lưu; không dùng
+   nó làm điều kiện deploy.
 
 Các ví dụ mặc định giả định Homebrew ARM ở `/opt/homebrew`. Mac Intel hoặc cách
 cài khác cần sửa `PATH`, Bun, `cloudflared` và PostgreSQL binary path. Khi
