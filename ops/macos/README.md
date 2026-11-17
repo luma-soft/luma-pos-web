@@ -194,3 +194,15 @@ chạy lại script cài đặt.
 sudo bash ~/project/LumaPOS/luma-pos-web/ops/macos/install-admin-helper.sh --uninstall
 ```
 
+
+## Xử lý sự cố
+
+| Hiện tượng | Nguyên nhân và cách xử lý |
+| --- | --- |
+| `Bootstrap failed: 5: Input/output error` khi tự chạy `launchctl` | Gọi `bootstrap` ngay sau `bootout` khi launchd chưa gỡ xong job. Chờ vài giây rồi chạy lại, hoặc dùng `lumapos-admin service start <tên>` (tự thử lại). |
+| Reload trình duyệt không thấy thay đổi | Production chạy bản build trong `/Users/Shared/LumaPOS/app`, không phải checkout của developer. Xem `RELEASE_COMMIT` và chạy **Cập nhật web**. |
+| App Mac báo "Máy chủ không phản hồi" nhưng `/api/health/live` vẫn 200 | `/api/health/ready` chậm hơn thời gian chờ của app (15 giây). Kiểm tra thời gian trả lời bằng `curl -w '%{time_total}' http://127.0.0.1:3000/api/health/ready`; kiểm tra Google Drive được cache 30 phút cho mỗi archive. |
+| Readiness `not_ready` với `recentGoogleDriveBackup` | Không có backup `succeeded` trên Google Drive trong 26 giờ, hoặc không đối chiếu được kích thước/MD5 của archive trên Drive. Xem lịch sử sao lưu ở trang `/admin` và log `backups`. |
+| Log web có `Failed to find Server Action` ngay sau khi cập nhật | Tab trình duyệt còn mở trang của bản cũ. Tải lại các tab LumaPOS. |
+| Thẻ Bản web báo "Mã nguồn có thay đổi chưa commit" | Checkout có file sửa dở; bản cập nhật chỉ gồm những gì đã commit. Commit (hoặc bỏ) thay đổi trước nếu cần đưa lên. |
+| App vẫn hỏi mật khẩu sau khi cài helper | Chạy `sudo -n /usr/local/libexec/lumapos-admin version` bằng user đang dùng app. Nếu báo cần mật khẩu, chạy lại `install-admin-helper.sh` bằng đúng user đó. |
