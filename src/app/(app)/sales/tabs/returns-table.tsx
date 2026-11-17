@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { FileX2 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
@@ -10,7 +10,7 @@ import type { ReturnListRow } from "@/lib/data/returns";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { SalesTableEmptyState } from "./sales-table-empty-state";
 import { MobileDocumentRow } from "./mobile-document-row";
-import { mobileDocumentDayHeadings } from "./mobile-document-day";
+import { mobileDocumentDayGroups, mobileDocumentTimestamp } from "./mobile-document-day";
 
 export function ReturnsTable({
   rows,
@@ -24,7 +24,13 @@ export function ReturnsTable({
   expandedFooter?: ReactNode;
 }) {
   const t = useTranslations();
-  const dayHeadings = mobileDocumentDayHeadings(rows, (row) => row.createdAt);
+  const locale = useLocale();
+  const dayGroups = mobileDocumentDayGroups(rows, (row) => row.createdAt, (row) => Number(row.totalRefund), {
+    locale,
+    today: (date) => t("mobile.invoices.groupToday", { date }),
+    yesterday: (date) => t("mobile.invoices.groupYesterday", { date }),
+    summary: (count, total) => t("mobile.invoices.groupSummary", { count, total }),
+  });
   const columns: DataTableColumn<ReturnListRow>[] = [
     {
       key: "code",
@@ -101,6 +107,8 @@ export function ReturnsTable({
       rows={rows}
       columns={columns}
       getRowId={(row) => row.id}
+      mobileListClassName="-mx-4 space-y-0 border-t border-border bg-surface"
+      mobileRowClassName="!rounded-none !border-0"
       expandedParam="expandedReturn"
       initialExpandedId={expandedId}
       detailSize="full"
@@ -116,7 +124,7 @@ export function ReturnsTable({
       renderMobileRow={({ row, toggle }) => (
         <MobileDocumentRow
           code={row.code}
-          dayHeading={dayHeadings.get(row.id)}
+          dayGroup={dayGroups.get(row.id)}
           customerName={row.customerName ?? t("orders.walkIn")}
           customer={(
             <PartnerDetailLink
@@ -124,12 +132,12 @@ export function ReturnsTable({
               partnerId={row.customerId}
               name={row.customerName ?? t("orders.walkIn")}
               openInCurrentTab
-              className="pointer-events-auto relative z-10 block truncate"
+              className="pointer-events-auto relative z-10 -my-3 block truncate py-3 text-foreground"
             />
           )}
           amount={formatCurrency(Number(row.totalRefund))}
           amountTone="danger"
-          createdAt={formatDate(row.createdAt)}
+          createdAt={mobileDocumentTimestamp(row.createdAt, locale)}
           onOpen={toggle}
           details={(
             <>

@@ -82,16 +82,17 @@ describe("sales customer detail navigation", () => {
 
   test("the mobile order action still opens its document independently of customer navigation", () => {
     let opened = 0;
-    const element = OrderMobileRow({ order: row, selected: false, onToggle() {}, onOpen: () => opened++, labels: { walkIn: "Khách lẻ", remaining: "Còn lại" } });
-    const buttons = [];
-    function visit(node) {
-      if (!node || typeof node !== "object") return;
-      if (node.type === "button") buttons.push(node);
-      for (const child of [node.props?.children].flat()) visit(child);
-    }
-    visit(element);
-    expect(buttons.length).toBeGreaterThan(0);
-    buttons[0].props.onClick();
+    let toggled = 0;
+    const labels = { walkIn: "Khách lẻ", status: "Đã thanh toán", itemSummary: null, select: "Chọn" };
+    const base = { order: row, selected: false, onToggle: () => toggled++, onOpen: () => opened++, onLongPress() {}, labels, timestamp: "" };
+    const element = OrderMobileRow({ ...base, selecting: false });
+    element.props.onOpen();
+    expect(opened).toBe(1);
+    expect(element.props.customer.props.partnerId).toBe(row.customerId);
+    // In selection mode a row tap toggles selection instead (native long-press flow).
+    const selecting = OrderMobileRow({ ...base, selecting: true });
+    selecting.props.onOpen();
+    expect(toggled).toBe(1);
     expect(opened).toBe(1);
   });
 });

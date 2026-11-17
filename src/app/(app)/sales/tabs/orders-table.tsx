@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   DataTableShell,
   stopRowToggle,
@@ -16,7 +16,7 @@ import {
   OrderStatusBadge,
   PaymentStatusBadge,
 } from "../../orders/status-badges";
-import { ChevronDown, FileX2, Loader2, Printer, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, Circle, FileX2, Loader2, Printer, XCircle } from "lucide-react";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
@@ -24,7 +24,8 @@ import { cancelOrders } from "@/lib/actions/orders";
 import { SalesTableEmptyState } from "./sales-table-empty-state";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { controlHeightClassName } from "@/components/ui/button-variants";
-import { mobileDocumentDayHeadings } from "./mobile-document-day";
+import { mobileDocumentDayGroups, mobileDocumentTimestamp, type MobileDocumentDayGroup } from "./mobile-document-day";
+import { MobileDocumentRow } from "./mobile-document-row";
 
 export function normalizeOrderBatchSelection(
   selectedIds: Set<string>,
@@ -106,6 +107,8 @@ export function OrderBatchToolbar({
   cancelling,
   onCancel,
   labels,
+  mobileSelecting = false,
+  onDone,
 }: {
   selectedCount: number;
   selectedIds: string[];
@@ -117,19 +120,32 @@ export function OrderBatchToolbar({
     print: string;
     cancel: string;
     selected?: string;
+    done?: string;
   };
+  /** Phones show batch actions only after a long press enters selection mode (iOS). */
+  mobileSelecting?: boolean;
+  onDone?: () => void;
 }) {
   const batchHref = `/orders/print-batch?${selectedIds.map((id) => `ids=${encodeURIComponent(id)}`).join("&")}`;
   const mergeHref = `/orders/merge?${selectedIds.map((id) => `ids=${encodeURIComponent(id)}`).join("&")}`;
   return (
-    <div className="flex w-full items-center justify-end gap-2 text-sm">
+    <div className={cn("w-full flex-wrap items-center justify-end gap-2 text-sm", mobileSelecting ? "flex" : "hidden lg:flex")}>
       <span
-        className="px-2 py-1 text-xs font-semibold text-slate-600"
+        className="px-2 py-1 text-xs font-semibold text-slate-600 max-lg:mr-auto"
         aria-live="polite"
       >
         {labels.selected ?? selectedCount}
       </span>
-      <div className="grid grid-cols-2 gap-2 lg:contents">
+      {onDone && labels.done && (
+        <button
+          type="button"
+          onClick={onDone}
+          className="min-h-11 px-2 text-[17px] font-semibold text-ios-accent lg:hidden"
+        >
+          {labels.done}
+        </button>
+      )}
+      <div className="grid w-full grid-cols-3 gap-2 lg:contents">
         {selectedCount < 2 ? (
           <button
             type="button"
@@ -183,83 +199,85 @@ export function OrderBatchToolbar({
   );
 }
 
+/** Status line copy from NativeInvoiceHistoryRow.statusLabel. */
+export function orderMobileStatusKey(status: string, paymentStatus: string) {
+  switch (status) {
+    case "draft": return "draft";
+    case "quote": return "quote";
+    case "confirmed": return "booked";
+    case "delivering": return "delivering";
+    case "completed": return paymentStatus === "paid" ? "paid" : "due";
+    case "returned": return "returned";
+    case "cancelled": return "cancelled";
+    case "merged": return "merged";
+    default: return "pending";
+  }
+}
+
 export function OrderMobileRow({
   order,
+  selecting,
   selected,
   onToggle,
   onOpen,
+  onLongPress,
   labels,
-  dayHeading,
+  dayGroup,
+  timestamp,
 }: {
   order: OrderListRow;
+  selecting: boolean;
   selected: boolean;
   onToggle: () => void;
   onOpen: () => void;
+  onLongPress: () => void;
   labels: {
     walkIn: string;
-    remaining: string;
+    status: string;
+    itemSummary: string | null;
+    select: string;
   };
-  dayHeading?: string;
+  dayGroup?: MobileDocumentDayGroup;
+  timestamp: string;
 }) {
-  const remaining = Number(order.total) - Number(order.amountPaid);
   const selectable = order.status !== "cancelled" && order.status !== "merged";
   const customerTitle = order.customerName ?? labels.walkIn;
+  const Indicator = selected ? CheckCircle2 : Circle;
   return (
-    <div>
-      {dayHeading && (
-        <div className="border-b border-border-soft bg-surface-2/60 px-3 py-2 text-xs font-bold text-slate-600 dark:text-slate-300" role="heading" aria-level={3}>
-          {dayHeading}
-        </div>
-      )}
-    <div className={cn(
-      "flex min-w-0 items-stretch",
-      selected && "bg-primary-50/50 dark:bg-primary-950/20",
-    )}>
-      <div className="shrink-0 p-3 pr-0 pt-3">
-        <OrderSelectionCheckbox
-          checked={selected}
-          disabled={!selectable}
-          onChange={onToggle}
-          label={order.code}
+    <MobileDocumentRow
+      customerName={customerTitle}
+      customer={(
+        <PartnerDetailLink
+          kind="customer"
+          partnerId={selecting ? null : order.customerId}
+          name={customerTitle}
+          openInCurrentTab
+          className="pointer-events-auto relative -my-3 block truncate py-3 text-foreground"
         />
-      </div>
-      <div className="relative min-h-[104px] min-w-0 flex-1 p-3 text-left">
-        {/* The transparent button covers the whole row, not just its title. */}
+      )}
+      dayGroup={dayGroup}
+      amount={formatCurrency(Number(order.total))}
+      status={labels.status}
+      details={labels.itemSummary}
+      code={order.code}
+      createdAt={timestamp}
+      selected={selected}
+      leading={selecting ? (
         <button
           type="button"
-          onClick={onOpen}
-          aria-label={`${customerTitle} · ${order.code}`}
-          className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
-        />
-        <div className="pointer-events-none relative flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <PartnerDetailLink
-              kind="customer"
-              partnerId={order.customerId}
-              name={customerTitle}
-              openInCurrentTab
-              className="pointer-events-auto relative block truncate text-[15px] font-semibold text-foreground"
-            />
-          </div>
-          <span className="min-w-0 max-w-[48%] shrink-0 text-right text-[15px] font-semibold tabular-nums [overflow-wrap:anywhere]">
-            {formatCurrency(Number(order.total))}
-          </span>
-        </div>
-        <div className="pointer-events-none relative mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
-          <OrderStatusBadge status={order.status} />
-          <PaymentStatusBadge status={order.paymentStatus} />
-          {selectable && remaining > 0 && (
-            <span className="font-medium tabular-nums text-er">
-              {labels.remaining}: {formatCurrency(remaining)}
-            </span>
-          )}
-        </div>
-        <div className="pointer-events-none relative mt-2 truncate text-[11px] text-slate-500 dark:text-slate-400">
-          {formatDate(order.createdAt)} · {order.code} · {channelLabel(order.sourceMode)}
-        </div>
-      </div>
-    </div>
-    </div>
+          onClick={onToggle}
+          disabled={!selectable}
+          aria-pressed={selected}
+          aria-label={`${labels.select} ${order.code}`}
+          data-button-radius="pill"
+          className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full disabled:opacity-40"
+        >
+          <Indicator className={cn("size-6", selected ? "fill-ios-accent text-white dark:text-black" : "text-ios-label-tertiary")} strokeWidth={selected ? 2.4 : 1.8} aria-hidden="true" />
+        </button>
+      ) : undefined}
+      onOpen={selecting ? onToggle : onOpen}
+      onLongPress={selectable ? onLongPress : undefined}
+    />
   );
 }
 
@@ -286,7 +304,14 @@ export function OrdersTable({
   );
   const selectedIds = selection?.selectedIds ?? internalSelectedIds;
   const setSelectedIds = selection?.onChange ?? setInternalSelectedIds;
-  const dayHeadings = mobileDocumentDayHeadings(rows, (order) => order.createdAt);
+  const locale = useLocale();
+  const [selecting, setSelecting] = useState(false);
+  const dayGroups = mobileDocumentDayGroups(rows, (order) => order.createdAt, (order) => Number(order.total), {
+    locale,
+    today: (date) => t("mobile.invoices.groupToday", { date }),
+    yesterday: (date) => t("mobile.invoices.groupYesterday", { date }),
+    summary: (count, total) => t("mobile.invoices.groupSummary", { count, total }),
+  });
   const selectableIds = rows
     .filter((order) => order.status !== "cancelled" && order.status !== "merged")
     .map((order) => order.id);
@@ -484,6 +509,11 @@ export function OrdersTable({
           <OrderBatchToolbar
             selectedCount={selectedVisibleIds.length}
             selectedIds={selectedVisibleIds}
+            mobileSelecting={selecting}
+            onDone={() => {
+              setSelecting(false);
+              setSelectedIds(new Set());
+            }}
             templates={printTemplates}
             cancelling={cancelling}
             onCancel={cancelSelectedOrders}
@@ -494,6 +524,7 @@ export function OrdersTable({
               selected: t("orders.selectedCount", {
                 count: selectedVisibleIds.length,
               }),
+              done: t("mobile.invoices.selectDone"),
             }}
           />
         }
@@ -504,16 +535,26 @@ export function OrdersTable({
             title={t("orders.empty")}
           />
         )}
+        mobileListClassName="-mx-4 space-y-0 border-t border-border bg-surface"
+        mobileRowClassName="!rounded-none !border-0"
         renderMobileRow={({ row: order }) => (
           <OrderMobileRow
             order={order}
-            dayHeading={dayHeadings.get(order.id)}
+            dayGroup={dayGroups.get(order.id)}
+            timestamp={mobileDocumentTimestamp(order.createdAt, locale)}
+            selecting={selecting}
             selected={normalizedSelection.has(order.id)}
             onToggle={() => toggle(order.id)}
             onOpen={() => openOrder(order)}
+            onLongPress={() => {
+              setSelecting(true);
+              if (!normalizedSelection.has(order.id)) toggle(order.id);
+            }}
             labels={{
               walkIn: t("orders.walkIn"),
-              remaining: t("orders.cols.remaining"),
+              status: t(`mobile.invoices.status.${orderMobileStatusKey(order.status, order.paymentStatus)}`),
+              itemSummary: orderItemSummary(order, t),
+              select: t("mobile.invoices.select"),
             }}
           />
         )}
@@ -522,10 +563,10 @@ export function OrdersTable({
   );
 }
 
-function channelLabel(source?: string | null) {
-  if (source === "shopee") return "Shopee";
-  if (source === "tiktok_shop") return "TikTok Shop";
-  if (source === "lazada") return "Lazada";
-  if (source === "tiki") return "Tiki";
-  return "POS";
+function orderItemSummary(order: OrderListRow, t: ReturnType<typeof useTranslations>) {
+  const names = order.productNames?.replaceAll(" {DEL}", " (DEL)").trim() || null;
+  if (order.itemCount <= 0) return names;
+  return names
+    ? t("mobile.invoices.itemSummary", { count: order.itemCount, names })
+    : t("mobile.invoices.itemCount", { count: order.itemCount });
 }

@@ -1,14 +1,14 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { FileSpreadsheet } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { SalesTableEmptyState } from "./sales-table-empty-state";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { MobileDocumentRow } from "./mobile-document-row";
-import { mobileDocumentDayHeadings } from "./mobile-document-day";
+import { mobileDocumentDayGroups, mobileDocumentTimestamp } from "./mobile-document-day";
 
 type QuoteRow = {
   id: string;
@@ -35,7 +35,13 @@ export function QuotesTable({
     next.set("detailOrderId", row.id);
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
   }
-  const dayHeadings = mobileDocumentDayHeadings(rows, (row) => row.createdAt);
+  const locale = useLocale();
+  const dayGroups = mobileDocumentDayGroups(rows, (row) => row.createdAt, (row) => Number(row.total), {
+    locale,
+    today: (date) => t("mobile.invoices.groupToday", { date }),
+    yesterday: (date) => t("mobile.invoices.groupYesterday", { date }),
+    summary: (count, total) => t("mobile.invoices.groupSummary", { count, total }),
+  });
   const columns: DataTableColumn<QuoteRow>[] = [
     { key: "code", label: t("quotes.cols.code"), required: true, width: "170px", render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, width: "170px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
@@ -49,13 +55,15 @@ export function QuotesTable({
       rows={rows}
       columns={columns}
       getRowId={(row) => row.id}
+      mobileListClassName="-mx-4 space-y-0 border-t border-border bg-surface"
+      mobileRowClassName="!rounded-none !border-0"
       minWidth="880px"
       onRowClick={openOrder}
       rowClickMode="row"
       renderMobileRow={({ row }) => (
         <MobileDocumentRow
           code={row.code}
-          dayHeading={dayHeadings.get(row.id)}
+          dayGroup={dayGroups.get(row.id)}
           customerName={row.customerName ?? t("orders.walkIn")}
           customer={(
             <PartnerDetailLink
@@ -63,11 +71,11 @@ export function QuotesTable({
               partnerId={row.customerId}
               name={row.customerName ?? t("orders.walkIn")}
               openInCurrentTab
-              className="pointer-events-auto relative z-10 block truncate"
+              className="pointer-events-auto relative z-10 -my-3 block truncate py-3 text-foreground"
             />
           )}
           amount={formatCurrency(Number(row.total))}
-          createdAt={formatDate(row.createdAt)}
+          createdAt={mobileDocumentTimestamp(row.createdAt, locale)}
           details={row.projectName ? (
             <span className="block truncate">{t("orders.cols.project")}: {row.projectName}</span>
           ) : undefined}

@@ -1214,6 +1214,29 @@
     }
   },
   "mobile": {
+    "invoices": {
+      "tabSales": "Sales",
+      "select": "Select",
+      "selectDone": "Done",
+      "groupToday": "Today · {date}",
+      "groupYesterday": "Yesterday · {date}",
+      "groupTomorrow": "Tomorrow · {date}",
+      "groupSummary": "{count, plural, one {# order} other {# orders}} · {total}",
+      "itemCount": "{count, plural, one {# item} other {# items}}",
+      "itemSummary": "{count, plural, one {# item} other {# items}} · {names}",
+      "status": {
+        "draft": "Draft",
+        "quote": "Quote",
+        "booked": "Order",
+        "delivering": "Delivering",
+        "paid": "Paid",
+        "due": "Payment due",
+        "returned": "Returned",
+        "cancelled": "Cancelled",
+        "merged": "Merged",
+        "pending": "Pending"
+      }
+    },
     "dashboard": {
       "subtitle": "Today's operations · POS-first",
       "rangeLabel": "Dashboard date range",

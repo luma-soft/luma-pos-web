@@ -47,7 +47,7 @@ test("refund amount can use danger tone while preserving row navigation", () => 
     createdAt: "08/11/2026",
     onOpen: () => {},
   }));
-  expect(html).toContain("text-er");
+  expect(html).toContain("text-ios-red");
   expect(html).toContain("200.000đ");
   expect(html).toContain("Khách trả");
   expect(html).toContain('aria-label="Khách trả · TH-002"');

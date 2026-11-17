@@ -1214,6 +1214,29 @@
     }
   },
   "mobile": {
+    "invoices": {
+      "tabSales": "Đơn bán",
+      "select": "Chọn",
+      "selectDone": "Xong",
+      "groupToday": "Hôm nay · {date}",
+      "groupYesterday": "Hôm qua · {date}",
+      "groupTomorrow": "Ngày mai · {date}",
+      "groupSummary": "{count} đơn · {total}",
+      "itemCount": "{count} mặt hàng",
+      "itemSummary": "{count} mặt hàng · {names}",
+      "status": {
+        "draft": "Nháp",
+        "quote": "Báo giá",
+        "booked": "Đặt hàng",
+        "delivering": "Đang giao",
+        "paid": "Đã thanh toán",
+        "due": "Còn phải thu",
+        "returned": "Đã trả hàng",
+        "cancelled": "Đã hủy",
+        "merged": "Đã gộp",
+        "pending": "Chờ xử lý"
+      }
+    },
     "dashboard": {
       "subtitle": "Nhịp vận hành hôm nay · POS-first",
       "rangeLabel": "Khoảng thời gian tổng quan",

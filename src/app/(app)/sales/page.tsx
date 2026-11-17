@@ -13,11 +13,12 @@ import { ReturnsTab } from "./tabs/returns";
 import { EINVOICE_UI_ENABLED } from "@/lib/features";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { cn } from "@/lib/utils";
+import { ListPrimaryActionProvider } from "@/components/list-search-filter";
 
 export const dynamic = "force-dynamic";
 
 const CORE_TABS = [
-  { tab: "orders", labelKey: "nav.orders" },
+  { tab: "orders", labelKey: "mobile.invoices.tabSales" },
   { tab: "returns", labelKey: "nav.returns" },
   { tab: "quotes", labelKey: "nav.quotes" },
   { tab: "bookings", labelKey: "nav.bookings" },
@@ -29,9 +30,16 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
   const einvoiceEnabled = EINVOICE_UI_ENABLED && context.features.einvoice;
   const tabs = einvoiceEnabled ? [...CORE_TABS, { tab: "einvoices", labelKey: "nav.einvoices" }] : CORE_TABS;
   const tab = params.tab === "einvoices" && !einvoiceEnabled ? "orders" : params.tab ?? "orders";
+  const primaryLabels = {
+    orders: t("orders.createViaPos"),
+    returns: t("returns.create"),
+    quotes: t("quotes.createQuote"),
+    bookings: t("bookings.createViaPos"),
+  };
 
   return (
-    <div className="p-4 sm:p-6">
+    // Phones use the native plain list: white page, full-bleed rows.
+    <div className="p-4 sm:p-6 max-lg:min-h-full max-lg:bg-surface">
       <div className="sticky top-0 z-20 -mx-4 -mt-4 mb-4 border-b border-border bg-surface sm:-mx-6 sm:-mt-6 lg:mb-5">
         <div className="hidden items-center px-4 sm:px-6 lg:flex lg:min-h-[52px] lg:pt-2.5">
           <div className="min-w-0">
@@ -42,25 +50,27 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
           <div className="min-w-0 flex-1">
             <GroupTabs base={Routes.Sales} items={tabs} edgeToEdge={false} nativeMobileStyle />
           </div>
-          <SalesPrimaryAction
-            tab={tab}
-            labels={{
-              orders: t("orders.createViaPos"),
-              returns: t("returns.create"),
-              quotes: t("quotes.createQuote"),
-              bookings: t("bookings.createViaPos"),
-            }}
-          />
+          <SalesPrimaryAction tab={tab} labels={primaryLabels} />
         </div>
       </div>
 
-      {tab === "quotes" ? <QuotesTab searchParams={params} />
-        : tab === "returns" ? <ReturnsTab searchParams={params} />
-        : tab === "bookings" ? <BookingsTab searchParams={params} />
-        : tab === "einvoices" && einvoiceEnabled ? <EInvoicesTab />
-        : <OrdersTab searchParams={params} />}
+      <ListPrimaryActionProvider action={salesPrimaryAction(tab, primaryLabels)}>
+        {tab === "quotes" ? <QuotesTab searchParams={params} />
+          : tab === "returns" ? <ReturnsTab searchParams={params} />
+          : tab === "bookings" ? <BookingsTab searchParams={params} />
+          : tab === "einvoices" && einvoiceEnabled ? <EInvoicesTab />
+          : <OrdersTab searchParams={params} />}
+      </ListPrimaryActionProvider>
     </div>
   );
+}
+
+function salesPrimaryAction(tab: string, labels: Record<"orders" | "returns" | "quotes" | "bookings", string>) {
+  if (tab === "returns") return { href: `${Routes.POS}?draft=return_quick`, label: labels.returns };
+  if (tab === "quotes") return { href: `${Routes.POS}?draft=quote`, label: labels.quotes };
+  if (tab === "bookings") return { href: Routes.POS, label: labels.bookings };
+  if (tab === "orders") return { href: Routes.POS, label: labels.orders };
+  return null;
 }
 
 function SalesPrimaryAction({
@@ -105,7 +115,8 @@ function SalesPrimaryAction({
       aria-label={action.label}
       className={cn(
         buttonVariants({ size: "default" }),
-        "min-w-11 shrink-0 rounded-lg px-3.5 font-semibold lg:min-w-0",
+        // On phones the create action sits beside search/filter as the iOS "+" button.
+        "min-w-11 shrink-0 rounded-lg px-3.5 font-semibold max-lg:hidden lg:min-w-0",
       )}
     >
       <Icon className="size-4" />
