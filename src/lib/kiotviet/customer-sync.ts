@@ -8,8 +8,8 @@ import {
 } from "./data-sync-plan";
 
 const CUSTOMER_CODE = "Mã khách hàng";
-const REVIEWED_CUSTOMER_DEBT_TOTAL = 169_142_600;
-const REVIEWED_CUSTOMER_NET_SALES_TOTAL = 3_571_207_470;
+const REVIEWED_CUSTOMER_DEBT_TOTAL = 187_599_720;
+const REVIEWED_CUSTOMER_NET_SALES_TOTAL = 3_647_380_690;
 
 export interface KiotVietCustomerSource {
   externalId: string;
@@ -149,6 +149,32 @@ function currentManagedCustomer(current: KiotVietCustomerCurrent): Omit<KiotViet
   };
 }
 
+function comparableName(value: string): string {
+  return normalizeKiotVietText(value).replace(/\s+/g, " ").toLocaleLowerCase("vi");
+}
+
+/**
+ * KiotViet stays authoritative for balances and status, but Luma POS keeps the
+ * customer details it already has: a blank KiotViet field never clears a POS
+ * value, and a name that differs only in letter case or spacing keeps the POS
+ * spelling.
+ */
+function effectiveSourceCustomer(
+  source: Omit<KiotVietCustomerSource, "externalId">,
+  local: Omit<KiotVietCustomerSource, "externalId"> | undefined,
+): Omit<KiotVietCustomerSource, "externalId"> {
+  if (!local) return source;
+  return {
+    ...source,
+    name: comparableName(source.name) === comparableName(local.name) ? local.name : source.name,
+    phone: source.phone ?? local.phone,
+    email: source.email ?? local.email,
+    address: source.address ?? local.address,
+    taxCode: source.taxCode ?? local.taxCode,
+    note: source.note ?? local.note,
+  };
+}
+
 function customerFingerprint(customer: Omit<KiotVietCustomerSource, "externalId">): string {
   return stableKiotVietFingerprint(customer);
 }
@@ -205,10 +231,21 @@ export function planKiotVietCustomerSync(input: {
   }));
   const mappedLocalIds = new Set(input.mappings.map((mapping) => mapping.localId));
   const mappingByExternalId = new Map(input.mappings.map((mapping) => [mapping.externalId, mapping]));
+  const localFor = (externalId: string) => {
+    const mapping = mappingByExternalId.get(externalId);
+    return mapping ? currentById.get(mapping.localId) : currentByCode.get(externalId);
+  };
+  const managedSource = (externalId: string) => {
+    const local = localFor(externalId);
+    return effectiveSourceCustomer(
+      sourceManagedCustomer(sourceByExternalId.get(externalId)!),
+      local ? currentManagedCustomer(local) : undefined,
+    );
+  };
   const entityPlan = planKiotVietEntities({
     sources: customers.map((customer) => ({
       externalId: customer.externalId,
-      fingerprint: customerFingerprint(sourceManagedCustomer(customer)),
+      fingerprint: customerFingerprint(managedSource(customer.externalId)),
     })),
     current: input.current.map((customer) => {
       const code = nullableText(customer.code);
@@ -278,13 +315,13 @@ export function planKiotVietCustomerSync(input: {
       action: "adopt" as const,
       externalId,
       localId,
-      customer: sourceManagedCustomer(sourceByExternalId.get(externalId)!),
+      customer: managedSource(externalId),
     })),
     ...entityPlan.updates.map(({ externalId, localId }) => ({
       action: "update" as const,
       externalId,
       localId,
-      customer: sourceManagedCustomer(sourceByExternalId.get(externalId)!),
+      customer: managedSource(externalId),
     })),
     ...inactivations.map(({ externalId, localId }) => ({
       action: "inactivate" as const,

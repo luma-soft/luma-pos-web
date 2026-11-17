@@ -12,6 +12,7 @@ import type { KiotVietPurchaseSyncPlan } from "./purchase-sync";
 import type { KiotVietReturnSyncPlan } from "./return-sync";
 import type { KiotVietSalesSyncPlan } from "./sales-sync";
 import type { KiotVietSupplierSyncPlan } from "./supplier-sync";
+import { kiotVietPosCode, type KiotVietPosCodeEntity } from "./pos-codes";
 import type {
   KiotVietDataSyncTransaction, KiotVietMappingAdoptionMethod,
   KiotVietMappingEntityType, KiotVietSyncPhase,
@@ -76,6 +77,34 @@ async function mapSource(input: ApplyInput & {
   });
 }
 
+const POS_CODE_TABLES = {
+  customer: customers, supplier: suppliers, booking: orders, sale: orders,
+  purchase: purchaseOrders, customer_return: returns, supplier_return: purchaseReturns,
+} as const;
+
+/**
+ * Luma POS owns record codes: a record created from KiotViet gets a POS code and
+ * the KiotViet code lives only in the source mapping written next to it.
+ */
+async function allocatePosCode(
+  input: ApplyInput, entity: KiotVietPosCodeEntity, externalId: string, at: Date,
+): Promise<string> {
+  const table = POS_CODE_TABLES[entity];
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const code = kiotVietPosCode(entity, externalId, at, attempt);
+    const taken = await input.transaction.select({ id: table.id }).from(table)
+      .where(and(eq(table.storeId, input.storeId), eq(table.code, code))).limit(1);
+    if (taken.length === 0) return code;
+  }
+  throw new Error(`Could not allocate a Luma POS code for KiotViet ${entity} ${externalId}`);
+}
+
+function withoutCode<T extends { code?: unknown }>(values: T): Omit<T, "code"> {
+  const { code: _code, ...rest } = values;
+  void _code;
+  return rest;
+}
+
 async function requireUpdated(rows: Array<{ id: string }>, label: string): Promise<void> {
   if (rows.length !== 1) throw new Error(`${label} does not belong to the target store`);
 }
@@ -107,8 +136,9 @@ async function applyCustomers(input: ApplyInput & { plan: Extract<KiotVietTypedP
     const localId = write.localId ?? randomUUID();
     if (write.action === "create" || write.action === "historical_placeholder") {
       const value = write.customer;
+      const code = await allocatePosCode(input, "customer", write.externalId, new Date());
       await input.transaction.insert(customers).values({
-        id: localId, storeId: input.storeId, code: value.code, name: value.name,
+        id: localId, storeId: input.storeId, code, name: value.name,
         type: "type" in value ? value.type : "retail",
         phone: "phone" in value ? value.phone : null, email: "email" in value ? value.email : null,
         address: "address" in value ? value.address : null, taxCode: "taxCode" in value ? value.taxCode : null,
@@ -121,7 +151,7 @@ async function applyCustomers(input: ApplyInput & { plan: Extract<KiotVietTypedP
     } else {
       const value = write.customer;
       await requireUpdated(await input.transaction.update(customers).set({
-        code: value.code, name: value.name, phone: value.phone, email: value.email,
+        name: value.name, phone: value.phone, email: value.email,
         address: value.address, taxCode: value.taxCode, note: value.note, isActive: value.isActive,
         currentDebt: String(value.currentDebt), totalSpent: String(value.totalSpent),
       }).where(and(eq(customers.storeId, input.storeId), eq(customers.id, localId))).returning({ id: customers.id }), `Customer ${localId}`);
@@ -137,8 +167,11 @@ async function applySuppliers(input: ApplyInput & { plan: Extract<KiotVietTypedP
     const localId = write.localId ?? randomUUID();
     if (write.action === "create" || write.action === "historical_placeholder" || write.action === "unknown_supplier_placeholder") {
       const value = write.supplier;
+      const code = write.action === "unknown_supplier_placeholder"
+        ? value.code
+        : await allocatePosCode(input, "supplier", write.externalId, new Date());
       await input.transaction.insert(suppliers).values({
-        id: localId, storeId: input.storeId, code: value.code, name: value.name,
+        id: localId, storeId: input.storeId, code, name: value.name,
         phone: "phone" in value ? value.phone : null, email: "email" in value ? value.email : null,
         address: "address" in value ? value.address : null, taxCode: "taxCode" in value ? value.taxCode : null,
         note: "note" in value ? value.note : null, isActive: value.isActive, currentDebt: String(value.currentDebt),
@@ -149,7 +182,7 @@ async function applySuppliers(input: ApplyInput & { plan: Extract<KiotVietTypedP
     } else if (write.action === "adopt" || write.action === "update") {
       const value = write.supplier;
       await requireUpdated(await input.transaction.update(suppliers).set({
-        code: value.code, name: value.name, phone: value.phone, email: value.email,
+        name: value.name, phone: value.phone, email: value.email,
         address: value.address, taxCode: value.taxCode, note: value.note, isActive: value.isActive,
         currentDebt: String(value.currentDebt),
       }).where(and(eq(suppliers.storeId, input.storeId), eq(suppliers.id, localId))).returning({ id: suppliers.id }), `Supplier ${localId}`);
@@ -245,8 +278,11 @@ async function applyBookings(input: ApplyInput & { plan: Extract<KiotVietTypedPh
     const localId = write.localId ?? randomUUID();
     const parentWasCreated = write.action === "create";
     const values = bookingOrderValues(write.booking);
-    if (parentWasCreated) await input.transaction.insert(orders).values({ id: localId, storeId: input.storeId, ...values });
-    else await requireUpdated(await input.transaction.update(orders).set(values).where(and(
+    if (parentWasCreated) await input.transaction.insert(orders).values({
+      id: localId, storeId: input.storeId, ...values,
+      code: await allocatePosCode(input, "booking", write.externalId, write.booking.createdAt),
+    });
+    else await requireUpdated(await input.transaction.update(orders).set(withoutCode(values)).where(and(
       eq(orders.storeId, input.storeId), eq(orders.id, localId), eq(orders.documentType, "booking"),
     )).returning({ id: orders.id }), `Booking ${localId}`);
     await mapSource({ ...input, entityType: "booking", externalId: write.externalId, localId, method: adoptionMethod(write.action, write.localId) });
@@ -274,8 +310,11 @@ async function applySales(input: ApplyInput & { plan: Extract<KiotVietTypedPhase
     // Every other stale mapped status is source-owned and repaired to completed.
     const status = currentStatus?.[0]?.status === "returned" ? "returned" : "completed";
     const values = saleOrderValues(write.sale, status);
-    if (parentWasCreated) await input.transaction.insert(orders).values({ id: localId, storeId: input.storeId, ...values });
-    else await requireUpdated(await input.transaction.update(orders).set(values).where(and(
+    if (parentWasCreated) await input.transaction.insert(orders).values({
+      id: localId, storeId: input.storeId, ...values,
+      code: await allocatePosCode(input, "sale", write.externalId, write.sale.createdAt),
+    });
+    else await requireUpdated(await input.transaction.update(orders).set(withoutCode(values)).where(and(
       eq(orders.storeId, input.storeId), eq(orders.id, localId), eq(orders.documentType, "sale"),
     )).returning({ id: orders.id }), `Sale ${localId}`);
     await mapSource({ ...input, entityType: "sale", externalId: write.externalId, localId, method: adoptionMethod(write.action, write.localId) });
@@ -297,8 +336,11 @@ async function applyPurchases(input: ApplyInput & { plan: Extract<KiotVietTypedP
       total: String(value.total), amountPaid: String(value.amountPaid), invoiceNumber: value.invoiceNumber,
       note: value.note, createdAt: value.createdAt,
     };
-    if (write.action === "create") await input.transaction.insert(purchaseOrders).values({ id: localId, storeId: input.storeId, warehouseId: defaultWarehouseId!, ...parent });
-    else await requireUpdated(await input.transaction.update(purchaseOrders).set(parent).where(and(
+    if (write.action === "create") await input.transaction.insert(purchaseOrders).values({
+      id: localId, storeId: input.storeId, warehouseId: defaultWarehouseId!, ...parent,
+      code: await allocatePosCode(input, "purchase", write.externalId, value.createdAt),
+    });
+    else await requireUpdated(await input.transaction.update(purchaseOrders).set(withoutCode(parent)).where(and(
       eq(purchaseOrders.storeId, input.storeId), eq(purchaseOrders.id, localId),
     )).returning({ id: purchaseOrders.id }), `Purchase ${localId}`);
     await mapSource({ ...input, entityType: "purchase", externalId: write.externalId, localId, method: adoptionMethod(write.action, write.localId) });
@@ -333,8 +375,11 @@ async function applyReturns(input: ApplyInput & { plan: Extract<KiotVietTypedPha
       sourceTax: String(value.tax), sourceOtherRefund: String(value.otherRefund), sourceReturnFee: String(value.returnFee),
       sourcePaymentSnapshots: value.paymentSnapshots, note: value.note, createdAt: value.createdAt, updatedAt: new Date(),
     };
-    if (write.action === "create") await input.transaction.insert(returns).values({ id: localId, storeId: input.storeId, ...parent });
-    else await requireUpdated(await input.transaction.update(returns).set(parent).where(and(
+    if (write.action === "create") await input.transaction.insert(returns).values({
+      id: localId, storeId: input.storeId, ...parent,
+      code: await allocatePosCode(input, "customer_return", write.externalId, value.createdAt),
+    });
+    else await requireUpdated(await input.transaction.update(returns).set(withoutCode(parent)).where(and(
       eq(returns.storeId, input.storeId), eq(returns.id, localId),
     )).returning({ id: returns.id }), `Return ${localId}`);
     await mapSource({ ...input, entityType: "customer_return", externalId: write.externalId, localId, method: adoptionMethod(write.action, write.localId) });
@@ -376,8 +421,11 @@ async function applyPurchaseReturns(input: ApplyInput & { plan: Extract<KiotViet
       refundAmount: String(value.refundAmount), refundMethod: value.refundMethod, debtAmount: String(value.debtAmount),
       note: value.note, createdAt: value.createdAt,
     };
-    if (write.action === "create") await input.transaction.insert(purchaseReturns).values({ id: localId, storeId: input.storeId, warehouseId: defaultWarehouseId!, ...parent });
-    else await requireUpdated(await input.transaction.update(purchaseReturns).set(parent).where(and(
+    if (write.action === "create") await input.transaction.insert(purchaseReturns).values({
+      id: localId, storeId: input.storeId, warehouseId: defaultWarehouseId!, ...parent,
+      code: await allocatePosCode(input, "supplier_return", write.externalId, value.createdAt),
+    });
+    else await requireUpdated(await input.transaction.update(purchaseReturns).set(withoutCode(parent)).where(and(
       eq(purchaseReturns.storeId, input.storeId), eq(purchaseReturns.id, localId),
     )).returning({ id: purchaseReturns.id }), `Supplier return ${localId}`);
     await mapSource({ ...input, entityType: "supplier_return", externalId: write.externalId, localId, method: adoptionMethod(write.action, write.localId) });

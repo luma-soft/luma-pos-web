@@ -2,6 +2,7 @@ import { pathToFileURL } from "node:url";
 import { readKiotVietDataBundle } from "../lib/kiotviet/data-sync-files";
 import type { KiotVietDataBundle, KiotVietDataPhase, KiotVietWorkbookSource } from "../lib/kiotviet/data-sync-types";
 import { normalizeKiotVietText } from "../lib/kiotviet/data-sync-plan";
+import { withKiotVietSourceIdentities } from "../lib/kiotviet/pos-codes";
 import {
   KIOTVIET_SYNC_PHASES,
   assertKiotVietDataSyncApplyGuard,
@@ -116,7 +117,10 @@ export interface KiotVietDataSyncReport {
 
 export interface KiotVietDataSyncCliDependencies {
   readBundle?: (directory: string) => KiotVietDataBundle;
-  loadPlanningState?: (storeSlug: string | null) => Promise<KiotVietCliPlanningState>;
+  loadPlanningState?: (
+    storeSlug: string | null,
+    options?: { customerLinks?: Array<{ externalId: string; localCode: string }> },
+  ) => Promise<KiotVietCliPlanningState>;
   applyPhase?: (input: {
     phase: KiotVietSyncPhase;
     storeId: string;
@@ -495,7 +499,7 @@ type ProductionTransaction = Parameters<Parameters<ProductionDatabase["transacti
 export async function loadKiotVietPlanningStateFromDatabase(
   database: ProductionDatabase | ProductionTransaction,
   storeSlug: string | null,
-  options: { serializeQueries?: boolean } = {},
+  options: { serializeQueries?: boolean; customerLinks?: Array<{ externalId: string; localCode: string }> } = {},
 ): Promise<KiotVietCliPlanningState> {
   if (!storeSlug) throw new Error("Dry-run database planning requires --store=hai-dang");
   const db = database as ProductionDatabase;
@@ -507,13 +511,16 @@ export async function loadKiotVietPlanningStateFromDatabase(
   const relation = relationResult.rows[0] as { name?: string | null } | undefined;
   const schemaReady = Boolean(relation?.name);
   const serialized = options.serializeQueries === true;
-  const [base, units, archived] = await executeKiotVietPlanningQueries([
+  const [base, units, archived, liveProductMappings] = await executeKiotVietPlanningQueries([
     () => db.select({ id: schema.products.id, sku: schema.products.sku, name: schema.products.name, baseUnit: schema.products.baseUnit, isActive: schema.products.isActive, lifecycleStatus: schema.products.lifecycleStatus }).from(schema.products).where(eq(schema.products.storeId, store.id)),
     () => db.select({ productId: schema.productUnits.productId, sku: schema.productUnits.sku, unitName: schema.productUnits.unitName, multiplier: schema.productUnits.multiplier })
       .from(schema.productUnits).where(eq(schema.productUnits.storeId, store.id)),
     () => db.select({ productId: schema.productSourceMappings.productId, externalId: schema.productSourceMappings.externalId, baseUnit: schema.products.baseUnit })
       .from(schema.productSourceMappings).innerJoin(schema.products, and(eq(schema.productSourceMappings.productId, schema.products.id), eq(schema.products.storeId, store.id)))
       .where(and(eq(schema.productSourceMappings.storeId, store.id), eq(schema.productSourceMappings.provider, "kiotviet"), sql`${schema.productSourceMappings.deletedAt} is not null`)),
+    () => db.select({ productId: schema.productSourceMappings.productId, externalId: schema.productSourceMappings.externalId })
+      .from(schema.productSourceMappings)
+      .where(and(eq(schema.productSourceMappings.storeId, store.id), eq(schema.productSourceMappings.provider, "kiotviet"), sql`${schema.productSourceMappings.deletedAt} is null`)),
   ] as const, serialized);
   const [customerRows, supplierRows, orderRows, orderLineRows, paymentRows, purchaseRows, purchaseLineRows, returnRows, returnLineRows, purchaseReturnRows, purchaseReturnLineRows] = await executeKiotVietPlanningQueries([
     () => db.select({ localId: schema.customers.id, code: schema.customers.code, name: schema.customers.name, phone: schema.customers.phone, email: schema.customers.email, address: schema.customers.address, taxCode: schema.customers.taxCode, note: schema.customers.note, isActive: schema.customers.isActive, currentDebt: schema.customers.currentDebt, totalSpent: schema.customers.totalSpent })
@@ -642,6 +649,18 @@ export async function loadKiotVietPlanningStateFromDatabase(
       mappingState[row.entityType] = values;
     }
   }
+  for (const link of options.customerLinks ?? []) {
+    const locals = customerRows.filter((item) => item.code === link.localCode);
+    if (locals.length !== 1) throw new Error(`--map-customer target ${link.localCode} must match exactly one POS customer`);
+    const localId = locals[0]!.localId;
+    const existing = mappingState.customer ?? [];
+    const byExternal = existing.find((mapping) => mapping.externalId === link.externalId);
+    const byLocal = existing.find((mapping) => mapping.localId === localId);
+    if (byExternal && byExternal.localId === localId) continue;
+    if (byExternal) throw new Error(`KiotViet customer ${link.externalId} is already mapped to another POS customer`);
+    if (byLocal) throw new Error(`POS customer ${link.localCode} is already mapped to KiotViet ${byLocal.externalId}`);
+    mappingState.customer = [...existing, { externalId: link.externalId, localId }];
+  }
   const saleOrders = orderRows.filter((item) => item.documentType === "sale");
   const saleOrderIds = new Set(saleOrders.map((item) => item.localId));
   const bookingOrders = orderRows.filter((item) => item.documentType === "booking");
@@ -661,6 +680,16 @@ export async function loadKiotVietPlanningStateFromDatabase(
   const externalByLocal = (entityType: string) => new Map(
     (mappingState[entityType] ?? []).map((mapping) => [mapping.localId, mapping.externalId]),
   );
+  // Luma POS owns record codes. Mapped rows are planned under their KiotViet
+  // identity so fingerprints, partner resolution and duplicate detection keep
+  // comparing source identities while the stored record shows its POS code.
+  withKiotVietSourceIdentities(customerRows, externalByLocal("customer"));
+  withKiotVietSourceIdentities(supplierRows, externalByLocal("supplier"));
+  withKiotVietSourceIdentities(orderRows, new Map([...externalByLocal("booking"), ...externalByLocal("sale")]));
+  withKiotVietSourceIdentities(purchaseRows, externalByLocal("purchase"));
+  withKiotVietSourceIdentities(returnRows, externalByLocal("customer_return"));
+  if (effectiveReturnRows !== returnRows) withKiotVietSourceIdentities(effectiveReturnRows, externalByLocal("customer_return"));
+  withKiotVietSourceIdentities(purchaseReturnRows, externalByLocal("supplier_return"));
   const parentMappings = {
     booking: externalByLocal("booking"), sale: externalByLocal("sale"), purchase: externalByLocal("purchase"),
     customerReturn: externalByLocal("customer_return"), supplierReturn: externalByLocal("supplier_return"),
@@ -1176,6 +1205,7 @@ export async function loadKiotVietPlanningStateFromDatabase(
       currentBaseProducts,
       productUnits: units.flatMap((item) => item.sku && !baseSkus.has(item.sku) ? [{ ...item, sku: item.sku, multiplier: Number(item.multiplier) }] : []),
       archivedSourceMappings: archived,
+      mappedBaseProducts: liveProductMappings,
       // No schema field records explicit Task-6 placeholder approval. An
       // inactive live product mapping alone is not approval, so fail closed.
       approvedHistoricalPlaceholders: [],
@@ -1184,9 +1214,12 @@ export async function loadKiotVietPlanningStateFromDatabase(
   };
 }
 
-async function loadProductionReadOnlyState(storeSlug: string | null): Promise<KiotVietCliPlanningState> {
+async function loadProductionReadOnlyState(
+  storeSlug: string | null,
+  options: { customerLinks?: Array<{ externalId: string; localCode: string }> } = {},
+): Promise<KiotVietCliPlanningState> {
   const { db } = await import("../db");
-  return loadKiotVietPlanningStateFromDatabase(db, storeSlug);
+  return loadKiotVietPlanningStateFromDatabase(db, storeSlug, options);
 }
 
 export async function runKiotVietDataSyncCli(argv: string[], dependencies: KiotVietDataSyncCliDependencies = {}) {
@@ -1195,7 +1228,7 @@ export async function runKiotVietDataSyncCli(argv: string[], dependencies: KiotV
   if (args.apply && args.phase !== "all") {
     assertKiotVietDataSyncApplyGuard({ apply: true, phase: args.phase, storeSlug: args.storeSlug, reviewedSourceSha256: args.reviewedSourceSha256, actualSourceSha256: reviewedHashForPhase(bundle, args.phase) });
   }
-  const state = await (dependencies.loadPlanningState ?? loadProductionReadOnlyState)(args.storeSlug);
+  const state = await (dependencies.loadPlanningState ?? loadProductionReadOnlyState)(args.storeSlug, { customerLinks: args.customerLinks });
   const executablePlans = planKiotVietBundle(bundle, state);
   const plans = executablePlans.map(({ phase, summary, blockers }) => ({ phase, summary, blockers }));
   const selected = args.phase === "all" ? null : executablePlans.find((item) => item.phase === args.phase)!;

@@ -61,6 +61,11 @@ export interface KiotVietHistoryProductResolverInput {
   productUnits: KiotVietHistoryProductUnit[];
   archivedSourceMappings: KiotVietHistoryArchivedSourceMapping[];
   approvedHistoricalPlaceholders: KiotVietApprovedHistoricalProductPlaceholder[];
+  /**
+   * Live KiotViet product links. Luma POS may keep its own SKU on a product; the
+   * KiotViet SKU then resolves to that product through this mapping.
+   */
+  mappedBaseProducts?: Array<{ externalId: string; productId: string }>;
 }
 
 export interface KiotVietHistoryProductResolver {
@@ -136,6 +141,19 @@ export function createKiotVietHistoryProductResolver(
       throw new Error(`KiotViet history alternate unit ${sku} has invalid multiplier`);
     }
   }
+  const mappedBaseBySku = new Map<string, KiotVietHistoryCurrentBaseProduct>();
+  for (const mapping of input.mappedBaseProducts ?? []) {
+    const sku = required(mapping.externalId, "mapped product external ID");
+    const product = baseById.get(mapping.productId);
+    if (!product) continue;
+    const skuOwner = baseBySku.get(sku);
+    if (skuOwner && skuOwner.id !== product.id) {
+      throw new Error(`KiotViet product ${sku} is mapped to ${product.sku} but is also the SKU of another product`);
+    }
+    if (unitBySku.has(sku)) throw new Error(`KiotViet product ${sku} is mapped to a base product and an alternate unit`);
+    if (mappedBaseBySku.has(sku)) throw new Error(`Duplicate KiotViet product mapping: ${sku}`);
+    mappedBaseBySku.set(sku, product);
+  }
   for (const placeholder of placeholderBySku.values()) {
     if (placeholder.isActive) {
       throw new Error(`KiotViet history placeholder ${placeholder.sku} must be inactive`);
@@ -146,7 +164,7 @@ export function createKiotVietHistoryProductResolver(
     resolve(reference) {
       const sku = required(reference.sku, "source SKU");
       const suppliedSourceUnitName = normalizeKiotVietText(reference.unitName);
-      const base = baseBySku.get(sku);
+      const base = baseBySku.get(sku) ?? mappedBaseBySku.get(sku);
       if (base) {
         return {
           status: "resolved",

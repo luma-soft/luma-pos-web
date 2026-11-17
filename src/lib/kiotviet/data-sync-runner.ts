@@ -118,6 +118,12 @@ export interface KiotVietDataSyncArgs {
   storeSlug: string | null;
   apply: boolean;
   reviewedSourceSha256: string | null;
+  /**
+   * Reviewed one-to-one links from a KiotViet customer code to an existing Luma
+   * POS customer code (`--map-customer=KH000112=KH-261105-040000O3`). The POS
+   * customer keeps its own code; the KiotViet code is stored as its mapping.
+   */
+  customerLinks: Array<{ externalId: string; localCode: string }>;
 }
 
 export interface KiotVietDataSyncSourceMetadata {
@@ -141,6 +147,7 @@ export function parseKiotVietDataSyncArgs(argv: string[]): KiotVietDataSyncArgs 
   let apply = false;
   let reviewedSourceSha256: string | null = null;
   let sawDirectory = false;
+  const customerLinks: Array<{ externalId: string; localCode: string }> = [];
 
   for (const argument of argv) {
     if (argument === "--apply") {
@@ -153,6 +160,15 @@ export function parseKiotVietDataSyncArgs(argv: string[]): KiotVietDataSyncArgs 
       phase = value;
     } else if (argument.startsWith("--source-sha256=")) {
       reviewedSourceSha256 = argument.slice("--source-sha256=".length).toLowerCase() || null;
+    } else if (argument.startsWith("--map-customer=")) {
+      const [externalId, localCode, extra] = argument.slice("--map-customer=".length).split("=").map((part) => part.trim());
+      if (!externalId || !localCode || extra !== undefined) {
+        throw new Error("--map-customer expects KIOTVIET_CODE=POS_CODE");
+      }
+      if (customerLinks.some((link) => link.externalId === externalId || link.localCode === localCode)) {
+        throw new Error(`Duplicate --map-customer link for ${externalId} or ${localCode}`);
+      }
+      customerLinks.push({ externalId, localCode });
     } else if (argument.startsWith("--")) {
       throw new Error(`Unsupported KiotViet sync option: ${argument}`);
     } else if (!sawDirectory) {
@@ -170,8 +186,14 @@ export function parseKiotVietDataSyncArgs(argv: string[]): KiotVietDataSyncArgs 
     if (storeSlug !== "hai-dang") throw new Error("--apply requires --store=hai-dang");
     if (phase === "all") throw new Error("--phase=all is dry-run only");
     if (!reviewedSourceSha256) throw new Error("--apply requires --source-sha256");
+    // A customer link is persisted only by the customers phase. Applying a
+    // document phase with an unpersisted link would resolve customers that the
+    // next run could not see.
+    if (customerLinks.length > 0 && phase !== "customers") {
+      throw new Error("--map-customer can only be applied with --phase=customers");
+    }
   }
-  return { directory, phase, storeSlug, apply, reviewedSourceSha256 };
+  return { directory, phase, storeSlug, apply, reviewedSourceSha256, customerLinks };
 }
 
 export function createEmptyKiotVietInvariantSnapshot(): KiotVietInvariantSnapshot {
