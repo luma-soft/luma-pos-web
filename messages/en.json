@@ -1301,6 +1301,11 @@
       "filters": "Order filters"
     },
     "pos": {
+      "addNote": "Add note",
+      "searchPrompt": "Search products or scan",
+      "emptyTitle": "The order is empty",
+      "emptyMessage": "Search or scan to add products.",
+      "debtBadge": "Owes {debt}",
       "itemCount": "{count, plural, one {# item} other {# items}}",
       "subtitle": "Find items, build the cart, and checkout",
       "orderSource": {

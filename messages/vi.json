@@ -1301,6 +1301,11 @@
       "filters": "Bộ lọc đơn hàng"
     },
     "pos": {
+      "addNote": "Thêm ghi chú",
+      "searchPrompt": "Tìm sản phẩm hoặc quét mã",
+      "emptyTitle": "Đơn hàng đang trống",
+      "emptyMessage": "Tìm kiếm hoặc quét mã để thêm sản phẩm.",
+      "debtBadge": "Nợ {debt}",
       "itemCount": "{count} sản phẩm",
       "subtitle": "Tìm hàng, tạo giỏ và thanh toán",
       "orderSource": {

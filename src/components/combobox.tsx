@@ -43,7 +43,7 @@ function findScrollBoundary(element: HTMLElement | null) {
  */
 export function SearchableSelect({
   value, onChange, options, placeholder, className, allowClear = true, onCreate, showSearch, disabled, actionLabel, onAction, actionIcon, id, ariaLabel,
-  onSearchChange, loading = false, hasMore = false, onLoadMore,
+  onSearchChange, loading = false, hasMore = false, onLoadMore, triggerClassName,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -65,6 +65,8 @@ export function SearchableSelect({
   loading?: boolean;
   hasMore?: boolean;
   onLoadMore?: () => void;
+  /** Extra classes for the trigger, e.g. the borderless native POS pickers. */
+  triggerClassName?: string;
 }) {
   const t = useTranslations("common");
   const [open, setOpen] = useState(false);
@@ -351,7 +353,7 @@ export function SearchableSelect({
         aria-expanded={open}
         aria-label={ariaLabel}
         onClick={() => { setOpen((v) => !v); setQ(""); }}
-        className="relative h-11 justify-start rounded-[10px] pl-3 pr-9 text-left lg:h-10"
+        className={cn("relative h-11 justify-start rounded-[10px] pl-3 pr-9 text-left lg:h-10", triggerClassName)}
       >
         <Text
           as="span"

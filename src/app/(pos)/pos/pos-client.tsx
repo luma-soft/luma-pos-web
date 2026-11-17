@@ -11,7 +11,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Plus, ListPlus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ChevronDown, ShieldCheck, SlidersHorizontal, Star } from "lucide-react";
+import { Search, Plus, ListPlus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ChevronDown, ShieldCheck, SlidersHorizontal, Star, UserRound, PackagePlus, Sparkles } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import { Combobox } from "@/components/combobox";
@@ -527,6 +527,9 @@ function currentTimestamp(): number {
   return Date.now();
 }
 
+/** Borderless 17pt trigger used by the iOS-style customer/price-book row on phones. */
+const nativePickerTrigger = "h-12 border-0 bg-transparent px-0 pr-7 text-[17px] font-semibold shadow-none hover:bg-transparent [&>span]:!text-ios-label [&>svg]:right-0 [&>svg]:size-[18px] [&>svg]:text-ios-label-secondary";
+
 export function PosClient({
   storageScope,
   storeId,
@@ -630,6 +633,9 @@ export function PosClient({
   const [variantParent, setVariantParent] = useState<PosProduct | null>(null);
   const [browsing, setBrowsing] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  // Phones keep the order note behind the bottom bar's "More" button, as on iOS.
+  const [mobileNoteOpen, setMobileNoteOpen] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const addMenuButtonRef = useRef<HTMLButtonElement>(null);
   const [addMenuPosition, setAddMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [printSize, setPrintSize] = useState<PaperSize | null>(null); // đang in phiếu tạm
@@ -2892,8 +2898,8 @@ export function PosClient({
 
   // Danh sách dòng hàng đã chọn — hiển thị ở khu chính (giống KiotViet).
   const orderLinesPanel = (
-    <div className="mb-16 flex flex-1 flex-col min-h-0 overflow-hidden rounded-xl border border-border bg-surface lg:mb-0">
-      <div className="px-3 py-2 border-b border-border flex items-center">
+    <div className="mb-16 flex flex-1 flex-col min-h-0 overflow-hidden rounded-xl border border-border bg-surface lg:mb-0 max-lg:mb-[calc(var(--mobile-tabbar-space)+80px)] max-lg:overflow-visible max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent">
+      <div className="px-3 py-2 border-b border-border flex items-center max-lg:hidden">
         <h2 className="font-semibold text-sm">
           {isReturnInvoiceDraft
             ? t("pos.returns.itemsTitle", { count: cart.length })
@@ -2902,7 +2908,19 @@ export function PosClient({
       </div>
       <div className="flex-1 overflow-auto">
         {cart.length === 0 && (
-          <div className="grid min-h-52 place-items-center px-6 py-12 text-center">
+          /* iOS empty order: accent magnifier, heavy title; tapping focuses search. */
+          <button
+            type="button"
+            onClick={() => document.querySelector<HTMLInputElement>("[data-pos-catalog] input[role=combobox]")?.focus()}
+            className="flex min-h-[50dvh] w-full flex-col items-center justify-center gap-3 px-8 text-center lg:hidden"
+          >
+            <Search className="size-8 text-ios-accent" strokeWidth={2.4} aria-hidden="true" />
+            <span className="text-[17px] font-extrabold">{t("mobile.pos.emptyTitle")}</span>
+            <span className="text-[15px] text-ios-label-secondary">{t("mobile.pos.emptyMessage")}</span>
+          </button>
+        )}
+        {cart.length === 0 && (
+          <div className="grid min-h-52 place-items-center px-6 py-12 text-center max-lg:hidden">
             <div>
               <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300">
                 <Search className="h-6 w-6" />
@@ -2953,47 +2971,71 @@ export function PosClient({
                 overKey === l.key && dragKey && dragKey !== l.key && "bg-primary-50/40 dark:bg-primary-950/20"
               )}
             >
-              <div className="p-3 lg:hidden">
-                <div className="flex items-start gap-2">
-                  <span className="mt-0.5 w-5 shrink-0 text-center text-xs tabular-nums text-slate-400">{idx + 1}</span>
-                  {l.isQuickLine ? (
-                    <div className="min-h-11 min-w-0 flex-1 text-left">
-                      <p className={cn("text-sm font-semibold leading-5", stockInsufficient && "text-er")}>{productDisplayName(l.product)}</p>
-                      <span className="mt-1 inline-flex rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{t("pos.quickLine.badge")}</span>
+              {/* iOS POSSelectedLine: thumbnail, name and stock with delete; then price, quantity and line total. */}
+              <div className="px-4 py-3.5 lg:hidden">
+                <div className="flex items-start gap-2.5">
+                  <div className="shrink-0 [&>*]:!size-[60px] [&>*]:!rounded-xl">
+                    <PosProductThumbnail product={l.product} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    {l.isQuickLine ? (
+                      <p className={cn("line-clamp-2 text-[15px] font-semibold leading-5", stockInsufficient && "text-ios-red")}>
+                        {productDisplayName(l.product)}
+                        <span className="ml-1.5 inline-flex rounded-full bg-ios-orange/12 px-1.5 py-0.5 align-middle text-[11px] font-semibold text-ios-orange">{t("pos.quickLine.badge")}</span>
+                      </p>
+                    ) : (
+                      <Link
+                        href={Routes.productDetail(l.product.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={cn("line-clamp-2 text-[15px] font-semibold leading-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ios-accent", stockInsufficient && "text-ios-red")}
+                      >
+                        {productDisplayName(l.product)}
+                      </Link>
+                    )}
+                    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                      {stockManaged && (
+                        <span className={cn("text-[13px]", Number(l.product.stock) <= 0 ? "text-ios-red" : "text-ios-label-secondary")}>
+                          {t("mobile.inventory.onHand", { stock: `${formatNumber(Number(l.product.stock) / (l.unitMultiplier || 1))} ${l.unitName}` })}
+                        </span>
+                      )}
+                      {linePriceBookName && (
+                        <span className="rounded-full bg-ios-accent/10 px-1.5 py-0.5 text-[11px] font-semibold text-ios-accent">{linePriceBookName}</span>
+                      )}
                     </div>
-                  ) : (
-                    <Link
-                      href={Routes.productDetail(l.product.id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block min-h-11 min-w-0 flex-1 text-left hover:text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                    >
-                      <p className={cn("text-sm font-semibold leading-5", stockInsufficient && "text-er")}>{productDisplayName(l.product)}</p>
-                      <p className="mt-0.5 truncate text-xs text-slate-400">{l.product.sku ?? ""}</p>
-                    </Link>
-                  )}
+                    {unitOptions.length > 0 && (
+                      <div className="mt-1.5 w-32">
+                        <Select
+                          value={l.unitName}
+                          onChange={(e) => changeUnit(l.key, e.target.value)}
+                          disabled={isCameraQuoteDraft}
+                          size="sm"
+                          options={unitOptions}
+                          menuMinWidth={192}
+                          className="w-full min-w-0 font-medium text-slate-700 dark:text-slate-200"
+                        />
+                      </div>
+                    )}
+                  </div>
                   <button
                     type="button"
                     disabled={isCameraQuoteDraft}
                     onClick={() => setCart((current) => current.filter((item) => item.key !== l.key))}
-                    className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-er disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-slate-800"
+                    className="-mr-2 -mt-2 grid size-11 shrink-0 place-items-center text-ios-label/70 disabled:cursor-not-allowed disabled:opacity-40"
                     aria-label={t("common.delete")}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="size-[18px]" aria-hidden="true" />
                   </button>
                 </div>
-                <div className={cn("mt-3 gap-2", unitOptions.length > 0 ? "grid grid-cols-[minmax(0,1fr)_8.25rem]" : "flex justify-end")}>
-                  {unitOptions.length > 0 && (
-                    <Select
-                      value={l.unitName}
-                      onChange={(e) => changeUnit(l.key, e.target.value)}
-                      disabled={isCameraQuoteDraft}
-                      size="sm"
-                      options={unitOptions}
-                      menuMinWidth={192}
-                      className="w-full min-w-0 font-medium text-slate-700 dark:text-slate-200"
-                    />
-                  )}
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isCameraQuoteDraft}
+                    onClick={() => setEditKey(editKey === l.key ? null : l.key)}
+                    className={cn("min-h-11 min-w-0 flex-1 text-left text-[14px] font-bold tabular-nums [overflow-wrap:anywhere]", belowPurchasePrice && "text-ios-red")}
+                  >
+                    {formatCurrency(eff.price)}
+                  </button>
                   <QuantityInput
                     value={l.quantity}
                     onChange={(quantity) => setQty(l.key, quantity)}
@@ -3004,27 +3046,10 @@ export function PosClient({
                     clearZeroOnFocus={isReturnDraft && l.returnSoldQuantity != null}
                     readOnly={isCameraQuoteDraft}
                     size="sm"
-                    className={cn(unitOptions.length > 0 ? "w-full" : "w-[8.25rem]", stockInsufficient && "border-er text-er focus-within:border-er")}
-                    inputClassName={cn(stockInsufficient && "border-er text-er")}
+                    className={cn("w-[132px] rounded-xl", stockInsufficient && "border-er text-er focus-within:border-er")}
+                    inputClassName={cn("font-bold text-ios-accent", stockInsufficient && "border-er text-er")}
                   />
-                </div>
-                <div className="mt-3 grid grid-cols-2 items-center gap-3">
-                  <div className="flex min-w-0 flex-col items-start gap-1">
-                    <button
-                      type="button"
-                      disabled={isCameraQuoteDraft}
-                      onClick={() => setEditKey(editKey === l.key ? null : l.key)}
-                      className={cn("flex min-h-11 w-full min-w-0 items-center text-left text-sm tabular-nums hover:text-primary-600 [overflow-wrap:anywhere]", belowPurchasePrice ? "font-semibold text-er" : "text-slate-500")}
-                    >
-                      {formatCurrency(eff.price)}{posUnitSuffix(l.unitName)}
-                    </button>
-                    {linePriceBookName && (
-                      <span className="max-w-full rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 [overflow-wrap:anywhere] dark:bg-sky-950/40 dark:text-sky-300">
-                        {linePriceBookName}
-                      </span>
-                    )}
-                  </div>
-                  <span className="min-w-0 text-right text-base font-bold tabular-nums [overflow-wrap:anywhere]">{formatCurrency(eff.price * l.quantity)}</span>
+                  <span className="min-w-0 flex-1 text-right text-[14px] font-bold tabular-nums [overflow-wrap:anywhere]">{formatCurrency(eff.price * l.quantity)}</span>
                 </div>
                 <textarea
                   rows={1}
@@ -3179,7 +3204,7 @@ export function PosClient({
           );
         })}
       </div>
-      <div className="border-t border-border p-2">
+      <div className={cn("border-t border-border p-2", !mobileNoteOpen && !orderNote && "max-lg:hidden", "max-lg:fixed max-lg:inset-x-0 max-lg:bottom-[calc(var(--mobile-tabbar-space)+78px)] max-lg:z-40 max-lg:bg-surface max-lg:px-4")}>
         <input
           type="text"
           value={orderNote ?? ""}
@@ -3224,25 +3249,61 @@ export function PosClient({
       )}
 
       {/* left: catalog */}
-      <div className={cn("flex-1 flex flex-col p-3 sm:p-4 min-w-0 min-h-0 overflow-y-auto overscroll-contain", mobileView === "cart" && "hidden lg:flex")}>
-        {/* nút sang trang thanh toán — chỉ mobile */}
-        <button
-          type="button"
-          disabled={cart.length === 0}
-          onClick={() => setMobileView("cart")}
-          aria-label={`${isQuoteDraft ? t("common.confirm") : primaryActionLabel} · ${formatCurrency(total)}`}
-          className={cn("group fixed inset-x-0 bottom-(--mobile-tabbar-space) z-50 flex items-center gap-3 border-t border-border bg-surface px-4 py-3 text-left lg:hidden", keyboardInset > 0 && "hidden")}
-        >
-          {/* iOS checkout bar: item count and total on the left, primary action on the right. */}
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[15px] text-ios-label-secondary">{t("mobile.pos.itemCount", { count: cart.length })}</span>
-            <span className="block truncate text-[22px] font-bold leading-7 tabular-nums">{formatCurrency(total)}</span>
-          </span>
-          <span className="flex h-[52px] min-w-[44%] items-center justify-center rounded-[14px] bg-ios-accent px-5 text-[17px] font-semibold text-white group-disabled:bg-black/[0.06] group-disabled:text-ios-label-tertiary dark:group-disabled:bg-white/[0.1]">
-            {isQuoteDraft ? t("common.confirm") : primaryActionLabel}
-          </span>
-        </button>
-        <div className="mb-3 space-y-2">
+      <div className={cn("flex-1 flex flex-col p-3 sm:p-4 min-w-0 min-h-0 overflow-y-auto overscroll-contain max-lg:bg-canvas max-lg:p-0", mobileView === "cart" && "hidden lg:flex")} data-pos-catalog>
+        {/* iOS POSBottomBar: count and total, "More" (order note), and the primary action. */}
+        <div className={cn("fixed inset-x-0 bottom-(--mobile-tabbar-space) z-50 flex items-center gap-2 border-t border-border bg-surface px-4 py-3 lg:hidden", keyboardInset > 0 && "hidden")}>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-semibold text-ios-label-secondary">{t("mobile.pos.itemCount", { count: cart.length })}</div>
+            <div className="truncate text-[20px] font-bold leading-7 tabular-nums">{formatCurrency(total)}</div>
+          </div>
+          <span className="h-[52px] w-px shrink-0 bg-border" aria-hidden="true" />
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setMobileMoreOpen((open) => !open)}
+              aria-haspopup="menu"
+              aria-expanded={mobileMoreOpen}
+              className="flex size-[54px] flex-col items-center justify-center gap-0.5 rounded-[14px] border border-border bg-surface text-ios-label"
+            >
+              <MoreHorizontal className="size-5" strokeWidth={2.6} aria-hidden="true" />
+              <span className="text-[13px] font-semibold leading-4">{t("nav.more")}</span>
+            </button>
+            {mobileMoreOpen && (
+              <>
+                <button type="button" aria-label={t("common.close")} onClick={() => setMobileMoreOpen(false)} className="fixed inset-0 z-40 cursor-default" />
+                <div role="menu" className="absolute bottom-[calc(100%+10px)] left-1/2 z-50 w-64 -translate-x-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-e2">
+                  {([
+                    { key: "note", icon: FileText, label: t("mobile.pos.addNote"), run: () => setMobileNoteOpen(true), disabled: cart.length === 0 },
+                    { key: "product", icon: PackagePlus, label: t("pos.addProduct"), run: () => openProductCreator("product"), disabled: false },
+                    { key: "quick", icon: ListPlus, label: t("pos.quickLine.title"), run: () => setQuickLineOpen(true), disabled: isCameraQuoteDraft || !canAddCatalogProducts },
+                    { key: "ai", icon: Sparkles, label: t("aiQuick.pos.open"), run: () => setAiQuickOpen(true), disabled: false },
+                  ] as const).map(({ key, icon: ItemIcon, label, run, disabled }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="menuitem"
+                      disabled={disabled}
+                      onClick={() => { setMobileMoreOpen(false); run(); }}
+                      className="flex min-h-12 w-full items-center gap-3 border-b border-border px-4 text-left text-[17px] last:border-b-0 active:bg-black/[0.05] disabled:text-ios-label-tertiary"
+                    >
+                      <ItemIcon className="size-5 shrink-0 text-ios-accent" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <button
+            type="button"
+            disabled={cart.length === 0}
+            onClick={() => setMobileView("cart")}
+            className="flex h-[54px] min-w-0 flex-[1.2] items-center justify-center rounded-[14px] bg-ios-accent px-3 text-[17px] font-bold text-white disabled:bg-black/[0.06] disabled:text-ios-label-secondary dark:disabled:bg-white/[0.1]"
+          >
+            <span className="truncate">{isQuoteDraft ? t("common.confirm") : primaryActionLabel}</span>
+          </button>
+        </div>
+        <div className="mb-3 space-y-2 max-lg:mb-0 max-lg:space-y-3 max-lg:bg-surface max-lg:px-4 max-lg:pt-2">
           {invoiceTabs}
           {canRecoverLegacyOutbox && legacyOutboxCount > 0 && (
             <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
@@ -3352,13 +3413,14 @@ export function PosClient({
               keepOpenOnSelect
               open={browsing}
               onOpenChange={setBrowsing}
-              placeholder={t("pos.searchPlaceholder")}
+              placeholder={t("mobile.pos.searchPrompt")}
               emptyMessage={search.trim() ? t("pos.noSearchResults") : t("pos.noProducts")}
               loadingMessage={t("common.loading")}
               unavailableMessage={t("common.error")}
               closeLabel={t("common.close")}
               debounceMs={PRODUCT_SEARCH_DEBOUNCE_MS}
               className="flex-1"
+              inputClassName="max-lg:h-14 max-lg:rounded-2xl max-lg:border-ios-stroke/50 max-lg:pl-12 max-lg:text-[17px] max-lg:placeholder:text-ios-label-secondary"
               renderItem={(result) => {
                 const p = result.product;
                 const resultUnit = result.unitName;
@@ -3418,7 +3480,7 @@ export function PosClient({
               }}
             />
             {showPriceComparison && (
-              <div ref={posPriceFilterRef} className="relative shrink-0">
+              <div ref={posPriceFilterRef} className="relative shrink-0 max-lg:hidden">
                 <button
                   type="button"
                   aria-label={t("inventory.priceFilter.title")}
@@ -3492,11 +3554,11 @@ export function PosClient({
                 )}
               </div>
             )}
+            {/* Phones reach these through the bottom bar's "More" menu, as on iOS. */}
+            <div className="contents max-lg:hidden">
             <ProductCreateMenu
               label={t("pos.addProduct")}
               showLabel={false}
-              nativeMobile
-              nativeMobileIcon="package"
               onSelect={openProductCreator}
               items={[
                 { kind: "product", label: t("products.kind.labels.product"), hint: t("products.kind.hints.product") },
@@ -3518,7 +3580,48 @@ export function PosClient({
               label={t("aiQuick.pos.open")}
               className="h-11 w-11 lg:h-10 lg:w-10 lg:min-h-0 lg:min-w-0"
             />
+            </div>
           </div>}
+          {/* iOS CustomerAndPriceBookPicker: borderless customer and price-book triggers. */}
+          <div className="-mx-4 flex items-center gap-4 border-b border-border px-4 pb-1 lg:hidden">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <UserRound className="size-5 shrink-0 text-ios-label-secondary" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <Combobox
+                  value={customerId}
+                  onChange={changeCustomer}
+                  placeholder={t("pos.walkInCustomer")}
+                  ariaLabel={t("orders.cols.customer")}
+                  triggerClassName={nativePickerTrigger}
+                  options={customerOptions.map((c) => ({ value: c.id, label: c.name, hint: c.phone ?? undefined }))}
+                  actionLabel={t("customers.createNew")}
+                  actionIcon={<UserPlus className="h-4 w-4" />}
+                  onAction={() => setCustomerCreateOpen(true)}
+                />
+                {customer && Number(customer.currentDebt) > 0 && (
+                  <div className="-mt-2 pb-1 text-[12px] font-bold tabular-nums text-ios-red">
+                    {t("mobile.pos.debtBadge", { debt: formatCurrency(Number(customer.currentDebt)) })}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="min-w-0 flex-1">
+              <Combobox
+                value={priceBook || defaultBook?.id || ""}
+                onChange={(id) => {
+                  const pb = data.priceBooks.find((book) => book.id === id);
+                  changePriceBook(!pb || pb.isDefault ? "" : pb.id);
+                }}
+                placeholder={t("pos.priceBook.title")}
+                ariaLabel={t("pos.priceBook.title")}
+                allowClear={false}
+                showSearch={false}
+                disabled={!canEditPriceBook}
+                triggerClassName={nativePickerTrigger}
+                options={data.priceBooks.map((pb) => ({ value: pb.id, label: pb.name }))}
+              />
+            </div>
+          </div>
         </div>
 
         {!isCameraQuoteDraft && orderLinesPanel}
