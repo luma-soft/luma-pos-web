@@ -12,12 +12,7 @@ globalThis.window = {
 };
 globalThis.CustomEvent ??= class CustomEvent { constructor(type) { this.type = type; } };
 
-const {
-  isOfflineSyncEnabled,
-  isStoreOfflinePolicyEnabled,
-  setOfflineSyncEnabled,
-  writeStoreOfflinePolicy,
-} = await import("./offline-sync-preference.ts");
+const { isOfflineSyncEnabled, setOfflineSyncEnabled } = await import("./offline-sync-preference.ts");
 
 afterAll(() => {
   // Other offline tests in this process read the switch from `window`.
@@ -30,29 +25,16 @@ beforeEach(() => {
   window.location.hostname = "pos.example.test";
 });
 
-test("store policy off forces offline sync off on every browser", () => {
-  setOfflineSyncEnabled(true);
-  expect(isOfflineSyncEnabled()).toBe(true);
-  expect(writeStoreOfflinePolicy(false)).toBe(true);
-  expect(isStoreOfflinePolicyEnabled()).toBe(false);
-  expect(isOfflineSyncEnabled()).toBe(false);
-});
-
-test("store policy on keeps the per-browser choice", () => {
-  expect(writeStoreOfflinePolicy(true)).toBe(false);
+test("each browser defaults on and keeps its own choice", () => {
   expect(isOfflineSyncEnabled()).toBe(true);
   setOfflineSyncEnabled(false);
   expect(isOfflineSyncEnabled()).toBe(false);
-});
-
-test("re-enabling the store policy is not reported as a disable", () => {
-  writeStoreOfflinePolicy(false);
-  expect(writeStoreOfflinePolicy(true)).toBe(false);
+  setOfflineSyncEnabled(true);
   expect(isOfflineSyncEnabled()).toBe(true);
 });
 
 test("the store Mac stays local-only", () => {
   window.location.hostname = "127.0.0.1";
-  writeStoreOfflinePolicy(true);
+  setOfflineSyncEnabled(true);
   expect(isOfflineSyncEnabled()).toBe(false);
 });

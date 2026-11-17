@@ -15,7 +15,6 @@ import { Routes } from "@/lib/routes";
 import { getTheme, getMode } from "@/lib/theme/cookie";
 import { getStoreSettings } from "@/lib/data/settings";
 import { ProductCatalogProvider } from "@/components/product-catalog-provider";
-import { OfflineStorePolicy } from "@/components/offline-store-policy";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { getProductCatalogRevision } from "@/lib/data/product-catalog";
 import { AppDataSyncProvider } from "@/components/app-data-sync-provider";
@@ -60,7 +59,6 @@ export default async function AppLayout({
   ]);
 
   return (
-    <OfflineStorePolicy enabled={store.prefs.app.offlineMode}>
     <TenantClientScopeProvider scopeId={catalogScopeId}>
     <AppDataSyncProvider revision={randomUUID()}>
     <ProductCatalogProvider key={catalogScopeId} userId={user.id} scopeId={catalogScopeId} serverRevision={catalogRevision} initialDefaultSort={initialDefaultSort}>
@@ -103,6 +101,5 @@ export default async function AppLayout({
     </ProductCatalogProvider>
     </AppDataSyncProvider>
     </TenantClientScopeProvider>
-    </OfflineStorePolicy>
   );
 }

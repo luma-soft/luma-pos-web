@@ -14,9 +14,6 @@ mock.module("@/lib/auth/store-context", () => ({
 mock.module("@/components/product-catalog-provider", () => ({
   ProductCatalogProvider: ({ children }) => children,
 }));
-mock.module("@/lib/data/settings", () => ({
-  getStoreSettings: async () => ({ prefs: { app: { offlineMode: true } } }),
-}));
 mock.module("@/components/mobile-tabbar", () => ({ MobileTabBar: () => null }));
 mock.module("next-intl", () => ({ NextIntlClientProvider: ({ children }) => children }));
 mock.module("next-intl/server", () => ({

@@ -5117,8 +5117,7 @@
       "onBody": "Đang bật: đơn POS và checklist được ghi vào hàng đợi trên thiết bị trước rồi mới gửi lên máy chủ; danh mục sản phẩm và lịch sử tồn kho được lưu sẵn để mở nhanh khi offline.",
       "offBody": "Đang tắt: mọi thao tác ghi và đọc đi thẳng tới máy chủ. Khi mất mạng, đơn sẽ không được lưu tạm — giỏ hàng vẫn giữ trên màn hình để bạn thử lại.",
       "queuedNote": "Đơn đã xếp hàng trước khi tắt vẫn tiếp tục được gửi khi mở POS có mạng. Tắt sẽ xóa bản sao danh mục và lịch sử tồn kho đã lưu trên trình duyệt này.",
-      "localHostBody": "Đang mở trực tiếp trên máy chủ cửa hàng (Mac): dữ liệu được đọc và ghi thẳng vào cơ sở dữ liệu trên máy này, nên không cần đồng bộ offline. Các thiết bị khác vẫn dùng chế độ offline.",
-      "storePolicyOffBody": "Cửa hàng đang tắt bán offline (quản lý đổi trong app iOS: Cài đặt › Cho phép bán offline). Mọi trình duyệt đọc và ghi thẳng tới máy chủ; đơn đã xếp hàng trước đó vẫn được gửi khi có mạng."
+      "localHostBody": "Đang mở trực tiếp trên máy chủ cửa hàng (Mac): dữ liệu được đọc và ghi thẳng vào cơ sở dữ liệu trên máy này, nên không cần đồng bộ offline. Các thiết bị khác vẫn dùng chế độ offline."
     }
   },
   "quotes": {

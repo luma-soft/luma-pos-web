@@ -3,8 +3,6 @@ import { requireUser } from "@/lib/actions/common";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 import { Routes } from "@/lib/routes";
 import { ProductCatalogProvider } from "@/components/product-catalog-provider";
-import { OfflineStorePolicy } from "@/components/offline-store-policy";
-import { getStoreSettings } from "@/lib/data/settings";
 import { AppDataSyncProvider } from "@/components/app-data-sync-provider";
 import { MobileTabBar } from "@/components/mobile-tabbar";
 import { NextIntlClientProvider } from "next-intl";
@@ -33,14 +31,10 @@ export default async function PosLayout({ children }: { children: React.ReactNod
   if (!storeContext) redirect(Routes.Login);
   const role = storeContext.role;
   const catalogScopeId = productCatalogScopeId(storeContext.storeId, user.id, role);
-  const [initialDefaultSort, store] = await Promise.all([
-    getProductSortPreference(storeContext.storeId, role),
-    getStoreSettings(storeContext.storeId),
-  ]);
+  const initialDefaultSort = await getProductSortPreference(storeContext.storeId, role);
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
-      <OfflineStorePolicy enabled={store.prefs.app.offlineMode}>
       <TenantClientScopeProvider scopeId={catalogScopeId}>
         <AppDataSyncProvider revision={randomUUID()}>
           <ProductCatalogProvider key={catalogScopeId} userId={user.id} scopeId={catalogScopeId} initialDefaultSort={initialDefaultSort}>
@@ -51,7 +45,6 @@ export default async function PosLayout({ children }: { children: React.ReactNod
           </ProductCatalogProvider>
         </AppDataSyncProvider>
       </TenantClientScopeProvider>
-      </OfflineStorePolicy>
     </NextIntlClientProvider>
   );
 }
