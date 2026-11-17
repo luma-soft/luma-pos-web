@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { setOfflineSyncEnabled, useIsLocalHostRuntime, useOfflineSyncEnabled } from "@/lib/offline/offline-sync-preference";
+import { setOfflineSyncEnabled, useIsLocalHostRuntime, useOfflineSyncEnabled, useStoreOfflinePolicyEnabled } from "@/lib/offline/offline-sync-preference";
 import { clearAllProductCatalogSnapshots } from "@/lib/offline/product-catalog-store";
 import { clearAllCachedStockHistory } from "@/lib/offline/product-stock-history-store";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, Copy, ExternalLink, KeyRound, Loader2, MessageCircle, Pencil, Plus, Power, Printer, Save, Star, Trash2, X } from "lucide-react";
@@ -599,11 +599,12 @@ function PosSettingsSection({ L, prefs, canManage }: { L: boolean; prefs: StoreP
   );
 }
 
-/** Per-browser switch (localStorage), not a store pref: every staff device chooses. */
+/** Per-browser switch (localStorage); the store policy `prefs.app.offlineMode` can force it off. */
 function OfflineSyncSettingsCard() {
   const t = useTranslations("settings.offlineSync");
   const enabled = useOfflineSyncEnabled();
   const localHost = useIsLocalHostRuntime();
+  const storePolicyEnabled = useStoreOfflinePolicyEnabled();
   function change(next: boolean) {
     setOfflineSyncEnabled(next);
     if (!next) {
@@ -616,6 +617,8 @@ function OfflineSyncSettingsCard() {
       <div className="p-4.5 flex flex-col gap-3" data-testid="offline-sync-settings">
         {localHost ? (
           <p className="text-xs text-slate-600">{t("localHostBody")}</p>
+        ) : !storePolicyEnabled ? (
+          <p className="text-xs text-slate-600" data-testid="offline-sync-store-policy-off">{t("storePolicyOffBody")}</p>
         ) : (
           <>
             <CtrlRow title={t("toggle")} desc={t("toggleDesc")} checked={enabled} onChange={change} />

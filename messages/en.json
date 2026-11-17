@@ -5115,7 +5115,8 @@
       "onBody": "On: POS orders and checklists are written to an on-device queue first, then sent to the server; the product catalog and stock history are stored locally for fast offline access.",
       "offBody": "Off: every write and read goes straight to the server. Without a connection orders are not saved locally — the cart stays on screen so you can retry.",
       "queuedNote": "Orders queued before turning this off are still sent when POS opens online. Turning it off removes the catalog and stock-history copies stored in this browser.",
-      "localHostBody": "Opened directly on the store server (Mac): data is read and written straight to the database on this machine, so offline sync isn't needed. Other devices keep using offline mode."
+      "localHostBody": "Opened directly on the store server (Mac): data is read and written straight to the database on this machine, so offline sync isn't needed. Other devices keep using offline mode.",
+      "storePolicyOffBody": "Offline selling is turned off for this store (a manager changes it in the iOS app: Settings › Allow offline sales). Every browser reads and writes straight to the server; orders queued earlier are still sent when online."
     }
   },
   "quotes": {
