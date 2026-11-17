@@ -208,7 +208,15 @@ export function SuppliersTable({
     },
     { key: "code", label: t("customers.cols.code"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.code}</span> },
     { key: "phone", label: t("customers.cols.phone"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.phone ?? "—"}</span> },
-    { key: "tax", label: t("customers.fields.taxCode"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.taxCode ?? "—"}</span> },
+    { key: "tax", label: t("customers.fields.taxCode"), defaultVisible: false, render: (row) => <span className="text-slate-500">{row.taxCode ?? "—"}</span> },
+    {
+      key: "debt",
+      label: t("suppliers.cols.debt"),
+      defaultVisible: true,
+      align: "right",
+      cellClassName: (row) => Number(row.currentDebt) > 0 ? "font-semibold text-er" : "text-slate-400",
+      render: (row) => Number(row.currentDebt) > 0 ? formatCurrency(Number(row.currentDebt)) : "—",
+    },
     {
       key: "totalPurchase",
       label: t("suppliers.cols.totalPurchase"),
@@ -217,14 +225,6 @@ export function SuppliersTable({
       width: "180px",
       cellClassName: "font-semibold text-primary-600",
       render: (row) => formatCurrency(Number(row.totalPurchase)),
-    },
-    {
-      key: "debt",
-      label: t("suppliers.cols.debt"),
-      defaultVisible: true,
-      align: "right",
-      cellClassName: (row) => Number(row.currentDebt) > 0 ? "font-semibold text-er" : "text-slate-400",
-      render: (row) => Number(row.currentDebt) > 0 ? formatCurrency(Number(row.currentDebt)) : "—",
     },
   ];
 
