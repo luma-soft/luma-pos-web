@@ -328,12 +328,14 @@ async function createBackup(runId: string) {
       },
     };
 
+    // The manifest is sent as text and cast once: a parameter typed jsonb is
+    // JSON-encoded again by the driver and would be stored as a JSON string.
     await connection.unsafe(`
       UPDATE public.database_backup_runs
       SET status = 'succeeded', finished_at = now(),
           duration_milliseconds = greatest(0, floor(extract(epoch from (now() - started_at)) * 1000)::int),
           archive_key = $1, archive_size_bytes = $2, sha256 = $3,
-          manifest = $4::jsonb, failure_code = NULL
+          manifest = $4::text::jsonb, failure_code = NULL
       WHERE id = $5::uuid AND status = 'running'
     `, [archiveKey, uploadedArchive.sizeBytes, archiveSha256, JSON.stringify(storedManifest), runId]);
 

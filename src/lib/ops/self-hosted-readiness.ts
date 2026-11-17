@@ -263,9 +263,7 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
   });
   const backupDestinationConfigured = backupDestinationReadiness.configured;
   const lastSuccessfulBackup = resultRows(backupRows)[0] ?? {};
-  const backupManifest = lastSuccessfulBackup.manifest && typeof lastSuccessfulBackup.manifest === "object"
-    ? lastSuccessfulBackup.manifest as Record<string, unknown>
-    : {};
+  const backupManifest = parseBackupManifest(lastSuccessfulBackup.manifest);
   const backupDestination = backupManifest.destination && typeof backupManifest.destination === "object"
     ? backupManifest.destination as Record<string, unknown>
     : {};
@@ -343,4 +341,22 @@ export async function readSelfHostedReadiness(): Promise<SelfHostedReadiness> {
     missingBackup,
     missingMedia,
   };
+}
+
+/**
+ * Backups recorded before 2026-11-17 stored their manifest as a JSON string
+ * (double-encoded) instead of an object; read both shapes.
+ */
+export function parseBackupManifest(value: unknown): Record<string, unknown> {
+  let manifest = value;
+  if (typeof manifest === "string") {
+    try {
+      manifest = JSON.parse(manifest);
+    } catch {
+      return {};
+    }
+  }
+  return manifest && typeof manifest === "object" && !Array.isArray(manifest)
+    ? manifest as Record<string, unknown>
+    : {};
 }
