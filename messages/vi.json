@@ -1301,6 +1301,8 @@
       "filters": "Bộ lọc đơn hàng"
     },
     "pos": {
+      "productSearchTitle": "Tìm sản phẩm",
+      "productSearchSubtitle": "Nhập tên, SKU hoặc quét mã vạch",
       "addNote": "Thêm ghi chú",
       "searchPrompt": "Tìm sản phẩm hoặc quét mã",
       "emptyTitle": "Đơn hàng đang trống",

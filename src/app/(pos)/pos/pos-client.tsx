@@ -3414,6 +3414,13 @@ export function PosClient({
               open={browsing}
               onOpenChange={setBrowsing}
               placeholder={t("mobile.pos.searchPrompt")}
+              mobileFullScreen={{
+                title: t("mobile.pos.productSearchTitle"),
+                subtitle: t("mobile.pos.productSearchSubtitle"),
+                backLabel: t("common.back"),
+                doneLabel: t("mobile.invoices.selectDone"),
+                selectedCount: cart.length,
+              }}
               emptyMessage={search.trim() ? t("pos.noSearchResults") : t("pos.noProducts")}
               loadingMessage={t("common.loading")}
               unavailableMessage={t("common.error")}

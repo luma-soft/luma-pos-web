@@ -1301,6 +1301,8 @@
       "filters": "Order filters"
     },
     "pos": {
+      "productSearchTitle": "Find products",
+      "productSearchSubtitle": "Enter a name, SKU or scan a barcode",
       "addNote": "Add note",
       "searchPrompt": "Search products or scan",
       "emptyTitle": "The order is empty",

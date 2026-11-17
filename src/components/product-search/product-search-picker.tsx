@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Loader2, Search, X } from "lucide-react";
+import { ChevronLeft, Loader2, Search, X } from "lucide-react";
 import { selectAllInputOnClick } from "@/lib/input-selection";
 import { cn } from "@/lib/utils";
 import { controlHeightClassName } from "@/components/ui/button-variants";
@@ -49,6 +49,17 @@ export type ProductSearchPickerProps<T> = {
   surfaceClassName?: string;
   inputAriaLabel?: string;
   testId?: string;
+  /**
+   * Phones: open as a full-screen product search (iOS POSProductSearch) with a
+   * back button, the result list and a footer "Done · N" when items are picked.
+   */
+  mobileFullScreen?: {
+    title: string;
+    subtitle?: string;
+    backLabel: string;
+    doneLabel: string;
+    selectedCount: number;
+  };
 };
 
 /**
@@ -82,9 +93,11 @@ export function ProductSearchPicker<T>({
   surfaceClassName,
   inputAriaLabel,
   testId,
+  mobileFullScreen,
 }: ProductSearchPickerProps<T>) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
+  const fullScreen = Boolean(mobileFullScreen) && open;
   const [items, setItems] = useState<readonly T[]>(browseItems);
   const [searching, setSearching] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -205,8 +218,35 @@ export function ProductSearchPicker<T>({
   const activeOptionId = activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined;
 
   return (
-    <div ref={rootRef} className={cn("relative min-w-0", className)} data-testid={testId}>
-      <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
+    <div
+      ref={rootRef}
+      className={cn(
+        "relative min-w-0",
+        className,
+        fullScreen && "max-lg:fixed max-lg:inset-0 max-lg:z-[80] max-lg:flex max-lg:flex-col max-lg:bg-canvas max-lg:pt-[env(safe-area-inset-top)]",
+      )}
+      data-testid={testId}
+      data-fullscreen={fullScreen || undefined}
+    >
+      {fullScreen && mobileFullScreen && (
+        <div className="flex items-center gap-3 bg-surface px-4 pb-3 pt-2 lg:hidden">
+          <button
+            type="button"
+            onClick={() => close()}
+            aria-label={mobileFullScreen.backLabel}
+            data-button-radius="pill"
+            className="grid size-[52px] shrink-0 place-items-center rounded-[16px] border border-ios-stroke/50 bg-surface text-ios-label"
+          >
+            <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden="true" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[22px] font-bold leading-7">{mobileFullScreen.title}</div>
+            {mobileFullScreen.subtitle && <div className="truncate text-[15px] text-ios-label-secondary">{mobileFullScreen.subtitle}</div>}
+          </div>
+        </div>
+      )}
+      <div className={cn("relative", fullScreen && "max-lg:border-b max-lg:border-border max-lg:bg-surface max-lg:px-4 max-lg:pb-3")}>
+      <Search className={cn("pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400", fullScreen && "max-lg:left-8 max-lg:top-[calc(50%-6px)]")} />
       <input
         type="text"
         role="combobox"
@@ -244,14 +284,22 @@ export function ProductSearchPicker<T>({
       {open && (
         <button
           type="button"
-          onClick={() => close()}
+          onClick={() => {
+            // Full-screen search clears the query in place; the back button leaves.
+            if (fullScreen && window.matchMedia("(max-width: 1023px)").matches) {
+              onQueryChange("");
+              return;
+            }
+            close();
+          }}
           title={closeLabel}
           aria-label={closeLabel}
-          className="absolute right-0 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-surface-2 hover:text-slate-600 lg:right-2 lg:h-7 lg:w-7"
+          className={cn("absolute right-0 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-surface-2 hover:text-slate-600 lg:right-2 lg:h-7 lg:w-7", fullScreen && "max-lg:right-4 max-lg:top-[calc(50%-6px)]")}
         >
           <X className="h-4 w-4" />
         </button>
       )}
+      </div>
 
       {open && (
         <div
@@ -267,6 +315,7 @@ export function ProductSearchPicker<T>({
           className={cn(
             "absolute inset-x-0 top-full z-[60] mt-1 max-h-[min(64dvh,520px)] overflow-auto rounded-xl border border-border bg-surface shadow-e2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
             surfaceClassName,
+            fullScreen && "max-lg:static max-lg:mt-0 max-lg:max-h-none max-lg:min-h-0 max-lg:flex-1 max-lg:rounded-none max-lg:border-0 max-lg:bg-canvas max-lg:shadow-none",
           )}
         >
           {showLoading ? (
@@ -304,6 +353,18 @@ export function ProductSearchPicker<T>({
               })}
             </div>
           )}
+        </div>
+      )}
+      {fullScreen && mobileFullScreen && mobileFullScreen.selectedCount > 0 && (
+        <div className="border-t border-border bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 lg:hidden">
+          <button
+            type="button"
+            onClick={() => close()}
+            className="flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-ios-accent text-[17px] font-bold text-white"
+          >
+            {mobileFullScreen.doneLabel}
+            <span className="rounded-full bg-white/25 px-2 text-[15px] tabular-nums">{mobileFullScreen.selectedCount}</span>
+          </button>
         </div>
       )}
     </div>
