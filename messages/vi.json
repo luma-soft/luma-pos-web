@@ -1947,7 +1947,8 @@
       "offlineSaveFailed": "Chưa lưu được đơn trên thiết bị. Giỏ hàng vẫn được giữ; hãy thử lại.",
       "onlineRequired": "Loại giao dịch này cần có mạng. Giỏ hàng vẫn được giữ trên màn hình.",
       "emptyCart": "Giỏ hàng trống.",
-      "draftAlreadyFinalized": "Đơn tạm này đã được thanh toán hoặc xóa. Hãy làm mới danh sách đơn trước khi tiếp tục."
+      "draftAlreadyFinalized": "Đơn tạm này đã được thanh toán hoặc xóa. Hãy làm mới danh sách đơn trước khi tiếp tục.",
+      "offlineSyncDisabled": "Không kết nối được máy chủ và đồng bộ offline đang tắt trên trình duyệt này. Giỏ hàng vẫn được giữ; hãy thử lại khi có mạng hoặc bật đồng bộ offline trong Cài đặt › Bán hàng."
     },
     "pricingConflict": {
       "refresh": "Làm mới giá để chọn lại",
@@ -2143,7 +2144,8 @@
       "legacyOutboxBody": "Không xác định được cửa hàng và tài khoản ban đầu nên các đơn này không được tự đồng bộ. Hãy tải bản sao và xác minh quyền sở hữu trước khi khôi phục thủ công.",
       "legacyOutboxPrivacy": "Tệp có thể chứa thông tin khách hàng hoặc tài chính. Hãy giữ riêng tư và lưu ở nơi an toàn.",
       "legacyOutboxExport": "Tải bản sao khôi phục",
-      "legacyOutboxExportWarning": "Các đơn offline này không được đồng bộ vì chưa xác định được cửa hàng và tài khoản ban đầu. Hãy xác minh quyền sở hữu trước khi khôi phục thủ công."
+      "legacyOutboxExportWarning": "Các đơn offline này không được đồng bộ vì chưa xác định được cửa hàng và tài khoản ban đầu. Hãy xác minh quyền sở hữu trước khi khôi phục thủ công.",
+      "bannerDirect": "Mất mạng — đồng bộ offline đang tắt, chưa thể lưu đơn"
     },
     "priceBook": {
       "title": "Chọn bảng giá",
@@ -2496,8 +2498,8 @@
       "moreWithCount": "Thao tác với {count} hàng hóa đã chọn",
       "stopTitle": "Ngừng kinh doanh hàng loạt",
       "stopDescription": "Ngừng kinh doanh {count} hàng hóa đã chọn? Các hàng hóa này sẽ không còn xuất hiện để bán tại POS.",
-    "resumeTitle": "Kinh doanh lại hàng loạt",
-    "resumeDescription": "Cho phép kinh doanh lại {count} hàng hóa đã chọn? Các hàng hóa này sẽ xuất hiện trở lại để bán tại POS.",
+      "resumeTitle": "Kinh doanh lại hàng loạt",
+      "resumeDescription": "Cho phép kinh doanh lại {count} hàng hóa đã chọn? Các hàng hóa này sẽ xuất hiện trở lại để bán tại POS.",
       "deleteTitle": "Xóa hàng hóa đã chọn",
       "deleteDescription": "Xóa {count} sản phẩm đã chọn khỏi danh mục? Chứng từ cũ vẫn giữ nguyên; tên sản phẩm đã xóa sẽ có nhãn DEL. Sản phẩm còn tồn kho hoặc số lượng giữ sẽ không được xóa.",
       "deleteResultTitle": "Kết quả xóa hàng hóa",
@@ -5039,6 +5041,15 @@
           "directKctServices": "KCT GTGT, TNCN 2% (Dịch vụ, xây dựng không bao thầu vật liệu không chịu thuế GTGT)"
         }
       }
+    },
+    "offlineSync": {
+      "title": "Đồng bộ offline",
+      "subtitle": "Chỉ áp dụng cho trình duyệt này",
+      "toggle": "Bật đồng bộ offline trên thiết bị này",
+      "toggleDesc": "Lưu hàng đợi đơn POS, checklist dịch vụ và bản sao danh mục trên trình duyệt để bán tiếp khi mất mạng.",
+      "onBody": "Đang bật: đơn POS và checklist được ghi vào hàng đợi trên thiết bị trước rồi mới gửi lên máy chủ; danh mục sản phẩm và lịch sử tồn kho được lưu sẵn để mở nhanh khi offline.",
+      "offBody": "Đang tắt: mọi thao tác ghi và đọc đi thẳng tới máy chủ. Khi mất mạng, đơn sẽ không được lưu tạm — giỏ hàng vẫn giữ trên màn hình để bạn thử lại.",
+      "queuedNote": "Đơn đã xếp hàng trước khi tắt vẫn tiếp tục được gửi khi mở POS có mạng. Tắt sẽ xóa bản sao danh mục và lịch sử tồn kho đã lưu trên trình duyệt này."
     }
   },
   "quotes": {

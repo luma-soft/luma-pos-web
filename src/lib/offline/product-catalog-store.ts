@@ -5,6 +5,7 @@ import {
   type ProductCatalogItem,
   type ProductCatalogSnapshot,
 } from "@/lib/product-catalog";
+import { isOfflineSyncEnabled } from "@/lib/offline/offline-sync-preference";
 
 const DB_NAME = "luma-pos-shared";
 const DB_VERSION = 2;
@@ -89,6 +90,8 @@ function openDatabase(): Promise<IDBDatabase | null> {
 export async function readProductCatalogSnapshot(
   scopeId: string,
 ): Promise<ProductCatalogSnapshot | null> {
+  // With offline sync off the catalog is always fetched from the server.
+  if (!isOfflineSyncEnabled()) return null;
   const database = await openDatabase();
   if (!database) return null;
 
@@ -129,6 +132,7 @@ export async function writeProductCatalogSnapshot(
   snapshot: ProductCatalogSnapshot,
   changes?: ProductCatalogWriteChanges,
 ): Promise<boolean> {
+  if (!isOfflineSyncEnabled()) return false;
   const database = await openDatabase();
   if (!database) return false;
 
@@ -240,6 +244,19 @@ export async function clearProductCatalogSnapshotsForUser(userId: string): Promi
       }
       cursor.continue();
     };
+    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.onabort = transaction.onerror = () => { database.close(); resolve(); };
+  });
+}
+
+/** Wipe every persisted catalog when the device turns offline sync off. */
+export async function clearAllProductCatalogSnapshots(): Promise<void> {
+  const database = await openDatabase();
+  if (!database) return;
+  await new Promise<void>((resolve) => {
+    const transaction = database.transaction([META_STORE, PRODUCTS_STORE], "readwrite");
+    transaction.objectStore(META_STORE).clear();
+    transaction.objectStore(PRODUCTS_STORE).clear();
     transaction.oncomplete = () => { database.close(); resolve(); };
     transaction.onabort = transaction.onerror = () => { database.close(); resolve(); };
   });

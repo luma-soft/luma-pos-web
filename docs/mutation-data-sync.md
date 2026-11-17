@@ -43,3 +43,19 @@ For new CRUD surfaces, verify create/update/delete from the originating screen a
 an already-mounted detail/list, plus failure, read-after-write races and tenant
 switches. Session-specific histories and nested sheets need explicit review;
 central invalidation does not automatically rewrite their local state.
+
+## Web offline sync switch (per browser)
+
+Settings › POS › "Đồng bộ offline / Offline sync" is a per-browser switch stored in
+`localStorage` (`luma.web.offline-sync.enabled.v1`, see
+`src/lib/offline/offline-sync-preference.ts`). Default: **off**.
+
+- Off: POS orders call the `createOrder` server action directly (no IndexedDB
+  outbox write-ahead, no sync relay, no queueing on network failure — the cart
+  stays and an error is shown). Service checklist edits call
+  `updateServiceChecklist` directly. Product Catalog and stock history are not
+  read from or written to IndexedDB; turning the switch off clears both caches.
+  Orders/checklists queued earlier while it was on are still drained.
+- On: the existing offline-first path (IndexedDB outbox + `/api/sync/relay`,
+  persisted catalog and stock history).
+- The service worker is unchanged (static assets + public offline page only).

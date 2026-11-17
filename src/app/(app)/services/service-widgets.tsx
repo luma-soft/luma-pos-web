@@ -80,6 +80,7 @@ import {
   type ServiceChecklistQueueEntry,
 } from "@/lib/offline/service-checklist-store";
 import { getOrCreateSyncDeviceId } from "@/lib/offline/pos-store";
+import { useOfflineSyncEnabled } from "@/lib/offline/offline-sync-preference";
 import { fetchSyncRelayReceipts, submitSyncRelayEvent, SyncRelayRequestError } from "@/lib/sync/relay-client";
 
 type ProjectOption = { id: string; name: string; serviceType: string | null };
@@ -839,6 +840,10 @@ export function InstalledAssetQuickCreate({
   );
 }
 
+function checklistTimestamp(): number {
+  return Date.now();
+}
+
 export function ServiceChecklistEditor({
   jobId,
   checklist,
@@ -864,10 +869,15 @@ export function ServiceChecklistEditor({
   const [pendingEntry, setPendingEntry] = useState<ServiceChecklistQueueEntry | null>(null);
   const [saveError, setSaveError] = useState(false);
   const syncingRef = useRef(false);
+  // Off: checklist edits call the server action directly, never the device queue.
+  const offlineSyncEnabled = useOfflineSyncEnabled();
 
-  useEffect(() => {
+  // Follow server revalidation unless a queued local edit owns the checklist.
+  const [syncedFrom, setSyncedFrom] = useState({ checklist, pendingEntry });
+  if (syncedFrom.checklist !== checklist || syncedFrom.pendingEntry !== pendingEntry) {
+    setSyncedFrom({ checklist, pendingEntry });
     if (!pendingEntry) setItems(checklist);
-  }, [checklist, pendingEntry]);
+  }
 
   const flushEntry = useCallback(async (entry: ServiceChecklistQueueEntry) => {
     if (!relayEnabled || !storeId || !scopeId || !navigator.onLine || syncingRef.current || entry.failed) return;
@@ -943,7 +953,7 @@ export function ServiceChecklistEditor({
     setItems(next);
     setBusyCode(code);
 
-    if (scopeId && storeId && (!navigator.onLine || relayEnabled)) {
+    if (offlineSyncEnabled && scopeId && storeId && (!navigator.onLine || relayEnabled)) {
       setSaveError(false);
       const eventId = crypto.randomUUID();
       const entry: Omit<ServiceChecklistQueueEntry, "storageId"> = {
@@ -951,7 +961,7 @@ export function ServiceChecklistEditor({
         storeId,
         jobId,
         eventId,
-        savedAt: Date.now(),
+        savedAt: checklistTimestamp(),
         payload: {
           type: "checklist.update",
           jobId,
@@ -974,10 +984,13 @@ export function ServiceChecklistEditor({
       return;
     }
 
-    const result = await updateServiceChecklist(jobId, next);
+    setSaveError(false);
+    // No connection and no offline queue: a thrown action call rolls back.
+    const result = await updateServiceChecklist(jobId, next).catch(() => null);
     setBusyCode(null);
-    if (result.ok) router.refresh();
+    if (result?.ok) router.refresh();
     else setItems(previous);
+    if (!result) setSaveError(true);
   }
 
   async function discardRejectedChange() {

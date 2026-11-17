@@ -1947,7 +1947,8 @@
       "offlineSaveFailed": "The order could not be saved on this device. Your cart is still here; please try again.",
       "onlineRequired": "This transaction requires an Internet connection. Your cart is still on screen.",
       "emptyCart": "Cart is empty.",
-      "draftAlreadyFinalized": "This saved order has already been checked out or deleted. Refresh the order list before continuing."
+      "draftAlreadyFinalized": "This saved order has already been checked out or deleted. Refresh the order list before continuing.",
+      "offlineSyncDisabled": "Can't reach the server and offline sync is off in this browser. The cart is kept; retry when online or turn on offline sync in Settings › POS."
     },
     "pricingConflict": {
       "refresh": "Refresh prices to reselect",
@@ -2143,7 +2144,8 @@
       "legacyOutboxBody": "Their original store and account are unknown, so they were not replayed. Export a recovery copy and verify ownership before any manual recovery.",
       "legacyOutboxPrivacy": "The file may contain customer or financial details. Keep it private and store it securely.",
       "legacyOutboxExport": "Export recovery copy",
-      "legacyOutboxExportWarning": "These offline orders were not replayed because their original store and account are unknown. Verify ownership before any manual recovery."
+      "legacyOutboxExportWarning": "These offline orders were not replayed because their original store and account are unknown. Verify ownership before any manual recovery.",
+      "bannerDirect": "Offline — offline sync is off, orders can't be saved yet"
     },
     "priceBook": {
       "title": "Select price book",
@@ -2496,8 +2498,8 @@
       "moreWithCount": "Actions for {count} selected products",
       "stopTitle": "Stop selling in bulk",
       "stopDescription": "Stop selling the {count} selected items? They will no longer be available for sale in POS.",
-    "resumeTitle": "Resume selling in bulk",
-    "resumeDescription": "Resume selling {count} selected products? They will be available for sale in POS again.",
+      "resumeTitle": "Resume selling in bulk",
+      "resumeDescription": "Resume selling {count} selected products? They will be available for sale in POS again.",
       "deleteTitle": "Delete selected products",
       "deleteDescription": "Remove {count} selected products from the catalog? Historical documents are preserved and deleted product names receive a DEL marker; products with stock or reservations cannot be deleted.",
       "deleteResultTitle": "Product deletion result",
@@ -5039,6 +5041,15 @@
           "directKctServices": "Not subject to VAT, PIT 2% (VAT-exempt services and construction without materials)"
         }
       }
+    },
+    "offlineSync": {
+      "title": "Offline sync",
+      "subtitle": "Applies to this browser only",
+      "toggle": "Enable offline sync on this device",
+      "toggleDesc": "Keeps the POS order queue, service checklist queue and a catalog copy in this browser so selling can continue without a connection.",
+      "onBody": "On: POS orders and checklists are written to an on-device queue first, then sent to the server; the product catalog and stock history are stored locally for fast offline access.",
+      "offBody": "Off: every write and read goes straight to the server. Without a connection orders are not saved locally — the cart stays on screen so you can retry.",
+      "queuedNote": "Orders queued before turning this off are still sent when POS opens online. Turning it off removes the catalog and stock-history copies stored in this browser."
     }
   },
   "quotes": {

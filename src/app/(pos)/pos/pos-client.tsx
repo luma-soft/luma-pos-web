@@ -73,6 +73,7 @@ import {
   storeRelayEventId,
   storeRelaySubmission,
 } from "@/lib/offline/pos-store";
+import { useOfflineSyncEnabled } from "@/lib/offline/offline-sync-preference";
 import {
   fetchSyncRelayReceipts,
   stableSyncEventId,
@@ -1382,6 +1383,9 @@ export function PosClient({
   }, [active.cameraInitialId, active.cameraPackages?.length, active.cameraQuote, initialContext?.cameraQuote, productById, cameraQuoteDefaults, patchActive, cameraPackagesToCart]);
 
   // ===== offline (Mức A) =====
+  // Per-browser switch. Off: orders call the server action directly; nothing
+  // new is queued. Previously queued orders are still drained below.
+  const offlineSyncEnabled = useOfflineSyncEnabled();
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
   const [legacyOutboxCount, setLegacyOutboxCount] = useState(0);
@@ -2224,6 +2228,11 @@ export function PosClient({
 
   /** Lưu đơn vào hàng đợi trên thiết bị trước khi đóng hóa đơn. */
   async function queueOffline(payload: Parameters<typeof createOrder>[0]) {
+    if (!offlineSyncEnabled) {
+      setSubmittingMode(null);
+      setError(t("pos.errors.offlineSyncDisabled"));
+      return false;
+    }
     if (!isOfflineQueueableOrder(payload)) {
       setSubmittingMode(null);
       setError(t("pos.errors.onlineRequired"));
@@ -2427,7 +2436,8 @@ export function PosClient({
     setError("");
     setPricingConflictId(null);
 
-    const offlineQueueable = isOfflineQueueableOrder(payload);
+    // With offline sync off no order touches the device outbox or the relay.
+    const offlineQueueable = offlineSyncEnabled && isOfflineQueueableOrder(payload);
     const relayCompatible = syncRelayEnabled && offlineQueueable;
 
     // Offline: chỉ xếp những đơn có thể gửi an toàn qua hàng đợi POS.
@@ -2439,7 +2449,7 @@ export function PosClient({
       }
       if (!offlineQueueable) {
         setSubmittingMode(null);
-        setError(t("pos.errors.onlineRequired"));
+        setError(t(offlineSyncEnabled ? "pos.errors.onlineRequired" : "pos.errors.offlineSyncDisabled"));
         return;
       }
       await queueOffline(payload);
@@ -3190,7 +3200,7 @@ export function PosClient({
             !online || pricingConflicts > 0 ? "bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/70 dark:text-amber-300"
               : "bg-sky-100 text-sky-800 border border-sky-300 dark:bg-sky-950/70 dark:text-sky-300"
           )}>
-            {!online ? <><WifiOff className="w-3.5 h-3.5" />{t("pos.offline.banner")}</>
+            {!online ? <><WifiOff className="w-3.5 h-3.5" />{t(offlineSyncEnabled ? "pos.offline.banner" : "pos.offline.bannerDirect")}</>
               : syncing ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />{t("pos.offline.syncing")}</>
               : pricingConflicts > 0 ? <>{t("pos.pricingConflict.queued", { count: pricingConflicts })}</>
               : pending > 0 ? <><RefreshCw className="w-3.5 h-3.5" />{t("pos.offline.pending", { n: pending })}</>

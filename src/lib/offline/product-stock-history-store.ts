@@ -4,6 +4,7 @@ import {
   checkProductStockHistoryVersion,
   loadProductStockHistory,
 } from "@/lib/actions/product-stock-history";
+import { isOfflineSyncEnabled } from "@/lib/offline/offline-sync-preference";
 
 type StockHistoryResult = Awaited<ReturnType<typeof loadProductStockHistory>>;
 type StockHistoryData = Extract<StockHistoryResult, { ok: true }>["data"];
@@ -47,6 +48,7 @@ export async function readCachedStockHistory(
   productId: string,
   page: number,
 ): Promise<CachedStockHistoryPage | null> {
+  if (!isOfflineSyncEnabled()) return null;
   const database = await openDatabase();
   if (!database) return null;
   return new Promise((resolve) => {
@@ -70,7 +72,7 @@ async function writeCachedStockHistory(
   productId: string,
   data: StockHistoryData,
 ): Promise<void> {
-  if (data.scopeId !== scopeId) return;
+  if (data.scopeId !== scopeId || !isOfflineSyncEnabled()) return;
   const epoch = cacheEpoch;
   const database = await openDatabase();
   if (!database) return;
@@ -167,6 +169,21 @@ export async function clearCachedStockHistoryForUser(userId: string): Promise<vo
       }
       cursor.continue();
     };
+    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.onabort = transaction.onerror = () => { database.close(); resolve(); };
+  });
+}
+
+/** Wipe every cached stock-history page when the device turns offline sync off. */
+export async function clearAllCachedStockHistory(): Promise<void> {
+  cacheEpoch += 1;
+  inflight.clear();
+  versionChecks.clear();
+  const database = await openDatabase();
+  if (!database) return;
+  await new Promise<void>((resolve) => {
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    transaction.objectStore(STORE_NAME).clear();
     transaction.oncomplete = () => { database.close(); resolve(); };
     transaction.onabort = transaction.onerror = () => { database.close(); resolve(); };
   });

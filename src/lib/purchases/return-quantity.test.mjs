@@ -33,7 +33,7 @@ test("compares quantities in base units when selling unit differs", () => {
   const packs = [{ id: "line-1", productId: "tile", quantity: 10, unitMultiplier: 10 }];
   expect(validateLinkedPurchaseReturn(packs, [returned(3)], [
     { ...returned(9), unitMultiplier: 10 },
-  ]).toEqual({ ok: true, normalized: [{ ...returned(9), unitMultiplier: 10 }] });
+  ])).toEqual({ ok: true, normalized: [{ ...returned(9), unitMultiplier: 10 }] });
   expect(validateLinkedPurchaseReturn(packs, [returned(20)], [
     { ...returned(9), unitMultiplier: 10 },
   ])).toEqual({ ok: false, error: "RETURN_QTY_EXCEEDS" });

@@ -416,6 +416,11 @@ export function ProductCatalogProvider({
         return;
       }
       readProductCatalogSnapshot(scopeId).then((shared) => {
+        // Without a persisted snapshot (offline sync off) ask the server instead.
+        if (!cancelled && !shared) {
+          void checkForUpdates();
+          return;
+        }
         if (
           cancelled || !shared || shared.userId !== userId || shared.scopeId !== scopeId ||
           !catalogRevisionChanged(revisionRef.current, shared.revision)
@@ -433,7 +438,7 @@ export function ProductCatalogProvider({
       cancelled = true;
       channel.close();
     };
-  }, [scopeId, userId]);
+  }, [checkForUpdates, scopeId, userId]);
 
   // Prepare both canonical and Inventory-only indexes in idle slices, outside
   // render and keystroke handlers. Non-variant catalogs share one index.

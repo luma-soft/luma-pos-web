@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
+import { setOfflineSyncEnabled, useOfflineSyncEnabled } from "@/lib/offline/offline-sync-preference";
+import { clearAllProductCatalogSnapshots } from "@/lib/offline/product-catalog-store";
+import { clearAllCachedStockHistory } from "@/lib/offline/product-stock-history-store";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, Copy, ExternalLink, KeyRound, Loader2, MessageCircle, Pencil, Plus, Power, Printer, Save, Star, Trash2, X } from "lucide-react";
 import { SearchableSelect } from "@/components/combobox";
 import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
@@ -433,6 +436,7 @@ export function SettingsClient({
 
         {active === "store" && <StoreSection L={L} store={store} canManage={canManage} />}
         {active === "pos" && <PosSettingsSection L={L} prefs={store.prefs.pos} canManage={canManage} />}
+        {active === "pos" && <OfflineSyncSettingsCard />}
         {active === "productBrowse" && <ProductBrowseSettingsSection L={L} value={catalog.defaultSort} onChange={catalog.setDefaultSort} canViewPurchasePrices={canViewPurchasePrices} />}
         {active === "cameraQuote" && <CameraQuoteSettingsSection prefs={store.prefs.cameraQuote} options={cameraQuoteOptions} canManage={canManage} />}
         {active === "hardware" && <HardwareSection L={L} prefs={store.prefs.hardware} canManage={canManage} />}
@@ -588,6 +592,28 @@ function PosSettingsSection({ L, prefs, canManage }: { L: boolean; prefs: StoreP
           onChange={canManage ? (v) => set("showProjectFields", v) : undefined}
         />
         <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} />
+      </div>
+    </Card>
+  );
+}
+
+/** Per-browser switch (localStorage), not a store pref: every staff device chooses. */
+function OfflineSyncSettingsCard() {
+  const t = useTranslations("settings.offlineSync");
+  const enabled = useOfflineSyncEnabled();
+  function change(next: boolean) {
+    setOfflineSyncEnabled(next);
+    if (!next) {
+      void clearAllProductCatalogSnapshots();
+      void clearAllCachedStockHistory();
+    }
+  }
+  return (
+    <Card title={t("title")} vi={t("subtitle")}>
+      <div className="p-4.5 flex flex-col gap-3" data-testid="offline-sync-settings">
+        <CtrlRow title={t("toggle")} desc={t("toggleDesc")} checked={enabled} onChange={change} />
+        <p className="text-xs text-slate-600">{t(enabled ? "onBody" : "offBody")}</p>
+        <p className="text-[11px] text-slate-500">{t("queuedNote")}</p>
       </div>
     </Card>
   );

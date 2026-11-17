@@ -1,5 +1,17 @@
 import "fake-indexeddb/auto";
 import { expect, test } from "bun:test";
+
+// These tests cover the offline-sync-on path; the device switch defaults off.
+globalThis.window ??= globalThis;
+globalThis.localStorage ??= (() => {
+  const values = new Map();
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: (key) => values.delete(key),
+  };
+})();
+localStorage.setItem("luma.web.offline-sync.enabled.v1", "true");
 import { mergeProductCatalogDelta } from "@/lib/product-catalog";
 import {
   productCatalogWriteChangesForSync,
