@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       const session = await createWebAuthSession(user.id);
       if (!session) return mobileError("errors.unauthorized", 401);
       const response = NextResponse.json({ ok: true });
-      setWebSessionCookie(response, session.token, session.expiresAt);
+      setWebSessionCookie(response, session.token, session.expiresAt, request);
       return response;
     }
 

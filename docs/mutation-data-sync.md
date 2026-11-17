@@ -46,10 +46,17 @@ central invalidation does not automatically rewrite their local state.
 
 ## Web offline sync switch (per browser)
 
-Settings › POS › "Đồng bộ offline / Offline sync" is a per-browser switch stored in
+Settings › System › "Đồng bộ offline / Offline sync" (`?tab=offline`) is a per-browser switch for the whole web app stored in
 `localStorage` (`luma.web.offline-sync.enabled.v1`, see
-`src/lib/offline/offline-sync-preference.ts`). Default: **off**.
+`src/lib/offline/offline-sync-preference.ts`).
 
+- On the store Mac itself (web opened at a loopback address, e.g.
+  `http://127.0.0.1:3000`, which is what the Mac host console's browser button
+  opens) the database is local, so offline sync is always off and the switch is
+  replaced by an explanation. The session cookie drops `Secure` only for such a
+  direct loopback http request (`src/lib/auth/session-cookie.ts`); requests via
+  the Cloudflare Tunnel keep it.
+- Every other device defaults to **on** (offline-first) and can turn it off.
 - Off: POS orders call the `createOrder` server action directly (no IndexedDB
   outbox write-ahead, no sync relay, no queueing on network failure — the cart
   stays and an error is shown). Service checklist edits call

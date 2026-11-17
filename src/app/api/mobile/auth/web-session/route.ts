@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     if (!principal) return mobileError("errors.unauthorized", 401);
     const session = await createWebAuthSession(principal.profileId);
     if (!session) return mobileError("errors.unauthorized", 401);
-    setWebSessionCookie(response, session.token, session.expiresAt);
+    setWebSessionCookie(response, session.token, session.expiresAt, request);
     return response;
   }
 

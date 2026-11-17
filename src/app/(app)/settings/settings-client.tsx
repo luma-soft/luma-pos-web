@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { setOfflineSyncEnabled, useOfflineSyncEnabled } from "@/lib/offline/offline-sync-preference";
+import { setOfflineSyncEnabled, useIsLocalHostRuntime, useOfflineSyncEnabled } from "@/lib/offline/offline-sync-preference";
 import { clearAllProductCatalogSnapshots } from "@/lib/offline/product-catalog-store";
 import { clearAllCachedStockHistory } from "@/lib/offline/product-stock-history-store";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, Copy, ExternalLink, KeyRound, Loader2, MessageCircle, Pencil, Plus, Power, Printer, Save, Star, Trash2, X } from "lucide-react";
@@ -214,7 +214,7 @@ function formatAiTestMessage(message: string, L: boolean) {
   return map[message] ? settingsTextByFlag(L, `ui.aiTest.${map[message]}`) : message;
 }
 
-type SectionId = "store" | "pos" | "productBrowse" | "cameraQuote" | "hardware" | "payments" | "print" | "tax" | "notifications" | "zalo" | "shopee" | "ai";
+type SectionId = "store" | "offline" | "pos" | "productBrowse" | "cameraQuote" | "hardware" | "payments" | "print" | "tax" | "notifications" | "zalo" | "shopee" | "ai";
 
 const NAV: { groupKey: string; items: { id: SectionId; ico: string; labelKey: string; badge?: string }[] }[] = [
   { groupKey: "store", items: [
@@ -232,6 +232,7 @@ const NAV: { groupKey: string; items: { id: SectionId; ico: string; labelKey: st
     { id: "tax", ico: "📋", labelKey: "tax" },
   ] },
   { groupKey: "system", items: [
+    { id: "offline", ico: "📶", labelKey: "offline" },
     { id: "notifications", ico: "🔔", labelKey: "notifications" },
     { id: "zalo", ico: "💬", labelKey: "zalo" },
     ...(ONLINE_SALES_ENABLED
@@ -242,6 +243,7 @@ const NAV: { groupKey: string; items: { id: SectionId; ico: string; labelKey: st
 ];
 const SEC_META: Record<SectionId, { titleKey: string; subtitleKey: string }> = {
   store: { titleKey: "store", subtitleKey: "store" },
+  offline: { titleKey: "offline", subtitleKey: "offline" },
   pos: { titleKey: "pos", subtitleKey: "pos" },
   productBrowse: { titleKey: "productBrowse", subtitleKey: "productBrowse" },
   cameraQuote: { titleKey: "cameraQuote", subtitleKey: "cameraQuote" },
@@ -436,7 +438,7 @@ export function SettingsClient({
 
         {active === "store" && <StoreSection L={L} store={store} canManage={canManage} />}
         {active === "pos" && <PosSettingsSection L={L} prefs={store.prefs.pos} canManage={canManage} />}
-        {active === "pos" && <OfflineSyncSettingsCard />}
+        {active === "offline" && <OfflineSyncSettingsCard />}
         {active === "productBrowse" && <ProductBrowseSettingsSection L={L} value={catalog.defaultSort} onChange={catalog.setDefaultSort} canViewPurchasePrices={canViewPurchasePrices} />}
         {active === "cameraQuote" && <CameraQuoteSettingsSection prefs={store.prefs.cameraQuote} options={cameraQuoteOptions} canManage={canManage} />}
         {active === "hardware" && <HardwareSection L={L} prefs={store.prefs.hardware} canManage={canManage} />}
@@ -601,6 +603,7 @@ function PosSettingsSection({ L, prefs, canManage }: { L: boolean; prefs: StoreP
 function OfflineSyncSettingsCard() {
   const t = useTranslations("settings.offlineSync");
   const enabled = useOfflineSyncEnabled();
+  const localHost = useIsLocalHostRuntime();
   function change(next: boolean) {
     setOfflineSyncEnabled(next);
     if (!next) {
@@ -611,9 +614,15 @@ function OfflineSyncSettingsCard() {
   return (
     <Card title={t("title")} vi={t("subtitle")}>
       <div className="p-4.5 flex flex-col gap-3" data-testid="offline-sync-settings">
-        <CtrlRow title={t("toggle")} desc={t("toggleDesc")} checked={enabled} onChange={change} />
-        <p className="text-xs text-slate-600">{t(enabled ? "onBody" : "offBody")}</p>
-        <p className="text-[11px] text-slate-500">{t("queuedNote")}</p>
+        {localHost ? (
+          <p className="text-xs text-slate-600">{t("localHostBody")}</p>
+        ) : (
+          <>
+            <CtrlRow title={t("toggle")} desc={t("toggleDesc")} checked={enabled} onChange={change} />
+            <p className="text-xs text-slate-600">{t(enabled ? "onBody" : "offBody")}</p>
+            <p className="text-[11px] text-slate-500">{t("queuedNote")}</p>
+          </>
+        )}
       </div>
     </Card>
   );

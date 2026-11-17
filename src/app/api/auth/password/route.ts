@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       return response;
     }
     void AUTH_SESSION_COOKIE;
-    clearWebSessionCookie(response);
+    clearWebSessionCookie(response, request);
     return response;
   } catch (error) {
     console.error("LumaPOS password change failed", {

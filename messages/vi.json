@@ -1977,7 +1977,7 @@
       "onlineRequired": "Loại giao dịch này cần có mạng. Giỏ hàng vẫn được giữ trên màn hình.",
       "emptyCart": "Giỏ hàng trống.",
       "draftAlreadyFinalized": "Đơn tạm này đã được thanh toán hoặc xóa. Hãy làm mới danh sách đơn trước khi tiếp tục.",
-      "offlineSyncDisabled": "Không kết nối được máy chủ và đồng bộ offline đang tắt trên trình duyệt này. Giỏ hàng vẫn được giữ; hãy thử lại khi có mạng hoặc bật đồng bộ offline trong Cài đặt › Bán hàng."
+      "offlineSyncDisabled": "Không kết nối được máy chủ và đồng bộ offline đang tắt trên trình duyệt này. Giỏ hàng vẫn được giữ; hãy thử lại khi có mạng hoặc bật đồng bộ offline trong Cài đặt › Đồng bộ offline."
     },
     "pricingConflict": {
       "refresh": "Làm mới giá để chọn lại",
@@ -4385,7 +4385,8 @@
       "notifications": "Thông báo",
       "zalo": "Zalo OA",
       "shopee": "App sàn TMĐT",
-      "ai": "AI"
+      "ai": "AI",
+      "offline": "Đồng bộ offline"
     },
     "payments": {
       "sepay": {
@@ -4935,7 +4936,8 @@
           "notifications": "Thông báo",
           "zalo": "Zalo OA",
           "shopee": "App sàn TMĐT",
-          "ai": "AI"
+          "ai": "AI",
+          "offline": "Đồng bộ offline"
         }
       },
       "sections": {
@@ -4994,6 +4996,10 @@
         "ai": {
           "title": "Cấu hình AI",
           "subtitle": "API key, model vision và bucket lưu file AI"
+        },
+        "offline": {
+          "title": "Đồng bộ offline",
+          "subtitle": "Chế độ offline-first cho toàn bộ web trên trình duyệt này"
         }
       },
       "industries": {
@@ -5073,12 +5079,13 @@
     },
     "offlineSync": {
       "title": "Đồng bộ offline",
-      "subtitle": "Chỉ áp dụng cho trình duyệt này",
+      "subtitle": "Áp dụng cho toàn bộ web trên trình duyệt này",
       "toggle": "Bật đồng bộ offline trên thiết bị này",
-      "toggleDesc": "Lưu hàng đợi đơn POS, checklist dịch vụ và bản sao danh mục trên trình duyệt để bán tiếp khi mất mạng.",
+      "toggleDesc": "Toàn bộ web (bán hàng, checklist dịch vụ, danh mục sản phẩm, lịch sử tồn kho) dùng hàng đợi và bản sao trên trình duyệt để tiếp tục làm việc khi mất mạng.",
       "onBody": "Đang bật: đơn POS và checklist được ghi vào hàng đợi trên thiết bị trước rồi mới gửi lên máy chủ; danh mục sản phẩm và lịch sử tồn kho được lưu sẵn để mở nhanh khi offline.",
       "offBody": "Đang tắt: mọi thao tác ghi và đọc đi thẳng tới máy chủ. Khi mất mạng, đơn sẽ không được lưu tạm — giỏ hàng vẫn giữ trên màn hình để bạn thử lại.",
-      "queuedNote": "Đơn đã xếp hàng trước khi tắt vẫn tiếp tục được gửi khi mở POS có mạng. Tắt sẽ xóa bản sao danh mục và lịch sử tồn kho đã lưu trên trình duyệt này."
+      "queuedNote": "Đơn đã xếp hàng trước khi tắt vẫn tiếp tục được gửi khi mở POS có mạng. Tắt sẽ xóa bản sao danh mục và lịch sử tồn kho đã lưu trên trình duyệt này.",
+      "localHostBody": "Đang mở trực tiếp trên máy chủ cửa hàng (Mac): dữ liệu được đọc và ghi thẳng vào cơ sở dữ liệu trên máy này, nên không cần đồng bộ offline. Các thiết bị khác vẫn dùng chế độ offline."
     }
   },
   "quotes": {

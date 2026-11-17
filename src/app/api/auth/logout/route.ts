@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const token = request.cookies.get(AUTH_SESSION_COOKIE)?.value;
     if (token) await revokeAuthSessionForTokens([token]);
     const response = NextResponse.json({ ok: true, signedOut: true });
-    clearWebSessionCookie(response);
+    clearWebSessionCookie(response, request);
     return response;
   }
 

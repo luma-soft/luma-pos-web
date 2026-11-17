@@ -1977,7 +1977,7 @@
       "onlineRequired": "This transaction requires an Internet connection. Your cart is still on screen.",
       "emptyCart": "Cart is empty.",
       "draftAlreadyFinalized": "This saved order has already been checked out or deleted. Refresh the order list before continuing.",
-      "offlineSyncDisabled": "Can't reach the server and offline sync is off in this browser. The cart is kept; retry when online or turn on offline sync in Settings › POS."
+      "offlineSyncDisabled": "Can't reach the server and offline sync is off in this browser. The cart is kept; retry when online or turn on offline sync in Settings › Offline sync."
     },
     "pricingConflict": {
       "refresh": "Refresh prices to reselect",
@@ -4385,7 +4385,8 @@
       "notifications": "Notifications",
       "zalo": "Zalo OA",
       "shopee": "Marketplace Apps",
-      "ai": "AI"
+      "ai": "AI",
+      "offline": "Offline sync"
     },
     "payments": {
       "sepay": {
@@ -4935,7 +4936,8 @@
           "notifications": "Notifications",
           "zalo": "Zalo OA",
           "shopee": "Marketplace Apps",
-          "ai": "AI"
+          "ai": "AI",
+          "offline": "Offline sync"
         }
       },
       "sections": {
@@ -4994,6 +4996,10 @@
         "ai": {
           "title": "AI Settings",
           "subtitle": "Provider key, vision model, and attachment bucket"
+        },
+        "offline": {
+          "title": "Offline sync",
+          "subtitle": "Offline-first mode for the whole web app in this browser"
         }
       },
       "industries": {
@@ -5073,12 +5079,13 @@
     },
     "offlineSync": {
       "title": "Offline sync",
-      "subtitle": "Applies to this browser only",
+      "subtitle": "Applies to the whole web app in this browser",
       "toggle": "Enable offline sync on this device",
-      "toggleDesc": "Keeps the POS order queue, service checklist queue and a catalog copy in this browser so selling can continue without a connection.",
+      "toggleDesc": "The whole web app (selling, service checklists, product catalog, stock history) uses an on-device queue and copies so work continues without a connection.",
       "onBody": "On: POS orders and checklists are written to an on-device queue first, then sent to the server; the product catalog and stock history are stored locally for fast offline access.",
       "offBody": "Off: every write and read goes straight to the server. Without a connection orders are not saved locally — the cart stays on screen so you can retry.",
-      "queuedNote": "Orders queued before turning this off are still sent when POS opens online. Turning it off removes the catalog and stock-history copies stored in this browser."
+      "queuedNote": "Orders queued before turning this off are still sent when POS opens online. Turning it off removes the catalog and stock-history copies stored in this browser.",
+      "localHostBody": "Opened directly on the store server (Mac): data is read and written straight to the database on this machine, so offline sync isn't needed. Other devices keep using offline mode."
     }
   },
   "quotes": {
