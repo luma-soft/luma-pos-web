@@ -32,7 +32,6 @@ import {
   Ban,
   Barcode,
   ChevronLeft,
-  ChevronDown,
   ChevronRight,
   Copy,
   ImageIcon,
@@ -42,6 +41,7 @@ import {
   Plus,
   Search,
   Store,
+  Tag,
   Trash2,
   X,
   ZoomIn,
@@ -74,6 +74,8 @@ import {
   productStockDisplay,
 } from "@/lib/product-stock";
 import { useProductSelection } from "./product-selection";
+import { MobileSelectionIndicator } from "@/components/mobile-ui";
+import { useLongPress } from "@/components/use-long-press";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import {
   checkStockHistoryVersionOnce,
@@ -311,6 +313,9 @@ export function ProductsTable({
   const [selectedUnits, setSelectedUnits] = useState<Record<string, string>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [allVariants, setAllVariants] = useState<Record<string, boolean>>({});
+  // Phones enter selection mode with a long press, as on iOS; desktop keeps checkboxes.
+  const [mobileSelecting, setMobileSelecting] = useState(false);
+  const mobileSelection = selectionEnabled && mobileSelecting;
   const query = queryOverride ?? params.get("q") ?? "";
   const expansionStorageKey = `luma:products:variants:${resetScrollKey ?? "default"}`;
 
@@ -474,8 +479,13 @@ export function ProductsTable({
 
   return (
     <>
-      {selectionEnabled && rows.length > 0 && (
+      {mobileSelection && rows.length > 0 && (
         <ProductMobileSelectionToolbar
+          doneLabel={t("mobile.invoices.selectDone")}
+          onDone={() => {
+            setMobileSelecting(false);
+            if (selectedVisibleIds.length > 0) toggleMany(selectedVisibleIds);
+          }}
           checked={allSelected}
           indeterminate={selectedVisibleIds.length > 0 && !allSelected}
           selectedCount={selectedVisibleIds.length}
@@ -496,8 +506,8 @@ export function ProductsTable({
         fillHeight
         resetScrollKey={resetScrollKey}
         empty={empty}
-        mobileListClassName="!space-y-0 overflow-hidden rounded-xl border border-border-soft bg-surface"
-        mobileRowClassName="!rounded-none !border-x-0 !border-t-0 last:!border-b-0"
+        mobileListClassName="-mx-4 !space-y-0 border-t border-border bg-surface"
+        mobileRowClassName="!rounded-none !border-0"
         onRowClick={(product) => groupOf(product) ? toggleGroup(product) : openProduct(product)}
         rowClickColumnKey="product"
         rowClassName={(product) => cn(
@@ -527,20 +537,32 @@ export function ProductsTable({
         }}
         renderMobileRow={({ row: product }) => {
           const group = groupOf(product);
-          if (!group) return <ProductMobileRow product={product} selectionEnabled={selectionEnabled} selected={selected(product)} selectLabel={t("products.bulk.selectProduct", { name: product.name })} stockNotTrackedLabel={t("products.stock.notTracked")} selectedUnitName={selectedUnitName(product)} onUnitChange={(unitName) => changeUnit(product.id, unitName)} onToggle={() => toggleProduct(product)} onOpen={() => openProduct(product)} />;
-          return <div className="m-3 overflow-hidden rounded-xl border border-primary-600 bg-surface">
-            <div className="flex items-start bg-primary-50/70 dark:bg-primary-950/40">
-              {selectionEnabled && <div className="pl-3 pt-4"><SelectionCheckbox checked={selected(product)} indeterminate={partiallySelected(product)} onChange={() => toggleProduct(product)} label={t("products.bulk.selectProduct", { name: product.name })} /></div>}
-              <button type="button" onClick={() => toggleGroup(product)} aria-expanded={isExpanded(product)} className="min-w-0 flex-1 p-3 text-left">
-                <div className="flex items-center gap-3"><ProductThumbnail product={product} /><div className="min-w-0 flex-1"><div className="text-sm font-semibold">{group.name}</div><div className="mt-1 text-sm font-medium text-primary-700 dark:text-primary-300">{t("products.variants.count", { count: membersFor(product).total })}</div></div><ChevronDown className={cn("h-5 w-5 shrink-0 text-primary-600", !isExpanded(product) && "-rotate-90")} /></div>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs"><span className="font-semibold">{t("products.variants.fromPrice", { price: formatCurrency(Number(group.minRetailPrice)) })}</span><span className="text-slate-500">{t("products.variants.totalStock")}: {group.totalStock === null ? t("products.variants.multipleUnits") : `${formatNumber(Number(group.totalStock))} ${product.baseUnit}`}</span></div>
-              </button>
+          const enterSelection = selectionEnabled ? () => {
+            setMobileSelecting(true);
+            if (!selected(product)) toggleProduct(product);
+          } : undefined;
+          if (!group) return <ProductMobileRow product={product} selectionEnabled={mobileSelection} selected={selected(product)} selectLabel={t("products.bulk.selectProduct", { name: product.name })} stockNotTrackedLabel={t("products.stock.notTracked")} selectedUnitName={selectedUnitName(product)} onUnitChange={(unitName) => changeUnit(product.id, unitName)} onToggle={() => toggleProduct(product)} onOpen={() => openProduct(product)} onLongPress={enterSelection} />;
+          const expanded = isExpanded(product);
+          return <div>
+            {/* Native variant-group row: tinted, "N mã hàng ›", from-price and total stock. */}
+            <div className={cn("flex min-w-0 items-center gap-3 bg-primary-600/[0.08] pl-4", selected(product) && "bg-primary-600/[0.14]")}>
+              {mobileSelection && <MobileSelectionIndicator selected={selected(product)} label={t("products.bulk.selectProduct", { name: product.name })} onToggle={() => toggleProduct(product)} />}
+              <ProductGroupMobileButton
+                product={product}
+                name={group.name}
+                countLabel={t("products.variants.count", { count: membersFor(product).total })}
+                priceLabel={t("products.variants.fromPrice", { price: formatCurrency(Number(group.minRetailPrice)) })}
+                stockLabel={`${t("products.variants.totalStock")}: ${group.totalStock === null ? t("products.variants.multipleUnits") : `${formatNumber(Number(group.totalStock))} ${product.baseUnit}`}`}
+                expanded={expanded}
+                onToggle={mobileSelection ? () => toggleProduct(product) : () => toggleGroup(product)}
+                onLongPress={enterSelection}
+              />
             </div>
-            {isExpanded(product) && <>
-              <div className="ml-3 border-l border-border">
-                {membersFor(product).members.map((member) => <ProductMobileRow key={member.id} product={{ ...member, variantGroup: undefined }} variantRow selectionEnabled={selectionEnabled} selected={selectedIds.has(member.id)} selectLabel={t("products.bulk.selectProduct", { name: member.name })} stockNotTrackedLabel={t("products.stock.notTracked")} selectedUnitName={selectedUnitName(member)} onUnitChange={(unitName) => changeUnit(member.id, unitName)} onToggle={() => toggle(member.id)} onOpen={() => openProduct(member)} />)}
+            {expanded && <>
+              <div className="pl-4">
+                {membersFor(product).members.map((member) => <ProductMobileRow key={member.id} product={{ ...member, variantGroup: undefined }} variantRow selectionEnabled={mobileSelection} selected={selectedIds.has(member.id)} selectLabel={t("products.bulk.selectProduct", { name: member.name })} stockNotTrackedLabel={t("products.stock.notTracked")} selectedUnitName={selectedUnitName(member)} onUnitChange={(unitName) => changeUnit(member.id, unitName)} onToggle={() => toggle(member.id)} onOpen={() => openProduct(member)} />)}
               </div>
-              <div className="border-t border-border-soft">{groupControls(product)}</div>
+              <div className="border-b border-border">{groupControls(product)}</div>
             </>}
           </div>;
         }}
@@ -556,6 +578,8 @@ export function ProductMobileSelectionToolbar({
   selectAllLabel,
   selectedLabel,
   onToggleAll,
+  doneLabel,
+  onDone,
 }: {
   checked: boolean;
   indeterminate: boolean;
@@ -563,6 +587,8 @@ export function ProductMobileSelectionToolbar({
   selectAllLabel: string;
   selectedLabel: string;
   onToggleAll: () => void;
+  doneLabel?: string;
+  onDone?: () => void;
 }) {
   return (
     <div className="mb-2 flex w-full items-center gap-2 lg:hidden">
@@ -579,6 +605,11 @@ export function ProductMobileSelectionToolbar({
         <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-bold text-primary-700">
           {selectedCount}
         </span>
+      )}
+      {onDone && doneLabel && (
+        <button type="button" onClick={onDone} className="ml-auto min-h-11 px-2 text-[17px] font-semibold text-ios-accent">
+          {doneLabel}
+        </button>
       )}
     </div>
   );
@@ -648,6 +679,7 @@ export function ProductMobileRow({
   onUnitChange,
   onToggle,
   onOpen,
+  onLongPress,
   groupSummary = false,
   variantRow = false,
 }: {
@@ -660,10 +692,12 @@ export function ProductMobileRow({
   onUnitChange: (unitName: string) => void;
   onToggle: () => void;
   onOpen: () => void;
+  onLongPress?: () => void;
   groupSummary?: boolean;
   variantRow?: boolean;
 }) {
   const t = useTranslations();
+  const longPress = useLongPress(onLongPress);
   const displayName = productDisplayName(product, " - ");
   const projected = unitProjection(product, selectedUnitName);
   const unitOptions = buildProductUnitOptions(product.baseUnit, product.unitDefinitions);
@@ -686,44 +720,45 @@ export function ProductMobileRow({
         { ...product, totalStock: projected.totalStock, baseUnit: projected.unitName },
         stockNotTrackedLabel,
       );
+  const tracked = stockDisplay !== stockNotTrackedLabel;
 
+  // NativeProductRow: thumbnail, 17pt name, SKU and group, then price, unit and "On hand" on the right.
   return (
-    <div className={cn(
-      "flex min-w-0 items-stretch border-b border-border-soft",
-      variantRow && "border-t border-border-soft",
-      selected && "bg-primary-50/50 dark:bg-primary-950/20",
-    )}>
+    <div className={cn("flex min-w-0 items-center gap-3 pl-4", selected && "bg-primary-600/[0.06]")}>
       {selectionEnabled && (
-        <div className="shrink-0 pl-3 pr-1 pt-4">
-          <SelectionCheckbox checked={selected} onChange={onToggle} label={selectLabel} />
-        </div>
+        <MobileSelectionIndicator selected={selected} label={selectLabel} onToggle={onToggle} />
       )}
-      <div className="relative min-h-[94px] min-w-0 flex-1 px-3 py-[13px]">
+      <div className="relative min-h-[94px] min-w-0 flex-1 border-b border-border py-3 pr-4">
         {/* One hit target for the row; the unit selector takes precedence. */}
         <button
           type="button"
-          onClick={onOpen}
+          onClick={() => {
+            if (longPress.consumeClick()) return;
+            if (selectionEnabled) onToggle();
+            else onOpen();
+          }}
+          {...longPress.handlers}
           aria-label={displayName}
-          className="absolute inset-0 rounded-md focus-visible:outline-2 focus-visible:outline-primary-500"
+          className="absolute inset-0 -left-4 [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ios-accent active:bg-black/[0.04] dark:active:bg-white/[0.06]"
         />
-        <div className="pointer-events-none relative flex min-w-0 items-start gap-3">
+        <div className="pointer-events-none relative flex min-w-0 items-center gap-3">
           <ProductThumbnail product={product} largeOnMobile />
           <div className="min-w-0 flex-1">
-            <div className="line-clamp-2 break-words text-sm font-semibold text-slate-950 dark:text-white">
+            <div className="line-clamp-2 break-words text-[17px] font-semibold leading-[22px] text-ios-label">
               {displayName}
             </div>
-            <div className="mt-1 truncate text-xs text-slate-500">{product.sku || "—"}</div>
+            <div className="mt-1 truncate text-[15px] leading-5 text-ios-label-secondary">{product.sku || "—"}</div>
             {!variantRow && product.categoryName && (
-              <div className="mt-0.5 truncate text-xs text-slate-500">{product.categoryName}</div>
+              <div className="mt-0.5 truncate text-[15px] leading-5 text-ios-label-secondary">{product.categoryName}</div>
             )}
             {variantRow && (
-              <div className="mt-1 truncate text-xs text-slate-500">
+              <div className="mt-0.5 truncate text-[13px] text-ios-label-secondary">
                 {t("products.list.colCost")}: {formatCurrency(projected.costPrice)}
               </div>
             )}
           </div>
-          <div className="flex min-w-[90px] max-w-[43%] shrink-0 flex-col items-end gap-1.5 text-right">
-            <div className="max-w-full break-words text-sm font-semibold tabular-nums text-slate-950 dark:text-white">
+          <div className="flex min-w-[90px] max-w-[43%] shrink-0 flex-col items-end gap-1.5 self-stretch text-right">
+            <div className="max-w-full break-words text-[17px] font-semibold leading-[22px] tabular-nums text-ios-label">
               {retailDisplay}
             </div>
             {!group && unitOptions.length > 1 ? (
@@ -737,18 +772,62 @@ export function ProductMobileRow({
                 />
               </div>
             ) : (
-              <span className="truncate text-xs text-slate-500">{projected.unitName}</span>
+              <span className="truncate text-[15px] text-ios-label-secondary">{projected.unitName}</span>
             )}
             <span className={cn(
-              "max-w-full break-words text-xs font-semibold",
-              projected.totalStock <= 0 ? "text-warn" : "text-primary-700 dark:text-primary-300",
+              "mt-auto max-w-full break-words text-[17px] leading-[22px]",
+              !tracked ? "text-ios-label-secondary" : projected.totalStock <= 0 ? "text-ios-orange" : "text-ios-green",
             )}>
-              {stockDisplay}
+              {tracked ? t("mobile.inventory.onHand", { stock: stockDisplay }) : stockDisplay}
             </span>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function ProductGroupMobileButton({
+  product,
+  name,
+  countLabel,
+  priceLabel,
+  stockLabel,
+  expanded,
+  onToggle,
+  onLongPress,
+}: {
+  product: ProductRow;
+  name: string;
+  countLabel: string;
+  priceLabel: string;
+  stockLabel: string;
+  expanded: boolean;
+  onToggle: () => void;
+  onLongPress?: () => void;
+}) {
+  const longPress = useLongPress(onLongPress);
+  return (
+    <button
+      type="button"
+      onClick={() => { if (!longPress.consumeClick()) onToggle(); }}
+      {...longPress.handlers}
+      aria-expanded={expanded}
+      className="flex min-h-[94px] min-w-0 flex-1 items-center gap-3 border-b border-border py-3 pr-4 text-left [-webkit-touch-callout:none] active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+    >
+      <ProductThumbnail product={product} largeOnMobile />
+      <span className="min-w-0 flex-1">
+        <span className="line-clamp-2 break-words text-[17px] font-semibold leading-[22px] text-ios-label">{name}</span>
+        <span className="mt-1 inline-flex items-center gap-1 text-[17px] text-ios-accent">
+          {countLabel}
+          <ChevronRight className={cn("size-[17px] transition-transform", expanded && "rotate-90")} strokeWidth={2.5} aria-hidden="true" />
+        </span>
+      </span>
+      <span className="flex max-w-[45%] shrink-0 flex-col items-end gap-1.5 self-stretch text-right">
+        <span className="text-[17px] font-semibold leading-[22px] tabular-nums text-ios-label">{priceLabel}</span>
+        <span className="text-[15px] leading-5 text-ios-label-secondary">{stockLabel}</span>
+      </span>
+    </button>
   );
 }
 
@@ -788,7 +867,7 @@ function ProductThumbnail({ product, largeOnMobile = false }: { product: Product
   return (
     <div className={cn(
       "relative shrink-0 overflow-hidden rounded-lg border border-border-soft bg-white dark:bg-slate-900",
-      largeOnMobile ? "h-16 w-16 lg:h-11 lg:w-11" : "h-11 w-11",
+      largeOnMobile ? "h-16 w-16 max-lg:rounded-[14px] max-lg:border-ios-stroke/40 max-lg:bg-surface-2 lg:h-11 lg:w-11" : "h-11 w-11",
     )}>
       {image ? (
         <Image
@@ -801,7 +880,8 @@ function ProductThumbnail({ product, largeOnMobile = false }: { product: Product
         />
       ) : (
         <div className="grid h-full place-items-center text-slate-300 dark:text-slate-600">
-          <ImageIcon className="h-5 w-5" />
+          <ImageIcon className={cn("h-5 w-5", largeOnMobile && "max-lg:hidden")} />
+          {largeOnMobile && <Tag className="size-6 -rotate-45 text-primary-600/50 lg:hidden" strokeWidth={1.8} aria-hidden="true" />}
         </div>
       )}
     </div>

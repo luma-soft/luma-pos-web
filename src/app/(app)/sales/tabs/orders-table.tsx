@@ -16,7 +16,8 @@ import {
   OrderStatusBadge,
   PaymentStatusBadge,
 } from "../../orders/status-badges";
-import { CheckCircle2, ChevronDown, Circle, FileX2, Loader2, Printer, XCircle } from "lucide-react";
+import { ChevronDown, FileX2, Loader2, Printer, XCircle } from "lucide-react";
+import { MobileSelectionIndicator } from "@/components/mobile-ui";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
@@ -242,7 +243,6 @@ export function OrderMobileRow({
 }) {
   const selectable = order.status !== "cancelled" && order.status !== "merged";
   const customerTitle = order.customerName ?? labels.walkIn;
-  const Indicator = selected ? CheckCircle2 : Circle;
   return (
     <MobileDocumentRow
       customerName={customerTitle}
@@ -263,17 +263,12 @@ export function OrderMobileRow({
       createdAt={timestamp}
       selected={selected}
       leading={selecting ? (
-        <button
-          type="button"
-          onClick={onToggle}
+        <MobileSelectionIndicator
+          selected={selected}
           disabled={!selectable}
-          aria-pressed={selected}
-          aria-label={`${labels.select} ${order.code}`}
-          data-button-radius="pill"
-          className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full disabled:opacity-40"
-        >
-          <Indicator className={cn("size-6", selected ? "fill-ios-accent text-white dark:text-black" : "text-ios-label-tertiary")} strokeWidth={selected ? 2.4 : 1.8} aria-hidden="true" />
-        </button>
+          label={`${labels.select} ${order.code}`}
+          onToggle={onToggle}
+        />
       ) : undefined}
       onOpen={selecting ? onToggle : onOpen}
       onLongPress={selectable ? onLongPress : undefined}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { useLongPress } from "@/components/use-long-press";
 import { cn } from "@/lib/utils";
 import type { MobileDocumentDayGroup } from "./mobile-document-day";
 
@@ -52,12 +53,7 @@ export function MobileDocumentRow({
   onOpen: () => void;
   onLongPress?: () => void;
 }) {
-  const pressTimer = useRef<number | null>(null);
-  const longPressed = useRef(false);
-  const cancelPress = () => {
-    if (pressTimer.current !== null) window.clearTimeout(pressTimer.current);
-    pressTimer.current = null;
-  };
+  const longPress = useLongPress(onLongPress);
 
   return (
     <div>
@@ -69,25 +65,9 @@ export function MobileDocumentRow({
           <button
             type="button"
             onClick={() => {
-              if (longPressed.current) {
-                longPressed.current = false;
-                return;
-              }
-              onOpen();
+              if (!longPress.consumeClick()) onOpen();
             }}
-            onPointerDown={onLongPress ? () => {
-              longPressed.current = false;
-              cancelPress();
-              pressTimer.current = window.setTimeout(() => {
-                longPressed.current = true;
-                navigator.vibrate?.(10);
-                onLongPress();
-              }, 500);
-            } : undefined}
-            onPointerUp={cancelPress}
-            onPointerLeave={cancelPress}
-            onPointerCancel={cancelPress}
-            onContextMenu={onLongPress ? (event) => event.preventDefault() : undefined}
+            {...longPress.handlers}
             aria-label={`${customerName} · ${code}`}
             className="absolute inset-0 -left-4 [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ios-accent active:bg-black/[0.04] dark:active:bg-white/[0.06]"
           />

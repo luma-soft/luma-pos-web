@@ -135,16 +135,11 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
   return (
     <ProductSelectionProvider visibleProducts={visibleProducts}>
       {!cameraMaterials && <ProductCatalogSwitcher activeView="products" productCount={result.total} categoryCount={categories.length} />}
-      {!cameraMaterials && (
-        <div className="mb-3 lg:hidden">
-          <h2 className="text-xl font-bold tracking-tight text-slate-950 dark:text-white">{t("products.title")}</h2>
-          <p className="mt-0.5 text-xs font-medium text-slate-500">{result.total.toLocaleString("vi-VN")} {t("products.unitLabel")}</p>
-        </div>
-      )}
+
       {cameraMaterials ? (
         <div className="mb-4"><InstantProductSearch value={query} onQueryChange={setLocalQuery} placeholder={t("products.list.searchPlaceholder")} /></div>
       ) : (
-        <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="mb-4 flex items-center gap-3 lg:flex-wrap">
           <ListSearchFilterBar
             search={<InstantProductSearch value={query} onQueryChange={setLocalQuery} placeholder={t("products.list.searchPlaceholder")} />}
             filter={<InventoryFilterDrawer
@@ -165,6 +160,7 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
           <ProductCreateMenu
             label={t("products.createNew")}
             showLabel
+            nativeMobile
             items={(["product", "service", "combo"] as const).map((kind) => ({
               kind,
               label: t(`products.kind.labels.${kind}`),

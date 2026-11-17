@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Boxes,
   PackagePlus,
+  Plus,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -41,12 +42,15 @@ export function ProductCreateMenu({
   onSelect,
   showLabel = true,
   additionalActions = [],
+  nativeMobile = false,
 }: {
   label: string;
   items: ProductCreateMenuItem[];
   onSelect?: (kind: ProductKind) => void;
   showLabel?: boolean;
   additionalActions?: ProductCreateMenuAction[];
+  /** Phones: inline iOS "+" square beside search/filter instead of a floating button. */
+  nativeMobile?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -72,7 +76,9 @@ export function ProductCreateMenu({
   }, [open]);
 
   return (
-    <div ref={rootRef} className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-30 w-auto shrink-0 sm:relative sm:bottom-auto sm:right-auto sm:ml-auto sm:w-auto">
+    <div ref={rootRef} className={nativeMobile
+      ? "relative z-30 w-auto shrink-0 lg:ml-auto"
+      : "fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-30 w-auto shrink-0 sm:relative sm:bottom-auto sm:right-auto sm:ml-auto sm:w-auto"}>
       <Button
         ref={triggerRef}
         type="button"
@@ -87,13 +93,15 @@ export function ProductCreateMenu({
           showLabel
             ? `${controlHeightClassName} w-auto px-4`
             : `${controlHeightClassName} w-11 px-0 lg:w-10`,
+          nativeMobile && "max-lg:size-12 max-lg:rounded-2xl max-lg:border max-lg:border-ios-stroke/60 max-lg:bg-surface max-lg:px-0 max-lg:text-ios-accent max-lg:shadow-none",
         )}
       >
-        <PackagePlus className="h-4 w-4" />
-        {showLabel && <span>{label}</span>}
+        <PackagePlus className={cn("h-4 w-4", nativeMobile && "max-lg:hidden")} />
+        {nativeMobile && <Plus className="!size-6 lg:hidden" strokeWidth={2.2} aria-hidden="true" />}
+        {showLabel && <span className={cn(nativeMobile && "max-lg:sr-only")}>{label}</span>}
       </Button>
       {open && (
-        <div id="product-create-menu" role="menu" className="absolute bottom-full right-0 z-50 mb-2 w-72 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-e2 sm:bottom-auto sm:top-full sm:mb-0 sm:mt-2 sm:w-80">
+        <div id="product-create-menu" role="menu" className={cn("absolute right-0 z-50 w-72 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-e2 sm:bottom-auto sm:top-full sm:mb-0 sm:mt-2 sm:w-80", nativeMobile ? "top-full mt-2" : "bottom-full mb-2")}>
           {items.map((item) => {
             const Icon = icons[item.kind];
             return (

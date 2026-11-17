@@ -1293,6 +1293,7 @@
       "totalPayable": "Total payable"
     },
     "inventory": {
+      "onHand": "On hand {stock}",
       "subtitle": "Products, stock, and purchasing"
     },
     "orders": {

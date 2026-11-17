@@ -50,7 +50,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     tab === "products" && !effectiveParams.productModal && effectiveParams.catalog !== "categories";
 
   return (
-    <div className="p-4 sm:p-6">
+    // Phones use the native plain list: white page, full-bleed rows.
+    <div className="p-4 sm:p-6 max-lg:min-h-full max-lg:bg-surface">
       <div className="sticky top-0 z-20 -mx-4 -mt-4 mb-4 border-b border-border bg-surface sm:-mx-6 sm:-mt-6 lg:mb-5">
         <div className="hidden items-center gap-3 px-4 sm:px-6 lg:flex lg:min-h-13 lg:pt-2.5">
           <div className="min-w-0 flex-1">

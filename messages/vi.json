@@ -1293,6 +1293,7 @@
       "totalPayable": "Tổng phải trả"
     },
     "inventory": {
+      "onHand": "Còn {stock}",
       "subtitle": "Sản phẩm, tồn kho và nhập hàng"
     },
     "orders": {

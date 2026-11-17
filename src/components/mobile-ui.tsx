@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, type LucideIcon } from "lucide-react";
+import { CheckCircle2, ChevronRight, Circle, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type MobileRecordCardProps = {
@@ -326,5 +326,33 @@ export function MobileListRow({
     <Link href={href} target={target} rel={target ? "noopener noreferrer" : undefined} className={mobileListRowClass}>
       <MobileListRowContent {...content} />
     </Link>
+  );
+}
+
+/** Selection-mode indicator (checkmark.circle.fill / circle) for long-press list selection. */
+export function MobileSelectionIndicator({
+  selected,
+  disabled = false,
+  label,
+  onToggle,
+}: {
+  selected: boolean;
+  disabled?: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  const Indicator = selected ? CheckCircle2 : Circle;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      aria-pressed={selected}
+      aria-label={label}
+      data-button-radius="pill"
+      className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full disabled:opacity-40"
+    >
+      <Indicator className={cn("size-6", selected ? "fill-ios-accent text-white dark:text-black" : "text-ios-label-tertiary")} strokeWidth={selected ? 2.4 : 1.8} aria-hidden="true" />
+    </button>
   );
 }
