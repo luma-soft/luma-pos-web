@@ -5,9 +5,9 @@ const component = readFileSync(new URL("./mobile-more-quick-search.tsx", import.
 const page = readFileSync(new URL("../app/(app)/more/page.tsx", import.meta.url), "utf8");
 
 test("More search has one results list and hides the menu only on mobile when searching", () => {
-  expect(component).toContain('normalizedQuery ? "hidden lg:block lg:space-y-5" : "space-y-5"');
+  expect(component).toContain('normalizedQuery ? "hidden lg:block lg:space-y-5" : "space-y-8 lg:space-y-5"');
   expect(component).toContain("{children}");
-  expect(component).toContain('className="space-y-2 lg:hidden"');
+  expect(component).toContain('className="space-y-6 lg:hidden"');
   expect(page).toContain("<MobileMoreQuickSearch");
   expect(page).toContain("</MobileMoreQuickSearch>");
 });

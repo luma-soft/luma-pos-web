@@ -1,36 +1,31 @@
 import {
-  Bell,
   BarChart3,
-  Users,
-  Truck,
-  BriefcaseBusiness,
-  Sparkles,
-  Wallet,
-  RotateCcw,
-  Clock3,
-  Wrench,
-  Settings,
-  Store,
-  UserRoundCog,
-  PackageSearch,
-  ShoppingCart,
-  ClipboardCheck,
+  BellDot,
+  BookOpen,
+  Building2,
   Camera,
+  Clock3,
   Cpu,
+  Images,
   Lightbulb,
   Printer,
-  Images,
+  Settings,
+  Sparkles,
+  Truck,
+  Users,
+  Wallet,
+  Wrench,
 } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { getRole, requireUser } from "@/lib/actions/common";
 import { getStoreSettings } from "@/lib/data/settings";
 import { Routes } from "@/lib/routes";
-import { MobileSectionLabel, MobileSettingsRow, MobileTopBar } from "@/components/mobile-ui";
+import { MobileListRow, MobileListSection, MobileTopBar } from "@/components/mobile-ui";
 import { MobileMoreQuickSearch, type MobileMoreSearchEntry } from "@/components/mobile-more-quick-search";
 import { ModeSwitcher } from "@/components/mode-switcher";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { LogoutButton } from "@/components/logout-button";
+import { MobileLogoutRow } from "@/components/logout-button";
 import { getMode, getTheme } from "@/lib/theme/cookie";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { SHIFT_MANAGEMENT_UI_ENABLED } from "@/lib/features";
@@ -67,7 +62,11 @@ export default async function MorePage() {
     ...(sales && context.features.camera_quote_builder ? [{ href: Routes.CameraQuote, label: t("mobile.more.cameraQuote"), subtitle: t("mobile.more.cameraQuoteHint"), external: true }] : []),
     ...(sales && context.features.hunonic_price_list ? [{ href: Routes.HunonicPriceList, label: t("mobile.more.hunonicPriceList"), subtitle: t("mobile.more.hunonicPriceListHint"), external: true }] : []),
     ...(sales && context.features.rang_dong_price_list ? [{ href: Routes.RangDongSmartPriceList, label: t("mobile.more.rangDongPriceList"), subtitle: t("mobile.more.rangDongPriceListHint"), external: true }] : []),
-    ...(manager ? [{ href: Routes.Finance, label: t("nav.groups.finance"), subtitle: t("mobile.more.financeHint") }] : []),
+    ...(manager ? [
+      { href: Routes.Finance, label: t("nav.groups.finance"), subtitle: t("mobile.more.financeHint") },
+      { href: Routes.Accounting, label: t("mobile.more.accountingTax") },
+    ] : []),
+    ...(sales && context.features.field_services ? [{ href: Routes.Services, label: t("mobile.more.serviceJobs") }] : []),
     ...(sales ? [{ href: `${Routes.Sales}?tab=returns`, label: t("nav.returns"), subtitle: t("mobile.more.returnsHint") }] : []),
     ...(sales && SHIFT_MANAGEMENT_UI_ENABLED ? [{ href: `${Routes.Finance}?tab=shifts`, label: t("nav.shifts"), subtitle: t("mobile.more.shiftHint") }] : []),
     ...(context.features.ai_assistant && store.prefs.ai.openaiApiKeySet ? [{ href: "/ai", label: t("nav.ai"), subtitle: t("mobile.more.aiHint") }] : []),
@@ -80,86 +79,81 @@ export default async function MorePage() {
   ];
 
 
+  const services = sales && context.features.field_services;
+
+  // Section order and grouping mirror MoreView.swift. Inventory, POS and returns
+  // live in their own tabs on iOS, so they are only reachable through search here.
   return (
     <div className="min-h-full bg-canvas lg:p-6">
-      <MobileTopBar title={t("nav.more")} subtitle={store.name ?? t("common.appName")} />
+      <MobileTopBar title={t("nav.more")} />
 
-      <div className="mx-auto max-w-2xl space-y-4 px-4 py-4 lg:rounded-card lg:border lg:border-border lg:bg-surface lg:p-6">
-        <section className="rounded-2xl bg-surface p-4 shadow-e1">
-          <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300">
-              <Store className="h-6 w-6" />
-            </div>
-            <div className="min-w-0">
-              <div className="truncate text-base font-black">{store.name ?? t("common.appName")}</div>
-              <div className="truncate text-xs font-medium text-slate-400">{user.email} · {role}</div>
-            </div>
-          </div>
-        </section>
-
+      <div className="mx-auto max-w-2xl px-4 pb-6 lg:rounded-card lg:border lg:border-border lg:bg-surface lg:p-6">
         <MobileMoreQuickSearch
           entries={searchEntries}
-          searchLabel={t("common.search")}
-          emptyLabel={t("common.noResults")}
+          searchLabel={t("mobile.more.searchPrompt")}
+          emptyLabel={t("mobile.more.noResultsTitle")}
           clearLabel={t("common.clear")}
         >
-        <MoreSection title={t("nav.groups.overview")}>
-          <MobileSettingsRow href={Routes.Notifications} icon={Bell} label={t("nav.notifications")} subtitle={t("mobile.more.notificationsHint")} tone="orange" />
-          {manager && <MobileSettingsRow href={Routes.Reports} icon={BarChart3} label={t("nav.reports")} subtitle={t("mobile.more.reportsHint")} tone="blue" />}
-        </MoreSection>
+          {(sales || stock) && (
+            <MobileListSection title={t("nav.groups.partners")}>
+              {sales && <MobileListRow href={Routes.Customers} icon={Users} title={t("nav.customers")} />}
+              {stock && <MobileListRow href={Routes.Suppliers} icon={Truck} title={t("nav.suppliers")} />}
+            </MobileListSection>
+          )}
 
-        <MoreSection title={t("nav.groups.partners")}>
-          {sales && <MobileSettingsRow href={Routes.Customers} icon={Users} label={t("nav.customers")} subtitle={t("mobile.more.customersHint")} tone="purple" />}
-          {stock && <MobileSettingsRow href={Routes.Suppliers} icon={Truck} label={t("nav.suppliers")} subtitle={t("mobile.more.suppliersHint")} />}
-          {sales && <MobileSettingsRow href={Routes.Projects} icon={BriefcaseBusiness} label={t("nav.projects")} subtitle={t("mobile.more.projectsHint")} />}
-        </MoreSection>
+          <MobileListSection>
+            <MobileListRow href={Routes.Notifications} icon={BellDot} title={t("nav.notifications")} />
+            {manager && <MobileListRow href={Routes.Reports} icon={BarChart3} title={t("nav.reports")} />}
+            {manager && <MobileListRow href={Routes.Finance} icon={Wallet} title={t("nav.groups.finance")} />}
+            {manager && <MobileListRow href={Routes.Accounting} icon={BookOpen} title={t("mobile.more.accountingTax")} />}
+          </MobileListSection>
 
-        {stock && (
-          <MoreSection title={t("nav.groups.inventory")}>
-            <MobileSettingsRow href={`${Routes.Inventory}?tab=products`} icon={PackageSearch} label={t("nav.products")} subtitle={t("mobile.more.productsHint")} tone="blue" />
-            <MobileSettingsRow href={`${Routes.Inventory}?tab=purchases`} icon={ShoppingCart} label={t("nav.purchases")} subtitle={t("mobile.more.purchasesHint")} />
-            <MobileSettingsRow href={`${Routes.Inventory}?tab=stock`} icon={ClipboardCheck} label={t("nav.stocktakes")} subtitle={t("mobile.more.stocktakesHint")} tone="orange" />
-          </MoreSection>
-        )}
+          {sales && (
+            <MobileListSection>
+              {services && <MobileListRow href={Routes.Services} icon={Wrench} title={t("mobile.more.serviceJobs")} />}
+              <MobileListRow href={Routes.Projects} icon={Building2} title={t("nav.projects")} />
+            </MobileListSection>
+          )}
 
-        <MoreSection title={t("nav.groups.manage")}>
-          <MobileSettingsRow href={Routes.Library} icon={Images} label={t("nav.library")} subtitle={t("mobile.more.libraryHint")} tone="purple" />
-          {sales && context.features.camera_quote_builder && <MobileSettingsRow href={Routes.CameraQuote} icon={Camera} label={t("mobile.more.cameraQuote")} subtitle={t("mobile.more.cameraQuoteHint")} tone="blue" target="_blank" />}
-          {sales && context.features.hunonic_price_list && <MobileSettingsRow href={Routes.HunonicPriceList} icon={Cpu} label={t("mobile.more.hunonicPriceList")} subtitle={t("mobile.more.hunonicPriceListHint")} tone="orange" target="_blank" />}
-          {sales && context.features.rang_dong_price_list && <MobileSettingsRow href={Routes.RangDongSmartPriceList} icon={Lightbulb} label={t("mobile.more.rangDongPriceList")} subtitle={t("mobile.more.rangDongPriceListHint")} tone="red" target="_blank" />}
-          {manager && <MobileSettingsRow href={Routes.Finance} icon={Wallet} label={t("nav.groups.finance")} subtitle={t("mobile.more.financeHint")} />}
-          {sales && <MobileSettingsRow href={`${Routes.Sales}?tab=returns`} icon={RotateCcw} label={t("nav.returns")} subtitle={t("mobile.more.returnsHint")} tone="red" />}
-          {sales && SHIFT_MANAGEMENT_UI_ENABLED && <MobileSettingsRow href={`${Routes.Finance}?tab=shifts`} icon={Clock3} label={t("nav.shifts")} subtitle={t("mobile.more.shiftHint")} tone="orange" />}
-          {context.features.ai_assistant && store.prefs.ai.openaiApiKeySet && <MobileSettingsRow href="/ai" icon={Sparkles} label={t("nav.ai")} subtitle={t("mobile.more.aiHint")} tone="purple" />}
-        </MoreSection>
+          <MobileListSection title={t("nav.tools")}>
+            <MobileListRow href={Routes.Tools} icon={Wrench} title={t("nav.tools")} />
+            {sales && context.features.camera_quote_builder && <MobileListRow href={Routes.CameraQuote} icon={Camera} title={t("mobile.more.cameraQuote")} subtitle={t("mobile.more.cameraQuoteHint")} target="_blank" />}
+            {sales && context.features.hunonic_price_list && <MobileListRow href={Routes.HunonicPriceList} icon={Cpu} title={t("mobile.more.hunonicPriceList")} subtitle={t("mobile.more.hunonicPriceListHint")} target="_blank" />}
+            {sales && context.features.rang_dong_price_list && <MobileListRow href={Routes.RangDongSmartPriceList} icon={Lightbulb} title={t("mobile.more.rangDongPriceList")} subtitle={t("mobile.more.rangDongPriceListHint")} target="_blank" />}
+          </MobileListSection>
 
-        <MoreSection title={t("nav.groups.system")}>
-          <MobileSettingsRow href={Routes.Tools} icon={Wrench} label={t("nav.tools")} subtitle={t("mobile.more.toolsHint")} tone="blue" />
-          {manager && <MobileSettingsRow href={Routes.Settings} icon={Settings} label={t("nav.settings")} subtitle={t("mobile.more.settingsHint")} />}
-          {manager && <MobileSettingsRow href={Routes.PrintSettings} icon={Printer} label={t("mobile.more.printTemplates")} subtitle={t("mobile.more.printTemplatesHint")} tone="orange" />}
-          {sales && <MobileSettingsRow href={Routes.POS} icon={UserRoundCog} label={t("nav.pos")} subtitle={t("mobile.more.posHint")} />}
-        </MoreSection>
+          {context.features.ai_assistant && store.prefs.ai.openaiApiKeySet && (
+            <MobileListSection title="AI">
+              <MobileListRow href="/ai" icon={Sparkles} title={t("nav.ai")} />
+            </MobileListSection>
+          )}
 
-        <section className="space-y-2">
-          <MobileSectionLabel>{t("mobile.more.preferences")}</MobileSectionLabel>
-          <div className="space-y-2 rounded-2xl bg-surface p-4 shadow-e1">
-            <ModeSwitcher current={mode} />
-            <ThemeSwitcher current={theme} />
-            <LanguageSwitcher />
-            <LogoutButton userId={user.id} />
-          </div>
-        </section>
+          <MobileListSection title={t("nav.groups.system")}>
+            <MobileListRow href={Routes.Library} icon={Images} title={t("nav.library")} />
+          </MobileListSection>
+
+          {sales && SHIFT_MANAGEMENT_UI_ENABLED && (
+            <MobileListSection title={t("nav.shifts")}>
+              <MobileListRow href={`${Routes.Finance}?tab=shifts`} icon={Clock3} title={t("nav.shifts")} />
+            </MobileListSection>
+          )}
+
+          {/* iOS keeps appearance and language inside Settings; the web settings page has no such section. */}
+          <MobileListSection title={t("mobile.more.preferences")}>
+            <div className="space-y-2 p-4">
+              <ModeSwitcher current={mode} />
+              <ThemeSwitcher current={theme} />
+              <LanguageSwitcher />
+            </div>
+          </MobileListSection>
+
+          <MobileListSection title={t("mobile.more.account")}>
+            {manager && <MobileListRow href={Routes.Settings} icon={Settings} title={t("nav.settings")} />}
+            {manager && <MobileListRow href={Routes.PrintSettings} icon={Printer} title={t("mobile.more.printTemplates")} />}
+            <MobileLogoutRow userId={user.id} />
+          </MobileListSection>
         </MobileMoreQuickSearch>
       </div>
     </div>
-  );
-}
-
-function MoreSection({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <section className="space-y-2">
-      <MobileSectionLabel>{title}</MobileSectionLabel>
-      <div className="overflow-hidden rounded-2xl bg-surface shadow-e1">{children}</div>
-    </section>
   );
 }
