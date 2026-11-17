@@ -73,17 +73,124 @@ phương Việt Nam. Chỉ cài khi timezone macOS là `Asia/Ho_Chi_Minh`; nếu
    `644`, rồi nạp bằng `launchctl bootstrap system <plist>`.
 4. Xem trạng thái bằng `launchctl print system/<label>` và log riêng của tiến
    trình. `/api/health/ready` phải trả 200 trước khi mở tunnel.
-5. Nâng cấp release: `ops/macos/build-release.sh` build commit `HEAD` vào
-   `/Users/Shared/LumaPOS/app-next` (không cần quyền admin), rồi
-   `sudo /Users/Shared/LumaPOS/app-next/ops/macos/deploy-release.sh` dừng
-   web/sync/notifications, thay release, khởi động lại và chờ
-   `/api/health/live`; nếu bản mới không lên thì tự khôi phục bản trước. Hai
-   release trước được giữ lại tại `app-prev-*` để rollback thủ công trên cùng
-   PostgreSQL. App Mac (Dịch vụ nền → **Cập nhật web**) chạy đúng hai bước
-   này. Readiness có thể vẫn là `not_ready` vì điều kiện sao lưu; không dùng
-   nó làm điều kiện deploy.
+5. Nâng cấp release theo mục [Cập nhật bản web](#cập-nhật-bản-web) bên dưới.
 
 Các ví dụ mặc định giả định Homebrew ARM ở `/opt/homebrew`. Mac Intel hoặc cách
 cài khác cần sửa `PATH`, Bun, `cloudflared` và PostgreSQL binary path. Khi
 chuyển lên VPS, dùng mẫu `systemd` trong [`ops/systemd`](../systemd/README.md);
 giữ nguyên env contract, schema, backend và object keys.
+
+## Cập nhật bản web
+
+Release đang chạy nằm tại `/Users/Shared/LumaPOS/app`; file `RELEASE_COMMIT`
+trong đó ghi commit của nó. Một lần cập nhật gồm hai bước:
+
+1. **Build** — `ops/macos/build-release.sh`, chạy bằng tài khoản Mac thường
+   (không cần quyền admin):
+   - xuất commit `HEAD` của checkout (`git archive`, nên thay đổi chưa commit
+     không được đưa vào) tới `/Users/Shared/LumaPOS/app-next`;
+   - clone APFS `node_modules` của release đang chạy nếu `bun.lock` không đổi,
+     ngược lại chạy `bun install --frozen-lockfile`;
+   - `next build` với một `DATABASE_URL` giả chỉ để import module; build không
+     kết nối database và không nhúng giá trị này vào output. Dịch vụ đọc giá
+     trị thật từ `secrets/runtime*.env`.
+2. **Deploy** — `lumapos-admin deploy`, chạy bằng root:
+   - từ chối `app-next` thiếu `.next/BUILD_ID`, chứa file `.env*`, hoặc có
+     symlink ở `app-next`, `.next`, `.next/cache`;
+   - `bootout` web, sync, notifications và chờ launchd gỡ xong (gọi
+     `bootstrap` ngay sau `bootout` sẽ báo `5: Input/output error`);
+   - đổi `app` thành `app-prev-<thời gian>`, `app-next` thành `app`, giao
+     `.next/cache` cho `_lumapos_svc`;
+   - nạp lại ba dịch vụ (có thử lại) và chờ `GET /api/health/live` trả 200
+     trong tối đa ~90 giây. Không dùng `/api/health/ready` làm điều kiện vì
+     nó có thể `not_ready` vì lý do vận hành (ví dụ chưa có backup Drive
+     trong 26 giờ) trong khi web vẫn phục vụ bình thường;
+   - nếu web không lên: trả release cũ về `app`, giữ bản lỗi ở
+     `app-failed-<thời gian>`, khởi động lại và thoát mã lỗi;
+   - giữ hai `app-prev-*` mới nhất để rollback thủ công. `app-failed-*` không
+     tự xoá; xoá tay sau khi đã xem lỗi.
+
+Worker sao lưu (`com.lumapos.backups`) chạy từ thư mục riêng ghi trong plist
+của nó và **không** được cập nhật bởi quy trình này.
+
+### Từ app Mac
+
+App LumaPOS trên Mac có thẻ **Bản web** ở màn Tổng quan và Dịch vụ nền: hiển
+thị commit đang chạy so với checkout (`LUMA_WEB_SOURCE_PATH`, mặc định
+`~/project/LumaPOS/luma-pos-web`) và nút **Cập nhật web** chạy đúng hai bước
+trên. Nếu đã cài công cụ quản trị (mục dưới), app không hỏi mật khẩu; nếu
+chưa, macOS hỏi mật khẩu admin một lần cho bước deploy.
+
+### Từ dòng lệnh
+
+```bash
+ops/macos/build-release.sh
+sudo /usr/local/libexec/lumapos-admin deploy      # đã cài công cụ quản trị
+sudo bash /Users/Shared/LumaPOS/app-next/ops/macos/deploy-release.sh   # chưa cài
+```
+
+### Rollback thủ công
+
+```bash
+sudo launchctl bootout system/com.lumapos.web
+sudo launchctl bootout system/com.lumapos.sync
+sudo launchctl bootout system/com.lumapos.notifications
+sudo mv /Users/Shared/LumaPOS/app /Users/Shared/LumaPOS/app-failed-manual
+sudo mv /Users/Shared/LumaPOS/app-prev-<thời gian> /Users/Shared/LumaPOS/app
+sudo /usr/local/libexec/lumapos-admin service start web
+sudo /usr/local/libexec/lumapos-admin service start sync
+sudo /usr/local/libexec/lumapos-admin service start notifications
+```
+
+Chỉ rollback app trên cùng PostgreSQL khi các release không khác nhau về
+migration.
+
+## Công cụ quản trị không cần mật khẩu
+
+`ops/macos/lumapos-admin` là helper chạy bằng root, chỉ nhận các lệnh cố định:
+
+| Lệnh | Việc làm |
+| --- | --- |
+| `deploy` | Đưa `/Users/Shared/LumaPOS/app-next` lên chạy như mô tả ở trên |
+| `service start\|stop\|restart <tên>` | `bootstrap`/`kickstart`, `bootout`, `kickstart -k` cho `com.lumapos.<tên>` |
+| `log <tên> [số dòng]` | `tail` file log khai báo trong plist của dịch vụ |
+| `version` | In phiên bản helper |
+
+`<tên>` chỉ được là `web`, `sync`, `notifications`, `backups`, `cloudflared`.
+Đường dẫn log đọc từ plist root-owned trong `/Library/LaunchDaemons`, không
+lấy từ người gọi. Helper không chạy file nào trong thư mục user ghi được.
+
+### Cài đặt (một lần, cần mật khẩu admin)
+
+```bash
+sudo bash ~/project/LumaPOS/luma-pos-web/ops/macos/install-admin-helper.sh
+```
+
+Script:
+
+- copy helper tới `/usr/local/libexec/lumapos-admin` (`root:wheel`, `0755`),
+  sau khi kiểm tra `/usr` và `/usr/local` thuộc root và không ghi được bởi
+  group/others;
+- tạo `/etc/sudoers.d/lumapos` (`root:wheel`, `0440`, kiểm tra bằng
+  `visudo`) cho phép đúng user đã chạy `sudo` (hoặc user truyền vào tham số
+  đầu) chạy helper bằng `sudo` không cần mật khẩu;
+- thử `sudo -n lumapos-admin version` bằng user đó.
+
+Sau khi cài, app Mac gọi `sudo -n /usr/local/libexec/lumapos-admin …` cho
+deploy, Bật/Tắt/Khởi động lại dịch vụ hệ thống và đọc log; nếu helper chưa cài
+hoặc `sudo -n` cần mật khẩu, app quay lại hộp thoại mật khẩu macOS như cũ.
+
+**Đánh đổi bảo mật:** mọi chương trình chạy dưới user đó có thể restart, tắt
+dịch vụ LumaPOS, đọc log của chúng và deploy release trong `app-next` mà không
+cần mật khẩu. Không có quyền root nào khác. Chỉ cài trên máy chủ cửa hàng có
+mật khẩu đăng nhập và không cho người lạ dùng.
+
+**Cập nhật helper:** bản cài là bản copy; sau khi kéo `lumapos-admin` mới về,
+chạy lại script cài đặt.
+
+**Gỡ:**
+
+```bash
+sudo bash ~/project/LumaPOS/luma-pos-web/ops/macos/install-admin-helper.sh --uninstall
+```
+

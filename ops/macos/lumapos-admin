@@ -1,0 +1,178 @@
+#!/bin/bash
+# LumaPOS administrative helper for the store Mac.
+#
+# Installed root-owned at /usr/local/libexec/lumapos-admin by
+# install-admin-helper.sh, together with a sudoers rule that lets the store
+# Mac's user run it without a password. It therefore accepts only a fixed set
+# of commands and never executes files from user-writable locations:
+#
+#   lumapos-admin deploy
+#       Put /Users/Shared/LumaPOS/app-next (built by build-release.sh) in place
+#       of /Users/Shared/LumaPOS/app and restart web, sync and notifications.
+#       Restores the previous release if /api/health/live does not answer.
+#   lumapos-admin service start|stop|restart <web|sync|notifications|backups|cloudflared>
+#   lumapos-admin log <web|sync|notifications|backups|cloudflared> [lines]
+#   lumapos-admin version
+#
+# Progress lines start with "STEP:" so the Mac host console can show them.
+set -uo pipefail
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+umask 022
+
+readonly HELPER_VERSION=1
+readonly LUMAPOS_ROOT=/Users/Shared/LumaPOS
+readonly LIVE_ROOT="$LUMAPOS_ROOT/app"
+readonly STAGING_ROOT="$LUMAPOS_ROOT/app-next"
+readonly SERVICE_USER=_lumapos_svc
+readonly DEPLOY_SERVICES=(web sync notifications)
+readonly KEEP_PREVIOUS=2
+
+step() { printf 'STEP:%s\n' "$1"; }
+fail() { printf '%s\n' "$1" >&2; exit "${2:-1}"; }
+
+[[ "$(id -u)" == 0 ]] || fail "lumapos-admin must run as root (sudo)" 77
+
+service_name() {
+  case "${1:-}" in
+    web|sync|notifications|backups|cloudflared) printf '%s' "$1" ;;
+    *) fail "Unknown LumaPOS service: ${1:-}" 64 ;;
+  esac
+}
+
+plist_of() { printf '/Library/LaunchDaemons/com.lumapos.%s.plist' "$1"; }
+target_of() { printf 'system/com.lumapos.%s' "$1"; }
+is_loaded() { launchctl print "$(target_of "$1")" >/dev/null 2>&1; }
+
+load_service() {
+  local name="$1"
+  [[ -f "$(plist_of "$name")" ]] || { echo "Missing $(plist_of "$name")" >&2; return 1; }
+  # bootout is asynchronous: retry while launchd finishes unloading.
+  for _ in $(seq 1 15); do
+    if is_loaded "$name"; then
+      launchctl kickstart "$(target_of "$name")" >/dev/null 2>&1 || true
+      return 0
+    fi
+    launchctl bootstrap system "$(plist_of "$name")" 2>/dev/null && return 0
+    sleep 2
+  done
+  echo "Could not load com.lumapos.$name" >&2
+  return 1
+}
+
+unload_services() {
+  local name
+  for name in "$@"; do launchctl bootout "$(target_of "$name")" 2>/dev/null || true; done
+  for _ in $(seq 1 30); do
+    local loaded=0
+    for name in "$@"; do is_loaded "$name" && loaded=1; done
+    [[ $loaded == 0 ]] && return 0
+    sleep 1
+  done
+}
+
+load_services() {
+  local name failed=0
+  for name in "$@"; do load_service "$name" || failed=1; done
+  return $failed
+}
+
+wait_live() {
+  for _ in $(seq 1 45); do
+    [[ "$(curl -s -m 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/health/live)" == 200 ]] && return 0
+    sleep 2
+  done
+  return 1
+}
+
+# The staging tree is written by an unprivileged user. Root only renames it and
+# fixes ownership of the cache directory, so refuse anything that could point
+# those operations elsewhere.
+check_staging() {
+  [[ -d "$STAGING_ROOT" && ! -L "$STAGING_ROOT" ]] || fail "No release at $STAGING_ROOT"
+  [[ ! -L "$STAGING_ROOT/.next" && -s "$STAGING_ROOT/.next/BUILD_ID" && ! -L "$STAGING_ROOT/.next/BUILD_ID" ]] \
+    || fail "$STAGING_ROOT has no build (run build-release.sh first)"
+  [[ ! -e "$STAGING_ROOT/.next/cache" || ( -d "$STAGING_ROOT/.next/cache" && ! -L "$STAGING_ROOT/.next/cache" ) ]] \
+    || fail "$STAGING_ROOT/.next/cache must be a plain directory"
+  local dotenv
+  for dotenv in .env .env.local .env.production .env.production.local; do
+    [[ -e "$STAGING_ROOT/$dotenv" || -L "$STAGING_ROOT/$dotenv" ]] && fail "Release contains $dotenv"
+  done
+  [[ -f "$STAGING_ROOT/ops/shared/run-service.sh" && ! -L "$STAGING_ROOT/ops/shared/run-service.sh" ]] \
+    || fail "Release has no ops/shared/run-service.sh"
+}
+
+prune_previous() {
+  ls -1d "$LUMAPOS_ROOT"/app-prev-* 2>/dev/null | sort -r | tail -n +$((KEEP_PREVIOUS + 1)) | while read -r old; do
+    [[ -d "$old" && ! -L "$old" ]] && rm -rf -- "$old"
+  done
+}
+
+cmd_deploy() {
+  check_staging
+  [[ -d "$LIVE_ROOT" && ! -L "$LIVE_ROOT" ]] || fail "No live release at $LIVE_ROOT"
+  local stamp previous
+  stamp="$(date +%Y%m%d_%H%M%S)"
+  previous="$LUMAPOS_ROOT/app-prev-$stamp"
+
+  step "stop"
+  unload_services "${DEPLOY_SERVICES[@]}"
+
+  step "swap"
+  if ! mv -- "$LIVE_ROOT" "$previous"; then
+    load_services "${DEPLOY_SERVICES[@]}"
+    fail "Could not move the live release aside"
+  fi
+  if ! mv -- "$STAGING_ROOT" "$LIVE_ROOT"; then
+    mv -- "$previous" "$LIVE_ROOT"
+    load_services "${DEPLOY_SERVICES[@]}"
+    fail "Could not move the new release in"
+  fi
+  mkdir -p -- "$LIVE_ROOT/.next/cache"
+  chown -R -P "$SERVICE_USER:staff" -- "$LIVE_ROOT/.next/cache"
+
+  step "start"
+  if load_services "${DEPLOY_SERVICES[@]}" && wait_live; then
+    step "live"
+    prune_previous
+    return 0
+  fi
+
+  step "rollback"
+  unload_services "${DEPLOY_SERVICES[@]}"
+  local failed_release="$LUMAPOS_ROOT/app-failed-$stamp"
+  mv -- "$LIVE_ROOT" "$failed_release"
+  mv -- "$previous" "$LIVE_ROOT"
+  load_services "${DEPLOY_SERVICES[@]}"
+  wait_live
+  fail "The new release did not come up; the previous release is running again (failed release kept at $failed_release)"
+}
+
+cmd_service() {
+  local action="${1:-}" name
+  name="$(service_name "${2:-}")" || exit $?
+  case "$action" in
+    start) load_service "$name" ;;
+    stop) launchctl bootout "$(target_of "$name")" ;;
+    restart) launchctl kickstart -k "$(target_of "$name")" ;;
+    *) fail "Unknown service action: $action" 64 ;;
+  esac
+}
+
+cmd_log() {
+  local name lines="${2:-300}" path
+  name="$(service_name "${1:-}")" || exit $?
+  [[ "$lines" =~ ^[0-9]{1,5}$ ]] || fail "Line count must be a number" 64
+  # The path comes from the root-owned launchd definition, not from the caller.
+  path="$(/usr/libexec/PlistBuddy -c 'Print :StandardErrorPath' "$(plist_of "$name")" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c 'Print :StandardOutPath' "$(plist_of "$name")" 2>/dev/null)" || true
+  [[ "$path" == /* && -f "$path" ]] || fail "No log file for $name" 66
+  tail -n "$lines" -- "$path"
+}
+
+case "${1:-}" in
+  deploy) shift; [[ $# == 0 ]] || fail "deploy takes no arguments" 64; cmd_deploy ;;
+  service) shift; cmd_service "$@" ;;
+  log) shift; cmd_log "$@" ;;
+  version) echo "$HELPER_VERSION" ;;
+  *) fail "Usage: lumapos-admin deploy | service start|stop|restart <name> | log <name> [lines] | version" 64 ;;
+esac
