@@ -134,7 +134,7 @@ export function AppNav({
       const feature = featureForHref[item.href];
       if (feature && !features[feature]) return false;
       if ((item.href === Routes.Accounting || item.href === Routes.TaxDeclarations) && role !== "owner" && role !== "manager") return false;
-      if (item.href === Routes.Admin && role !== "owner" && role !== "manager") return false;
+      if (item.href === Routes.Admin && role !== "owner") return false;
       return item.href !== "/ai" || aiConfigured;
     }),
   }));
