@@ -9,7 +9,13 @@ import path from "node:path";
 const GOOGLE_DRIVE_ARCHIVE_PREFIX = "google-drive/";
 const ARCHIVE_KEY_PATTERN = /^google-drive\/[0-9]{4}\/[0-9]{2}\/[0-9]{2}\/lumapos-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.lumaenc$/i;
 const MAX_RCLONE_OUTPUT_BYTES = 64 * 1024;
-const REMOTE_PROBE_CACHE_MS = 30_000;
+const REMOTE_PROBE_CACHE_MS = 5 * 60_000;
+// Readiness is polled every few seconds (Mac host console, health checks), and
+// each Drive lookup through rclone takes several seconds. An uploaded archive
+// is immutable, so a verified one stays verified; a failed check is retried
+// after a minute.
+const ARCHIVE_VERIFIED_CACHE_MS = 30 * 60_000;
+const ARCHIVE_FAILED_CACHE_MS = 60_000;
 
 type GoogleDriveBackupConfig = {
   remoteRoot: string;
@@ -30,6 +36,7 @@ export type GoogleDriveBackupReadiness = {
 };
 
 let remoteProbeCache: { checkedAt: number; key: string; ok: boolean } | null = null;
+const archiveVerificationCache = new Map<string, { checkedAt: number; result: Promise<boolean> }>();
 
 function isAbsolute(value: string | undefined) {
   return Boolean(value?.trim() && path.isAbsolute(value.trim()));
@@ -251,14 +258,24 @@ export async function verifyGoogleDriveBackupArchive(input: {
     || !/^[0-9a-f]{32}$/.test(expectedMd5)
   ) return false;
 
-  try {
-    const info = await readRemoteFileInfo(config, remotePath);
-    return info.IsDir !== true
-      && info.Size === expectedSize
-      && md5Hash(info) === expectedMd5;
-  } catch {
-    return false;
+  const cacheKey = `${config.rcloneBin}\n${config.configPath}\n${remotePath}\n${expectedSize}\n${expectedMd5}`;
+  const now = Date.now();
+  const cached = archiveVerificationCache.get(cacheKey);
+  if (cached) {
+    // Concurrent callers share one in-flight lookup.
+    const settled = await Promise.race([cached.result, Promise.resolve(undefined)]);
+    const ttl = settled === false ? ARCHIVE_FAILED_CACHE_MS : ARCHIVE_VERIFIED_CACHE_MS;
+    if (settled === undefined || now - cached.checkedAt < ttl) return cached.result;
   }
+
+  const result = readRemoteFileInfo(config, remotePath)
+    .then((info) => info.IsDir !== true
+      && info.Size === expectedSize
+      && md5Hash(info) === expectedMd5)
+    .catch(() => false);
+  archiveVerificationCache.clear();
+  archiveVerificationCache.set(cacheKey, { checkedAt: now, result });
+  return result;
 }
 
 export async function uploadGoogleDriveBackupArchive(input: {
