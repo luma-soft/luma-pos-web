@@ -38,7 +38,7 @@ export default async function PosLayout({ children }: { children: React.ReactNod
       <TenantClientScopeProvider scopeId={catalogScopeId}>
         <AppDataSyncProvider revision={randomUUID()}>
           <ProductCatalogProvider key={catalogScopeId} userId={user.id} scopeId={catalogScopeId} initialDefaultSort={initialDefaultSort}>
-            <div className="h-dvh overflow-hidden bg-canvas pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
+            <div className="h-dvh overflow-hidden bg-canvas pb-(--mobile-tabbar-space) lg:pb-0">
               {children}
               <MobileTabBar role={role} />
             </div>

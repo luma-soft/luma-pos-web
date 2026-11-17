@@ -90,12 +90,13 @@ export function MobileTopBar({
   className?: string;
 }) {
   return (
-    <header className={cn("border-b border-border bg-canvas/95 px-4 pb-3 pt-3 backdrop-blur-sm lg:hidden", className)}>
-      <div className="flex min-h-12 items-center gap-2.5">
+    // Native large-title navigation header: 34pt bold title on the grouped background, no bar or divider.
+    <header className={cn("bg-canvas px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] lg:hidden", className)}>
+      <div className="flex min-h-[52px] items-center gap-2">
         {leading}
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[23px] font-bold leading-tight tracking-[-0.02em]">{title}</h1>
-          {subtitle && <p className="mt-0.5 text-xs font-semibold leading-4 text-slate-500 dark:text-slate-400">{subtitle}</p>}
+          <h1 className="truncate text-[34px] font-bold leading-[41px] tracking-[0.01em]">{title}</h1>
+          {subtitle && <p className="mt-0.5 text-[13px] font-normal leading-[18px] text-ios-label-secondary">{subtitle}</p>}
         </div>
         {trailing && <div className="flex shrink-0 items-center gap-2">{trailing}</div>}
       </div>
@@ -143,34 +144,107 @@ export function TouchTargetToggle({
   );
 }
 
-export function MobileMetricTile({
-  label,
-  value,
-  subtitle,
-  tone = "neutral",
-}: {
-  label: React.ReactNode;
-  value: React.ReactNode;
-  subtitle: React.ReactNode;
-  tone?: "neutral" | "success" | "warning" | "info";
-}) {
-  const subtitleTone = {
-    neutral: "text-slate-500 dark:text-slate-400",
-    success: "text-ok",
-    warning: "text-warn",
-    info: "text-in",
-  }[tone];
+type MobileIconTint = "accent" | "green" | "orange" | "red";
+
+const iconTintClass: Record<MobileIconTint, string> = {
+  accent: "text-ios-accent",
+  green: "text-ios-green",
+  orange: "text-ios-orange",
+  red: "text-ios-red",
+};
+
+/** DashboardSummaryCardContainer / quick-action card: 22pt continuous card on the grouped background. */
+export function MobileGroupedCard({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <section className={cn("rounded-[22px] bg-surface px-4 py-3", className)}>{children}</section>;
+}
+
+/** Headline-bold card title with an optional "See all ›" accent link (DashboardSeeAllLabel). */
+export function MobileCardHeader({ title, href, linkLabel }: { title: React.ReactNode; href?: string; linkLabel?: React.ReactNode }) {
   return (
-    <div className="flex min-h-[98px] flex-col justify-between rounded-2xl bg-surface p-4 shadow-e1">
-      <div className="text-xs font-semibold leading-4 text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-1 min-w-0 text-[22px] font-bold leading-tight tracking-[-0.02em] tabular-nums">{value}</div>
-      <div className={cn("mt-1 text-xs font-medium", subtitleTone)}>{subtitle}</div>
+    <div className="flex min-h-6 items-center justify-between gap-3">
+      <h2 className="min-w-0 truncate text-[17px] font-bold leading-[22px]">{title}</h2>
+      {href && linkLabel && (
+        <Link href={href} className="inline-flex min-h-11 shrink-0 items-center gap-1 text-[15px] font-semibold text-ios-accent -my-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ios-accent">
+          {linkLabel}
+          <ChevronRight className="size-3.5" strokeWidth={2.75} aria-hidden="true" />
+        </Link>
+      )}
     </div>
   );
 }
 
-export function MobileSectionLabel({ children }: { children: React.ReactNode }) {
-  return <h2 className="px-0.5 text-[13px] font-semibold leading-5 text-slate-500 dark:text-slate-400">{children}</h2>;
+/** Capsule segmented control rendered as links (LumaSegmentedControl). */
+export function MobileSegmentedLinks({
+  label,
+  items,
+}: {
+  label: string;
+  items: Array<{ href: string; label: React.ReactNode; active: boolean }>;
+}) {
+  return (
+    <nav aria-label={label} className="flex rounded-full bg-primary-600/[0.075] p-[3px]">
+      {items.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          data-button-radius="pill"
+          aria-current={item.active ? "page" : undefined}
+          className={cn(
+            // Options size to their labels (singleLineTitles) and the text scales down like minimumScaleFactor.
+            "flex min-h-11 min-w-0 flex-auto items-center justify-center whitespace-nowrap rounded-full px-2.5 text-center text-[min(15px,3.6vw)] font-semibold tracking-[-0.01em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ios-accent",
+            item.active ? "bg-primary-600 text-white" : "text-ios-label/85",
+          )}
+        >
+          {item.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/** Inner summary tile (DashboardSummaryView.metricTileContent): 18pt tile on systemBackground. */
+export const mobileMetricTileClass = "block min-h-[88px] w-full min-w-0 rounded-[18px] bg-white px-3 py-2.5 text-left shadow-[0_1px_4px_rgb(0_0_0/0.06)] transition-opacity active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ios-accent dark:bg-black dark:shadow-none";
+
+export type MobileMetricTileContentProps = {
+  icon: LucideIcon;
+  tint?: MobileIconTint;
+  label: React.ReactNode;
+  value: React.ReactNode;
+  detail: React.ReactNode;
+  showsChevron?: boolean;
+  accessory?: React.ReactNode;
+};
+
+export function MobileMetricTileContent({
+  icon: Icon,
+  tint = "accent",
+  label,
+  value,
+  detail,
+  showsChevron = false,
+  accessory,
+}: MobileMetricTileContentProps) {
+  return (
+    <>
+      <span className="flex h-5 items-center gap-1.5">
+        <Icon className={cn("size-[18px] shrink-0", iconTintClass[tint])} strokeWidth={2.4} aria-hidden="true" />
+        <span className="min-w-0 flex-1 truncate text-[min(15px,3.4vw)] font-semibold tracking-[-0.01em] text-ios-label-secondary">{label}</span>
+        {accessory}
+      </span>
+      <span className="mt-1 flex h-6 items-center gap-1">
+        <span className="min-w-0 flex-1 truncate text-[20px] font-bold leading-6 tabular-nums text-ios-label">{value}</span>
+        {showsChevron && <ChevronRight className="size-[15px] shrink-0 text-ios-label-tertiary" strokeWidth={2.75} aria-hidden="true" />}
+      </span>
+      <span className="mt-1 block h-4 truncate text-[12px] leading-4 text-ios-label-secondary">{detail}</span>
+    </>
+  );
+}
+
+export function MobileMetricTile({ href, showsChevron = Boolean(href), ...content }: MobileMetricTileContentProps & { href?: string }) {
+  const body = <MobileMetricTileContent {...content} showsChevron={showsChevron} />;
+  return href
+    ? <Link href={href} className={mobileMetricTileClass}>{body}</Link>
+    : <div className={mobileMetricTileClass}>{body}</div>;
 }
 
 export function MobileQuickActionGrid({
@@ -181,24 +255,28 @@ export function MobileQuickActionGrid({
   items: Array<{ href: string; icon: LucideIcon; label: React.ReactNode }>;
 }) {
   return (
-    <section className="rounded-2xl bg-surface px-4 py-3 shadow-e1">
-      <h2 className="mb-3 text-base font-bold">{title}</h2>
-      <div className="grid grid-cols-4 gap-2">
-        {items.map(({ href, icon: Icon, label }) => (
+    <section className="rounded-[22px] bg-surface px-4 py-[11px]">
+      <h2 className="text-[17px] font-bold leading-[22px]">{title}</h2>
+      <div className="mt-2.5 grid grid-cols-4 gap-1">
+        {items.map(({ href, icon: Icon, label }, index) => (
           <Link
-            key={href}
+            key={`${index}-${href}`}
             href={href}
-            className="flex min-h-[88px] min-w-11 flex-col items-center justify-start gap-2 rounded-xl px-1 py-1 text-center text-xs font-semibold leading-4 text-foreground transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:scale-[0.98]"
+            className="flex min-h-[74px] min-w-0 flex-col items-center gap-1.5 text-center transition-opacity active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ios-accent"
           >
-            <span className="grid size-12 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300">
-              <Icon className="size-[22px]" strokeWidth={2} aria-hidden="true" />
+            <span className="grid size-[50px] shrink-0 place-items-center rounded-full bg-primary-600/12 text-primary-600">
+              <Icon className="size-[22px]" strokeWidth={2.2} aria-hidden="true" />
             </span>
-            <span className="line-clamp-2">{label}</span>
+            <span className="w-full truncate text-[12px] font-semibold leading-[18px]">{label}</span>
           </Link>
         ))}
       </div>
     </section>
   );
+}
+
+export function MobileSectionLabel({ children }: { children: React.ReactNode }) {
+  return <h2 className="px-0.5 text-[13px] font-semibold leading-5 text-slate-500 dark:text-slate-400">{children}</h2>;
 }
 
 export function MobileActionRow({

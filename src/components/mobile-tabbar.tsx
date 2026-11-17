@@ -25,6 +25,11 @@ const TABS: readonly Tab[] = [
   { id: "more", href: Routes.More, labelKey: "nav.more", icon: Ellipsis },
 ];
 
+/**
+ * Floating capsule tab bar matching the native iOS 26 tab bar: translucent
+ * material, a highlighted pill behind the selected tab, accent-tinted selection
+ * and primary-label inactive items.
+ */
 export function MobileTabBar({ role }: { role: Role }) {
   const t = useTranslations();
   const pathname = usePathname();
@@ -50,26 +55,31 @@ export function MobileTabBar({ role }: { role: Role }) {
   return (
     <nav
       aria-label={t("common.primaryNavigation")}
-      className="fixed inset-x-0 bottom-0 z-40 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-stretch border-t border-border bg-surface/98 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-5 pb-[max(0.75rem,calc(env(safe-area-inset-bottom)-0.75rem))] lg:hidden"
     >
-      {(isTechnician ? TABS.filter((tab) => tab.id === "more") : TABS).map((tab) => {
-        const active = sectionActive[tab.id];
-        const Icon = tab.icon;
-        return (
-          <Link
-            key={tab.id}
-            href={tab.href}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "group flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-1 px-1 py-1 text-[11px] font-semibold leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 active:scale-[0.98]",
-              active ? "text-primary-700 dark:text-primary-300" : "text-slate-500 dark:text-slate-400",
-            )}
-          >
-            <Icon className="h-[23px] w-[23px] shrink-0" strokeWidth={active ? 2.35 : 1.9} aria-hidden="true" />
-            <span className="max-w-full truncate whitespace-nowrap">{t(tab.labelKey)}</span>
-          </Link>
-        );
-      })}
+      <div className="pointer-events-auto mx-auto flex h-[62px] max-w-[480px] items-stretch gap-0.5 rounded-full border border-white/60 bg-white/72 p-1 font-ios shadow-[0_8px_30px_rgb(0_0_0/0.12),0_1px_2px_rgb(0_0_0/0.06)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-[#1C1C1E]/78 dark:shadow-[0_8px_30px_rgb(0_0_0/0.5)]">
+        {(isTechnician ? TABS.filter((tab) => tab.id === "more") : TABS).map((tab) => {
+          const active = sectionActive[tab.id];
+          const Icon = tab.icon;
+          return (
+            <Link
+              key={tab.id}
+              href={tab.href}
+              aria-current={active ? "page" : undefined}
+              data-button-radius="pill"
+              className={cn(
+                "flex min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1 text-[10.5px] font-semibold leading-tight transition-[background-color,color,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ios-accent active:scale-[0.96]",
+                active
+                  ? "bg-black/[0.06] text-ios-accent dark:bg-white/[0.1]"
+                  : "text-ios-label",
+              )}
+            >
+              <Icon className="h-[22px] w-[22px] shrink-0" strokeWidth={active ? 2.4 : 2} aria-hidden="true" />
+              <span className="max-w-full truncate whitespace-nowrap">{t(tab.labelKey)}</span>
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }

@@ -12,9 +12,9 @@ import { OrderStatusBadge, PaymentStatusBadge } from "../orders/status-badges";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Text } from "@/components/ui/text";
 import { OrderDetailLink } from "@/components/order-detail-link";
-import { Bell, ClipboardCheck, Package, ShoppingCart, Truck } from "lucide-react";
-import { MobileMetricTile, MobileQuickActionGrid, MobileSectionLabel, MobileTopBar } from "@/components/mobile-ui";
-import { MobileProfitMetricValue } from "@/components/mobile-profit-metric-value";
+import { BarChart3, Bell, FileText, ListChecks, Package, ScanLine, ShoppingCart, Users } from "lucide-react";
+import { MobileCardHeader, MobileMetricTile, MobileQuickActionGrid, MobileSegmentedLinks, MobileTopBar } from "@/components/mobile-ui";
+import { MobileProfitMetricTile } from "@/components/mobile-profit-metric-tile";
 import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
@@ -41,14 +41,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const range = resolveDashboardRange(params.range);
   const data = await getDashboard(context.storeId, range);
-  const mobileRevenuePoints = range === "year" ? groupDashboardRevenueByMonth(data.revenueByDay) : data.revenueByDay;
-  const mobileDayFormatter = new Intl.DateTimeFormat(locale, {
-    day: "2-digit",
-    month: "2-digit",
-  });
-
   const maxDay = Math.max(1, ...data.revenueByDay.map((d) => Number(d.revenue)));
-  const mobileMaxDay = Math.max(1, ...mobileRevenuePoints.map((d) => Number(d.revenue)));
+  const marginFormatter = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const debtorRows: DashboardDebtRow[] = data.topDebtors.map((customer) => {
     const debt = Number(customer.currentDebt);
     const limit = Number(customer.debtLimit ?? 0);
@@ -71,214 +65,175 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       <div className="min-h-full bg-canvas lg:hidden">
         <MobileTopBar
           title={context.storeName.trim() || "LumaPOS"}
-          subtitle={t("dashboard.title")}
           trailing={(
             <Link
               href={Routes.Notifications}
               aria-label={t("nav.notifications")}
-              className="grid h-11 w-11 place-items-center rounded-full bg-surface text-slate-600 shadow-e1 transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:scale-[0.98] dark:text-slate-300"
+              data-button-radius="pill"
+              className="grid size-11 place-items-center rounded-full bg-surface text-ios-label-secondary transition-opacity active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ios-accent"
             >
-              <Bell className="h-6 w-6" />
+              <Bell className="size-[22px]" strokeWidth={2} />
             </Link>
           )}
-          bottom={(
-            <nav
-              aria-label={t("mobile.dashboard.rangeLabel")}
-              className="grid grid-cols-4 gap-1 rounded-xl bg-surface-2 p-1"
-            >
-              {MOBILE_RANGES.map((r) => (
-                <Link
-                  key={r}
-                  href={`${Routes.Dashboard}?range=${r}`}
-                  aria-current={range === r ? "page" : undefined}
-                  className={cn(
-                    "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 text-center text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
-                    range === r
-                      ? "bg-surface text-foreground shadow-e1"
-                      : "text-slate-500 hover:text-foreground dark:text-slate-300",
-                  )}
-                >
-                  {t(`dashboard.range.${r}`)}
-                </Link>
-              ))}
-            </nav>
-          )}
         />
-        <div className="space-y-4 px-4 py-4">
-          <section className="space-y-2">
-            <MobileSectionLabel>{t("mobile.dashboard.businessStats")}</MobileSectionLabel>
-            <div className="grid grid-cols-2 gap-3">
+        {/* Section order mirrors DashboardView.swift. */}
+        <div className="space-y-4 px-4 pb-6 pt-2">
+          <section className="rounded-[22px] bg-surface px-4 py-3 shadow-[0_4px_12px_color-mix(in_oklab,var(--primary-600)_3.5%,transparent)]">
+            <h2 className="text-[17px] font-bold leading-[22px]">{t("mobile.dashboard.businessStats")}</h2>
+            <div className="mt-2.5">
+              <MobileSegmentedLinks
+                label={t("mobile.dashboard.rangeLabel")}
+                items={MOBILE_RANGES.map((r) => ({
+                  href: `${Routes.Dashboard}?range=${r}`,
+                  label: t(`dashboard.range.${r}`),
+                  active: range === r,
+                }))}
+              />
+            </div>
+            <div className="mt-2.5 grid grid-cols-2 gap-2">
               <MobileMetricTile
+                icon={BarChart3}
                 label={t("mobile.dashboard.revenue")}
-                value={formatCompactCurrency(data.revenue)}
-                subtitle={t(`dashboard.range.${range}`)}
-                tone="success"
+                value={formatCompactCurrency(data.revenue, locale)}
+                detail={t("mobile.dashboard.ordersCount", { count: data.orderCount })}
+                href={Routes.Reports}
+              />
+              <MobileProfitMetricTile
+                label={t("mobile.dashboard.grossProfit")}
+                value={formatCompactCurrency(data.grossProfit, locale)}
+                margin={t("mobile.dashboard.marginPct", { pct: marginFormatter.format(data.marginPct) })}
+                hiddenMargin={t("mobile.dashboard.hiddenMargin")}
               />
               <MobileMetricTile
-                label={t("dashboard.grossProfit")}
-                value={<MobileProfitMetricValue value={data.grossProfit} />}
-                subtitle={t("dashboard.marginPct", { pct: data.marginPct.toFixed(1) })}
-                tone={data.grossProfit >= 0 ? "success" : "warning"}
+                icon={FileText}
+                label={t("mobile.dashboard.orderCount")}
+                value={formatNumber(data.orderCount)}
+                detail={data.orderCount > 0
+                  ? t("mobile.dashboard.avgPerOrder", { amount: formatCompactCurrency(data.avgOrder, locale) })
+                  : "—"}
+                href={Routes.Sales}
               />
               <MobileMetricTile
-                label={t("mobile.dashboard.orders")}
-                value={data.orderCount}
-                subtitle={data.orderCount > 0
-                  ? t("dashboard.avgPerOrder", { avg: formatCurrency(Math.round(data.avgOrder)) })
-                  : t(`dashboard.range.${range}`)}
-                tone="info"
-              />
-              <Link
+                icon={Users}
+                tint="red"
+                label={t("mobile.dashboard.receivablesFull")}
+                value={formatCompactCurrency(data.debt.total, locale)}
+                detail={t("mobile.dashboard.debtorsCount", { count: data.debt.debtors })}
                 href={`${Routes.Customers}?owing=1`}
-                className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                <MobileMetricTile
-                  label={t("mobile.dashboard.receivables")}
-                  value={formatCompactCurrency(data.debt.total)}
-                  subtitle={t("dashboard.debtors", { count: data.debt.debtors })}
-                  tone="neutral"
-                />
-              </Link>
+              />
             </div>
           </section>
 
           <MobileQuickActionGrid
             title={t("mobile.dashboard.quickActions")}
             items={[
-              { href: Routes.POS, icon: ShoppingCart, label: t("nav.mobileSales") },
-              { href: `${Routes.Inventory}?tab=products`, icon: Package, label: t("nav.products") },
-              { href: Routes.PurchaseNew, icon: Truck, label: t("nav.purchases") },
-              { href: `${Routes.Inventory}?tab=stock`, icon: ClipboardCheck, label: t("nav.stocktakes") },
+              { href: Routes.POS, icon: ShoppingCart, label: t("mobile.dashboard.newSale") },
+              { href: Routes.POS, icon: ScanLine, label: t("mobile.dashboard.scan") },
+              { href: Routes.PurchaseNew, icon: Package, label: t("mobile.dashboard.receive") },
+              { href: `${Routes.Inventory}?tab=stock`, icon: ListChecks, label: t("mobile.dashboard.stocktake") },
             ]}
           />
 
-          <section className="rounded-2xl bg-surface shadow-e1">
-            <div className="border-b border-border-soft px-4 py-3.5">
-              <h2 className="text-sm font-black">{t("mobile.dashboard.revenueTrend")}</h2>
-              <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                {t("mobile.dashboard.selectedRange", { range: t(`dashboard.range.${range}`) })}
-              </p>
-            </div>
-            {mobileRevenuePoints.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
-                {t("dashboard.noData")}
+          <section className="rounded-2xl bg-surface p-3.5">
+            <MobileCardHeader title={t("mobile.dashboard.lowStockTitle")} href={`${Routes.Inventory}?low=1`} linkLabel={t("mobile.dashboard.seeAll")} />
+            {data.lowStock.length === 0 ? (
+              <p className="flex min-h-14 items-center justify-center text-[15px] text-ios-label-secondary">
+                {data.lowStockCount === 0
+                  ? t("mobile.dashboard.lowStockEmpty")
+                  : t("mobile.dashboard.lowStockNeedCheck", { count: data.lowStockCount })}
               </p>
             ) : (
-              <div className="overflow-x-auto overscroll-x-contain px-4 pb-4 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex h-40 min-w-max items-end gap-2">
-                  {mobileRevenuePoints.map((d) => {
-                    const v = Number(d.revenue);
-                    const date = range === "year" ? new Intl.DateTimeFormat(locale, { month: "short" }).format(new Date(`${d.day}T00:00:00`)) : mobileDayFormatter.format(new Date(`${d.day}T00:00:00`));
-                    const label = t("mobile.dashboard.trendBarLabel", {
-                      date,
-                      revenue: formatCurrency(v),
-                    });
-                    return (
-                      <div key={d.day} className="flex h-full w-7 min-w-7 shrink-0 flex-col items-center gap-1.5">
-                        <div className="flex min-h-0 w-full flex-1 items-end">
-                          <div
-                            role="img"
-                            aria-label={label}
-                            title={label}
-                            className={cn(
-                              "w-7 min-w-7 rounded-t-md",
-                              d.dow === 7 ? "bg-surface-2" : "bg-primary-600/90",
-                            )}
-                            style={{ height: `${Math.max(4, (v / mobileMaxDay) * 100)}%` }}
-                          />
-                        </div>
-                        <span aria-hidden="true" className="text-[9px] font-bold tabular-nums text-slate-500 dark:text-slate-400">
-                          {date}
+              <div className="mt-2.5 divide-y divide-border">
+                {data.lowStock.slice(0, 5).map((product) => {
+                  const stock = Number(product.totalStock);
+                  const min = Number(product.minLevel);
+                  const outOfStock = stock <= 0;
+                  const critical = outOfStock || stock <= min / 2;
+                  const unit = product.baseUnit?.trim();
+                  return (
+                    <Link key={product.id} href={Routes.product(product.id)}
+                      className="flex min-h-14 items-center gap-2.5 py-[9px] transition-opacity active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ios-accent">
+                      <span className={cn("grid size-[38px] shrink-0 place-items-center rounded-[10px]", critical ? "bg-ios-red/12 text-ios-red" : "bg-ios-orange/12 text-ios-orange")} aria-hidden="true">
+                        <Package className="size-[18px]" strokeWidth={2.2} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[15px] font-semibold">{productDisplayName(product)}</span>
+                        <span className="mt-0.5 block truncate text-[12px] text-ios-label-secondary">
+                          {unit
+                            ? t("mobile.dashboard.stockOfMin", { stock: formatNumber(stock), unit, min: formatNumber(min) })
+                            : t("mobile.dashboard.stockOfMinNoUnit", { stock: formatNumber(stock), min: formatNumber(min) })}
                         </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                      </span>
+                      <span className={cn("shrink-0 rounded-full px-[9px] py-[5px] text-[11px] font-semibold", critical ? "bg-ios-red/12 text-ios-red" : "bg-ios-orange/12 text-ios-orange")}>
+                        {t(outOfStock ? "mobile.dashboard.badgeOutOfStock" : critical ? "mobile.dashboard.badgeCritical" : "mobile.dashboard.badgeLow")}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+            <Link
+              href={Routes.PurchaseNew}
+              className="mt-2.5 flex min-h-11 items-center justify-center rounded-xl bg-canvas text-[15px] font-semibold ring-[0.5px] ring-inset ring-ios-stroke transition-opacity active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ios-accent"
+            >
+              {t("mobile.dashboard.createPurchase")}
+            </Link>
+          </section>
+
+          <MobileDashboardOfflineNotice />
+
+          <section className="rounded-2xl bg-surface p-3.5">
+            <MobileCardHeader title={t("mobile.dashboard.recentSales")} href={Routes.Sales} linkLabel={t("mobile.dashboard.seeAll")} />
+            {data.recentOrders.length === 0 ? (
+              <p className="flex min-h-[88px] items-center justify-center text-[15px] text-ios-label-secondary">{t("mobile.dashboard.recentEmpty")}</p>
+            ) : (
+              <div className="mt-1 divide-y divide-border">
+                {data.recentOrders.slice(0, 2).map((order) => (
+                  <div key={order.id} className="flex min-h-[82px] items-center gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <OrderDetailLink
+                        orderId={order.id}
+                        className="block truncate text-[15px] font-semibold text-ios-accent"
+                      >
+                        {order.customerName || t("orders.walkIn")}
+                      </OrderDetailLink>
+                      <span className="mt-1 block truncate text-[12px] text-ios-label-secondary">
+                        {order.code} · {formatDate(order.createdAt)}
+                      </span>
+                      <span className="mt-1.5 inline-flex flex-wrap gap-1.5">
+                        <OrderStatusBadge status={order.status} />
+                        <PaymentStatusBadge status={order.paymentStatus} />
+                      </span>
+                    </div>
+                    <span className="max-w-[45%] shrink-0 text-right text-[15px] font-semibold tabular-nums [overflow-wrap:anywhere]">
+                      {formatCurrency(Number(order.total))}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </section>
 
-          <section className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <MobileSectionLabel>{t("dashboard.lowStockTitle")}</MobileSectionLabel>
-              <Link href={`${Routes.Inventory}?low=1`} className="text-xs font-semibold text-primary-600">{t("dashboard.viewAll")}</Link>
-            </div>
-            <div className="divide-y divide-border-soft overflow-hidden rounded-2xl border border-border bg-surface px-3 shadow-e1">
-              {data.lowStock.length === 0 ? (
-                <p className="py-5 text-center text-sm text-slate-500">{t("dashboard.stockOk")}</p>
-              ) : data.lowStock.slice(0, 5).map((product) => (
-                <Link key={product.id} href={Routes.product(product.id)}
-                  className="flex min-h-14 items-center gap-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-lg" aria-hidden="true">
-                    {categoryEmoji(product.categoryName)}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">{productDisplayName(product)}</span>
-                    <span className="block text-xs text-slate-500">
-                      {t("dashboard.stockOfMin", {
-                        stock: formatNumber(Number(product.totalStock)),
-                        unit: product.baseUnit,
-                        min: formatNumber(Number(product.minLevel)),
-                      })}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-xs font-semibold text-warn">{t("dashboard.badgeLow")}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-          <MobileDashboardOfflineNotice />
-          <section className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <MobileSectionLabel>{t("dashboard.recentOrders")}</MobileSectionLabel>
-              <Link href={Routes.Sales} className="text-xs font-semibold text-primary-600">{t("dashboard.allOrders")}</Link>
-            </div>
-            <div className="divide-y divide-border-soft overflow-hidden rounded-2xl border border-border bg-surface px-3 shadow-e1">
-              {data.recentOrders.length === 0 ? (
-                <p className="py-5 text-center text-sm text-slate-500">{t("orders.empty")}</p>
-              ) : data.recentOrders.slice(0, 2).map((order) => (
-                <div key={order.id} className="flex min-h-[82px] items-center gap-3 py-3">
-                  <div className="min-w-0 flex-1">
-                    <OrderDetailLink
-                      orderId={order.id}
-                      className="block truncate text-sm font-semibold text-primary-600"
-                    >
-                      {order.customerName || t("orders.walkIn")}
-                    </OrderDetailLink>
-                    <span className="mt-1 block truncate text-xs text-slate-500">
-                      {order.code} · {formatDate(order.createdAt)}
-                    </span>
-                    <span className="mt-1.5 inline-flex flex-wrap gap-1.5">
-                      <OrderStatusBadge status={order.status} />
-                      <PaymentStatusBadge status={order.paymentStatus} />
-                    </span>
-                  </div>
-                  <span className="max-w-[45%] shrink-0 text-right text-sm font-bold tabular-nums [overflow-wrap:anywhere]">
-                    {formatCurrency(Number(order.total))}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-
           {debtorRows.length > 0 && (
             <DashboardDebtCard
+              mobile
               kind="customer"
-              title={t("dashboard.topDebtors")}
+              title={t("mobile.dashboard.debtTitle")}
               href={`${Routes.Customers}?owing=1`}
-              linkLabel={t("dashboard.debtLink")}
-              totalLabel={t("dashboard.totalReceivable")}
+              linkLabel={t("mobile.dashboard.seeAll")}
+              totalLabel={t("mobile.dashboard.totalReceivable")}
               rows={debtorRows}
               total={data.debt.total}
             />
           )}
           {supplierRows.length > 0 && (
             <DashboardDebtCard
+              mobile
               kind="supplier"
-              title={t("dashboard.topSuppliers")}
+              title={t("mobile.dashboard.payablesTitle")}
               href={`${Routes.Suppliers}?owing=owing`}
-              linkLabel={t("dashboard.supplierDebtLink")}
-              totalLabel={t("dashboard.totalPayables")}
+              linkLabel={t("mobile.dashboard.seeAll")}
+              totalLabel={t("mobile.dashboard.totalPayable")}
               rows={supplierRows}
               total={data.payables.total}
             />
@@ -507,6 +462,7 @@ function DashboardDebtCard({
   totalLabel,
   rows,
   total,
+  mobile = false,
 }: {
   kind: "customer" | "supplier";
   title: string;
@@ -515,9 +471,71 @@ function DashboardDebtCard({
   totalLabel: string;
   rows: DashboardDebtRow[];
   total: number;
+  /** Native DashboardTopDebtorsView/TopSuppliersView presentation for phones. */
+  mobile?: boolean;
 }) {
+  const list = (
+    <div className={cn("divide-y", mobile ? "divide-border" : "divide-border-soft")}>
+      {rows.slice(0, 5).map((row) => {
+        const initials = row.name.split(" ").map((word) => word[0]).slice(-2).join("").toUpperCase();
+        return (
+          <div key={row.id} className={cn("flex items-center", mobile ? "gap-2.5 py-[9px]" : "gap-3 py-2.5")}>
+            <div className={cn(
+              "grid h-9 w-9 shrink-0 place-items-center rounded-full font-bold",
+              mobile
+                ? "bg-primary-600/12 text-[11px] text-primary-600"
+                : "bg-primary-50 text-[11px] text-primary-700 dark:bg-primary-950/50 dark:text-primary-400",
+            )}>
+              {initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <PartnerDetailLink
+                kind={kind}
+                partnerId={row.id}
+                name={row.name}
+                openInCurrentTab
+                className={mobile
+                  ? "-my-3 block truncate py-3 text-[15px] font-semibold leading-5 text-ios-accent"
+                  : "block whitespace-normal break-words text-[13px] font-semibold"}
+              />
+              {row.detail && (
+                <div className={cn(
+                  "line-clamp-2 break-words",
+                  mobile ? "mt-0.5 text-[12px]" : "text-xs",
+                  row.detailTone === "danger" ? (mobile ? "text-ios-red" : "text-er") : (mobile ? "text-ios-label-secondary" : "text-slate-400"),
+                )}>
+                  {row.detail}
+                </div>
+              )}
+            </div>
+            <b className={cn(
+              "shrink-0 text-right tabular-nums",
+              mobile ? "text-[12px] font-semibold" : "text-[13px]",
+              kind === "customer" ? (mobile ? "text-ios-red" : "text-er") : (mobile ? "text-ios-orange" : "text-warn"),
+            )}>
+              {formatCurrency(Number(row.currentDebt))}
+            </b>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  if (mobile) {
+    return (
+      <section className="rounded-2xl bg-surface p-3.5">
+        <MobileCardHeader title={title} href={href} linkLabel={linkLabel} />
+        <div className="mt-1">{list}</div>
+        <div className="mt-2.5 flex justify-between gap-3 border-t border-border pt-3.5 text-[15px]">
+          <span className="text-ios-label-secondary">{totalLabel}</span>
+          <b className="font-semibold tabular-nums">{formatCurrency(total)}</b>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <section className="rounded-2xl border border-border bg-surface shadow-e1 lg:rounded-card lg:shadow-none">
+    <section className="rounded-card border border-border bg-surface">
       <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-3 sm:px-5">
         <Text as="h2" weight="bold" className="min-w-0" text={title} />
         <Link href={href} className="shrink-0 text-xs font-medium text-primary-600 hover:underline">
@@ -525,35 +543,7 @@ function DashboardDebtCard({
         </Link>
       </div>
       <div className="px-3 py-1 sm:p-4">
-        <div className="divide-y divide-border-soft">
-          {rows.slice(0, 5).map((row) => {
-            const initials = row.name.split(" ").map((word) => word[0]).slice(-2).join("").toUpperCase();
-            return (
-              <div key={row.id} className="flex items-center gap-3 py-2.5">
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary-50 text-[11px] font-bold text-primary-700 dark:bg-primary-950/50 dark:text-primary-400">
-                  {initials}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <PartnerDetailLink
-                    kind={kind}
-                    partnerId={row.id}
-                    name={row.name}
-                    openInCurrentTab
-                    className="block whitespace-normal break-words text-[13px] font-semibold"
-                  />
-                  {row.detail && (
-                    <div className={cn("line-clamp-2 break-words text-xs", row.detailTone === "danger" ? "text-er" : "text-slate-400")}>
-                      {row.detail}
-                    </div>
-                  )}
-                </div>
-                <b className={cn("shrink-0 text-right text-[13px] tabular-nums", kind === "customer" ? "text-er" : "text-warn")}>
-                  {formatCurrency(Number(row.currentDebt))}
-                </b>
-              </div>
-            );
-          })}
-        </div>
+        {list}
         <div className="mt-2 flex justify-between gap-3 border-t border-border pt-3 text-sm">
           <Text as="span" variant="muted" text={totalLabel} />
           <b className="tabular-nums">{formatCurrency(total)}</b>
@@ -570,22 +560,19 @@ function contactLine(phone?: string | null, address?: string | null) {
   return contact.length > 0 ? contact.join(" · ") : null;
 }
 
-function formatCompactCurrency(value: number) {
-  const amount = Math.abs(value);
-  const sign = value < 0 ? "-" : "";
-  if (amount >= 1_000_000_000) return `${sign}${(amount / 1_000_000_000).toFixed(1).replace(".0", "")}Bđ`;
-  if (amount >= 1_000_000) return `${sign}${(amount / 1_000_000).toFixed(1).replace(".0", "")}Mđ`;
-  if (amount >= 1_000) return `${sign}${Math.round(amount / 1_000)}Kđ`;
-  return `${sign}${Math.round(amount)}đ`;
+/** NativeDashboardFormatting.compactMetricMoney: "163M ₫", "1,2B ₫", "950 ₫". */
+function formatCompactCurrency(value: number, locale: string) {
+  const magnitude = Math.abs(value);
+  const numberLocale = locale === "en" ? "en-US" : "vi-VN";
+  const [divisor, suffix] = magnitude >= 999_950_000 ? [1_000_000_000, "B"]
+    : magnitude >= 999_950 ? [1_000_000, "M"]
+    : magnitude >= 1_000 ? [1_000, "K"]
+    : [1, ""];
+  const scaled = value / divisor;
+  const digits = new Intl.NumberFormat(numberLocale, {
+    maximumFractionDigits: divisor > 1 && Math.abs(scaled) < 10 ? 1 : 0,
+    minimumFractionDigits: 0,
+  }).format(scaled);
+  return `${digits}${suffix} ₫`;
 }
 
-/** Reduce a year's already loaded daily points to monthly bars for small screens. */
-function groupDashboardRevenueByMonth(days: Array<{ day: string; dow: number; revenue: number }>) {
-  const months = new Map<string, number>();
-  for (const { day, revenue } of days) {
-    const month = day.slice(0, 7);
-    months.set(month, (months.get(month) ?? 0) + Number(revenue));
-  }
-  return [...months.entries()].sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, revenue]) => ({ day: `${month}-01`, dow: 1, revenue }));
-}

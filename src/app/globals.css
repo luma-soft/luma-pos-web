@@ -132,7 +132,11 @@
   --ios-label-tertiary: rgb(60 60 67 / 0.3);
   --ios-stroke: rgb(0 0 0 / 0.18);
   --ios-red: #FF3B30;
+  --ios-green: #34C759;
+  --ios-orange: #FF9500;
   --ios-accent: #007AFF; /* luma → systemBlue */
+  /* Space reserved under scrolling content for the floating tab bar (62px bar + 8px gap). */
+  --mobile-tabbar-space: calc(70px + max(0.75rem, calc(env(safe-area-inset-bottom) - 0.75rem)));
 }
 [data-theme="ocean"]   { --ios-accent: #32ADE6; }
 [data-theme="terra"]   { --ios-accent: #FF9500; }
@@ -147,12 +151,55 @@
   --ios-label-tertiary: rgb(235 235 245 / 0.3);
   --ios-stroke: rgb(255 255 255 / 0.18);
   --ios-red: #FF453A;
+  --ios-green: #30D158;
+  --ios-orange: #FF9F0A;
   --ios-accent: #0A84FF;
 }
 [data-mode="dark"][data-theme="ocean"]   { --ios-accent: #64D2FF; }
 [data-mode="dark"][data-theme="terra"]   { --ios-accent: #FF9F0A; }
 [data-mode="dark"][data-theme="emerald"] { --ios-accent: #30D158; }
 [data-mode="dark"][data-theme="violet"]  { --ios-accent: #BF5AF2; }
+
+/* Phone/tablet web adopts the native app's surfaces: grouped background, flat
+   secondary-grouped cards, system font and UIKit separators. Desktop keeps the
+   warm-neutral brand surfaces. (0,2,0) selectors outrank the base mode tokens. */
+@media (max-width: 1023px) {
+  :root,
+  :root[data-mode="dark"] {
+    --background: var(--ios-grouped-bg);
+    --foreground: var(--ios-label);
+    --canvas: var(--ios-grouped-bg);
+    --surface: var(--ios-card);
+    --surface-2: var(--ios-card-disabled);
+    --border: var(--ios-stroke);
+    --border-soft: rgb(120 120 128 / 0.16);
+    --font-sans: var(--ios-font);
+  }
+  /* The native "luma" accent is systemBlue (NativeAccentTheme.luma). */
+  :root[data-theme="luma"] {
+    --primary-50:  #EBF4FF;
+    --primary-100: #D6E9FF;
+    --primary-200: #ADD3FF;
+    --primary-300: #7ABAFF;
+    --primary-400: #3D9BFF;
+    --primary-500: #1A88FF;
+    --primary-600: #007AFF;
+    --primary-700: #0066D6;
+    --primary-800: #0052AD;
+    --primary-900: #003D80;
+    --primary-950: #00264F;
+  }
+  :root[data-theme="luma"][data-mode="dark"] {
+    --primary-300: #64B0FF;
+    --primary-400: #409CFF;
+    --primary-500: #2A90FF;
+    --primary-600: #0A84FF;
+    --primary-700: #0A84FF;
+    --primary-950: #0A2A4D;
+  }
+  /* Inset-grouped cards are flat on iOS; elevation stays for floating layers. */
+  .shadow-e1:not([class*="ring"]) { box-shadow: none; }
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -189,6 +236,8 @@
   --color-ios-label-tertiary: var(--ios-label-tertiary);
   --color-ios-stroke: var(--ios-stroke);
   --color-ios-red: var(--ios-red);
+  --color-ios-green: var(--ios-green);
+  --color-ios-orange: var(--ios-orange);
   --color-ios-accent: var(--ios-accent);
   --font-ios: var(--ios-font);
   --font-ios-rounded: var(--ios-font-rounded);
