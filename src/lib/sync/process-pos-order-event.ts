@@ -17,10 +17,13 @@ export async function processPosOrderRelayEvent(
     payload: unknown;
   },
 ): Promise<PosOrderRelayResult> {
-  const { userId, ...rawCommand } = input;
+  // sync_events.base_revision is nullable; PostgreSQL returns NULL as `null`.
+  // The relay envelope only accepts an omitted revision, so drop the key
+  // instead of forwarding `baseRevision: null` (which fails validation).
+  const { userId, baseRevision, ...rawCommand } = input;
   const command = {
     ...rawCommand,
-    ...(rawCommand.baseRevision == null ? {} : { baseRevision: rawCommand.baseRevision }),
+    ...(baseRevision == null ? {} : { baseRevision }),
   };
   const parsed = posOrderSyncSchema.safeParse(command);
   if (!parsed.success) {
