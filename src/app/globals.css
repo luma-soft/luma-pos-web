@@ -116,6 +116,44 @@
   color-scheme: dark;
 }
 
+/* ============================================
+   iOS parity tokens — mirror the native app's UIKit semantic colors
+   (systemGroupedBackground, secondarySystemGroupedBackground, labels,
+   LumaStroke and NativeAccentTheme) for mobile web surfaces.
+   ============================================ */
+:root {
+  --ios-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Be Vietnam Pro", sans-serif;
+  --ios-font-rounded: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, system-ui, "Be Vietnam Pro", sans-serif;
+  --ios-grouped-bg: #F2F2F7;
+  --ios-card: #FFFFFF;
+  --ios-card-disabled: #F2F2F7;
+  --ios-label: #000000;
+  --ios-label-secondary: rgb(60 60 67 / 0.6);
+  --ios-label-tertiary: rgb(60 60 67 / 0.3);
+  --ios-stroke: rgb(0 0 0 / 0.18);
+  --ios-red: #FF3B30;
+  --ios-accent: #007AFF; /* luma → systemBlue */
+}
+[data-theme="ocean"]   { --ios-accent: #32ADE6; }
+[data-theme="terra"]   { --ios-accent: #FF9500; }
+[data-theme="emerald"] { --ios-accent: #34C759; }
+[data-theme="violet"]  { --ios-accent: #AF52DE; }
+[data-mode="dark"] {
+  --ios-grouped-bg: #000000;
+  --ios-card: #1C1C1E;
+  --ios-card-disabled: #2C2C2E;
+  --ios-label: #FFFFFF;
+  --ios-label-secondary: rgb(235 235 245 / 0.6);
+  --ios-label-tertiary: rgb(235 235 245 / 0.3);
+  --ios-stroke: rgb(255 255 255 / 0.18);
+  --ios-red: #FF453A;
+  --ios-accent: #0A84FF;
+}
+[data-mode="dark"][data-theme="ocean"]   { --ios-accent: #64D2FF; }
+[data-mode="dark"][data-theme="terra"]   { --ios-accent: #FF9F0A; }
+[data-mode="dark"][data-theme="emerald"] { --ios-accent: #30D158; }
+[data-mode="dark"][data-theme="violet"]  { --ios-accent: #BF5AF2; }
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -143,6 +181,17 @@
   --color-er: var(--er);          --color-er-soft: var(--er-soft);
   --color-in: var(--in);          --color-in-soft: var(--in-soft);
   --color-nav: var(--nav);
+  --color-ios-grouped-bg: var(--ios-grouped-bg);
+  --color-ios-card: var(--ios-card);
+  --color-ios-card-disabled: var(--ios-card-disabled);
+  --color-ios-label: var(--ios-label);
+  --color-ios-label-secondary: var(--ios-label-secondary);
+  --color-ios-label-tertiary: var(--ios-label-tertiary);
+  --color-ios-stroke: var(--ios-stroke);
+  --color-ios-red: var(--ios-red);
+  --color-ios-accent: var(--ios-accent);
+  --font-ios: var(--ios-font);
+  --font-ios-rounded: var(--ios-font-rounded);
 
   /* 16px card radius (spec) */
   --radius-card: 16px;
