@@ -1,7 +1,7 @@
 /* LumaPOS PWA: cache only public, immutable app assets.
    NEVER persist authenticated HTML/RSC/API: /pos includes store/customer data.
    Running POS keeps its own scoped IndexedDB/local drafts while offline. */
-const CACHE = "lumapos-static-v7";
+const CACHE = "lumapos-static-v8";
 const APP_SHELL = ["/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/icon-180.png"];
 const OFFLINE_DOCUMENT = "/offline.html";
 
