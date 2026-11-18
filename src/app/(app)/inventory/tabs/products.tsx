@@ -5,6 +5,8 @@ import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { getProduct, getProductFormOptions } from "@/lib/data/products";
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
 import { Pagination } from "@/components/pagination";
+import { DesktopPagination } from "@/components/mobile-load-more";
+import { loadCategoriesPage } from "./load-more-actions";
 import { parsePageSize } from "@/lib/pagination";
 import { MobileInventoryCatalogSkeleton } from "@/components/mobile-inventory-catalog-skeleton";
 import { NewProductForm } from "../../products/new/product-form";
@@ -43,8 +45,10 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
     return (
       <>
         <ProductCatalogSwitcher activeView="categories" categoryCount={categoryData.total} />
-        <CategoriesManager categories={categoryData.rows} parentOptions={categoryData.roots} total={categoryData.total} />
-        <Pagination page={page} pageCount={categoryData.pageCount} total={categoryData.total} pageSize={pageSize} unitLabel={t("categories.unitLabel")} />
+        <CategoriesManager categories={categoryData.rows} parentOptions={categoryData.roots} total={categoryData.total} loadMore={{ page, pageCount: categoryData.pageCount, loadPage: loadCategoriesPage.bind(null, params) }} />
+        <DesktopPagination>
+          <Pagination page={page} pageCount={categoryData.pageCount} total={categoryData.total} pageSize={pageSize} unitLabel={t("categories.unitLabel")} />
+        </DesktopPagination>
       </>
     );
   }

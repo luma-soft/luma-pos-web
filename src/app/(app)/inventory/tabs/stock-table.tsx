@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { productDisplayName } from "@/lib/products/variant-presentation";
 import { useState } from "react";
 import Link from "next/link";
@@ -38,7 +39,13 @@ export function stockSev(stock: number, min: number): Sev {
   return "ok";
 }
 
-export function StockTable({ rows }: { rows: StockRow[]; stock?: StockFilter }) {
+export function StockTable({ rows: serverRows, loadMore }: {
+  rows: StockRow[];
+  stock?: StockFilter;
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<StockRow>;
+}) {
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
   const router = useRouter();
   const columns: DataTableColumn<StockRow>[] = [
@@ -51,6 +58,7 @@ export function StockTable({ rows }: { rows: StockRow[]; stock?: StockFilter }) 
     { key: "status", label: t("orders.cols.status"), defaultVisible: true, render: (row) => <StatusBadge sev={stockSev(Number(row.totalStock), Number(row.minLevel))} /> },
   ];
   return (
+    <>
     <DataTableShell
       tableId="inventory.stock"
       rows={rows}
@@ -97,6 +105,8 @@ export function StockTable({ rows }: { rows: StockRow[]; stock?: StockFilter }) 
       detailPanelClassName="h-auto max-h-[min(720px,calc(100dvh-3rem))] sm:max-w-6xl"
       detailBodyClassName="p-0"
     />
+    {loadMoreFooter}
+    </>
   );
 }
 

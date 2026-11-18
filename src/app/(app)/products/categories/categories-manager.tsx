@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, ChevronDown, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
@@ -13,9 +14,23 @@ import { createCategoryNode, updateCategory, deleteCategory } from "@/lib/action
 interface Cat { id: string; name: string; parentId: string | null; parentName: string | null; productCount: number; }
 interface ParentOption { id: string; name: string; }
 
-export function CategoriesManager({ categories: initial, parentOptions: initialParentOptions, total }: { categories: Cat[]; parentOptions: ParentOption[]; total: number }) {
+export function CategoriesManager({ categories: initial, parentOptions: initialParentOptions, total, loadMore }: {
+  categories: Cat[];
+  parentOptions: ParentOption[];
+  total: number;
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<Cat>;
+}) {
   const t = useTranslations();
   const [cats, setCats] = useState(initial);
+  // Pages loaded on phones join the locally edited list.
+  const { rows: loadedCats, footer: loadMoreFooter } = useMobileLoadMore(initial, loadMore, (category) => category.id);
+  const [mergedCount, setMergedCount] = useState(initial.length);
+  if (loadedCats.length > mergedCount) {
+    const extra = loadedCats.slice(mergedCount);
+    setMergedCount(loadedCats.length);
+    setCats((current) => [...current, ...extra.filter((category) => !current.some((item) => item.id === category.id))]);
+  }
   const [parentOptions, setParentOptions] = useState(initialParentOptions);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
@@ -191,6 +206,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
           );
         }}
       />
+      {loadMoreFooter}
 
       {/* modal tạo nhóm hàng */}
       {open && (

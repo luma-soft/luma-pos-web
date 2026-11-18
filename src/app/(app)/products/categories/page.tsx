@@ -3,6 +3,8 @@ import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { getCategoriesWithCounts } from "@/lib/data/categories";
 import { Pagination } from "@/components/pagination";
+import { DesktopPagination } from "@/components/mobile-load-more";
+import { loadCategoriesPage } from "../../inventory/tabs/load-more-actions";
 import { parsePageSize } from "@/lib/pagination";
 import { CategoriesManager } from "./categories-manager";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -18,8 +20,10 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
   return (
     <div className="w-full min-w-0 p-4 sm:p-6">
       <MobileDetailHeader backHref={Routes.Products} backLabel={t("common.back")} title={t("categories.title")} />
-      <CategoriesManager categories={categoryData.rows} parentOptions={categoryData.roots} total={categoryData.total} />
-      <Pagination page={page} pageCount={categoryData.pageCount} total={categoryData.total} pageSize={pageSize} unitLabel={t("categories.unitLabel")} />
+      <CategoriesManager categories={categoryData.rows} parentOptions={categoryData.roots} total={categoryData.total} loadMore={{ page, pageCount: categoryData.pageCount, loadPage: loadCategoriesPage.bind(null, params) }} />
+      <DesktopPagination>
+        <Pagination page={page} pageCount={categoryData.pageCount} total={categoryData.total} pageSize={pageSize} unitLabel={t("categories.unitLabel")} />
+      </DesktopPagination>
     </div>
   );
 }

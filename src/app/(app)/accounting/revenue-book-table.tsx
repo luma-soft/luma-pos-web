@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { MobileRecordField } from "@/components/mobile-ui";
 import Link from "next/link";
@@ -7,7 +8,13 @@ import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { RevenueBookRow } from "@/lib/data/accounting";
 import { Routes } from "@/lib/routes";
 
-export function RevenueBookTable({ rows, showActivity }: { rows: RevenueBookRow[]; showActivity: boolean }) {
+export function RevenueBookTable({ rows: serverRows, showActivity, loadMore }: {
+  rows: RevenueBookRow[];
+  showActivity: boolean;
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<RevenueBookRow>;
+}) {
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => `${row.sourceType}-${row.id}`);
   const columns: DataTableColumn<RevenueBookRow>[] = [
     { key: "date", label: "Ngày tháng", required: true, width: "150px", render: (row) => formatDate(row.date) },
     {
@@ -33,6 +40,7 @@ export function RevenueBookTable({ rows, showActivity }: { rows: RevenueBookRow[
     { key: "createdByName", label: "Người tạo", defaultVisible: false, width: "160px", render: (row) => row.createdByName || "—" },
   ];
   return (
+    <>
     <DataTableShell
       tableId="accounting.revenue-book"
       rows={rows}
@@ -56,5 +64,7 @@ export function RevenueBookTable({ rows, showActivity }: { rows: RevenueBookRow[
         </div>
       )}
     />
+    {loadMoreFooter}
+    </>
   );
 }

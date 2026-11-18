@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { productDisplayName } from "@/lib/products/variant-presentation";
 import { legacyText } from "@/lib/i18n/catalog-text";
 
@@ -255,8 +256,14 @@ export function ServiceProjectMobileRow({
   );
 }
 
-export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProjectRow[]; customers: { id: string; name: string }[] }) {
+export function ServiceProjectsTable({ rows: serverRows, customers, loadMore }: {
+  rows: ServiceProjectRow[];
+  customers: { id: string; name: string }[];
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<ServiceProjectRow>;
+}) {
   const t = useTranslations();
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
   const visibleRows = rows.filter((row) => !deletedIds.has(row.id));
   useEffect(() => {
@@ -320,6 +327,7 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
   ];
 
   return (
+    <>
     <DataTableShell
       tableId="services.projects"
       rows={visibleRows}
@@ -335,6 +343,8 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
         />
       )}
     />
+    {loadMoreFooter}
+    </>
   );
 }
 

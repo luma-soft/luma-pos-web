@@ -10,6 +10,7 @@ import {
   type InventoryStatusCounts,
 } from "@/lib/data/inventory";
 import { Pagination } from "@/components/pagination";
+import { loadStockPage } from "./load-more-actions";
 import { parsePageSize } from "@/lib/pagination";
 import { getProductFormOptions } from "@/lib/data/products";
 import { TableSkeleton } from "@/components/table-skeleton";
@@ -33,7 +34,7 @@ const STOCK_STATUSES: InventoryStockStatus[] = [
   "inStock",
 ];
 
-function parseStockStatus(value: string | undefined) {
+export function parseStockStatus(value: string | undefined) {
   return STOCK_STATUSES.includes(value as InventoryStockStatus)
     ? (value as InventoryStockStatus)
     : undefined;
@@ -112,7 +113,7 @@ async function StockStatusDetail({
       closeHref={`${Routes.Inventory}?tab=stock`}
       bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
       footer={(
-        <div className="[&>div]:mt-0">
+        <div className="[&>div]:mt-0 max-lg:hidden">
           <Pagination
             page={page}
             pageCount={pageCount}
@@ -146,7 +147,7 @@ async function StockStatusDetail({
               <p className="font-medium">{t("inventory.empty")}</p>
             </div>
           ) : (
-            <StockTable rows={rows} stock={status} />
+            <StockTable rows={rows} stock={status} loadMore={{ page, pageCount, loadPage: loadStockPage.bind(null, searchParams) }} />
           )}
         </section>
       </div>

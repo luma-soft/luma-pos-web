@@ -12,9 +12,12 @@ import { parsePageSize } from "@/lib/pagination";
 import { Routes } from "@/lib/routes";
 import { formatCurrency } from "@/lib/utils";
 import { ReportExportButton } from "../reports/report-export-button";
-import { ReportPeriodFilter, type ReportPeriod } from "../reports/report-period-filter";
+import { ReportPeriodFilter } from "../reports/report-period-filter";
 import { RevenueBookFilters } from "./revenue-book-filters";
 import { RevenueBookTable } from "./revenue-book-table";
+import { revenueBookQuery } from "./revenue-book-query";
+import { loadRevenueBookPage } from "./load-more-actions";
+import { DesktopPagination } from "@/components/mobile-load-more";
 import { CashDetailBook, IncomeExpenseBook, InventoryDetailBook, OtherTaxBook, TaxActivityRevenueBook } from "./accounting-book-tables";
 import { TaxClassificationEditor } from "./tax-classification-editor";
 import { OtherTaxForm } from "./other-tax-form";
@@ -33,7 +36,6 @@ type SearchParams = {
   size?: string;
 };
 
-const PERIODS: readonly ReportPeriod[] = ["today", "7d", "30d", "90d", "this_month", "last_month", "this_year", "custom"];
 
 export default async function AccountingPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const context = await requireStoreRole(["owner", "manager"]);
@@ -44,8 +46,7 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
     ? ["revenue", "income-expense", "inventory", "cash", "other-tax", "classification"]
     : ["revenue", "other-tax", "classification"];
   const activeTab = allowedTabs.includes(params.tab ?? "") ? params.tab! : "revenue";
-  const period = PERIODS.includes(params.period as ReportPeriod) ? params.period as ReportPeriod : "this_month";
-  const dateRange = resolveDateRange(period, params.from, params.to);
+  const { period, dateRange, filters: revenueFilters } = revenueBookQuery(params);
   const periodFilter = <ReportPeriodFilter period={period} from={dateRange.fromValue} to={dateRange.toValue} basePath={Routes.Accounting} />;
 
   if (!book) {
@@ -67,11 +68,7 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
 
   const pageSize = parsePageSize(params.size);
   const data = await getRevenueBook(context.storeId, prefs.tax, {
-    from: dateRange.from,
-    to: dateRange.toExclusive,
-    q: params.q,
-    document: params.document === "sale" || params.document === "return" ? params.document : "all",
-    einvoice: params.einvoice === "issued" || params.einvoice === "none" ? params.einvoice : "all",
+    ...revenueFilters,
     page: Number(params.page) || 1,
     pageSize,
   });
@@ -141,8 +138,8 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
         )}
         {showActivity && <TaxActivityRevenueBook rows={activityRevenue} />}
         <RevenueBookFilters />
-        <RevenueBookTable rows={data.rows} showActivity={showActivity} />
-        <Pagination page={data.page} pageCount={data.pageCount} total={data.total} pageSize={data.pageSize} unitLabel="giao dịch" />
+        <RevenueBookTable rows={data.rows} showActivity={showActivity} loadMore={{ page: data.page, pageCount: data.pageCount, loadPage: loadRevenueBookPage.bind(null, params) }} />
+        <DesktopPagination><Pagination page={data.page} pageCount={data.pageCount} total={data.total} pageSize={data.pageSize} unitLabel="giao dịch" /></DesktopPagination>
         </>}
         {activeTab === "income-expense" && auxiliary && <><BookHeading code="S2c-HKD" title="Sổ chi tiết doanh thu, chi phí" /><IncomeExpenseBook revenue={exportData.rows} purchases={auxiliary.purchases} expenses={auxiliary.expenses} /></>}
         {activeTab === "inventory" && auxiliary && <><BookHeading code="S2d-HKD" title="Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa" /><InventoryDetailBook rows={auxiliary.inventory} /></>}
@@ -157,26 +154,3 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
 function BookHeading({ code, title }: { code: string; title: string }) {
   return <div className="rounded-card border border-border bg-surface p-4 shadow-e1"><div className="font-bold">{title}{code ? ` (${code})` : ""}</div><p className="mt-1 text-sm text-slate-500">Dữ liệu được tổng hợp tự động từ chứng từ đã hoàn tất trong kỳ đã chọn.</p></div>;
 }
-
-function resolveDateRange(period: ReportPeriod, fromParam?: string, toParam?: string) {
-  const today = startOfDay(new Date());
-  const tomorrow = addDays(today, 1);
-  let from = new Date(today.getFullYear(), today.getMonth(), 1);
-  let toExclusive = tomorrow;
-  if (period === "today") from = today;
-  else if (period === "7d") from = addDays(today, -6);
-  else if (period === "30d") from = addDays(today, -29);
-  else if (period === "90d") from = addDays(today, -89);
-  else if (period === "last_month") { from = new Date(today.getFullYear(), today.getMonth() - 1, 1); toExclusive = new Date(today.getFullYear(), today.getMonth(), 1); }
-  else if (period === "this_year") from = new Date(today.getFullYear(), 0, 1);
-  else if (period === "custom") {
-    const customFrom = parseDate(fromParam); const customTo = parseDate(toParam);
-    if (customFrom && customTo && customFrom <= customTo) { from = customFrom; toExclusive = addDays(customTo, 1); }
-  }
-  const toInclusive = addDays(toExclusive, -1);
-  return { from, toExclusive, fromValue: dateInputValue(from), toValue: dateInputValue(toInclusive) };
-}
-function parseDate(value?: string) { if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null; const date = new Date(`${value}T00:00:00`); return Number.isNaN(date.getTime()) ? null : date; }
-function startOfDay(value: Date) { const date = new Date(value); date.setHours(0, 0, 0, 0); return date; }
-function addDays(value: Date, days: number) { const date = new Date(value); date.setDate(date.getDate() + days); return date; }
-function dateInputValue(value: Date) { return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`; }
