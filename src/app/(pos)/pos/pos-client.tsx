@@ -4725,7 +4725,7 @@ function LinePriceEditor({
           <section>
             <span className={label}>{t("mobile.pos.discountPerUnit", { unit: screen.unitName })}</span>
             <fieldset disabled={editor.free} className="m-0 flex min-w-0 items-center gap-2 border-0 p-0 disabled:opacity-50">
-              <div className="flex min-w-0 flex-1 justify-center gap-6 rounded-full bg-ios-accent/[0.075] p-[3px]" role="radiogroup" aria-label={t("pos.priceEditor.discount")}>
+              <div className="grid min-w-0 flex-1 grid-cols-2 rounded-full bg-ios-accent/[0.075] p-[3px]" role="radiogroup" aria-label={t("pos.priceEditor.discount")}>
                 {(["pct", "vnd"] as const).map((mode) => (
                   <button
                     key={mode}
@@ -4734,7 +4734,7 @@ function LinePriceEditor({
                     aria-checked={editor.discountMode === mode}
                     onClick={() => setDiscountMode(mode)}
                     data-button-radius="pill"
-                    className={cn("grid h-11 w-11 place-items-center rounded-full text-[15px] font-semibold", editor.discountMode === mode ? "bg-ios-accent text-white" : "text-ios-label/85")}
+                    className={cn("grid h-11 w-full place-items-center rounded-full text-[15px] font-semibold transition-colors", editor.discountMode === mode ? "bg-ios-accent text-white" : "text-ios-label/85")}
                   >
                     {mode === "pct" ? "%" : "₫"}
                   </button>
