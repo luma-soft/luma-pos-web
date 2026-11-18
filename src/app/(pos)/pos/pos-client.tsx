@@ -24,7 +24,6 @@ import { Input } from "@/components/ui/input";
 import { LumaActionMenu } from "@/components/ui/action-menu";
 import { RowPreviewModal } from "@/components/data-table";
 import { QuantityInput } from "@/components/ui/quantity-input";
-import { TouchTargetToggle } from "@/components/mobile-ui";
 import { PrintDoc, type PrintLine } from "@/components/print/print-doc";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
@@ -531,7 +530,7 @@ function currentTimestamp(): number {
 /** POSProductThumbnail: image, or the accent-tinted cube tile used by the native app. */
 function PosLineThumbnail({ product, size = "row" }: { product: PosProduct; size?: "row" | "large" }) {
   const image = Array.isArray(product.imageUrls) && typeof product.imageUrls[0] === "string" ? product.imageUrls[0].trim() : "";
-  const box = size === "large" ? "size-[76px] rounded-[16px]" : "size-[60px] rounded-[14px]";
+  const box = size === "large" ? "size-[72px] rounded-[16px]" : "size-[60px] rounded-[14px]";
   return image ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={image} alt="" className={cn(box, "shrink-0 bg-surface object-cover")} />
@@ -4619,8 +4618,8 @@ function LinePriceEditor({
         <div className="flex shrink-0 items-center gap-3.5 border-b border-border px-5 pb-4 pt-2">
           {screen.thumbnail}
           <div className="min-w-0 flex-1">
-            <div className="line-clamp-2 text-[19px] font-bold leading-6">{productDisplayName(line.product)}</div>
-            {screen.code && <div className="mt-1 truncate font-mono text-[14px] text-ios-label-secondary">{screen.code}</div>}
+            <div className="line-clamp-2 text-[17px] font-bold leading-[22px]">{productDisplayName(line.product)}</div>
+            {screen.code && <div className="mt-1 truncate font-mono text-[13px] font-semibold text-ios-label-secondary">{screen.code}</div>}
           </div>
         </div>
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-6 pt-5">
@@ -4634,7 +4633,7 @@ function LinePriceEditor({
               max={screen.maxQuantity}
               touchTargets
               className={cn("h-[52px] w-full rounded-[14px] border-ios-stroke/50 [&_button]:text-ios-red", screen.stockInsufficient && "text-ios-red")}
-              inputClassName={cn("text-[22px] font-extrabold", screen.stockInsufficient && "text-ios-red")}
+              inputClassName={cn("![font-family:ui-monospace,SFMono-Regular,Menlo,monospace] !text-[22px] font-extrabold", screen.stockInsufficient && "text-ios-red")}
             />
             {screen.stockSummary && (
               <p className={cn("mt-2 text-[15px]", screen.stockInsufficient ? "font-bold text-ios-red" : "font-semibold text-ios-label/75")}>{screen.stockSummary}</p>
@@ -4696,7 +4695,7 @@ function LinePriceEditor({
               disabled={editor.free}
               aria-invalid={belowPurchasePrice}
               className={cn(
-                "no-spinner h-[52px] w-full rounded-[14px] border-0 bg-surface px-3.5 text-right font-mono text-[29px] font-extrabold",
+                "no-spinner h-[52px] w-full rounded-[14px] border-0 bg-surface px-3.5 text-right ![font-family:ui-monospace,SFMono-Regular,Menlo,monospace] !text-[29px] !font-extrabold",
                 belowPurchasePrice && "text-ios-red",
               )}
             />
@@ -4711,17 +4710,57 @@ function LinePriceEditor({
               <div className="text-[17px] font-semibold">{t("mobile.pos.freeItem")}</div>
               <div className="text-[13px] text-ios-label/70">{t("mobile.pos.freeItemHint")}</div>
             </div>
-            <TouchTargetToggle checked={editor.free} onChange={changeFree} aria-label={t("mobile.pos.freeItem")} />
+            <button
+              type="button"
+              role="switch"
+              aria-checked={editor.free}
+              aria-label={t("mobile.pos.freeItem")}
+              onClick={() => changeFree(!editor.free)}
+              data-button-radius="pill"
+              className={cn("relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors", editor.free ? "bg-ios-accent" : "bg-[rgb(120_120_128/0.16)] dark:bg-[rgb(120_120_128/0.32)]")}
+            >
+              <span className={cn("absolute top-[2px] size-[27px] rounded-full bg-white shadow-[0_3px_8px_rgb(0_0_0/0.15),0_1px_1px_rgb(0_0_0/0.16)] transition-[left]", editor.free ? "left-[22px]" : "left-[2px]")} />
+            </button>
           </section>
           <section>
             <span className={label}>{t("mobile.pos.discountPerUnit", { unit: screen.unitName })}</span>
-            <fieldset disabled={editor.free} className="m-0 min-w-0 border-0 p-0 disabled:opacity-50 [&_input]:h-12 [&_input]:text-[20px] [&_input]:font-bold">
-              <PosAmountModeInput
-                value={discountInput}
-                mode={editor.discountMode}
-                onValueChange={setDiscount}
-                onModeChange={setDiscountMode}
-              />
+            <fieldset disabled={editor.free} className="m-0 flex min-w-0 items-center gap-2 border-0 p-0 disabled:opacity-50">
+              <div className="flex min-w-0 flex-1 justify-center gap-6 rounded-full bg-ios-accent/[0.075] p-[3px]" role="radiogroup" aria-label={t("pos.priceEditor.discount")}>
+                {(["pct", "vnd"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="radio"
+                    aria-checked={editor.discountMode === mode}
+                    onClick={() => setDiscountMode(mode)}
+                    data-button-radius="pill"
+                    className={cn("grid h-11 w-11 place-items-center rounded-full text-[15px] font-semibold", editor.discountMode === mode ? "bg-ios-accent text-white" : "text-ios-label/85")}
+                  >
+                    {mode === "pct" ? "%" : "₫"}
+                  </button>
+                ))}
+              </div>
+              {editor.discountMode === "vnd" ? (
+                <MoneyInput
+                  value={discountInput}
+                  onChange={(value) => setDiscount(value ?? 0)}
+                  aria-label={t("pos.priceEditor.discount")}
+                  className="no-spinner h-12 min-w-0 flex-1 rounded-[12px] border-0 bg-surface px-3 text-right ![font-family:ui-monospace,SFMono-Regular,Menlo,monospace] !text-[20px] !font-bold"
+                />
+              ) : (
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  aria-label={t("pos.priceEditor.discount")}
+                  value={discountInput ? String(discountInput) : ""}
+                  placeholder="0"
+                  onChange={(event) => {
+                    const parsed = Number(event.target.value.replace(",", "."));
+                    if (Number.isFinite(parsed)) setDiscount(Math.min(100, Math.max(0, parsed)));
+                  }}
+                  className="h-12 min-w-0 flex-1 rounded-[12px] border-0 bg-surface px-3 text-right ![font-family:ui-monospace,SFMono-Regular,Menlo,monospace] text-[20px] font-bold outline-none placeholder:text-ios-label/75"
+                />
+              )}
             </fieldset>
           </section>
           <section>
@@ -4730,21 +4769,22 @@ function LinePriceEditor({
               id="pos-line-screen-note"
               rows={3}
               value={screen.note}
+              placeholder={t("mobile.pos.note")}
               onChange={(event) => screen.onNoteChange(event.target.value)}
-              className="block w-full resize-none rounded-[14px] border border-ios-stroke/50 bg-surface px-3.5 py-3 text-[17px] outline-none focus:border-ios-accent"
+              className="block w-full resize-none rounded-[8px] border border-ios-stroke/50 bg-surface px-3.5 py-3 text-[17px] outline-none placeholder:text-ios-label-tertiary focus:border-ios-accent"
             />
           </section>
         </div>
-        <div className="shrink-0 space-y-3 border-t border-border bg-canvas px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
-          <div className="flex h-[58px] items-center justify-between rounded-[14px] border border-ios-accent/25 bg-ios-accent/12 px-4 text-ios-accent">
-            <span className="text-[17px] font-semibold">{t("mobile.pos.lineTotal")}</span>
-            <span className="text-[22px] font-extrabold tabular-nums">{formatCurrency(resolved.sellPrice * screen.quantity)}</span>
+        <div className="shrink-0 space-y-3 border-t border-border bg-canvas px-5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-3">
+          <div className="flex min-h-14 items-center justify-between gap-2.5 rounded-[14px] border border-ios-accent/20 bg-ios-accent/12 px-4 text-ios-accent">
+            <span className="text-[17px] font-bold">{t("mobile.pos.lineTotal")}</span>
+            <span className="text-[20px] font-extrabold tabular-nums">{formatCurrency(resolved.sellPrice * screen.quantity)}</span>
           </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={screen.onRemove}
-              className="flex min-h-[52px] flex-1 items-center gap-2 text-[17px] font-semibold text-ios-red"
+              className="flex min-h-12 flex-1 items-center gap-2 text-[17px] font-semibold text-ios-red"
             >
               <Trash2 className="size-5" aria-hidden="true" />
               {t("mobile.pos.removeLine")}
@@ -4752,7 +4792,7 @@ function LinePriceEditor({
             <button
               type="button"
               onClick={onClose}
-              className="h-[52px] min-w-[44%] rounded-[14px] bg-ios-accent px-6 text-[17px] font-bold text-white"
+              className="h-12 min-w-[126px] rounded-[14px] bg-ios-accent px-6 text-[17px] font-bold text-white"
             >
               {t("common.done")}
             </button>
