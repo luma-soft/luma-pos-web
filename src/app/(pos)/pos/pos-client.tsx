@@ -3011,7 +3011,8 @@ export function PosClient({
           const m2 = l.product.m2PerUnit ? Number(l.product.m2PerUnit) * l.unitMultiplier * l.quantity : 0;
           const eff = effPrice(l);
           const purchaseUnitPrice = purchasePriceForSoldUnit(l.product, data.priceBooks, l.unitMultiplier);
-          const belowPurchasePrice = isSellPriceBelowPurchase(eff.price, purchaseUnitPrice);
+          // Return tickets refund the customer; a below-cost sale warning does not apply.
+          const belowPurchasePrice = !isReturnDraft && isSellPriceBelowPurchase(eff.price, purchaseUnitPrice);
           const stockManaged = isProductStockManaged(l.product.categoryName);
           const ordered = orderedBaseQuantityByProduct.get(l.product.id) ?? 0;
           const stockInsufficient = exceedsAvailableStock(stockManaged, Number(l.product.stock), ordered + Number(l.product.booked), isReturnDraft);
@@ -3250,6 +3251,7 @@ export function PosClient({
                   line={l}
                   invoicePriceBook={priceBook}
                   priceBooks={data.priceBooks}
+                  isReturn={isReturnDraft}
                   onChange={(book, price, disc, free, mode, value) => applyLinePrice(l.key, book, price, disc, free, mode, value)}
                   onClose={() => setEditKey(null)}
                   screen={editScreen ? {
@@ -4496,9 +4498,11 @@ type LineEditorScreenProps = {
 };
 
 function LinePriceEditor({
-  line, invoicePriceBook, priceBooks, onChange, onClose, screen,
+  line, invoicePriceBook, priceBooks, isReturn = false, onChange, onClose, screen,
 }: {
   line: CartLine;
+  /** Return tickets refund the customer, so the below-cost warning is suppressed. */
+  isReturn?: boolean;
   invoicePriceBook: PriceBook;
   priceBooks: PosData["priceBooks"];
   onChange: (priceBook: PriceBook | undefined, unitPrice: number, lineDiscount: number, free: boolean, discountMode: LineDiscountMode, discountValue: number) => void;
@@ -4545,7 +4549,7 @@ function LinePriceEditor({
   }, [onChange]);
   const resolved = resolveLinePriceEditor(editor);
   const purchaseUnitPrice = purchasePriceForSoldUnit(line.product, priceBooks, line.unitMultiplier);
-  const belowPurchasePrice = isSellPriceBelowPurchase(resolved.sellPrice, purchaseUnitPrice);
+  const belowPurchasePrice = !isReturn && isSellPriceBelowPurchase(resolved.sellPrice, purchaseUnitPrice);
   const discountInput = Math.max(0, Number(editor.discount) || 0);
 
   function selectedPriceBook() {
