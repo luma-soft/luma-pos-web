@@ -299,7 +299,7 @@ export function ProductSearchPicker<T>({
           "w-full rounded-xl border border-border bg-surface py-2 pl-10 pr-11 text-base outline-none transition-colors placeholder:text-slate-400 focus:border-primary-600 lg:pr-10 lg:text-sm",
           inputClassName,
           // LumaSearchFilterBar field: 52pt, 15pt radius, grouped background, hairline stroke, no focus ring.
-          fullScreen && "max-lg:h-[52px] max-lg:rounded-[15px] max-lg:border-ios-stroke/50 max-lg:bg-canvas max-lg:pl-[42px] max-lg:pr-11 max-lg:text-[17px] max-lg:placeholder:text-ios-label-secondary max-lg:focus:border-ios-stroke/50",
+          fullScreen && "max-lg:h-[52px] max-lg:rounded-[15px] max-lg:border-ios-stroke/50 max-lg:bg-canvas max-lg:pl-[42px] max-lg:pr-11 max-lg:text-[17px] max-lg:placeholder:text-ios-label-secondary max-lg:focus:!border-ios-stroke/50",
         )}
       />
       {open && (!fullScreen || query) && (
