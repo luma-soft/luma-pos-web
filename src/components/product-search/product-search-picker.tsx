@@ -21,6 +21,44 @@ import {
   shouldSelectProductSearchItem,
 } from "./product-search-state";
 
+type ViewportFrame = { top: number; height: number; keyboardOpen: boolean };
+
+/**
+ * iOS Safari keeps fixed overlays sized to the layout viewport, so the software
+ * keyboard covers their bottom. While the phone full-screen search is open, pin
+ * it to the visual viewport so the footer sits on the keyboard (safeAreaInset).
+ */
+function useVisualViewportFrame(active: boolean): ViewportFrame | null {
+  const [frame, setFrame] = useState<ViewportFrame | null>(null);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!active || viewport == null) return;
+    const phone = window.matchMedia("(max-width: 1023px)");
+    const update = () => {
+      if (!phone.matches) {
+        setFrame(null);
+        return;
+      }
+      const covered = window.innerHeight - viewport.height - viewport.offsetTop;
+      setFrame({
+        top: Math.round(viewport.offsetTop),
+        height: Math.round(viewport.height),
+        // Ignore browser chrome shifts; only a substantial loss is the keyboard.
+        keyboardOpen: covered >= 100,
+      });
+    };
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+      setFrame(null);
+    };
+  }, [active]);
+  return active ? frame : null;
+}
+
 export type ProductSearchPickerStatus = "ready" | "loading" | "unavailable";
 
 export type ProductSearchPickerProps<T> = {
@@ -99,6 +137,7 @@ export function ProductSearchPicker<T>({
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
   const fullScreen = Boolean(mobileFullScreen) && open;
+  const viewportFrame = useVisualViewportFrame(fullScreen);
   const [items, setItems] = useState<readonly T[]>(browseItems);
   const [searching, setSearching] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -242,8 +281,10 @@ export function ProductSearchPicker<T>({
         className,
         fullScreen && "max-lg:fixed max-lg:inset-0 max-lg:z-[80] max-lg:flex max-lg:flex-col max-lg:bg-canvas max-lg:pt-[env(safe-area-inset-top)]",
       )}
+      style={viewportFrame ? { top: viewportFrame.top, bottom: "auto", height: viewportFrame.height } : undefined}
       data-testid={testId}
       data-fullscreen={fullScreen || undefined}
+      data-keyboard-open={viewportFrame?.keyboardOpen || undefined}
     >
       {fullScreen && mobileFullScreen && (
         // LumaProductSelectionHeader: 52pt back button, 17pt heavy title, 12pt subtitle.
@@ -394,7 +435,7 @@ export function ProductSearchPicker<T>({
         </div>
       )}
       {fullScreen && mobileFullScreen && mobileFullScreen.selectedCount > 0 && (
-        <div className="border-t border-border bg-surface px-ios-inset pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 lg:hidden">
+        <div className={cn("border-t border-border bg-surface px-ios-inset pt-3 lg:hidden", viewportFrame?.keyboardOpen ? "pb-3" : "pb-[max(0.75rem,env(safe-area-inset-bottom))]")}>
           <button
             type="button"
             onClick={() => close()}
