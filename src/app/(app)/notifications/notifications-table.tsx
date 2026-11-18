@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
@@ -199,7 +200,12 @@ function ActivityChanges({ row }: { row: AuditRow }) {
   </>;
 }
 
-export function NotificationsTable({ rows }: { rows: AuditRow[] }) {
+export function NotificationsTable({ rows: serverRows, loadMore }: {
+  rows: AuditRow[];
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<AuditRow>;
+}) {
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => String(row.id));
   const t = useTranslations();
   const columns: DataTableColumn<AuditRow>[] = [
     { key: "notification", label: t("notifications.inbox.tabs.activity"), required: true, render: (row) => <ActivityCell row={row} t={t} /> },
@@ -209,6 +215,7 @@ export function NotificationsTable({ rows }: { rows: AuditRow[] }) {
     { key: "time", label: t("notifications.columns.time"), defaultVisible: true, width: "160px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
   ];
   return (
+    <>
     <DataTableShell
       tableId="notifications.audit"
       rows={rows}
@@ -222,6 +229,8 @@ export function NotificationsTable({ rows }: { rows: AuditRow[] }) {
       detailSubtitle={() => t("notifications.activity.detailSubtitle")}
       detailSize="lg"
     />
+    {loadMoreFooter}
+    </>
   );
 }
 

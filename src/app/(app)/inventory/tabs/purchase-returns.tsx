@@ -7,6 +7,8 @@ import { Routes } from "@/lib/routes";
 import { getPurchaseReturnFormOptions, getPurchaseReturns } from "@/lib/data/purchase-returns";
 import { parsePageSize } from "@/lib/pagination";
 import { Pagination } from "@/components/pagination";
+import { DesktopPagination } from "@/components/mobile-load-more";
+import { loadPurchaseReturnsPage } from "./load-more-actions";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { PurchaseReturnsTable } from "./purchase-returns-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
@@ -26,13 +28,18 @@ export async function PurchaseReturnsTab({ searchParams }: { searchParams: SP })
   );
 }
 
+/** List filters shared by the server page and the phone load-more action. */
+export function purchaseReturnsListFilters(searchParams: SP) {
+  return { q: searchParams.q, status: searchParams.status, settlement: searchParams.settlement, supplierId: searchParams.supplierId, from: searchParams.from, to: searchParams.to };
+}
+
 async function PurchaseReturnsContent({ searchParams }: { searchParams: SP }) {
   const context = await requireStoreContext();
   const t = await getTranslations();
   const page = Number(searchParams.page) || 1;
   const pageSize = parsePageSize(searchParams.size);
   const [{ rows, total, pageCount }, options] = await Promise.all([
-    getPurchaseReturns(context.storeId, { q: searchParams.q, status: searchParams.status, settlement: searchParams.settlement, supplierId: searchParams.supplierId, from: searchParams.from, to: searchParams.to, page, pageSize }),
+    getPurchaseReturns(context.storeId, { ...purchaseReturnsListFilters(searchParams), page, pageSize }),
     getPurchaseReturnFormOptions(context.storeId),
   ]);
 
@@ -58,9 +65,11 @@ async function PurchaseReturnsContent({ searchParams }: { searchParams: SP }) {
           <p className="text-sm mt-1">{t("purchaseReturns.emptyHint")}</p>
         </div>
       ) : (
-        <PurchaseReturnsTable rows={rows} capabilities={inventoryDocumentCapabilities("purchase-returns", context.role)} />
+        <PurchaseReturnsTable rows={rows} capabilities={inventoryDocumentCapabilities("purchase-returns", context.role)} loadMore={{ page, pageCount, loadPage: loadPurchaseReturnsPage.bind(null, searchParams) }} />
       )}
-      <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("purchaseReturns.unitLabel")} />
+      <DesktopPagination>
+        <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("purchaseReturns.unitLabel")} />
+      </DesktopPagination>
     </>
   );
 }

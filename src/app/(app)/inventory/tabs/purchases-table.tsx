@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
@@ -8,7 +9,10 @@ import type { PrintTemplate } from "@/lib/print/template-shared";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { PurchaseDetailModal, PurchaseStatusBadge, purchaseOwed, type PurchaseRow } from "./purchase-detail-modal";
 
-export function PurchasesTable({ rows, printTemplates, detailPurchase = null }: { rows: PurchaseRow[]; detailPurchase?: PurchaseRow | null; printTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[] }) {
+export function PurchasesTable({ rows: serverRows, loadMore, printTemplates, detailPurchase = null }: { rows: PurchaseRow[];
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<PurchaseRow>; detailPurchase?: PurchaseRow | null; printTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[] }) {
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
   const searchParams = useSearchParams();
   const selectedPurchaseId = searchParams.get("detailPurchaseId");
@@ -81,6 +85,7 @@ export function PurchasesTable({ rows, printTemplates, detailPurchase = null }: 
           );
         }}
       />
+      {loadMoreFooter}
 
       <PurchaseDetailModal
         purchase={selectedPurchase}

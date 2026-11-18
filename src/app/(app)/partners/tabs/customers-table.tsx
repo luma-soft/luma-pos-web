@@ -1,5 +1,6 @@
 "use client";
 
+import { DesktopPagination, useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { MoneyInput } from "@/components/ui/money-input";
 import { DateInput } from "@/components/ui/date-input";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
@@ -79,7 +80,10 @@ export function CustomersTable({
   returnPrintTemplates,
   aiPreview = false,
   initialDetailCustomer = null,
+  loadMore,
 }: {
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<CustomerRow>;
   data: CustomerListResult;
   filters: CustomerFilters;
   returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
@@ -99,15 +103,18 @@ export function CustomersTable({
           aiPreview={aiPreview}
           initialDetailCustomer={initialDetailCustomer}
           onOpenFilters={() => setFilterOpen(true)}
+          loadMore={loadMore}
         />
 
-        <Pagination
-          page={data.page}
-          pageCount={data.pageCount}
-          total={data.total}
-          pageSize={data.pageSize}
-          unitLabel={t("customers.unitLabel")}
-        />
+        <DesktopPagination>
+          <Pagination
+            page={data.page}
+            pageCount={data.pageCount}
+            total={data.total}
+            pageSize={data.pageSize}
+            unitLabel={t("customers.unitLabel")}
+          />
+        </DesktopPagination>
       </section>
 
       {filterOpen && (
@@ -187,7 +194,9 @@ function CustomerRows({
   aiPreview,
   onOpenFilters,
   initialDetailCustomer,
+  loadMore,
 }: {
+  loadMore?: LoadMoreSource<CustomerRow>;
   data: CustomerListResult;
   filters: CustomerFilters;
   returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
@@ -199,13 +208,14 @@ function CustomerRows({
   const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { rows: loadedRows, footer: loadMoreFooter } = useMobileLoadMore(data.rows, loadMore, (row) => row.id);
   const [createOpen, setCreateOpen] = useState(aiPreview);
   const [walkInSelected, setWalkInSelected] = useState(false);
   const selectedCustomerId = searchParams.get("detailCustomerId")
     ?? (walkInSelected ? WALK_IN_ROW_ID : null);
   const [detailTab, setDetailTab] = useState<CustomerExpandTab>("info");
   const selectedCustomer =
-    data.rows.find((customer) => customer.id === selectedCustomerId) ??
+    loadedRows.find((customer) => customer.id === selectedCustomerId) ??
     (initialDetailCustomer?.id === selectedCustomerId
       ? initialDetailCustomer
       : null);
@@ -221,7 +231,7 @@ function CustomerRows({
         totalSpent: String(data.walkInSummary.netSales),
       } as unknown as CustomerRow)
     : null;
-  const tableRows = walkInRow ? [walkInRow, ...data.rows] : data.rows;
+  const tableRows = walkInRow ? [walkInRow, ...loadedRows] : loadedRows;
   function closeCustomer() {
     setWalkInSelected(false);
     updateModalUrlQuery({ detailCustomerId: null });
@@ -436,6 +446,7 @@ function CustomerRows({
           </article>
         )}
       />
+      {loadMoreFooter}
       <CustomerCreateDialog
         open={createOpen}
         aiPreview={aiPreview}

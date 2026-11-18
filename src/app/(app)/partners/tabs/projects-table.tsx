@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
@@ -55,7 +56,10 @@ export function ProjectMobileRow({
   );
 }
 
-export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; customers: { id: string; name: string }[] }) {
+export function ProjectsTable({ rows: serverRows, loadMore, customers }: { rows: ProjectRow[];
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<ProjectRow>; customers: { id: string; name: string }[] }) {
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
   const columns: DataTableColumn<ProjectRow>[] = [
     { key: "name", label: t("projects.cols.name"), required: true, wrap: true, render: (row) => <span className="whitespace-normal break-words font-semibold text-primary-600">{row.name}</span> },
@@ -88,6 +92,7 @@ export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; custome
   ];
 
   return (
+    <>
     <DataTableShell
       tableId="partners.projects"
       rows={rows}
@@ -125,6 +130,8 @@ export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; custome
         </div>
       )}
     />
+    {loadMoreFooter}
+    </>
   );
 }
 

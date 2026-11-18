@@ -17,6 +17,12 @@ mock.module("next-intl/server", () => ({ getTranslations: async () => (key) => k
 mock.module("./customers-table", () => ({ CustomersTable: () => null }));
 mock.module("./suppliers-table", () => ({ SuppliersTable: () => null }));
 mock.module("@/components/pagination", () => ({ Pagination: () => null }));
+mock.module("@/components/mobile-load-more", () => ({ DesktopPagination: ({ children }) => children }));
+mock.module("./load-more-actions", () => ({
+  loadCustomersPage: async () => [],
+  loadSuppliersPage: async () => [],
+  loadProjectsPage: async () => [],
+}));
 
 const { CustomersTab } = await import("./customers.tsx");
 const { SuppliersTab } = await import("./suppliers.tsx");

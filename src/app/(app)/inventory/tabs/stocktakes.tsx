@@ -10,14 +10,20 @@ import { InstantFilterForm } from "@/components/instant-filter-form";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { parsePageSize } from "@/lib/pagination";
 import { Pagination } from "@/components/pagination";
+import { DesktopPagination } from "@/components/mobile-load-more";
+import { loadStocktakesPage } from "./load-more-actions";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 import { stocktakeListSummaryFields } from "@/lib/stocktakes/list-summary-fields";
 
 type SP = Record<string, string | undefined>;
 
-export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
-  const context = await requireStoreContext();
-  const t = await getTranslations();
+/** Stocktake list query shared by the server page and the phone load-more action. */
+export async function getStocktakeListPage(
+  context: { storeId: string; role: Parameters<typeof canViewPurchasePrices>[0] },
+  searchParams: SP,
+  requestedPage: number,
+  pageSize: number,
+) {
   const q = searchParams.stocktakeQ?.trim();
   const searchCondition = q
     ? or(
@@ -33,8 +39,6 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
     searchCondition,
   );
   const canViewValues = canViewPurchasePrices(context.role);
-  const pageSize = parsePageSize(searchParams.size);
-  const requestedPage = Math.max(1, Math.floor(Number(searchParams.page) || 1));
 
   const [countResult] = await db
     .select({ total: count() })
@@ -61,6 +65,15 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
     .orderBy(desc(stocktakes.createdAt))
     .limit(pageSize)
     .offset((page - 1) * pageSize);
+  return { rows, total, page, pageCount, canViewValues };
+}
+
+export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
+  const t = await getTranslations();
+  const pageSize = parsePageSize(searchParams.size);
+  const requestedPage = Math.max(1, Math.floor(Number(searchParams.page) || 1));
+  const { rows, total, page, pageCount, canViewValues } = await getStocktakeListPage(context, searchParams, requestedPage, pageSize);
 
   return (
     <section className="space-y-4" aria-labelledby="stocktake-list-heading">
@@ -100,15 +113,18 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
           fillHeight={false}
           canCancelBalanced={canViewValues}
           canViewValues={canViewValues}
+          loadMore={{ page, pageCount, loadPage: loadStocktakesPage.bind(null, searchParams) }}
         />
       )}
-      <Pagination
-        page={page}
-        pageCount={pageCount}
-        total={total}
-        pageSize={pageSize}
-        unitLabel={t("stocktakes.unitLabel")}
-      />
+      <DesktopPagination>
+        <Pagination
+          page={page}
+          pageCount={pageCount}
+          total={total}
+          pageSize={pageSize}
+          unitLabel={t("stocktakes.unitLabel")}
+        />
+      </DesktopPagination>
       <p className="text-xs text-slate-400">{t("stocktakes.balanceHint")}</p>
     </section>
   );

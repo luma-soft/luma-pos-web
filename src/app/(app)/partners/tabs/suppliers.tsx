@@ -1,6 +1,8 @@
 import { getTranslations } from "next-intl/server";
 import { getSupplier, getSuppliers } from "@/lib/data/partners";
 import { Pagination } from "@/components/pagination";
+import { DesktopPagination } from "@/components/mobile-load-more";
+import { loadSuppliersPage } from "./load-more-actions";
 import { parsePageSize } from "@/lib/pagination";
 import { SuppliersTable } from "./suppliers-table";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -9,6 +11,12 @@ import { z } from "zod";
 type SP = Record<string, string | undefined>;
 const OWING = ["", "owing", "clear"] as const;
 type Owing = (typeof OWING)[number];
+
+/** List filters shared by the server page and the phone load-more action. */
+export function suppliersListFilters(params: SP) {
+  const owing: Owing = OWING.includes(params.owing as Owing) ? (params.owing as Owing) : "";
+  return { q: params.q, owing: owing === "" ? undefined : owing };
+}
 
 export async function SuppliersTab({ searchParams }: { searchParams: SP }) {
   const context = await requireStoreContext();
@@ -35,9 +43,12 @@ export async function SuppliersTab({ searchParams }: { searchParams: SP }) {
         pageSize={pageSize}
         initialDetailId={detailSupplierId}
         initialDetailSupplier={detailSupplier}
+        loadMore={{ page, pageCount, loadPage: loadSuppliersPage.bind(null, params) }}
       />
 
-      <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("suppliers.unitLabel")} />
+      <DesktopPagination>
+        <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("suppliers.unitLabel")} />
+      </DesktopPagination>
     </>
   );
 }

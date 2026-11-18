@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { OrderDetailLink } from "@/components/order-detail-link";
@@ -22,7 +23,12 @@ const CAT_STYLES: Record<string, string> = {
   other: "bg-surface-2 text-slate-600",
 };
 
-export function CashbookTable({ rows }: { rows: CashbookRow[] }) {
+export function CashbookTable({ rows: serverRows, loadMore }: {
+  rows: CashbookRow[];
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<CashbookRow>;
+}) {
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
   const router = useRouter();
   const columns: DataTableColumn<CashbookRow>[] = [
@@ -41,6 +47,7 @@ export function CashbookTable({ rows }: { rows: CashbookRow[] }) {
     },
   ];
   return (
+    <>
     <DataTableShell
       tableId="finance.cashbook"
       rows={rows}
@@ -119,6 +126,8 @@ export function CashbookTable({ rows }: { rows: CashbookRow[] }) {
         </div>
       )}
     />
+    {loadMoreFooter}
+    </>
   );
 }
 

@@ -5,6 +5,8 @@ import { Plus, Truck } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { getPurchase, getPurchaseFormOptions, getPurchases } from "@/lib/data/inventory";
 import { Pagination } from "@/components/pagination";
+import { DesktopPagination } from "@/components/mobile-load-more";
+import { loadPurchasesPage } from "./load-more-actions";
 import { parsePageSize } from "@/lib/pagination";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { TableSkeleton } from "@/components/table-skeleton";
@@ -27,15 +29,20 @@ export async function PurchasesTab({ searchParams }: { searchParams: SP }) {
   );
 }
 
+/** List filters shared by the server page and the phone load-more action. */
+export function purchasesListFilters(params: SP) {
+  const status = PSTATUS.includes(params.status as typeof PSTATUS[number]) ? (params.status ?? "") : "";
+  return { q: params.q, status: status || undefined, supplierId: params.supplierId, from: params.from, to: params.to, debtOnly: params.debtOnly === "1" };
+}
+
 async function PurchasesContent({ searchParams }: { searchParams: SP }) {
   const context = await requireStoreContext();
   const t = await getTranslations();
   const params = searchParams;
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
-  const status = PSTATUS.includes(params.status as typeof PSTATUS[number]) ? (params.status ?? "") : "";
   const [{ rows, total, pageCount }, printTemplates, options] = await Promise.all([
-    getPurchases(context.storeId, { q: params.q, status: status || undefined, supplierId: params.supplierId, from: params.from, to: params.to, debtOnly: params.debtOnly === "1", page, pageSize }),
+    getPurchases(context.storeId, { ...purchasesListFilters(params), page, pageSize }),
     getPrintTemplatesForDoc(context.storeId, "purchase"),
     getPurchaseFormOptions(context.storeId),
   ]);
@@ -66,11 +73,13 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
         </div>
       ) : (
         <>
-          <PurchasesTable rows={rows} printTemplates={printTemplates} detailPurchase={detailPurchase} />
+          <PurchasesTable rows={rows} printTemplates={printTemplates} detailPurchase={detailPurchase} loadMore={{ page, pageCount, loadPage: loadPurchasesPage.bind(null, params) }} />
         </>
       )}
 
-      <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("purchases.unitLabel")} />
+      <DesktopPagination>
+        <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("purchases.unitLabel")} />
+      </DesktopPagination>
     </>
   );
 }

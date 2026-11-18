@@ -4,6 +4,8 @@ import { Building2 } from "lucide-react";
 import { db } from "@/db";
 import { customers } from "@/db/schema";
 import { Pagination } from "@/components/pagination";
+import { DesktopPagination } from "@/components/mobile-load-more";
+import { loadProjectsPage } from "./load-more-actions";
 import { parsePageSize } from "@/lib/pagination";
 import { getProjectPage } from "@/lib/data/projects";
 import { ProjectQuickCreate } from "../../projects/project-widgets";
@@ -35,9 +37,11 @@ export async function ProjectsTab({ searchParams }: { searchParams: SP }) {
           <p className="text-sm mt-1">{t("projects.emptyHint")}</p>
         </div>
       ) : (
-        <ProjectsTable rows={rows} customers={customerOptions} />
+        <ProjectsTable rows={rows} customers={customerOptions} loadMore={{ page, pageCount, loadPage: loadProjectsPage.bind(null, searchParams) }} />
       )}
-      <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("projects.unitLabel")} />
+      <DesktopPagination>
+        <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("projects.unitLabel")} />
+      </DesktopPagination>
     </>
   );
 }

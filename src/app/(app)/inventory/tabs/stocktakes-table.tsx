@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronRight } from "lucide-react";
@@ -80,16 +81,20 @@ export function StocktakeMobileRow({
 }
 
 export function StocktakesTable({
-  rows,
+  rows: serverRows,
+  loadMore,
   fillHeight = true,
   canCancelBalanced = false,
   canViewValues = false,
 }: {
   rows: StocktakeRow[];
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<StocktakeRow>;
   fillHeight?: boolean;
   canCancelBalanced?: boolean;
   canViewValues?: boolean;
 }) {
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
   const columns: DataTableColumn<StocktakeRow>[] = [
     { key: "code", label: t("stocktakes.cols.code"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
@@ -103,6 +108,7 @@ export function StocktakesTable({
     { key: "actions", label: "", required: true, width: "90px", align: "right", render: (row) => <span onClick={stopRowToggle}><StocktakeRowActions id={row.id} status={row.status} /></span> },
   ];
   return (
+    <>
     <DataTableShell
       tableId="inventory.stocktakes"
       rows={rows}
@@ -131,6 +137,8 @@ export function StocktakesTable({
       detailSubtitle={(row) => `${formatDate(row.createdAt)} · ${t(`stocktakes.status.${row.status}` as never)}`}
       detailPanelClassName="h-[min(88dvh,780px)] w-[min(96vw,1200px)] sm:max-w-none"
     />
+    {loadMoreFooter}
+    </>
   );
 }
 

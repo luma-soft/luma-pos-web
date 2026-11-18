@@ -1,5 +1,6 @@
 "use client";
 
+import { DesktopPagination } from "@/components/mobile-load-more";
 import {
   useCallback,
   useEffect,
@@ -46,6 +47,14 @@ type ActivityPage = {
   pageCount: number;
   pageSize: number;
 };
+
+/** One activity page for the phone auto load-more (same endpoint as pagination). */
+async function fetchActivityRows(page: number, pageSize: number): Promise<AuditRow[]> {
+  const response = await fetch(`/api/notifications/activity?page=${page}&size=${pageSize}`, { cache: "no-store" });
+  const payload = (await response.json()) as { ok?: boolean; data?: ActivityPage };
+  if (!response.ok || !payload.ok || !payload.data || !Array.isArray(payload.data.rows)) throw new Error("activity_failed");
+  return payload.data.rows;
+}
 
 export function NotificationsClient({
   activities: initialActivities,
@@ -385,7 +394,15 @@ export function NotificationsClient({
             />
           ) : (
             <>
-              <NotificationsTable rows={activities.rows} />
+              <NotificationsTable
+                rows={activities.rows}
+                loadMore={{
+                  page: activities.page,
+                  pageCount: activities.pageCount,
+                  loadPage: (page) => fetchActivityRows(page, activities.pageSize),
+                }}
+              />
+              <DesktopPagination>
               <Pagination
                 page={activities.page}
                 pageCount={activities.pageCount}
@@ -399,6 +416,7 @@ export function NotificationsClient({
                   void loadActivityPage(1, pageSize)
                 }
               />
+              </DesktopPagination>
             </>
           )
         ) : loading ? (

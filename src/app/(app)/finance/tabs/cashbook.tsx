@@ -4,6 +4,8 @@ import { Routes } from "@/lib/routes";
 import { cn, formatCurrency } from "@/lib/utils";
 import { getCashbook } from "@/lib/data/cashbook";
 import { Pagination } from "@/components/pagination";
+import { DesktopPagination } from "@/components/mobile-load-more";
+import { loadCashbookPage } from "./load-more-actions";
 import { parsePageSize } from "@/lib/pagination";
 import { CashTxForm } from "../../cashbook/cash-tx-form";
 import { CashbookTable } from "./cashbook-table";
@@ -58,10 +60,12 @@ export async function CashbookTab({ searchParams }: { searchParams: SP }) {
       {data.rows.length === 0 ? (
         <div className="bg-surface border border-border rounded-card"><p className="p-10 text-center text-slate-400 text-sm">{t("cashbook.empty")}</p></div>
       ) : (
-        <CashbookTable rows={data.rows} />
+        <CashbookTable rows={data.rows} loadMore={{ page, pageCount: data.pageCount, loadPage: loadCashbookPage.bind(null, params) }} />
       )}
 
-      <Pagination page={page} pageCount={data.pageCount} total={data.total} pageSize={pageSize} unitLabel={t("cashbook.unitLabel")} />
+      <DesktopPagination>
+        <Pagination page={page} pageCount={data.pageCount} total={data.total} pageSize={pageSize} unitLabel={t("cashbook.unitLabel")} />
+      </DesktopPagination>
     </>
   );
 }

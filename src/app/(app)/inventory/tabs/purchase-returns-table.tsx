@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { productLineDisplayName } from "@/lib/products/variant-presentation";
 
 import Link from "next/link";
@@ -46,7 +47,10 @@ function purchaseReturnLinePricing(item: PurchaseReturnRow["items"][number]) {
   };
 }
 
-export function PurchaseReturnsTable({ rows, capabilities }: { rows: PurchaseReturnRow[]; capabilities?: { canEdit: boolean; canDelete: boolean } }) {
+export function PurchaseReturnsTable({ rows: serverRows, loadMore, capabilities }: { rows: PurchaseReturnRow[];
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<PurchaseReturnRow>; capabilities?: { canEdit: boolean; canDelete: boolean } }) {
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
   const columns: DataTableColumn<PurchaseReturnRow>[] = [
     { key: "code", label: t("purchaseReturns.cols.code"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
@@ -60,6 +64,7 @@ export function PurchaseReturnsTable({ rows, capabilities }: { rows: PurchaseRet
   ];
 
   return (
+    <>
     <DataTableShell
       tableId="inventory.purchaseReturns"
       rows={rows}
@@ -113,6 +118,8 @@ export function PurchaseReturnsTable({ rows, capabilities }: { rows: PurchaseRet
         </div>
       )}
     />
+    {loadMoreFooter}
+    </>
   );
 }
 

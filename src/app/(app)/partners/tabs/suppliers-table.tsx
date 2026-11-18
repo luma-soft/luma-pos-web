@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
@@ -125,7 +126,8 @@ async function loadSupplierPreview(id: string, signal: AbortSignal): Promise<Sup
 }
 
 export function SuppliersTable({
-  rows,
+  rows: serverRows,
+  loadMore,
   totalDebt,
   totalPurchase,
   query,
@@ -134,6 +136,8 @@ export function SuppliersTable({
   initialDetailSupplier = null,
 }: {
   rows: SupplierRow[];
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<SupplierRow>;
   totalDebt: number;
   totalPurchase: number;
   query: string;
@@ -142,6 +146,7 @@ export function SuppliersTable({
   initialDetailId?: string | null;
   initialDetailSupplier?: SupplierSelectionRow | null;
 }) {
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -362,6 +367,7 @@ export function SuppliersTable({
           );
         }}
       />
+      {loadMoreFooter}
 
       {filterOpen && (
         <div
