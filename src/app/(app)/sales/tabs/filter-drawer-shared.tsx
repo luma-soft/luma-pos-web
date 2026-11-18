@@ -13,7 +13,6 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
   Loader2,
@@ -23,6 +22,7 @@ import { FloatingMenuPortal } from "@/components/ui/floating-menu-portal";
 import { selectAllInputOnClick } from "@/lib/input-selection";
 import { isOrderDateRangeValid } from "@/lib/orders/filter-date-range";
 import { cn } from "@/lib/utils";
+import { MobileEntityPickerScreen, usePhoneLayout } from "./filter-mobile-screens";
 
 export type PickerOption = { value: string; label: string };
 
@@ -46,6 +46,7 @@ export type EntityPickerOption = {
   value: string;
   label: string;
   hint?: string;
+  imageUrl?: string;
 };
 
 const focusableSelectors =
@@ -88,7 +89,8 @@ export function parseEntityOptions(payload: unknown): EntityPickerOption[] {
         : "";
     if (!value || !label) return [];
     const hint = deriveHint(row);
-    return [{ value, label, ...(hint ? { hint } : {}) }];
+    const imageUrl = isString(row.imageUrl) ? row.imageUrl.trim() : "";
+    return [{ value, label, ...(hint ? { hint } : {}), ...(imageUrl ? { imageUrl } : {}) }];
   });
 }
 
@@ -313,10 +315,7 @@ export function LumaDateRangePicker({
   to,
   onChange,
   error,
-  rowLabel,
 }: {
-  /** Phones: render as an inline iOS row with this label on the left. */
-  rowLabel?: string;
   fromName: string;
   toName: string;
   from: string;
@@ -344,10 +343,7 @@ export function LumaDateRangePicker({
       <button
         ref={triggerRef}
         type="button"
-        className={cn(
-          "flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-surface px-3 text-left text-sm outline-none transition hover:border-primary-300 focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-100",
-          rowLabel && mobileRowBase,
-        )}
+        className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-surface px-3 text-left text-sm outline-none transition hover:border-primary-300 focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-100"
         aria-label="Chọn khoảng thời gian"
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -359,15 +355,13 @@ export function LumaDateRangePicker({
           }
         }}
       >
-        <CalendarDays className={cn("size-4 text-slate-500", rowLabel && "max-lg:hidden")} />
-        {rowLabel && <span className="min-w-0 flex-1 truncate text-ios-label lg:hidden">{rowLabel}</span>}
-        <span className={cn("min-w-0 flex-1 font-semibold", rowLabel && "max-lg:flex-none max-lg:font-normal max-lg:text-ios-label-secondary max-lg:tabular-nums")}>
+        <CalendarDays className="size-4 text-slate-500" />
+        <span className="min-w-0 flex-1 font-semibold">
           {from || "Từ ngày"} → {to || "Đến ngày"}
         </span>
-        <ChevronDown className={cn("size-4 text-slate-400", open && "rotate-180", rowLabel && "max-lg:hidden")} />
-        {rowLabel && <ChevronRight className="-ml-1.5 size-4 shrink-0 text-ios-label-tertiary lg:hidden" strokeWidth={2.4} aria-hidden="true" />}
+        <ChevronDown className={cn("size-4 text-slate-400", open && "rotate-180")} />
       </button>
-      {error && <p className={cn("mt-2 text-xs font-semibold text-red-600", rowLabel && "max-lg:mt-0 max-lg:px-4 max-lg:pb-2.5 max-lg:text-[13px] max-lg:font-normal")}>{error}</p>}
+      {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
 
       <FloatingMenuPortal
           open={open}
@@ -503,16 +497,19 @@ export function LumaEntityPicker({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
+  // Phones push NativeInvoiceFilterPickerView-style screen instead of a popover.
+  const phone = usePhoneLayout();
+  const pushesScreen = mobileIcon != null && phone;
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || pushesScreen) return;
     const restoreFocus = window.setTimeout(() => {
       searchRef.current?.focus();
     }, 0);
     return () => {
       clearTimeout(restoreFocus);
     };
-  }, [open]);
+  }, [open, pushesScreen]);
 
   useEffect(() => {
     if (!open) return;
@@ -617,36 +614,37 @@ export function LumaEntityPicker({
         <ChevronRight className={cn("size-4 shrink-0 text-slate-400", mobileIcon != null && "max-lg:text-ios-label-tertiary")} strokeWidth={mobileIcon != null ? 2.4 : 2} />
       </button>
 
+      {pushesScreen && open && (
+        <MobileEntityPickerScreen
+          kind={kind}
+          title={label}
+          searchPrompt={placeholder}
+          query={query}
+          onQueryChange={setQuery}
+          options={options}
+          loading={loading}
+          error={error}
+          value={value}
+          labelValue={labelValue}
+          onPick={(option) => onChange({ value: option.value, label: option.label })}
+          onClear={() => onChange({ value: "", label: "" })}
+          onClose={() => {
+            setOpen(false);
+            setQuery("");
+          }}
+        />
+      )}
       <FloatingMenuPortal
-        open={open}
+        open={open && !pushesScreen}
         anchorRef={triggerRef}
         onDismiss={() => setOpen(false)}
         data-luma-picker-surface={name}
         side="bottom"
         matchAnchorWidth
         maxMenuHeight={360}
-        className={cn(
-          "flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl",
-          // NativeInvoiceFilterPickerView is a pushed full-screen list on phones.
-          mobileIcon != null && "max-lg:!inset-0 max-lg:!h-auto max-lg:!max-h-none max-lg:!w-auto max-lg:rounded-none max-lg:border-0 max-lg:bg-canvas max-lg:pt-[env(safe-area-inset-top)] max-lg:pb-[env(safe-area-inset-bottom)] max-lg:shadow-none",
-        )}
+        className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
       >
-          {mobileIcon != null && (
-            <div className="flex items-center gap-3 px-ios-inset pb-1 pt-2 lg:hidden">
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Quay lại"
-                data-button-radius="pill"
-                className="grid size-11 shrink-0 place-items-center rounded-full border border-black/[0.06] bg-surface text-ios-label shadow-[0_2px_10px_rgb(0_0_0/0.08)] dark:border-white/10"
-              >
-                <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden="true" />
-              </button>
-              <span className="min-w-0 flex-1 truncate text-center text-[17px] font-semibold">{label}</span>
-              <span className="size-11 shrink-0" aria-hidden="true" />
-            </div>
-          )}
-          <div className={cn("relative border-b border-border p-3", mobileIcon != null && "max-lg:border-0 max-lg:px-ios-inset max-lg:py-ios-search")}>
+          <div className="relative border-b border-border p-3">
             <Search className="absolute left-6 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               ref={searchRef}
@@ -675,13 +673,10 @@ export function LumaEntityPicker({
               }}
               placeholder={placeholder}
               aria-label={`Tìm ${label.toLocaleLowerCase("vi")}`}
-              className={cn(
-                "h-11 min-h-11 w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 lg:h-10 lg:min-h-0",
-                mobileIcon != null && "max-lg:h-10 max-lg:min-h-10 max-lg:rounded-[10px] max-lg:border-0 max-lg:bg-[rgb(118_118_128/0.12)] max-lg:text-[17px] max-lg:focus:ring-0",
-              )}
+              className="h-11 min-h-11 w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 lg:h-10 lg:min-h-0"
             />
           </div>
-          <div id={listboxId} role="listbox" className={cn("min-h-0 overflow-y-auto py-1", mobileIcon != null && "max-lg:mx-ios-inset max-lg:mb-3 max-lg:rounded-[26px] max-lg:bg-surface max-lg:py-0 max-lg:[&>button:not(:last-child)]:border-b max-lg:[&>button:not(:last-child)]:border-border max-lg:[&>button]:min-h-[52px] max-lg:[&>button]:text-[17px]")}>
+          <div id={listboxId} role="listbox" className="min-h-0 overflow-y-auto py-1">
             {value && (
               <button
                 type="button"
@@ -718,11 +713,11 @@ export function LumaEntityPicker({
                   )}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className={cn("block truncate text-sm font-semibold", mobileIcon != null && "max-lg:text-[17px] max-lg:font-normal")}>
+                    <span className="block truncate text-sm font-semibold">
                       {option.label}
                     </span>
                     {option.hint && (
-                      <span className={cn("mt-0.5 block truncate text-xs text-slate-500", mobileIcon != null && "max-lg:text-[13px] max-lg:text-ios-label-secondary")}>
+                      <span className="mt-0.5 block truncate text-xs text-slate-500">
                         {option.hint}
                       </span>
                     )}

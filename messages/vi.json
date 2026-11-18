@@ -1278,7 +1278,6 @@
         "product": "Sản phẩm",
         "time": "Thời gian tạo đơn",
         "range": "Khoảng thời gian",
-        "dates": "Ngày",
         "statusSection": "Trạng thái",
         "orderStatus": "Trạng thái đơn",
         "includeCancelled": "Hiển thị đơn đã hủy",
@@ -1288,7 +1287,14 @@
         "source": "Nguồn đơn",
         "orderValue": "Giá trị đơn hàng",
         "minimum": "Từ số tiền",
-        "maximum": "Đến số tiền"
+        "maximum": "Đến số tiền",
+        "anyValue": "Tất cả",
+        "pickerEmpty": "Không tìm thấy kết quả",
+        "pickerError": "Không tải được danh sách",
+        "apply": "Áp dụng",
+        "fromDate": "Từ ngày",
+        "toDate": "Đến ngày",
+        "invalidRange": "Khoảng ngày không hợp lệ hoặc vượt quá 1 năm."
       }
     },
     "dashboard": {

@@ -43,12 +43,18 @@ async function getFilterOptions(kind: FilterOptionKind, query: string) {
           accentInsensitiveLike(customers.code, query),
         )
       : undefined;
-    return db
-      .select({ id: customers.id, label: customers.name, hint: customers.phone })
+    const rows = await db
+      .select({ id: customers.id, label: customers.name, code: customers.code, phone: customers.phone })
       .from(customers)
       .where(match)
       .orderBy(desc(customers.createdAt))
       .limit(30);
+    // Native picker subtitle: "code · phone".
+    return rows.map((row) => ({
+      id: row.id,
+      label: row.label,
+      hint: [row.code, row.phone].filter((part) => part?.trim()).join(" · ") || null,
+    }));
   }
   if (kind === "product") {
     const match = query
@@ -61,6 +67,7 @@ async function getFilterOptions(kind: FilterOptionKind, query: string) {
         sku: products.sku,
         variantName: products.variantName,
         specs: products.specs,
+        imageUrls: products.imageUrls,
       })
       .from(products)
       .where(match)
@@ -70,6 +77,9 @@ async function getFilterOptions(kind: FilterOptionKind, query: string) {
       id: product.id,
       label: productDisplayName(product),
       hint: product.sku,
+      imageUrl: Array.isArray(product.imageUrls) && typeof product.imageUrls[0] === "string"
+        ? product.imageUrls[0]
+        : null,
     }));
   }
   if (kind === "project") {

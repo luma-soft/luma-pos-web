@@ -10,7 +10,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { Barcode, Package, RotateCcw, Search, UserRound, X } from "lucide-react";
+import { Barcode, ChevronRight, Package, RotateCcw, Search, UserRound, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { FilterTriggerButton, ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
@@ -30,6 +30,7 @@ import {
   LumaWebPicker,
   collectFocusableElements,
 } from "./filter-drawer-shared";
+import { MobileDateRangeScreen, formatFilterDateRange } from "./filter-mobile-screens";
 
 export type OrdersFilterValues = {
   q: string;
@@ -175,6 +176,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
   const panelRef = useRef<HTMLElement>(null);
   const requestId = useRef(0);
   const [open, setOpen] = useState(false);
+  const [dateScreenOpen, setDateScreenOpen] = useState(false);
   const [draft, setDraft] = useState<OrdersFilterDraft>(() =>
     createDraftFromValues(values),
   );
@@ -188,6 +190,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
 
   const closeDrawer = useCallback(() => {
     setDraft(createDraftFromValues(values));
+    setDateScreenOpen(false);
     setOpen(false);
   }, [values]);
 
@@ -280,10 +283,17 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
     return () => window.clearTimeout(debounceTimer);
   }, [invalid, open, runOrderCountQuery]);
 
+  // Return focus to the trigger only after the drawer actually closed, not on first render.
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (!open) {
-      window.requestAnimationFrame(() => openButtonRef.current?.focus());
+    if (open) {
+      wasOpen.current = true;
+      return;
     }
+    if (!wasOpen.current) return;
+    wasOpen.current = false;
+    if (window.matchMedia("(max-width: 1023px)").matches) return;
+    window.requestAnimationFrame(() => openButtonRef.current?.focus());
   }, [open]);
 
   function updateDraft(partial: Partial<OrdersFilterDraft>) {
@@ -487,8 +497,39 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                 </FilterSection>
 
                 <FilterSection title="Thời gian" mobileTitle={t("mobile.invoices.filters.time")}>
+                  {/* Phones: one row that pushes the date screen (presets + custom dates). */}
+                  <button
+                    type="button"
+                    onClick={() => setDateScreenOpen(true)}
+                    className="flex min-h-11 w-full items-center gap-3 px-4 py-[11px] text-left active:bg-black/[0.06] dark:active:bg-white/[0.08] lg:hidden"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[17px] text-ios-label">{t("mobile.invoices.filters.range")}</span>
+                      {draft.timePreset !== "all" && (draft.from || draft.to) && (
+                        <span className="mt-0.5 block text-[13px] tabular-nums text-ios-label-secondary">
+                          {formatFilterDateRange(draft.from, draft.to)}
+                        </span>
+                      )}
+                    </span>
+                    <span className="max-w-[50%] truncate text-[17px] text-ios-label-secondary">
+                      {ORDER_TIME_PRESETS.find((option) => option.value === draft.timePreset)?.label}
+                    </span>
+                    <ChevronRight className="-ml-1.5 size-4 shrink-0 text-ios-label-tertiary" strokeWidth={2.4} aria-hidden="true" />
+                  </button>
+                  {dateScreenOpen && (
+                    <MobileDateRangeScreen
+                      title={t("mobile.invoices.filters.range")}
+                      presets={ORDER_TIME_PRESETS}
+                      preset={draft.timePreset}
+                      from={draft.from}
+                      to={draft.to}
+                      resolvePreset={(preset) => resolveOrderTimePreset(preset as OrderTimePreset) ?? null}
+                      onApply={({ preset, from, to }) => updateDraft({ timePreset: preset, from, to })}
+                      onClose={() => setDateScreenOpen(false)}
+                    />
+                  )}
+                  <div className="space-y-3 max-lg:hidden">
                   <LumaWebPicker
-                    rowLabel={t("mobile.invoices.filters.range")}
                     label="Khoảng thời gian"
                     ariaLabel="Khoảng thời gian"
                     name="timePreset"
@@ -498,7 +539,6 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                   />
                   {draft.timePreset !== "all" && (
                     <LumaDateRangePicker
-                      rowLabel={t("mobile.invoices.filters.dates")}
                       key={`${open}-${draft.from}-${draft.to}`}
                       fromName="from"
                       toName="to"
@@ -514,6 +554,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                       error={dateRangeError ? "Khoảng ngày không hợp lệ hoặc vượt quá 1 năm." : ""}
                     />
                   )}
+                  </div>
                 </FilterSection>
 
                 <PickerSection

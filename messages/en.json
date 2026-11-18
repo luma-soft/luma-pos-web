@@ -1278,7 +1278,6 @@
         "product": "Product",
         "time": "Order date",
         "range": "Date range",
-        "dates": "Dates",
         "statusSection": "Status",
         "orderStatus": "Order status",
         "includeCancelled": "Include cancelled orders",
@@ -1288,7 +1287,14 @@
         "source": "Order source",
         "orderValue": "Order value",
         "minimum": "Minimum",
-        "maximum": "Maximum"
+        "maximum": "Maximum",
+        "anyValue": "All",
+        "pickerEmpty": "No results found",
+        "pickerError": "Couldn't load the list",
+        "apply": "Apply",
+        "fromDate": "From",
+        "toDate": "To",
+        "invalidRange": "The date range is invalid or longer than one year."
       }
     },
     "dashboard": {
