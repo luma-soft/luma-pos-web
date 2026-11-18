@@ -271,8 +271,10 @@ function createFilterCountQuery(kind: DocumentFilterKind, draft: DocumentFilterD
     const status = serializeBookingStatus(draft.status);
     if (status) query.set(...status);
     if (draft.payment && draft.payment !== "all") query.set("payment", draft.payment);
-  } else if (kind === "quotes" && draft.status && draft.status !== "quote") {
-    query.set("status", draft.status);
+  } else if (kind === "quotes") {
+    // The quotes list defaults to open quotes ("quote"); the count API defaults to
+    // "all", so the status must always be sent or the count includes converted quotes.
+    query.set("status", draft.status || "quote");
   }
   if (draft.timePreset !== DEFAULT_TIME_FILTER_PRESET || draft.from || draft.to) {
     query.set("timePreset", draft.timePreset);

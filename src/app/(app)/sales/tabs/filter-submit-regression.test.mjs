@@ -28,3 +28,8 @@ describe("sales filter submission", () => {
     });
   }
 });
+
+test("quotes count query always sends the quote status the list uses", () => {
+  // The list defaults to open quotes while /api/orders/count defaults to "all".
+  expect(documentDrawer).toContain('query.set("status", draft.status || "quote")');
+});
