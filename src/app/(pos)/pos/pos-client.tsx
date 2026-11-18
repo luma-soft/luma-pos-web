@@ -2975,7 +2975,7 @@ export function PosClient({
 
   // Danh sách dòng hàng đã chọn — hiển thị ở khu chính (giống KiotViet).
   const orderLinesPanel = (
-    <div className="mb-16 flex flex-1 flex-col min-h-0 overflow-hidden rounded-xl border border-border bg-surface lg:mb-0 max-lg:mb-[calc(var(--mobile-tabbar-space)+80px)] max-lg:overflow-visible max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent">
+    <div className="mb-16 flex flex-1 flex-col min-h-0 overflow-hidden rounded-xl border border-border bg-surface lg:mb-0 max-lg:mb-20 max-lg:overflow-visible max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent">
       <div className="px-3 py-2 border-b border-border flex items-center max-lg:hidden">
         <h2 className="font-semibold text-sm">
           {isReturnInvoiceDraft
