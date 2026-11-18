@@ -6,6 +6,7 @@ import { getTheme, getMode } from "@/lib/theme/cookie";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { ConfirmDialogProvider } from "@/components/confirm-dialog-provider";
 import { DismissKeyboardOnOutsidePress } from "@/components/dismiss-keyboard-on-outside-press";
+import { DATA_TABLE_FILL_INIT } from "@/lib/data-table-fill";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -45,6 +46,7 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <Script id="mode-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: MODE_INIT }} />
+        <Script id="data-table-fill-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: DATA_TABLE_FILL_INIT }} />
         <ServiceWorkerRegister />
         <NextIntlClientProvider messages={messages}>
           <DismissKeyboardOnOutsidePress />

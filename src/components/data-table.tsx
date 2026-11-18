@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Columns3, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { updateModalUrlQuery } from "@/lib/modal-url-query";
+import { DATA_TABLE_FILL_ATTRIBUTE, dataTableFillHeight } from "@/lib/data-table-fill";
 
 type SortValue = string | number | Date | null | undefined;
 type SortDirection = "asc" | "desc";
@@ -323,14 +324,13 @@ export function DataTableShell<T>({
     }
   }, [storageKey, visibleColumnKeys]);
 
-  useEffect(() => {
+  // Layout effect so client renders get the measured height before paint; the
+  // root layout's DATA_TABLE_FILL_INIT script covers the server-rendered first paint.
+  useLayoutEffect(() => {
     if (!fillHeight || !maxHeight) return;
     const updateHeight = () => {
       const top = desktopTableRef.current?.getBoundingClientRect().top ?? 0;
-      // Reserve only the pagination row and a small bottom inset. The app shell
-      // constrains the viewport, so a large safety gap would leave visible
-      // whitespace below every table.
-      setAvailableHeight(Math.max(minHeight, Math.floor(window.innerHeight - top - 96)));
+      setAvailableHeight(dataTableFillHeight(top, window.innerHeight, minHeight));
     };
     updateHeight();
     window.addEventListener("resize", updateHeight);
@@ -425,6 +425,8 @@ export function DataTableShell<T>({
     />
   );
 
+  const fillAttributes = fillHeight && maxHeight ? { [DATA_TABLE_FILL_ATTRIBUTE]: minHeight } : {};
+
   return (
     <div className={cn("relative flex min-h-0 w-full min-w-0 flex-col", embedded && "rounded-b-[inherit]")}>
       {toolbar && <div className={cn("mb-2 flex flex-wrap items-center justify-end gap-2", toolbarFloating && "lg:absolute lg:-top-[56px] lg:right-0 lg:mb-0")}>{toolbar}</div>}
@@ -432,6 +434,8 @@ export function DataTableShell<T>({
       {rows.length === 0 && empty ? (
         <div
           ref={desktopTableRef}
+          {...fillAttributes}
+          suppressHydrationWarning
           className={cn(
             "min-h-[280px] [&>*]:flex [&>*]:h-full [&>*]:w-full [&>*]:flex-col [&>*]:items-center [&>*]:justify-center",
             fillHeight && "h-full",
@@ -506,6 +510,8 @@ export function DataTableShell<T>({
             )}
           <div
             ref={desktopTableRef}
+          {...fillAttributes}
+          suppressHydrationWarning
             className={cn(
               "min-h-0 bg-surface",
               embedded ? "rounded-b-[inherit] border-0" : "rounded-card border border-border-soft",
