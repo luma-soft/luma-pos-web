@@ -91,7 +91,7 @@ export function MobileTopBar({
 }) {
   return (
     // Native large-title navigation header: 34pt bold title on the grouped background, no bar or divider.
-    <header className={cn("bg-canvas px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] lg:hidden", className)}>
+    <header className={cn("bg-canvas px-ios-inset pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] lg:hidden", className)}>
       <div className="flex min-h-[52px] items-center gap-2">
         {leading}
         <div className="min-w-0 flex-1">
@@ -250,7 +250,7 @@ export function MobileQuickActionGrid({
   items: Array<{ href: string; icon: LucideIcon; label: React.ReactNode }>;
 }) {
   return (
-    <section className="rounded-[22px] bg-surface px-4 py-[11px]">
+    <section className="rounded-[22px] bg-surface px-ios-inset py-[11px]">
       <h2 className="text-[17px] font-bold leading-[22px]">{title}</h2>
       <div className="mt-2.5 grid grid-cols-4 gap-1">
         {items.map(({ href, icon: Icon, label }, index) => (
@@ -281,7 +281,7 @@ export function MobileListSection({ title, children, className }: { title?: Reac
 }
 
 export const mobileListRowClass =
-  "group flex min-h-[52px] w-full items-center gap-4 pl-4 text-left transition-colors active:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ios-accent dark:active:bg-white/[0.08]";
+  "group flex min-h-[52px] w-full items-center gap-4 pl-ios-inset text-left transition-colors active:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ios-accent dark:active:bg-white/[0.08]";
 
 /** List row content: accent SF-style icon, 17pt title, optional caption, chevron, inset separator. */
 export function MobileListRowContent({
@@ -300,7 +300,7 @@ export function MobileListRowContent({
   return (
     <>
       <Icon className={cn("size-[22px] shrink-0", destructive ? "text-ios-red" : "text-ios-accent")} strokeWidth={1.9} aria-hidden="true" />
-      <span className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2 border-b border-border py-2.5 pr-4 group-last:border-b-0">
+      <span className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2 border-b border-border py-2.5 pr-ios-inset group-last:border-b-0">
         <span className="min-w-0 flex-1">
           <span className={cn("block truncate text-[17px] leading-[22px]", destructive ? "text-ios-red" : "text-ios-label")}>{title}</span>
           {subtitle && <span className="mt-0.5 block truncate text-[12px] leading-4 text-ios-label-secondary">{subtitle}</span>}

@@ -87,7 +87,7 @@ export default async function MorePage() {
     <div className="min-h-full bg-canvas lg:p-6">
       <MobileTopBar title={t("nav.more")} />
 
-      <div className="mx-auto max-w-2xl px-4 pb-6 lg:rounded-card lg:border lg:border-border lg:bg-surface lg:p-6">
+      <div className="mx-auto max-w-2xl px-ios-inset pb-6 lg:rounded-card lg:border lg:border-border lg:bg-surface lg:p-6">
         <MobileMoreQuickSearch
           entries={searchEntries}
           searchLabel={t("mobile.more.searchPrompt")}

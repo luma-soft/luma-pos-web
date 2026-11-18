@@ -239,6 +239,16 @@
   --color-ios-green: var(--ios-green);
   --color-ios-orange: var(--ios-orange);
   --color-ios-accent: var(--ios-accent);
+  /* LumaLayoutMetrics (native iOS) — shared spacing for every phone screen:
+     px-ios-inset, gap-ios-section, gap-ios-search, py-ios-row, gap-ios-field… */
+  --spacing-ios-inset: 16px;        /* standardHorizontalInset / standardContentInset */
+  --spacing-ios-section: 16px;      /* standardSectionGap */
+  --spacing-ios-search: 10px;       /* standardSearchControlSpacing */
+  --spacing-ios-row: 13px;          /* standardListRowVerticalInset */
+  --spacing-ios-field: 8px;         /* standardFormFieldSpacing */
+  --spacing-ios-label: 6px;         /* lumaFormFieldLabelSpacing */
+  --spacing-ios-control: 52px;      /* LumaButtonMetrics.standardHeight */
+  --spacing-ios-compact: 44px;      /* LumaProductSelectionMetrics.compactControlHeight */
   --font-ios: var(--ios-font);
   --font-ios-rounded: var(--ios-font-rounded);
 

@@ -139,7 +139,7 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
       {cameraMaterials ? (
         <div className="mb-4"><InstantProductSearch value={query} onQueryChange={setLocalQuery} placeholder={t("products.list.searchPlaceholder")} /></div>
       ) : (
-        <div className="mb-4 flex items-center gap-3 lg:flex-wrap">
+        <div className="mb-4 flex items-center gap-ios-search lg:flex-wrap lg:gap-3">
           <ListSearchFilterBar
             search={<InstantProductSearch value={query} onQueryChange={setLocalQuery} placeholder={t("products.list.searchPlaceholder")} />}
             filter={<InventoryFilterDrawer

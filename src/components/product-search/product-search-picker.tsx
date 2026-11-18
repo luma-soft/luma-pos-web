@@ -233,7 +233,7 @@ export function ProductSearchPicker<T>({
       data-fullscreen={fullScreen || undefined}
     >
       {fullScreen && mobileFullScreen && (
-        <div className="flex items-center gap-3 bg-surface px-4 pb-3 pt-2 lg:hidden">
+        <div className="flex items-center gap-3 bg-surface px-ios-inset pb-3 pt-2 lg:hidden">
           <button
             type="button"
             onClick={() => close()}
@@ -249,7 +249,7 @@ export function ProductSearchPicker<T>({
           </div>
         </div>
       )}
-      <div className={cn("relative", fullScreen && "max-lg:border-b max-lg:border-border max-lg:bg-surface max-lg:px-4 max-lg:pb-3")}>
+      <div className={cn("relative", fullScreen && "max-lg:border-b max-lg:border-border max-lg:bg-surface max-lg:px-ios-inset max-lg:pb-3")}>
       <Search className={cn("pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400", fullScreen && "max-lg:left-8 max-lg:top-[calc(50%-6px)]")} />
       <input
         type="text"
@@ -360,7 +360,7 @@ export function ProductSearchPicker<T>({
         </div>
       )}
       {fullScreen && mobileFullScreen && mobileFullScreen.selectedCount > 0 && (
-        <div className="border-t border-border bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 lg:hidden">
+        <div className="border-t border-border bg-surface px-ios-inset pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 lg:hidden">
           <button
             type="button"
             onClick={() => close()}

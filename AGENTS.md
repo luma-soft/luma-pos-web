@@ -40,3 +40,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
   model; không được thay Luma picker trên mobile bằng dropdown native trên web.
 - Trước khi chốt UI picker, bắt buộc kiểm tra trạng thái đã mở trên browser mục
   tiêu. Chỉ kiểm tra trigger khi đang đóng là chưa đủ.
+
+## Khoảng cách màn mobile (khớp iOS)
+
+- Màn web dưới 1024px dùng bộ biến khoảng cách trong `src/app/globals.css`,
+  khớp `LumaLayoutMetrics` của app iOS: `ios-inset` (16, lề ngang/nội dung),
+  `ios-section` (16, giữa các khối), `ios-search` (10, ô tìm ↔ nút lọc/+),
+  `ios-row` (13, đệm dọc dòng list), `ios-field` (8), `ios-label` (6),
+  `ios-control` (52, nút chính), `ios-compact` (44).
+- Dùng lớp Tailwind tương ứng (`px-ios-inset`, `gap-ios-search`, `py-ios-row`,
+  `space-y-ios-section`, `h-ios-compact`…) thay cho số cứng; khi iOS đổi
+  metric thì sửa một chỗ ở `globals.css`.

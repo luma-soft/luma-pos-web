@@ -129,7 +129,7 @@ export function ListSearchFilterBar({
 }) {
   const primaryAction = useContext(ListPrimaryActionContext);
   return (
-    <div className={cn("flex min-w-0 flex-1 items-center gap-2 max-lg:gap-3", className)}>
+    <div className={cn("flex min-w-0 flex-1 items-center gap-2 max-lg:gap-ios-search", className)}>
       <div className={cn("min-w-0 flex-1 lg:max-w-xl", searchClassName)}>{search}</div>
       {filter}
       {primaryAction && (

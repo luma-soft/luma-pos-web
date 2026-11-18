@@ -77,8 +77,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           )}
         />
         {/* Section order mirrors DashboardView.swift. */}
-        <div className="space-y-4 px-4 pb-6 pt-2">
-          <section className="rounded-[22px] bg-surface px-4 py-3 shadow-[0_4px_12px_color-mix(in_oklab,var(--primary-600)_3.5%,transparent)]">
+        <div className="space-y-ios-section px-ios-inset pb-6 pt-2">
+          <section className="rounded-[22px] bg-surface px-ios-inset py-3 shadow-[0_4px_12px_color-mix(in_oklab,var(--primary-600)_3.5%,transparent)]">
             <h2 className="text-[17px] font-bold leading-[22px]">{t("mobile.dashboard.businessStats")}</h2>
             <div className="mt-2.5">
               <MobileSegmentedLinks

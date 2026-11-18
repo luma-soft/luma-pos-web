@@ -545,7 +545,7 @@ export function ProductsTable({
           const expanded = isExpanded(product);
           return <div>
             {/* Native variant-group row: tinted, "N mã hàng ›", from-price and total stock. */}
-            <div className={cn("flex min-w-0 items-center gap-3 bg-primary-600/[0.08] pl-4", selected(product) && "bg-primary-600/[0.14]")}>
+            <div className={cn("flex min-w-0 items-center gap-3 bg-primary-600/[0.08] pl-ios-inset", selected(product) && "bg-primary-600/[0.14]")}>
               {mobileSelection && <MobileSelectionIndicator selected={selected(product)} label={t("products.bulk.selectProduct", { name: product.name })} onToggle={() => toggleProduct(product)} />}
               <ProductGroupMobileButton
                 product={product}
@@ -559,7 +559,7 @@ export function ProductsTable({
               />
             </div>
             {expanded && <>
-              <div className="pl-4">
+              <div className="pl-ios-inset">
                 {membersFor(product).members.map((member) => <ProductMobileRow key={member.id} product={{ ...member, variantGroup: undefined }} variantRow selectionEnabled={mobileSelection} selected={selectedIds.has(member.id)} selectLabel={t("products.bulk.selectProduct", { name: member.name })} stockNotTrackedLabel={t("products.stock.notTracked")} selectedUnitName={selectedUnitName(member)} onUnitChange={(unitName) => changeUnit(member.id, unitName)} onToggle={() => toggle(member.id)} onOpen={() => openProduct(member)} />)}
               </div>
               <div className="border-b border-border">{groupControls(product)}</div>
@@ -724,11 +724,11 @@ export function ProductMobileRow({
 
   // NativeProductRow: thumbnail, 17pt name, SKU and group, then price, unit and "On hand" on the right.
   return (
-    <div className={cn("flex min-w-0 items-center gap-3 pl-4", selected && "bg-primary-600/[0.06]")}>
+    <div className={cn("flex min-w-0 items-center gap-3 pl-ios-inset", selected && "bg-primary-600/[0.06]")}>
       {selectionEnabled && (
         <MobileSelectionIndicator selected={selected} label={selectLabel} onToggle={onToggle} />
       )}
-      <div className="relative min-h-[94px] min-w-0 flex-1 border-b border-border py-3 pr-4">
+      <div className="relative min-h-[94px] min-w-0 flex-1 border-b border-border py-ios-row pr-ios-inset">
         {/* One hit target for the row; the unit selector takes precedence. */}
         <button
           type="button"
@@ -739,7 +739,7 @@ export function ProductMobileRow({
           }}
           {...longPress.handlers}
           aria-label={displayName}
-          className="absolute inset-0 -left-4 [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ios-accent active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+          className="absolute inset-0 -left-ios-inset [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ios-accent active:bg-black/[0.04] dark:active:bg-white/[0.06]"
         />
         <div className="pointer-events-none relative flex min-w-0 items-center gap-3">
           <ProductThumbnail product={product} largeOnMobile />
@@ -813,7 +813,7 @@ function ProductGroupMobileButton({
       onClick={() => { if (!longPress.consumeClick()) onToggle(); }}
       {...longPress.handlers}
       aria-expanded={expanded}
-      className="flex min-h-[94px] min-w-0 flex-1 items-center gap-3 border-b border-border py-3 pr-4 text-left [-webkit-touch-callout:none] active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+      className="flex min-h-[94px] min-w-0 flex-1 items-center gap-3 border-b border-border py-ios-row pr-ios-inset text-left [-webkit-touch-callout:none] active:bg-black/[0.04] dark:active:bg-white/[0.06]"
     >
       <ProductThumbnail product={product} largeOnMobile />
       <span className="min-w-0 flex-1">

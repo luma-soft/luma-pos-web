@@ -8,7 +8,7 @@ import type { MobileDocumentDayGroup } from "./mobile-document-day";
 /** LumaGroupedListHeader: day title with the day's count and total. */
 export function MobileDocumentDayHeader({ title, summary }: { title: string; summary?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 bg-surface px-4 pb-1 pt-4" role="heading" aria-level={3}>
+    <div className="flex items-baseline justify-between gap-3 bg-surface px-ios-inset pb-1 pt-4" role="heading" aria-level={3}>
       <span className="min-w-0 truncate text-[15px] font-semibold text-ios-label-secondary">{title}</span>
       {summary && <span className="shrink-0 text-[13px] text-ios-label-tertiary tabular-nums">{summary}</span>}
     </div>
@@ -59,9 +59,9 @@ export function MobileDocumentRow({
     <div>
       {dayGroup ? <MobileDocumentDayHeader title={dayGroup.title} summary={dayGroup.summary} />
         : dayHeading ? <MobileDocumentDayHeader title={dayHeading} /> : null}
-      <div className={cn("flex min-w-0 items-center gap-3 pl-4", selected && "bg-primary-600/[0.06]")}>
+      <div className={cn("flex min-w-0 items-center gap-3 pl-ios-inset", selected && "bg-primary-600/[0.06]")}>
         {leading}
-        <div className="relative min-w-0 flex-1 border-b border-border py-3 pr-4">
+        <div className="relative min-w-0 flex-1 border-b border-border py-ios-row pr-ios-inset">
           <button
             type="button"
             onClick={() => {
@@ -69,7 +69,7 @@ export function MobileDocumentRow({
             }}
             {...longPress.handlers}
             aria-label={`${customerName} · ${code}`}
-            className="absolute inset-0 -left-4 [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ios-accent active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+            className="absolute inset-0 -left-ios-inset [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ios-accent active:bg-black/[0.04] dark:active:bg-white/[0.06]"
           />
           <div className="pointer-events-none relative flex items-baseline justify-between gap-3">
             <div className="min-w-0 flex-1 truncate text-[17px] font-semibold leading-[22px]">

@@ -2826,13 +2826,13 @@ export function PosClient({
   const invoiceTabs = (
     <>
       {/* iOS: current-order picker capsule with a "+" new-order button beside it. */}
-      <div className="flex items-center gap-3 lg:hidden">
+      <div className="flex items-center gap-[18px] lg:hidden">
         <button
           type="button"
           onClick={() => setMobileInvoicePickerOpen(true)}
           aria-haspopup="dialog"
           aria-expanded={mobileInvoicePickerOpen}
-          className="flex h-[52px] min-w-0 flex-1 items-center gap-3 rounded-[22px] border border-ios-stroke/50 bg-surface px-4 text-left"
+          className="flex h-ios-compact min-w-0 flex-1 items-center gap-2 rounded-[15px] border border-ios-stroke/50 bg-surface px-3 text-left"
         >
           <span className="min-w-0 flex-1 truncate text-[17px] font-bold">
             {draftDisplayLabel(active, Math.max(0, invoices.findIndex((inv) => inv.id === activeId)))}
@@ -2851,7 +2851,7 @@ export function PosClient({
           aria-haspopup="menu"
           aria-expanded={addMenuOpen}
           data-button-radius="pill"
-          className="grid size-[52px] shrink-0 place-items-center rounded-[22px] border border-ios-stroke/50 bg-surface text-ios-accent active:opacity-60"
+          className="grid size-ios-compact shrink-0 place-items-center rounded-[14px] border border-ios-stroke/50 bg-surface text-ios-accent active:opacity-60"
         >
           <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
         </button>
@@ -3038,7 +3038,7 @@ export function PosClient({
             >
               {/* iOS POSSelectedLine: thumbnail, name and stock with delete; then price, unit,
                   stepper and line total. Tapping the line opens the full-screen line editor. */}
-              <div className={cn("mx-4 border-b border-border py-3.5 lg:hidden", idx === cart.length - 1 && "border-b-0")}>
+              <div className={cn("mx-ios-inset border-b border-border py-3.5 lg:hidden", idx === cart.length - 1 && "border-b-0")}>
                 <div className="flex items-start gap-2.5">
                   <button
                     type="button"
@@ -3318,7 +3318,7 @@ export function PosClient({
       {/* left: catalog */}
       <div className={cn("flex-1 flex flex-col p-3 sm:p-4 min-w-0 min-h-0 overflow-y-auto overscroll-contain max-lg:bg-canvas max-lg:p-0", mobileView === "cart" && "hidden lg:flex")} data-pos-catalog>
         {/* iOS POSBottomBar: count and total, "More" (order note), and the primary action. */}
-        <div className={cn("fixed inset-x-0 bottom-(--mobile-tabbar-space) z-50 flex items-center gap-2 border-t border-border bg-surface px-4 py-3 lg:hidden", keyboardInset > 0 && "hidden")}>
+        <div className={cn("fixed inset-x-0 bottom-(--mobile-tabbar-space) z-50 flex items-center gap-2 border-t border-border bg-surface px-ios-inset py-3 lg:hidden", keyboardInset > 0 && "hidden")}>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-semibold text-ios-label-secondary">{t("mobile.pos.itemCount", { count: cart.length })}</div>
             <div className="truncate text-[20px] font-bold leading-7 tabular-nums">{formatCurrency(total)}</div>
@@ -3370,7 +3370,7 @@ export function PosClient({
             <span className="truncate">{isQuoteDraft ? t("common.confirm") : primaryActionLabel}</span>
           </button>
         </div>
-        <div className="mb-3 space-y-2 max-lg:mb-0 max-lg:space-y-3 max-lg:bg-surface max-lg:px-4 max-lg:pt-2">
+        <div className="mb-3 space-y-2 max-lg:mb-0 max-lg:space-y-3 max-lg:bg-surface max-lg:px-ios-inset max-lg:pt-3">
           {invoiceTabs}
           {canRecoverLegacyOutbox && legacyOutboxCount > 0 && (
             <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
@@ -3657,7 +3657,7 @@ export function PosClient({
             </div>
           </div>}
           {/* iOS CustomerAndPriceBookPicker: borderless customer and price-book triggers. */}
-          <div className="-mx-4 flex items-center gap-4 border-b border-border px-4 pb-1 lg:hidden">
+          <div className="-mx-ios-inset flex items-center gap-[18px] border-b border-border px-ios-inset pb-1 lg:hidden">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <UserRound className="size-5 shrink-0 text-ios-label-secondary" aria-hidden="true" />
               <div className="min-w-0 flex-1">
