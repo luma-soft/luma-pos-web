@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { Pagination } from "@/components/pagination";
+import { DesktopPagination, useMobileGrowingPages } from "@/components/mobile-load-more";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { parsePageSize } from "@/lib/pagination";
 import { parsePricingSort } from "@/lib/pricing/pricing-policy";
@@ -102,10 +103,14 @@ export function PricingCatalogContent({
   const sortedProducts = useMemo(() => sortProductsBySort(matchingProducts, sort), [matchingProducts, sort]);
   const total = sortedProducts.length;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  // Phones show page 1..N and grow N while scrolling; desktop keeps its page.
+  const mobilePaging = useMobileGrowingPages(JSON.stringify(searchParams), total, pageSize);
+  const sliceStart = mobilePaging.phone ? 0 : (page - 1) * pageSize;
+  const sliceEnd = mobilePaging.phone ? mobilePaging.pages * pageSize : page * pageSize;
   const rows = useMemo<PricingRow[]>(() => sortedProducts
-    .slice((page - 1) * pageSize, page * pageSize)
+    .slice(sliceStart, sliceEnd)
     .map((product) => toPricingRow(product, books, canViewPurchasePrices)),
-  [books, canViewPurchasePrices, page, pageSize, sortedProducts]);
+  [books, canViewPurchasePrices, sliceEnd, sliceStart, sortedProducts]);
 
   if (!catalog.snapshot) {
     if (catalog.status === "loading") return <TableSkeleton cols={4} rows={10} mobile="products" />;
@@ -159,7 +164,10 @@ export function PricingCatalogContent({
           pageSize,
         ].join("\u0000")}
       />
-      <Pagination page={Math.min(page, pageCount)} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
+      {mobilePaging.footer}
+      <DesktopPagination>
+        <Pagination page={Math.min(page, pageCount)} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
+      </DesktopPagination>
     </>
   );
 }

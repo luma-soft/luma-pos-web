@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { ListSearchFilterBar } from "@/components/list-search-filter";
 import { Pagination } from "@/components/pagination";
+import { useMobileGrowingPages } from "@/components/mobile-load-more";
 import { MobileInventoryCatalogSkeleton } from "@/components/mobile-inventory-catalog-skeleton";
 import { parsePageSize } from "@/lib/pagination";
 import { parsePriceComparisonParams } from "@/lib/pricing/price-comparison";
@@ -60,6 +61,12 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
     () => showPriceComparison ? parsePriceComparisonParams(new URLSearchParams(filterKey)) : {},
     [filterKey, showPriceComparison],
   );
+  // Phones show page 1..N of the local catalog and grow N while scrolling.
+  const mobileResetKey = `${filterKey}\u0000${query}\u0000${pageSize}`;
+  const [mobileTotal, setMobileTotal] = useState(0);
+  const mobilePaging = useMobileGrowingPages(mobileResetKey, mobileTotal, pageSize);
+  const effectivePage = mobilePaging.phone ? 1 : page;
+  const effectivePageSize = mobilePaging.phone ? pageSize * mobilePaging.pages : pageSize;
   const filters = useMemo(() => ({
     query,
     categoryId: params.get("category") ?? undefined,
@@ -74,17 +81,18 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
     status,
     view: view === "flat" ? "flat" as const : "grouped" as const,
     sort: parseProductListSort(params.get("sort"), catalog.defaultSort),
-    page,
-    pageSize,
+    page: effectivePage,
+    pageSize: effectivePageSize,
     cameraMaterials,
     cameraSkus: new Set(cameraSkus),
     ...priceComparison,
-  }), [cameraMaterials, cameraSkus, catalog.defaultSort, page, pageSize, params, priceComparison, query, status, view]);
+  }), [cameraMaterials, cameraSkus, catalog.defaultSort, effectivePage, effectivePageSize, params, priceComparison, query, status, view]);
   const result = useMemo(() => exploreProductCatalog(
     canonicalProducts,
     catalog.snapshot?.warehouses ?? [],
     filters,
   ), [canonicalProducts, catalog.snapshot?.warehouses, filters]);
+  if (mobileTotal !== result.total) setMobileTotal(result.total);
 
   const localFilterCount = useCallback((draft: Record<string, string>, search: string) => productCatalogMatches(
     canonicalProducts,
@@ -185,7 +193,8 @@ export function ProductCatalogProductsContent({ showPriceComparison, cameraMater
           </div>
         )}
       />
-      <div className="shrink-0 pt-3">
+      {mobilePaging.footer}
+      <div className="shrink-0 pt-3 max-lg:hidden">
         <Pagination
           page={Math.min(page, result.pageCount)}
           pageCount={result.pageCount}

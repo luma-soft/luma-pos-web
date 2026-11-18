@@ -136,6 +136,39 @@ function MobileLoadMoreFooter({
   );
 }
 
+/**
+ * Lists paged in the browser (offline catalog): phones grow the visible page count
+ * as the end scrolls into view. Returns how many pages to show from page 1; desktop
+ * keeps its own page. `resetKey` restarts from one page when filters change.
+ */
+export function useMobileGrowingPages(resetKey: string, total: number, pageSize: number) {
+  const phone = usePhoneLayout();
+  const [state, setState] = useState({ key: resetKey, pages: 1 });
+  const pages = state.key === resetKey ? state.pages : 1;
+  const hasMore = phone && pages * pageSize < total;
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!hasMore || !sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setState((current) => ({ key: resetKey, pages: (current.key === resetKey ? current.pages : 1) + 1 }));
+      },
+      { rootMargin: "0px 0px 600px 0px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, pages, resetKey]);
+
+  return {
+    phone,
+    pages,
+    footer: phone ? <div ref={sentinelRef} className="h-px lg:hidden" aria-hidden="true" /> : null,
+  };
+}
+
 /** Wraps desktop pagination so phones rely on automatic loading instead. */
 export function DesktopPagination({ children }: { children: ReactNode }) {
   return <div className="max-lg:hidden">{children}</div>;
