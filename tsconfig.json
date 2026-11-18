@@ -34,7 +34,17 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    ".next-fixture/types/**/*.ts",
+    ".next-fixture/dev/types/**/*.ts",
+    ".next-prod-db/types/**/*.ts",
+    ".next-prod-db/dev/types/**/*.ts",
+    "tmp/next-prod-db/types/**/*.ts",
+    "tmp/next-prod-db/dev/types/**/*.ts",
+    "tmp/next-offline-sync-verify/types/**/*.ts",
+    "tmp/next-offline-sync-verify/dev/types/**/*.ts",
+    ".next-offline-review/types/**/*.ts",
+    ".next-offline-review/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
