@@ -47,7 +47,7 @@ export function PosQuantitySlot({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("group relative w-[8.25rem] shrink-0", className)}
+      className={cn("group relative w-[8.25rem] shrink-0 max-lg:w-[124px]", className)}
       {...props}
     >
       {children}

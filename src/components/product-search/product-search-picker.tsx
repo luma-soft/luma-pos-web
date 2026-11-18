@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ChevronLeft, Loader2, Search, X } from "lucide-react";
+import { ChevronLeft, CircleX, Loader2, Search, X } from "lucide-react";
 import { selectAllInputOnClick } from "@/lib/input-selection";
 import { cn } from "@/lib/utils";
 import { controlHeightClassName } from "@/components/ui/button-variants";
@@ -106,6 +106,7 @@ export function ProductSearchPicker<T>({
   const paginationKey = `${pageSize}:${query}`;
   const [pagination, setPagination] = useState({ key: paginationKey, count: pageSize });
   const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const requestGateRef = useRef(new ProductSearchRequestGate());
   const listboxId = useId();
 
@@ -177,18 +178,29 @@ export function ProductSearchPicker<T>({
     return () => window.clearTimeout(timer);
   }, [debounceMs, loadItems, open, query]);
 
-  function select(item: T) {
+  function isPhoneFullScreen() {
+    return fullScreen && window.matchMedia("(max-width: 1023px)").matches;
+  }
+
+  /** Keeps the software keyboard up: refocus inside the same tap gesture (iOS allows it there). */
+  function keepSearchFocus() {
+    if (document.activeElement !== inputRef.current) inputRef.current?.focus({ preventScroll: true });
+  }
+
+  function select(item: T, { fromNestedField = false }: { fromNestedField?: boolean } = {}) {
     if (!shouldSelectProductSearchItem({
       selected: isItemSelected?.(item) ?? false,
       disabled: isItemDisabled?.(item) ?? false,
     })) return;
     onSelect(item);
     // The full-screen phone search stays open for multi-add, like the native picker.
-    const keepOpen = keepOpenOnSelect || (fullScreen && window.matchMedia("(max-width: 1023px)").matches);
+    const keepOpen = keepOpenOnSelect || isPhoneFullScreen();
     if (!keepOpen) close();
     else {
       setOpen(true);
       setActiveIndex(-1);
+      // Native POS search keeps the keyboard while picking several products.
+      if (isPhoneFullScreen() && !fromNestedField) keepSearchFocus();
     }
   }
 
@@ -234,25 +246,27 @@ export function ProductSearchPicker<T>({
       data-fullscreen={fullScreen || undefined}
     >
       {fullScreen && mobileFullScreen && (
-        <div className="flex items-center gap-3 bg-surface px-ios-inset pb-3 pt-2 lg:hidden">
+        // LumaProductSelectionHeader: 52pt back button, 17pt heavy title, 12pt subtitle.
+        <div className="flex items-center gap-3 bg-surface px-ios-inset pb-1 pt-3 lg:hidden">
           <button
             type="button"
             onClick={() => close()}
             aria-label={mobileFullScreen.backLabel}
             data-button-radius="pill"
-            className="grid size-[52px] shrink-0 place-items-center rounded-[16px] border border-ios-stroke/50 bg-surface text-ios-label"
+            className="grid size-[52px] shrink-0 place-items-center rounded-[14px] border border-ios-stroke/50 bg-surface text-ios-label"
           >
-            <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden="true" />
+            <ChevronLeft className="size-[22px]" strokeWidth={2.6} aria-hidden="true" />
           </button>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[22px] font-bold leading-7">{mobileFullScreen.title}</div>
-            {mobileFullScreen.subtitle && <div className="truncate text-[15px] text-ios-label-secondary">{mobileFullScreen.subtitle}</div>}
+            <div className="truncate text-[17px] font-extrabold leading-[22px]">{mobileFullScreen.title}</div>
+            {mobileFullScreen.subtitle && <div className="mt-0.5 truncate text-[12px] leading-4 text-ios-label-secondary">{mobileFullScreen.subtitle}</div>}
           </div>
         </div>
       )}
-      <div className={cn("relative", fullScreen && "max-lg:border-b max-lg:border-border max-lg:bg-surface max-lg:px-ios-inset max-lg:pb-3")}>
-      <Search className={cn("pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400", fullScreen && "max-lg:left-8 max-lg:top-[calc(50%-6px)]")} />
+      <div className={cn("relative", fullScreen && "max-lg:border-b max-lg:border-border max-lg:bg-surface max-lg:px-ios-inset max-lg:py-ios-search")}>
+      <Search className={cn("pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400", fullScreen && "max-lg:left-[30px] max-lg:size-[18px] max-lg:text-ios-label-secondary")} />
       <input
+        ref={inputRef}
         type="text"
         role="combobox"
         aria-label={inputAriaLabel ?? placeholder}
@@ -284,24 +298,30 @@ export function ProductSearchPicker<T>({
           controlHeightClassName,
           "w-full rounded-xl border border-border bg-surface py-2 pl-10 pr-11 text-base outline-none transition-colors placeholder:text-slate-400 focus:border-primary-600 lg:pr-10 lg:text-sm",
           inputClassName,
+          // LumaSearchFilterBar field: 52pt, 15pt radius, grouped background, hairline stroke, no focus ring.
+          fullScreen && "max-lg:h-[52px] max-lg:rounded-[15px] max-lg:border-ios-stroke/50 max-lg:bg-canvas max-lg:pl-[42px] max-lg:pr-11 max-lg:text-[17px] max-lg:placeholder:text-ios-label-secondary max-lg:focus:border-ios-stroke/50",
         )}
       />
-      {open && (
+      {open && (!fullScreen || query) && (
         <button
           type="button"
+          onMouseDown={(event) => { if (fullScreen) event.preventDefault(); }}
           onClick={() => {
             // Full-screen search clears the query in place; the back button leaves.
-            if (fullScreen && window.matchMedia("(max-width: 1023px)").matches) {
+            if (isPhoneFullScreen()) {
               onQueryChange("");
+              keepSearchFocus();
               return;
             }
             close();
           }}
           title={closeLabel}
           aria-label={closeLabel}
-          className={cn("absolute right-0 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-surface-2 hover:text-slate-600 lg:right-2 lg:h-7 lg:w-7", fullScreen && "max-lg:right-4 max-lg:top-[calc(50%-6px)]")}
+          className={cn("absolute right-0 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-surface-2 hover:text-slate-600 lg:right-2 lg:h-7 lg:w-7", fullScreen && "max-lg:right-[18px] max-lg:text-ios-label-tertiary")}
         >
-          <X className="h-4 w-4" />
+          {fullScreen
+            ? <><X className="h-4 w-4 max-lg:hidden" /><CircleX className="size-[18px] fill-current text-ios-label-tertiary [&>path]:stroke-surface lg:hidden" /></>
+            : <X className="h-4 w-4" />}
         </button>
       )}
       </div>
@@ -338,7 +358,7 @@ export function ProductSearchPicker<T>({
           ) : visibleItems.length === 0 ? (
             <ProductSearchMessage text={emptyMessage} />
           ) : (
-            <div className="py-1">
+            <div className={cn("py-1", fullScreen && "max-lg:py-0")}>
               {visibleItems.map((item, index) => {
                 const active = index === activeIndex;
                 const selected = isItemSelected?.(item) ?? false;
@@ -354,11 +374,16 @@ export function ProductSearchPicker<T>({
                       // Nested quantity/price controls must be focusable; the
                       // default-prevention is only for row clicks so selecting
                       // a result does not steal focus from the search field.
-                      if ((event.target as HTMLElement).closest("input,button,textarea,select")) return;
+                      if ((event.target as HTMLElement).closest("input,textarea,select")) return;
                       event.preventDefault();
                     }}
-                    onClick={() => select(item)}
-                    className={cn(active && "bg-surface-2")}
+                    onClick={(event) => {
+                      const fromNestedField = Boolean((event.target as HTMLElement).closest("input,textarea,select"));
+                      select(item, { fromNestedField });
+                      // Steppers and already-picked rows must not drop the keyboard either.
+                      if (!fromNestedField && isPhoneFullScreen()) keepSearchFocus();
+                    }}
+                    className={cn(active && "bg-surface-2", fullScreen && "max-lg:border-b max-lg:border-border max-lg:bg-transparent")}
                   >
                     {renderItem(item, { active, selected })}
                   </div>

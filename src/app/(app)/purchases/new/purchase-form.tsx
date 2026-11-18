@@ -38,7 +38,7 @@ import {
   purchaseUnitCostFromTotal,
 } from "@/lib/purchases/line-calculations";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
-import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
+import { ProductSearchResultLayout, ProductSearchStockLabel, productSearchMetaClass, productSearchNameClass, productSearchPriceClass } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 import { expandProductSearchUnitResults, rankProductSearchUnitResults } from "@/lib/pos/search-unit-results";
@@ -642,8 +642,8 @@ export function PurchaseForm({
                       leading={<ProductSearchThumbnail product={product} />}
                       summary={(
                         <>
-                          <div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div>
-                          <div className="font-mono text-xs text-slate-400">{product.sku}</div>
+                          <div className={productSearchNameClass}>{productDisplayName(product)} · {selectedUnit}</div>
+                          <div className={cn(productSearchMetaClass, "font-mono")}>{product.sku}</div>
                           {product.isStockManaged && <ProductSearchStockLabel
                             quantity={stock}
                             unit={selectedUnit}
@@ -653,22 +653,21 @@ export function PurchaseForm({
                           />}
                         </>
                       )}
+                      price={<span className={productSearchPriceClass}>
+                          {formatCurrency(unitCost)}/{selectedUnit}
+                        </span>}
                       controls={lineSelected && line ? (
                         <div onClick={(event) => event.stopPropagation()}>
                           <QuantityInput
                             size="sm"
-                            className="w-[8.25rem]"
+                            className="w-[8.25rem] max-lg:w-[124px]"
                             min={0}
                             value={line.quantity}
                             onChange={(quantity) => patch(product.id, { quantity })}
                             inputLabel={t("common.productQuantity", { product: product.name })}
                           />
                         </div>
-                      ) : (
-                        <span className="shrink-0 text-sm font-semibold text-primary-600 tabular-nums">
-                          {formatCurrency(unitCost)}/{selectedUnit}
-                        </span>
-                      )}
+                      ) : undefined}
                     />
                   );
                 }}

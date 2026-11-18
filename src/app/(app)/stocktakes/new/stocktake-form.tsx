@@ -23,7 +23,7 @@ import { useProductCatalog } from "@/components/product-catalog-provider";
 import { getCatalogWarehouseStock, type ProductCatalogItem } from "@/lib/product-catalog";
 import type { AiActionPreview } from "@/lib/ai/actions";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
-import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
+import { ProductSearchResultLayout, ProductSearchStockLabel, productSearchMetaClass, productSearchNameClass } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 
 export interface ProductOption {
@@ -283,8 +283,8 @@ export function StocktakeForm({
                       selected={selected}
                       leading={<ProductSearchThumbnail product={product} />}
                       summary={<>
-                        <div className="text-sm font-semibold">{productDisplayName(product)}</div>
-                        <div className="font-mono text-xs text-slate-400">{product.sku}</div>
+                        <div className={productSearchNameClass}>{productDisplayName(product)}</div>
+                        <div className={cn(productSearchMetaClass, "font-mono")}>{product.sku}</div>
                         <ProductSearchStockLabel
                           quantity={product.stock}
                           unit={product.baseUnit}
@@ -296,7 +296,7 @@ export function StocktakeForm({
                         <div onClick={(event) => event.stopPropagation()}>
                           <QuantityInput
                             size="sm"
-                            className="w-[8.25rem]"
+                            className="w-[8.25rem] max-lg:w-[124px]"
                             min={0}
                             value={lines.find((line) => line.product.id === product.id)?.actualQty ?? 0}
                             onChange={(quantity) => setQty(product.id, quantity)}
@@ -408,7 +408,7 @@ export function StocktakeForm({
                       <tr key={l.product.id} className="transition hover:bg-surface-2/70">
                         <td className="px-4 py-3 [overflow-wrap:anywhere]">
                           <div className="font-semibold">{productDisplayName(l.product)}</div>
-                          <div className="font-mono text-xs text-slate-400">{l.product.sku} · {l.product.baseUnit}</div>
+                          <div className={cn(productSearchMetaClass, "font-mono")}>{l.product.sku} · {l.product.baseUnit}</div>
                         </td>
                         <td className="px-2 py-3 text-right tabular-nums text-slate-500 [overflow-wrap:anywhere]">{formatNumber(l.product.stock)}</td>
                         <td className="px-2 py-3 text-right">

@@ -53,7 +53,7 @@ import {
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
 import { PRODUCT_SEARCH_DEBOUNCE_MS } from "@/components/product-search/product-search-state";
 import { LumaWebPicker } from "@/app/(app)/sales/tabs/filter-drawer-shared";
-import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
+import { ProductSearchResultLayout, ProductSearchStockLabel, productSearchMetaClass, productSearchNameClass, productSearchPriceClass } from "@/components/product-search/product-search-layout";
 import { ProductCreateMenu, type ProductKind } from "@/app/(app)/inventory/tabs/product-create-menu";
 import { shouldShowPrintTax, type PaperSize, type PrintTemplate } from "@/lib/print/template-shared";
 import type { StorePrefs } from "@/lib/schemas/settings";
@@ -543,8 +543,11 @@ function PosLineThumbnail({ product, size = "row" }: { product: PosProduct; size
 
 /** POSQuantityStepper: tinted capsule with − value + (value in accent). */
 function PosLineStepper({
-  value, max, disabled, invalid, onChange, decreaseLabel, increaseLabel, quantityLabel,
+  value, max, disabled, invalid, onChange, decreaseLabel, increaseLabel, quantityLabel, size = "cart", className,
 }: {
+  /** "search": POSQuantityStepper in product search rows (44pt tall, 36pt segments, 12pt value). */
+  size?: "cart" | "search";
+  className?: string;
   value: number;
   max?: number;
   disabled?: boolean;
@@ -562,8 +565,13 @@ function PosLineStepper({
     setDraft(null);
   };
   return (
-    <div className={cn("flex h-[30px] w-[102px] shrink-0 items-center rounded-[9px] bg-ios-accent/15 text-ios-accent", disabled && "opacity-50")}>
-      <button type="button" disabled={disabled} onClick={() => onChange(value - 1)} aria-label={decreaseLabel} className="grid h-11 w-[34px] place-items-center">
+    <div className={cn(
+      "flex shrink-0 items-center bg-ios-accent/15 text-ios-accent",
+      size === "search" ? "h-11 w-[108px] rounded-[12px]" : "h-[30px] w-[102px] rounded-[9px]",
+      disabled && "opacity-50",
+      className,
+    )}>
+      <button type="button" disabled={disabled} onClick={() => onChange(value - 1)} aria-label={decreaseLabel} className={cn("grid h-11 place-items-center", size === "search" ? "w-9" : "w-[34px]")}>
         <Minus className="size-4" strokeWidth={2.4} aria-hidden="true" />
       </button>
       <input
@@ -576,9 +584,13 @@ function PosLineStepper({
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
-        className={cn("h-[30px] min-h-0 w-[34px] min-w-0 border-0 bg-transparent p-0 text-center font-mono text-[15px] font-bold outline-none", invalid ? "text-ios-red" : "text-ios-accent")}
+        className={cn(
+          "min-h-0 min-w-0 border-0 bg-transparent p-0 text-center font-mono font-bold outline-none",
+          size === "search" ? "h-11 w-9 text-[12px]" : "h-[30px] w-[34px] text-[15px]",
+          invalid ? "text-ios-red" : "text-ios-accent",
+        )}
       />
-      <button type="button" disabled={disabled || (max != null && value >= max)} onClick={() => onChange(value + 1)} aria-label={increaseLabel} className="grid h-11 w-[34px] place-items-center disabled:opacity-40">
+      <button type="button" disabled={disabled || (max != null && value >= max)} onClick={() => onChange(value + 1)} aria-label={increaseLabel} className={cn("grid h-11 place-items-center disabled:opacity-40", size === "search" ? "w-9" : "w-[34px]")}>
         <Plus className="size-4" strokeWidth={2.4} aria-hidden="true" />
       </button>
     </div>
@@ -3515,23 +3527,37 @@ export function PosClient({
                     leading={<PosProductThumbnail product={p} />}
                     summary={(
                       <>
-                        <div className="text-sm font-medium whitespace-normal break-words">{productDisplayName(p)}{resultUnit == null ? "" : ` · ${resultUnit}`}</div>
+                        <div className={cn(productSearchNameClass, "whitespace-normal break-words font-medium")}>{productDisplayName(p)}{resultUnit == null ? "" : ` · ${resultUnit}`}</div>
                         {p.isVariantParent ? (
-                          <div className="text-xs text-slate-400">{children.length} SKU con</div>
+                          <div className={productSearchMetaClass}>{children.length} SKU con</div>
                         ) : null}
                         {stockManaged && <ProductSearchStockLabel
                           quantity={stock}
                           unit={resultUnit ?? p.baseUnit}
                           unitMultiplier={Number(result.alternateUnit?.multiplier) || 1}
                           label={t("pos.stockLabel")}
-                          className={stockInsufficient ? "text-er" : undefined}
+                          className={cn(stockInsufficient && "text-er", stock <= 0 && "max-lg:text-ios-red")}
                         />}
                       </>
                     )}
-                    controls={(
+                    desktopPriceWithControls
+                    addTileIcon={p.isVariantParent ? "chevron" : "plus"}
+                    price={<div className={cn(productSearchPriceClass, "w-24 text-right sm:w-32 max-lg:w-auto")}>{resultPriceLabel}</div>}
+                    controls={line ? (
                       <>
                         {line && (
-                          <PosQuantitySlot onClick={(event) => event.stopPropagation()}>
+                          <PosQuantitySlot onClick={(event) => event.stopPropagation()} className="max-lg:w-auto">
+                            <PosLineStepper
+                              size="search"
+                              className="lg:hidden"
+                              value={line.quantity}
+                              max={line.returnSoldQuantity}
+                              invalid={stockInsufficient}
+                              onChange={(quantity) => setQty(line.key, quantity)}
+                              decreaseLabel={line.quantity <= 1 && !isReturnDraft ? t("mobile.pos.removeLine") : t("mobile.pos.decrease")}
+                              increaseLabel={t("mobile.pos.increase")}
+                              quantityLabel={t("mobile.pos.quantity")}
+                            />
                             <QuantityInput
                               value={line.quantity}
                               onChange={(quantity) => setQty(line.key, quantity)}
@@ -3541,14 +3567,13 @@ export function PosClient({
                               suffixBelow={isReturnDraft && line.returnSoldQuantity != null}
                               clearZeroOnFocus={isReturnDraft && line.returnSoldQuantity != null}
                               size="sm"
-                              className={cn("w-full", stockInsufficient && "border-er text-er focus-within:border-er")}
+                              className={cn("w-full max-lg:hidden", stockInsufficient && "border-er text-er focus-within:border-er")}
                               inputClassName={cn(stockInsufficient && "border-er text-er")}
                             />
                           </PosQuantitySlot>
                         )}
-                        <div className="w-24 text-right text-sm font-semibold text-primary-600 tabular-nums sm:w-32">{resultPriceLabel}</div>
                       </>
-                    )}
+                    ) : undefined}
                   />
                 );
               }}

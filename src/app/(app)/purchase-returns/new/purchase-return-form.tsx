@@ -32,7 +32,7 @@ import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPurchaseReturnProduct } from "@/lib/inventory/product-catalog-adapter";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
-import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
+import { ProductSearchResultLayout, ProductSearchStockLabel, productSearchMetaClass, productSearchNameClass, productSearchPriceClass } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 import { expandProductSearchUnitResults, rankProductSearchUnitResults } from "@/lib/pos/search-unit-results";
@@ -345,8 +345,8 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                       selected={selected}
                       leading={<ProductSearchThumbnail product={product} />}
                       summary={<>
-                        <div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div>
-                        <div className="font-mono text-xs text-slate-400">{product.sku}</div>
+                        <div className={productSearchNameClass}>{productDisplayName(product)} · {selectedUnit}</div>
+                        <div className={cn(productSearchMetaClass, "font-mono")}>{product.sku}</div>
                         {product.isStockManaged && <ProductSearchStockLabel
                           quantity={stock}
                           unit={selectedUnit}
@@ -355,11 +355,12 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                           location={warehouse?.name}
                         />}
                       </>}
+                      price={<span className={productSearchPriceClass}>{formatCurrency(Number(product.costPrice ?? 0) * multiplier)}/{selectedUnit}</span>}
                       controls={lineSelected && line ? (
                         <div onClick={(event) => event.stopPropagation()}>
                           <QuantityInput
                             size="sm"
-                            className="w-[8.25rem]"
+                            className="w-[8.25rem] max-lg:w-[124px]"
                             min={0}
                             max={totalStock(line)}
                             value={line.quantity}
@@ -367,7 +368,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                             inputLabel={t("common.productQuantity", { product: product.name })}
                           />
                         </div>
-                      ) : <span className="shrink-0 text-sm text-slate-500 tabular-nums">{formatCurrency(Number(product.costPrice ?? 0) * multiplier)}/{selectedUnit}</span>}
+                      ) : undefined}
                     />
                   );
                 }}

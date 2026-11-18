@@ -29,7 +29,7 @@ import type { PurchaseProductRow } from "@/lib/data/inventory";
 import { internalUseReasonLabel } from "@/lib/inventory/internal-use-reason";
 import type { InternalUseIssueRow } from "@/lib/data/internal-use";
 import { ProductSearchPicker } from "@/components/product-search/product-search-picker";
-import { ProductSearchResultLayout, ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
+import { ProductSearchResultLayout, ProductSearchStockLabel, productSearchMetaClass, productSearchNameClass, productSearchPriceClass } from "@/components/product-search/product-search-layout";
 import { ProductSearchThumbnail } from "@/components/product-search/product-search-thumbnail";
 import { setSelectedProductQuantity } from "@/components/product-search/product-search-state";
 import { expandProductSearchUnitResults, rankProductSearchUnitResults } from "@/lib/pos/search-unit-results";
@@ -252,8 +252,8 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                         selected={selected}
                         leading={<ProductSearchThumbnail product={product} />}
                         summary={<>
-                          <div className="text-sm font-semibold">{productDisplayName(product)} · {selectedUnit}</div>
-                          <div className="font-mono text-xs text-slate-400">{product.sku}</div>
+                          <div className={productSearchNameClass}>{productDisplayName(product)} · {selectedUnit}</div>
+                          <div className={cn(productSearchMetaClass, "font-mono")}>{product.sku}</div>
                           {product.isStockManaged && <ProductSearchStockLabel
                             quantity={stock}
                             unit={selectedUnit}
@@ -262,18 +262,19 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                             location={warehouse?.name}
                           />}
                         </>}
+                        price={<span className={productSearchPriceClass}>{formatCurrency(Number(product.costPrice ?? 0) * multiplier)}/{selectedUnit}</span>}
                         controls={lineSelected && line ? (
                           <div onClick={(event) => event.stopPropagation()}>
                             <QuantityInput
                               size="sm"
-                              className="w-[8.25rem]"
+                              className="w-[8.25rem] max-lg:w-[124px]"
                               min={0}
                               value={line.quantity}
                               onChange={(quantity) => upd(line.key, { quantity })}
                               inputLabel={t("common.productQuantity", { product: product.name })}
                             />
                           </div>
-                        ) : <span className="text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(product.costPrice ?? 0) * multiplier)}/{selectedUnit}</span>}
+                        ) : undefined}
                       />
                     );
                   }}
