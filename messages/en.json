@@ -1266,6 +1266,29 @@
         "cancelled": "Cancelled",
         "merged": "Merged",
         "pending": "Pending"
+      },
+      "filters": {
+        "title": "Order filters",
+        "selectedCount": "{count} conditions selected",
+        "clear": "Clear",
+        "results": "{count} matching orders",
+        "resultsPending": "… matching orders",
+        "findBy": "Find by",
+        "customer": "Customer",
+        "product": "Product",
+        "time": "Order date",
+        "range": "Date range",
+        "dates": "Dates",
+        "statusSection": "Status",
+        "orderStatus": "Order status",
+        "includeCancelled": "Include cancelled orders",
+        "paymentSection": "Payment",
+        "paymentStatus": "Payment status",
+        "paymentMethod": "Payment method",
+        "source": "Order source",
+        "orderValue": "Order value",
+        "minimum": "Minimum",
+        "maximum": "Maximum"
       }
     },
     "dashboard": {

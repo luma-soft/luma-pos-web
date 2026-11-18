@@ -13,7 +13,9 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
+  ChevronsUpDown,
   Loader2,
   Search,
 } from "lucide-react";
@@ -23,6 +25,14 @@ import { isOrderDateRangeValid } from "@/lib/orders/filter-date-range";
 import { cn } from "@/lib/utils";
 
 export type PickerOption = { value: string; label: string };
+
+/**
+ * Phones: filter controls render as iOS inset-grouped rows (LumaSelectField
+ * `.inline`, NavigationLink rows) inside a FilterSection card. Desktop keeps the
+ * bordered field look via `lg:` classes.
+ */
+const mobileRowBase =
+  "max-lg:min-h-11 max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent max-lg:px-4 max-lg:py-[11px] max-lg:text-[17px] max-lg:font-normal max-lg:hover:border-0 max-lg:active:bg-black/[0.06] max-lg:dark:active:bg-white/[0.08] max-lg:focus-visible:ring-inset";
 export type EntityPickerKind =
   | "customer"
   | "product"
@@ -105,9 +115,12 @@ export function LumaWebPicker({
   options,
   searchable = false,
   searchPlaceholder = "Tìm kiếm",
+  rowLabel,
   onChange,
 }: {
   label?: string;
+  /** Phones: render as an inline iOS row with this label on the left. */
+  rowLabel?: string;
   ariaLabel: string;
   name: string;
   value?: string;
@@ -169,7 +182,7 @@ export function LumaWebPicker({
     <div className="relative">
       <input type="hidden" name={name} value={selectedValue} />
       {label && (
-        <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+        <span className={cn("mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300", rowLabel && "max-lg:hidden")}>
           {label}
         </span>
       )}
@@ -193,17 +206,23 @@ export function LumaWebPicker({
             setOpen(false);
           }
         }}
-        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 text-left text-sm font-semibold outline-none transition hover:border-primary-300 focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-100"
+        className={cn(
+          "flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 text-left text-sm font-semibold outline-none transition hover:border-primary-300 focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-100",
+          rowLabel && mobileRowBase,
+        )}
       >
-        <span className="min-w-0 flex-1 truncate">
+        {rowLabel && <span className="min-w-0 flex-1 truncate text-ios-label lg:hidden">{rowLabel}</span>}
+        <span className={cn("min-w-0 flex-1 truncate", rowLabel && "max-lg:flex-none max-lg:max-w-[55%] max-lg:text-right max-lg:text-ios-label-secondary")}>
           {selectedOption?.label ?? "Chọn"}
         </span>
         <ChevronDown
           className={cn(
             "size-4 shrink-0 text-slate-400 transition-transform",
             open && "rotate-180 text-primary-600",
+            rowLabel && "max-lg:hidden",
           )}
         />
+        {rowLabel && <ChevronsUpDown className="-ml-1.5 size-[15px] shrink-0 text-ios-label-secondary lg:hidden" strokeWidth={2.2} aria-hidden="true" />}
       </button>
 
       <FloatingMenuPortal
@@ -217,7 +236,7 @@ export function LumaWebPicker({
           id={listboxId}
           role="listbox"
           aria-label={ariaLabel}
-          className="rounded-xl border border-border bg-surface p-1.5 shadow-2xl"
+          className={cn("rounded-xl border border-border bg-surface p-1.5 shadow-2xl", rowLabel && "max-lg:rounded-[14px]")}
         >
           {searchable && (
             <div className="sticky top-0 z-10 bg-surface p-1.5">
@@ -271,6 +290,7 @@ export function LumaWebPicker({
                   "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold outline-none transition hover:bg-surface-2 focus-visible:bg-primary-50 focus-visible:ring-2 focus-visible:ring-primary-200 dark:focus-visible:bg-primary-950/30",
                   selected &&
                     "bg-primary-50 text-primary-700 dark:bg-primary-950/30 dark:text-primary-300",
+                  rowLabel && "max-lg:text-[17px] max-lg:font-normal",
                 )}
               >
                 <span className="min-w-0 flex-1">{option.label}</span>
@@ -293,7 +313,10 @@ export function LumaDateRangePicker({
   to,
   onChange,
   error,
+  rowLabel,
 }: {
+  /** Phones: render as an inline iOS row with this label on the left. */
+  rowLabel?: string;
   fromName: string;
   toName: string;
   from: string;
@@ -321,7 +344,10 @@ export function LumaDateRangePicker({
       <button
         ref={triggerRef}
         type="button"
-        className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-surface px-3 text-left text-sm outline-none transition hover:border-primary-300 focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-100"
+        className={cn(
+          "flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-surface px-3 text-left text-sm outline-none transition hover:border-primary-300 focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-100",
+          rowLabel && mobileRowBase,
+        )}
         aria-label="Chọn khoảng thời gian"
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -333,13 +359,15 @@ export function LumaDateRangePicker({
           }
         }}
       >
-        <CalendarDays className="size-4 text-slate-500" />
-        <span className="min-w-0 flex-1 font-semibold">
+        <CalendarDays className={cn("size-4 text-slate-500", rowLabel && "max-lg:hidden")} />
+        {rowLabel && <span className="min-w-0 flex-1 truncate text-ios-label lg:hidden">{rowLabel}</span>}
+        <span className={cn("min-w-0 flex-1 font-semibold", rowLabel && "max-lg:flex-none max-lg:font-normal max-lg:text-ios-label-secondary max-lg:tabular-nums")}>
           {from || "Từ ngày"} → {to || "Đến ngày"}
         </span>
-        <ChevronDown className={cn("size-4 text-slate-400", open && "rotate-180")} />
+        <ChevronDown className={cn("size-4 text-slate-400", open && "rotate-180", rowLabel && "max-lg:hidden")} />
+        {rowLabel && <ChevronRight className="-ml-1.5 size-4 shrink-0 text-ios-label-tertiary lg:hidden" strokeWidth={2.4} aria-hidden="true" />}
       </button>
-      {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
+      {error && <p className={cn("mt-2 text-xs font-semibold text-red-600", rowLabel && "max-lg:mt-0 max-lg:px-4 max-lg:pb-2.5 max-lg:text-[13px] max-lg:font-normal")}>{error}</p>}
 
       <FloatingMenuPortal
           open={open}
@@ -445,10 +473,13 @@ export function LumaEntityPicker({
   labelValue,
   placeholder,
   icon,
+  mobileIcon,
   showLabel = true,
   onChange,
 }: {
   label: string;
+  /** Phones: icon of the iOS navigation row (person, box…); enables the row look. */
+  mobileIcon?: ReactNode;
   name: string;
   labelName: string;
   queryName?: string;
@@ -542,7 +573,7 @@ export function LumaEntityPicker({
       {queryName && <input type="hidden" name={queryName} value={labelValue} />}
 
       {showLabel ? (
-        <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+        <span className={cn("mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300", mobileIcon != null && "max-lg:hidden")}>
           {label}
         </span>
       ) : null}
@@ -558,18 +589,32 @@ export function LumaEntityPicker({
             return !current;
           })
         }
-        className="flex min-h-14 w-full items-center gap-3 rounded-xl border border-border bg-surface px-3 text-left outline-none transition hover:border-primary-300 focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-100"
+        className={cn(
+          "flex min-h-14 w-full items-center gap-3 rounded-xl border border-border bg-surface px-3 text-left outline-none transition hover:border-primary-300 focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-100",
+          mobileIcon != null && cn(mobileRowBase, "max-lg:min-h-[52px] max-lg:gap-2.5 max-lg:py-2"),
+        )}
       >
-        {icon ? <span className="shrink-0 text-slate-500">{icon}</span> : null}
+        {mobileIcon != null && (
+          // NativeInvoiceFilterSheet.filterRow: 20pt secondary symbol, 15pt title, 12pt value.
+          <span className="grid w-5 shrink-0 place-items-center text-ios-label-secondary lg:hidden [&>svg]:size-[19px]">{mobileIcon}</span>
+        )}
+        {mobileIcon != null && (
+          <span className="min-w-0 flex-1 lg:hidden">
+            <span className="block text-[15px] leading-5 text-ios-label">{label}</span>
+            {labelValue && <span className="block truncate text-[12px] leading-4 text-ios-label-secondary">{labelValue}</span>}
+          </span>
+        )}
+        {icon ? <span className={cn("shrink-0 text-slate-500", mobileIcon != null && "max-lg:hidden")}>{icon}</span> : null}
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-sm",
             value || labelValue ? "font-semibold" : "text-slate-400",
+            mobileIcon != null && "max-lg:hidden",
           )}
         >
           {labelValue || placeholder}
         </span>
-        <ChevronRight className="size-4 shrink-0 text-slate-400" />
+        <ChevronRight className={cn("size-4 shrink-0 text-slate-400", mobileIcon != null && "max-lg:text-ios-label-tertiary")} strokeWidth={mobileIcon != null ? 2.4 : 2} />
       </button>
 
       <FloatingMenuPortal
@@ -580,9 +625,28 @@ export function LumaEntityPicker({
         side="bottom"
         matchAnchorWidth
         maxMenuHeight={360}
-        className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
+        className={cn(
+          "flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl",
+          // NativeInvoiceFilterPickerView is a pushed full-screen list on phones.
+          mobileIcon != null && "max-lg:!inset-0 max-lg:!h-auto max-lg:!max-h-none max-lg:!w-auto max-lg:rounded-none max-lg:border-0 max-lg:bg-canvas max-lg:pt-[env(safe-area-inset-top)] max-lg:pb-[env(safe-area-inset-bottom)] max-lg:shadow-none",
+        )}
       >
-          <div className="relative border-b border-border p-3">
+          {mobileIcon != null && (
+            <div className="flex items-center gap-3 px-ios-inset pb-1 pt-2 lg:hidden">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Quay lại"
+                data-button-radius="pill"
+                className="grid size-11 shrink-0 place-items-center rounded-full border border-black/[0.06] bg-surface text-ios-label shadow-[0_2px_10px_rgb(0_0_0/0.08)] dark:border-white/10"
+              >
+                <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden="true" />
+              </button>
+              <span className="min-w-0 flex-1 truncate text-center text-[17px] font-semibold">{label}</span>
+              <span className="size-11 shrink-0" aria-hidden="true" />
+            </div>
+          )}
+          <div className={cn("relative border-b border-border p-3", mobileIcon != null && "max-lg:border-0 max-lg:px-ios-inset max-lg:py-ios-search")}>
             <Search className="absolute left-6 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               ref={searchRef}
@@ -611,10 +675,13 @@ export function LumaEntityPicker({
               }}
               placeholder={placeholder}
               aria-label={`Tìm ${label.toLocaleLowerCase("vi")}`}
-              className="h-11 min-h-11 w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 lg:h-10 lg:min-h-0"
+              className={cn(
+                "h-11 min-h-11 w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 lg:h-10 lg:min-h-0",
+                mobileIcon != null && "max-lg:h-10 max-lg:min-h-10 max-lg:rounded-[10px] max-lg:border-0 max-lg:bg-[rgb(118_118_128/0.12)] max-lg:text-[17px] max-lg:focus:ring-0",
+              )}
             />
           </div>
-          <div id={listboxId} role="listbox" className="min-h-0 overflow-y-auto py-1">
+          <div id={listboxId} role="listbox" className={cn("min-h-0 overflow-y-auto py-1", mobileIcon != null && "max-lg:mx-ios-inset max-lg:mb-3 max-lg:rounded-[26px] max-lg:bg-surface max-lg:py-0 max-lg:[&>button:not(:last-child)]:border-b max-lg:[&>button:not(:last-child)]:border-border max-lg:[&>button]:min-h-[52px] max-lg:[&>button]:text-[17px]")}>
             {value && (
               <button
                 type="button"
@@ -651,11 +718,11 @@ export function LumaEntityPicker({
                   )}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">
+                    <span className={cn("block truncate text-sm font-semibold", mobileIcon != null && "max-lg:text-[17px] max-lg:font-normal")}>
                       {option.label}
                     </span>
                     {option.hint && (
-                      <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      <span className={cn("mt-0.5 block truncate text-xs text-slate-500", mobileIcon != null && "max-lg:text-[13px] max-lg:text-ios-label-secondary")}>
                         {option.hint}
                       </span>
                     )}

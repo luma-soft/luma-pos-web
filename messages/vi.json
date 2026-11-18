@@ -1266,6 +1266,29 @@
         "cancelled": "Đã hủy",
         "merged": "Đã gộp",
         "pending": "Chờ xử lý"
+      },
+      "filters": {
+        "title": "Bộ lọc đơn hàng",
+        "selectedCount": "{count} điều kiện đã chọn",
+        "clear": "Xóa",
+        "results": "{count} đơn phù hợp",
+        "resultsPending": "… đơn phù hợp",
+        "findBy": "Tìm theo",
+        "customer": "Khách hàng",
+        "product": "Sản phẩm",
+        "time": "Thời gian tạo đơn",
+        "range": "Khoảng thời gian",
+        "dates": "Ngày",
+        "statusSection": "Trạng thái",
+        "orderStatus": "Trạng thái đơn",
+        "includeCancelled": "Hiển thị đơn đã hủy",
+        "paymentSection": "Thanh toán",
+        "paymentStatus": "Tình trạng thanh toán",
+        "paymentMethod": "Phương thức thanh toán",
+        "source": "Nguồn đơn",
+        "orderValue": "Giá trị đơn hàng",
+        "minimum": "Từ số tiền",
+        "maximum": "Đến số tiền"
       }
     },
     "dashboard": {

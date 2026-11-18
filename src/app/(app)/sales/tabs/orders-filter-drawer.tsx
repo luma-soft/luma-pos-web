@@ -10,11 +10,12 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { Barcode, Search, X } from "lucide-react";
+import { Barcode, Package, RotateCcw, Search, UserRound, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { FilterTriggerButton, ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 import { Routes } from "@/lib/routes";
+import { cn } from "@/lib/utils";
 import {
   DEFAULT_TIME_FILTER_PRESET,
   ORDER_TIME_PRESETS,
@@ -133,6 +134,22 @@ function amountRangeInvalid(draft: OrdersFilterDraft) {
   return minSet && maxSet && min > max;
 }
 
+/** Number of conditions shown under the phone filter title (NativeInvoiceFilterState.activeCount). */
+function activeConditionCount(draft: OrdersFilterDraft) {
+  return [
+    Boolean(draft.customerId || draft.customerLabel),
+    Boolean(draft.productId || draft.productLabel),
+    draft.timePreset !== DEFAULT_TIME_FILTER_PRESET,
+    draft.status !== "all",
+    draft.payment !== "all",
+    draft.paymentMethod !== "all",
+    draft.source !== "all",
+    Boolean(draft.minTotal.trim()),
+    Boolean(draft.maxTotal.trim()),
+    draft.includeCancelled,
+  ].filter(Boolean).length;
+}
+
 export function hasActiveOrderFilters(values: OrdersFilterValues) {
   return Boolean(
     values.customerId ||
@@ -184,6 +201,8 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
     const panel = panelRef.current;
     const focusElements = () => collectFocusableElements(panel);
     window.requestAnimationFrame(() => {
+      // Phones open like the native sheet: no field focused, no focus ring on Cancel.
+      if (window.matchMedia("(max-width: 1023px)").matches) return;
       focusElements()[0]?.focus();
     });
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -385,10 +404,27 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="orders-filter-title"
-            className="ml-auto flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-surface shadow-2xl lg:h-full lg:max-w-md lg:overflow-visible"
+            className="ml-auto flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-surface shadow-2xl max-lg:bg-canvas lg:h-full lg:max-w-md lg:overflow-visible"
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <div className="flex shrink-0 items-start border-b border-border px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-4 lg:px-6 lg:py-5">
+            {/* LumaFilterScreenHeader: Cancel, centred title and selected-condition count. */}
+            <div className="grid shrink-0 grid-cols-[72px_minmax(0,1fr)_72px] items-center gap-2 bg-canvas px-ios-inset pb-3 pt-[calc(0.5rem+env(safe-area-inset-top))] lg:hidden">
+              <button
+                type="button"
+                onClick={closeDrawer}
+                className="min-h-11 justify-self-start text-[17px] font-medium text-ios-accent"
+              >
+                {t("common.cancel")}
+              </button>
+              <div className="min-w-0 text-center">
+                <h2 className="text-[20px] font-semibold leading-[25px]">{t("mobile.invoices.filters.title")}</h2>
+                <p className="mt-[3px] text-[13px] leading-[18px] text-ios-label-secondary">
+                  {t("mobile.invoices.filters.selectedCount", { count: activeConditionCount(draft) })}
+                </p>
+              </div>
+              <span aria-hidden="true" />
+            </div>
+            <div className="flex shrink-0 items-start border-b border-border px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-4 max-lg:hidden lg:px-6 lg:py-5">
               <div className="min-w-0 flex-1">
                 <h2
                   id="orders-filter-title"
@@ -418,9 +454,10 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
             >
               <input type="hidden" name="tab" value="orders" />
               {values.q && <input type="hidden" name="q" value={values.q} />}
-              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 lg:space-y-6 lg:px-6 lg:py-5">
-                <FilterSection title="Tìm theo">
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 max-lg:space-y-ios-section max-lg:pb-6 max-lg:pt-1 lg:space-y-6 lg:px-6 lg:py-5">
+                <FilterSection title="Tìm theo" mobileTitle={t("mobile.invoices.filters.findBy")}>
                   <LumaEntityPicker
+                    mobileIcon={<UserRound />}
                     label="Khách hàng"
                     name="customerId"
                     labelName="customerLabel"
@@ -434,6 +471,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                     }
                   />
                   <LumaEntityPicker
+                    mobileIcon={<Package />}
                     label="Sản phẩm"
                     name="productId"
                     labelName="productLabel"
@@ -448,8 +486,9 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                   />
                 </FilterSection>
 
-                <FilterSection title="Thời gian">
+                <FilterSection title="Thời gian" mobileTitle={t("mobile.invoices.filters.time")}>
                   <LumaWebPicker
+                    rowLabel={t("mobile.invoices.filters.range")}
                     label="Khoảng thời gian"
                     ariaLabel="Khoảng thời gian"
                     name="timePreset"
@@ -459,6 +498,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                   />
                   {draft.timePreset !== "all" && (
                     <LumaDateRangePicker
+                      rowLabel={t("mobile.invoices.filters.dates")}
                       key={`${open}-${draft.from}-${draft.to}`}
                       fromName="from"
                       toName="to"
@@ -478,6 +518,15 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
 
                 <PickerSection
                   title="Trạng thái đơn"
+                  mobileTitle={t("mobile.invoices.filters.statusSection")}
+                  rowLabel={t("mobile.invoices.filters.orderStatus")}
+                  mobileTrailing={(
+                    <IncludeCancelledRow
+                      label={t("mobile.invoices.filters.includeCancelled")}
+                      checked={draft.includeCancelled}
+                      onChange={(checked) => updateDraft({ includeCancelled: checked })}
+                    />
+                  )}
                   name="status"
                   value={draft.status}
                   onChange={(value) => updateDraft({ status: value })}
@@ -503,6 +552,18 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                 />
                 <PickerSection
                   title="Trạng thái thanh toán"
+                  mobileTitle={t("mobile.invoices.filters.paymentSection")}
+                  rowLabel={t("mobile.invoices.filters.paymentStatus")}
+                  mobileTrailing={(
+                    <LumaWebPicker
+                      name="paymentMethod"
+                      ariaLabel={t("mobile.invoices.filters.paymentMethod")}
+                      rowLabel={t("mobile.invoices.filters.paymentMethod")}
+                      value={draft.paymentMethod}
+                      options={paymentMethodOptions}
+                      onChange={(value) => updateDraft({ paymentMethod: value })}
+                    />
+                  )}
                   name="payment"
                   value={draft.payment}
                   onChange={(value) => updateDraft({ payment: value })}
@@ -518,25 +579,20 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                             : "Chưa thanh toán",
                   }))}
                 />
-                <ChipSection
-                  title="Phương thức thanh toán"
-                  name="paymentMethod"
-                  value={draft.paymentMethod}
-                  options={paymentMethods.map((value) => ({
-                    value,
-                    label:
-                      value === "all"
-                        ? "Tất cả"
-                        : value === "cash"
-                          ? "Tiền mặt"
-                          : value === "bank_transfer"
-                            ? "Chuyển khoản"
-                            : "Thẻ",
-                  }))}
-                  onChange={(value) => updateDraft({ paymentMethod: value })}
-                />
+                {/* Phones pick the method in the Payment group above; the chips stay on desktop. */}
+                <div className="max-lg:hidden">
+                  <ChipSection
+                    title="Phương thức thanh toán"
+                    name="paymentMethod"
+                    value={draft.paymentMethod}
+                    options={paymentMethodOptions}
+                    onChange={(value) => updateDraft({ paymentMethod: value })}
+                  />
+                </div>
                 <PickerSection
                   title="Nguồn đơn"
+                  mobileTitle={t("mobile.invoices.filters.source")}
+                  rowLabel={t("mobile.invoices.filters.source")}
                   name="source"
                   value={draft.source}
                   onChange={(value) => updateDraft({ source: value })}
@@ -557,7 +613,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                   }))}
                 />
 
-                <label className="flex items-center gap-4 border-y border-border py-4 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">
+                <label className="flex items-center gap-4 border-y border-border py-4 max-lg:hidden min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-bold">
                       Hiện đơn đã hủy
@@ -574,9 +630,10 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                   />
                 </label>
 
-                <FilterSection title="Giá trị đơn">
-                  <div className="grid grid-cols-2 gap-3">
+                <FilterSection title="Giá trị đơn" mobileTitle={t("mobile.invoices.filters.orderValue")}>
+                  <div className="grid grid-cols-2 gap-3 max-lg:block max-lg:[&>*+*]:bg-[linear-gradient(var(--color-border),var(--color-border))] max-lg:[&>*+*]:bg-[length:calc(100%-16px)_1px] max-lg:[&>*+*]:bg-right-top max-lg:[&>*+*]:bg-no-repeat">
                     <LabeledInput
+                      mobileLabel={t("mobile.invoices.filters.minimum")}
                       label="Từ"
                       name="minTotal"
                       value={draft.minTotal}
@@ -587,6 +644,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                       }
                     />
                     <LabeledInput
+                      mobileLabel={t("mobile.invoices.filters.maximum")}
                       label="Đến"
                       name="maxTotal"
                       value={draft.maxTotal}
@@ -598,31 +656,42 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                     />
                   </div>
                   {invalidAmount && (
-                    <p className="text-xs font-semibold text-red-600">
+                    <p className="text-xs font-semibold text-red-600 max-lg:px-4 max-lg:pb-2.5 max-lg:text-[13px] max-lg:font-normal">
                       Giá trị từ không được lớn hơn giá trị đến.
                     </p>
                   )}
                 </FilterSection>
               </div>
 
-              <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-border bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] lg:px-6 lg:py-4 lg:pb-4">
+              {/* LumaFilterScreenFooter on phones: tinted Clear, hairline divider, filled result button. */}
+              <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-border bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] max-lg:flex max-lg:items-center max-lg:gap-3.5 max-lg:border-0 max-lg:px-3 max-lg:pb-[calc(0.5rem+env(safe-area-inset-bottom))] max-lg:pt-3 lg:px-6 lg:py-4 lg:pb-4">
                 <button
                   type="button"
                   onClick={clearFilters}
-                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary-600 font-bold text-primary-700 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0"
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary-600 font-bold text-primary-700 min-w-11 max-lg:min-h-14 max-lg:min-w-[126px] max-lg:flex-1 max-lg:gap-2 max-lg:rounded-[18px] max-lg:border-0 max-lg:bg-ios-accent/10 max-lg:px-3 max-lg:text-[17px] max-lg:font-semibold max-lg:text-ios-accent lg:min-w-0"
                 >
-                  Xóa lọc
+                  <RotateCcw className="size-[18px] lg:hidden" strokeWidth={2.4} aria-hidden="true" />
+                  <span className="lg:hidden">{t("mobile.invoices.filters.clear")}</span>
+                  <span className="max-lg:hidden">Xóa lọc</span>
                 </button>
+                <span className="h-[34px] w-px shrink-0 bg-border lg:hidden" aria-hidden="true" />
                 <button
                   type="submit"
                   disabled={invalid}
                   aria-busy={countPending && !invalid}
-                  className="min-h-11 rounded-xl bg-primary-600 px-4 font-bold text-white hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0"
+                  className="min-h-11 rounded-xl bg-primary-600 px-4 font-bold text-white hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 min-w-11 max-lg:min-h-14 max-lg:min-w-[150px] max-lg:flex-1 max-lg:rounded-[18px] max-lg:bg-ios-accent max-lg:px-3 max-lg:text-[16px] max-lg:font-semibold lg:min-w-0"
                 >
                   <span aria-live="polite">
-                    {invalid || count === null
-                      ? "Xem … đơn"
-                      : `Xem ${count} đơn`}
+                    <span className="lg:hidden">
+                      {invalid || count === null
+                        ? t("mobile.invoices.filters.resultsPending")
+                        : t("mobile.invoices.filters.results", { count })}
+                    </span>
+                    <span className="max-lg:hidden">
+                      {invalid || count === null
+                        ? "Xem … đơn"
+                        : `Xem ${count} đơn`}
+                    </span>
                   </span>
                 </button>
               </div>
@@ -635,41 +704,94 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
   );
 }
 
+const paymentMethodOptions = paymentMethods.map((value) => ({
+  value,
+  label:
+    value === "all"
+      ? "Tất cả"
+      : value === "cash"
+        ? "Tiền mặt"
+        : value === "bank_transfer"
+          ? "Chuyển khoản"
+          : "Thẻ",
+}));
+
+/**
+ * Desktop: titled block. Phones: an iOS inset-grouped Form section — grey header
+ * and a rounded card whose rows are separated by inset hairlines.
+ */
 function FilterSection({
   title,
+  mobileTitle,
   children,
 }: {
   title: string;
+  mobileTitle?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-3">
-      <h3 className="text-sm font-extrabold">{title}</h3>
-      {children}
+    <section className="space-y-3 max-lg:space-y-2">
+      <h3 className="text-sm font-extrabold max-lg:hidden">{title}</h3>
+      <h3 className="px-4 text-[15px] font-semibold leading-5 text-ios-label-secondary lg:hidden">{mobileTitle ?? title}</h3>
+      <div className="space-y-3 max-lg:space-y-0 max-lg:overflow-hidden max-lg:rounded-[26px] max-lg:bg-surface max-lg:[&>*+*]:bg-[linear-gradient(var(--color-border),var(--color-border))] max-lg:[&>*+*]:bg-[length:calc(100%-16px)_1px] max-lg:[&>*+*]:bg-right-top max-lg:[&>*+*]:bg-no-repeat">
+        {children}
+      </div>
     </section>
+  );
+}
+
+/** iOS LumaSwitch row ("Hiển thị đơn đã hủy") inside the phone status group. */
+function IncludeCancelledRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex min-h-11 items-center gap-3 px-4 py-1.5 lg:hidden">
+      <span className="min-w-0 flex-1 text-[17px] text-ios-label">{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        data-button-radius="pill"
+        className={cn("relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors", checked ? "bg-ios-green" : "bg-[rgb(120_120_128/0.16)] dark:bg-[rgb(120_120_128/0.32)]")}
+      >
+        <span className={cn("absolute top-[2px] size-[27px] rounded-full bg-white shadow-[0_3px_8px_rgb(0_0_0/0.15),0_1px_1px_rgb(0_0_0/0.16)] transition-[left]", checked ? "left-[22px]" : "left-[2px]")} />
+      </button>
+    </div>
   );
 }
 
 function LabeledInput({
   label,
+  mobileLabel,
   icon,
   suffix,
   ...props
 }: MoneyInputProps & {
   label: string;
+  /** Phones: LumaLabeledNumberInputField `.inline` — label left, amount right. */
+  mobileLabel?: string;
   icon?: ReactNode;
   suffix?: string;
 }) {
   return (
-    <label className="block rounded-xl border border-border px-3 pb-2 pt-1 focus-within:border-primary-500 focus-within:ring-2 focus-visible:ring-primary-100">
-      <span className="block text-xs text-slate-500">{label}</span>
-      <span className="flex items-center gap-2">
+    <label className="block rounded-xl border border-border px-3 pb-2 pt-1 focus-within:border-primary-500 focus-within:ring-2 focus-visible:ring-primary-100 max-lg:flex max-lg:min-h-11 max-lg:items-center max-lg:gap-3 max-lg:rounded-none max-lg:border-0 max-lg:px-4 max-lg:py-0 max-lg:focus-within:ring-0">
+      <span className="block text-xs text-slate-500 max-lg:hidden">{label}</span>
+      {mobileLabel && <span className="shrink-0 text-[17px] text-ios-label lg:hidden">{mobileLabel}</span>}
+      <span className="flex items-center gap-2 max-lg:min-w-0 max-lg:flex-1 max-lg:gap-1">
         {icon && <span className="text-slate-500">{icon}</span>}
         <MoneyInput
           {...props}
-          className="min-w-0 flex-1 border-0 rounded-none px-0 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
+          className="min-w-0 flex-1 border-0 rounded-none px-0 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 max-lg:text-right max-lg:text-[17px] max-lg:placeholder:text-ios-label-tertiary"
         />
-        {suffix && <span className="text-sm font-semibold">{suffix}</span>}
+        {suffix && <span className="text-sm font-semibold max-lg:text-[17px] max-lg:font-normal max-lg:text-ios-label-secondary">{suffix}</span>}
       </span>
     </label>
   );
@@ -715,26 +837,35 @@ function ChipSection({
 
 function PickerSection({
   title,
+  mobileTitle,
+  rowLabel,
+  mobileTrailing,
   name,
   value,
   options,
   onChange,
 }: {
   title: string;
+  mobileTitle?: string;
+  rowLabel?: string;
+  /** Extra phone-only rows grouped in the same card (switch, second picker). */
+  mobileTrailing?: ReactNode;
   name: string;
   value: string;
   options: { value: string; label: string }[];
   onChange?: (value: string) => void;
 }) {
   return (
-    <FilterSection title={title}>
+    <FilterSection title={title} mobileTitle={mobileTitle}>
       <LumaWebPicker
         name={name}
         ariaLabel={title}
+        rowLabel={rowLabel}
         value={value}
         options={options}
         onChange={onChange}
       />
+      {mobileTrailing && <div className="lg:hidden">{mobileTrailing}</div>}
     </FilterSection>
   );
 }
