@@ -22,7 +22,8 @@ describe("sales filter submission", () => {
     });
 
     test(`${name}: clear resets the draft instead of merely closing`, () => {
-      expect(source).toContain("onClick={clearFilters}");
+      expect(source).toContain("onClear={clearFilters}");
+      expect(readFileSync(new URL("filter-drawer-sections.tsx", import.meta.url), "utf8")).toContain("onClick={onClear}");
       expect(source).not.toMatch(/onClick=\{closeDrawer\}[\s\S]{0,300}Xóa lọc/);
     });
   }

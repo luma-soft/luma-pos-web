@@ -1,6 +1,8 @@
 import { test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
-const sources = ["orders-filter-drawer.tsx", "document-filter-drawer.tsx"].map((name) => readFileSync(new URL(name, import.meta.url), "utf8"));
+// The drawers share their footer/header pieces from filter-drawer-sections.tsx.
+const sections = readFileSync(new URL("filter-drawer-sections.tsx", import.meta.url), "utf8");
+const sources = ["orders-filter-drawer.tsx", "document-filter-drawer.tsx"].map((name) => `${readFileSync(new URL(name, import.meta.url), "utf8")}\n${sections}`);
 test("all invoice filters use iPhone full-screen sheets with desktop drawer restored", () => {
  for (const src of sources) {
   expect(src).toContain('h-[100dvh] w-full max-w-none');
