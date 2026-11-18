@@ -108,7 +108,7 @@ export function PricingCatalogContent({
   [books, canViewPurchasePrices, page, pageSize, sortedProducts]);
 
   if (!catalog.snapshot) {
-    if (catalog.status === "loading") return <TableSkeleton cols={4} rows={10} />;
+    if (catalog.status === "loading") return <TableSkeleton cols={4} rows={10} mobile="products" />;
     return (
       <div className="rounded-xl border border-dashed border-border bg-surface p-8 text-center">
         <p className="font-semibold">Không có danh mục sản phẩm ngoại tuyến</p>

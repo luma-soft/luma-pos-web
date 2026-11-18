@@ -1,10 +1,17 @@
+import { useTranslations } from "next-intl";
+import { MobileListScreenSkeleton } from "@/components/mobile-skeletons";
+
 /**
  * Skeleton hiện ngay khi chuyển trang (route động cần loading.tsx để Next prefetch
  * được layout shell → đổi trang thấy ngay khung thay vì trắng/chờ server query).
  */
 export default function Loading() {
+  const t = useTranslations();
   return (
-    <div className="p-4 sm:p-6 animate-pulse">
+    <>
+    {/* Phones: native large title, search and NativeInvoiceHistorySkeleton rows. */}
+    <MobileListScreenSkeleton label={t("common.loading")} />
+    <div className="max-lg:hidden p-4 sm:p-6 animate-pulse">
       {/* header */}
       <div className="-mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 bg-surface border-b border-border">
         <div className="min-h-13 px-4 sm:px-6 pt-2.5 flex items-center">
@@ -35,5 +42,6 @@ export default function Loading() {
         ))}
       </div>
     </div>
+    </>
   );
 }

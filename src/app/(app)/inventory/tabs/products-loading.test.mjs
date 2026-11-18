@@ -12,10 +12,8 @@ test("product tab keeps one consistent shell from streaming through cache restor
   expect(productsTab).toContain("fallback={<MobileInventoryCatalogSkeleton />}");
   expect(catalog).toContain('if (catalog.status === "loading") return <MobileInventoryCatalogSkeleton />');
 });
-test("mobile loader matches product row geometry without a desktop regression", () => {
-  expect(skeleton).toContain('className="space-y-3 lg:hidden"');
-  expect(skeleton).toContain("min-h-[94px]");
-  expect(skeleton).toContain("h-16 w-16");
+test("mobile loader uses the native product browse skeleton without a desktop regression", () => {
+  expect(skeleton).toContain("<MobileProductListSkeleton");
   expect(skeleton).toContain('className="hidden lg:block"');
-  expect(skeleton).toContain("<TableSkeleton cols={8} rows={10} />");
+  expect(skeleton).toContain("<DesktopTableSkeleton cols={8} rows={10} />");
 });

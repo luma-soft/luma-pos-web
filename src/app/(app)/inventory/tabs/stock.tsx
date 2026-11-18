@@ -43,7 +43,7 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
   const status = parseStockStatus(searchParams.stockStatus);
 
   return (
-    <Suspense fallback={<TableSkeleton cols={6} rows={8} />}>
+    <Suspense fallback={<TableSkeleton cols={6} rows={8} mobile="products" />}>
       <>
         <StockOverviewContent searchParams={status ? { tab: "stock" } : searchParams} />
         {status && <StockStatusDetail searchParams={searchParams} status={status} />}

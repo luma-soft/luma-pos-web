@@ -34,7 +34,7 @@ export async function PricingTab({ searchParams }: { searchParams: SP }) {
     : { ...requestedFilters, priceCondition: undefined, priceAgainst: undefined };
 
   return (
-    <Suspense fallback={<TableSkeleton cols={4} rows={10} />}>
+    <Suspense fallback={<TableSkeleton cols={4} rows={10} mobile="products" />}>
       <PricingCatalogContent
         books={[...books].sort(comparePriceBooks)}
         searchParams={searchParams}

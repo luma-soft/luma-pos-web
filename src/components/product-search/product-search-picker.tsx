@@ -1,5 +1,6 @@
 "use client";
 
+import { MobilePosSearchSkeleton } from "@/components/mobile-skeletons";
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -322,7 +323,15 @@ export function ProductSearchPicker<T>({
             fullScreen && "max-lg:static max-lg:mt-0 max-lg:max-h-none max-lg:min-h-0 max-lg:flex-1 max-lg:rounded-none max-lg:border-0 max-lg:bg-canvas max-lg:shadow-none",
           )}
         >
-          {showLoading ? (
+          {showLoading && fullScreen ? (
+            <>
+              {/* POSProductSearchSkeletonList on phones; the compact spinner stays for desktop. */}
+              <MobilePosSearchSkeleton label={loadingMessage} />
+              <div className="max-lg:hidden">
+                <ProductSearchMessage icon={<Loader2 className="h-4 w-4 animate-spin" />} text={loadingMessage} />
+              </div>
+            </>
+          ) : showLoading ? (
             <ProductSearchMessage icon={<Loader2 className="h-4 w-4 animate-spin" />} text={loadingMessage} />
           ) : showUnavailable ? (
             <ProductSearchMessage text={unavailableMessage} />
