@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { planKiotVietCustomerSync, type KiotVietCustomerCurrent } from "./customer-sync";
-import { parseKiotVietDataSyncArgs } from "./data-sync-runner";
-import { createKiotVietHistoryProductResolver } from "./history-product-resolver";
-import { isKiotVietStyleCode, kiotVietPosCode, withKiotVietSourceIdentities } from "./pos-codes";
+import { planKiotVietCustomerSync } from "./customer-sync.ts";
+import { parseKiotVietDataSyncArgs } from "./data-sync-runner.ts";
+import { createKiotVietHistoryProductResolver } from "./history-product-resolver.ts";
+import { isKiotVietStyleCode, kiotVietPosCode, withKiotVietSourceIdentities } from "./pos-codes.ts";
 
 const at = new Date("2026-11-17T13:14:54.000Z");
 
@@ -50,7 +50,7 @@ describe("--map-customer", () => {
 });
 
 describe("customer sync keeps Luma POS details", () => {
-  const local: KiotVietCustomerCurrent = {
+  const local = {
     localId: "11111111-1111-4111-8111-111111111111",
     // Already presented under its KiotViet identity by the loader.
     code: "KH000112",
@@ -77,7 +77,7 @@ describe("customer sync keeps Luma POS details", () => {
       mappings: [{ externalId: "KH000112", localId: local.localId }], historicalDocumentCustomerCodes: [],
     });
     expect(plan.writes).toHaveLength(1);
-    const write = plan.writes[0]!;
+    const write = plan.writes[0];
     expect(write.action).toBe("update");
     expect("customer" in write && write.customer).toMatchObject({ name: "Ông Nội", address: "Nam Cầu Kiền", currentDebt: 3_000_000 });
   });

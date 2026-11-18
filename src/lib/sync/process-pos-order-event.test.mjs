@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 const STORE_ID = "00000000-0000-4000-8000-000000000001";
-const createdPayloads: unknown[] = [];
+const createdPayloads = [];
 
 mock.module("@/lib/auth/store-context", () => ({
   resolveStoreContextForUser: async () => ({ storeId: STORE_ID, role: "owner" }),
 }));
 mock.module("@/lib/orders/create-command", () => ({
-  createOrderForSalesPrincipal: async (_principal: unknown, payload: unknown) => {
+  createOrderForSalesPrincipal: async (_principal, payload) => {
     createdPayloads.push(payload);
     return { ok: true, data: { id: "order-1", code: "HD000001" } };
   },
@@ -17,7 +17,7 @@ mock.module("@/lib/orders/checkout-pricing", () => ({
   CHECKOUT_PRICING_CHANGED: "errors.checkoutPricingChanged",
 }));
 
-const { processPosOrderRelayEvent } = await import("./process-pos-order-event");
+const { processPosOrderRelayEvent } = await import("./process-pos-order-event.ts");
 
 const payload = {
   mode: "sale",

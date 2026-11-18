@@ -23,6 +23,12 @@ interface SourceDefinition {
   consistentHeaderColumns?: string[];
   reconciliation?: Omit<KiotVietDocumentReconciliationRules, "codeColumn">;
   master?: boolean;
+  /**
+   * Tax columns KiotViet leaves out of an export when the user hides them. A
+   * missing column reads as 0; the payable reconciliation still fails for any
+   * document that actually carried tax, so nothing is silently dropped.
+   */
+  zeroIfMissing?: string[];
 }
 
 const SOURCE_DEFINITIONS: SourceDefinition[] = [
@@ -44,6 +50,7 @@ const SOURCE_DEFINITIONS: SourceDefinition[] = [
     phase: "bookings",
     prefix: "DanhSachChiTietDatHang",
     codeColumn: "Mã đặt hàng",
+    zeroIfMissing: ["VAT"],
     requiredHeaders: ["Mã đặt hàng", "Mã hóa đơn", "Tổng tiền hàng", "Giảm giá phiếu đặt", "VAT", "Thu khác", "Khách cần trả", "Khách đã trả", "Tiền mặt", "Thẻ", "Chuyển khoản", "Ví", "Điểm", "Trạng thái", "Mã hàng", "Số lượng", "Thành tiền"],
     consistentHeaderColumns: ["Mã hóa đơn", "Khách cần trả", "Khách đã trả", "Trạng thái"],
     reconciliation: {
@@ -60,6 +67,7 @@ const SOURCE_DEFINITIONS: SourceDefinition[] = [
     phase: "sales",
     prefix: "DanhSachChiTietHoaDon",
     codeColumn: "Mã hóa đơn",
+    zeroIfMissing: ["VAT"],
     requiredHeaders: ["Mã hóa đơn", "Mã đặt hàng", "Tổng tiền hàng", "Giảm giá hóa đơn", "VAT", "Thu khác", "Khách cần trả", "Khách đã trả", "Tiền mặt", "Thẻ", "Chuyển khoản", "Ví", "Trạng thái", "Mã hàng", "Số lượng", "Thành tiền"],
     consistentHeaderColumns: ["Mã đặt hàng", "Khách cần trả", "Khách đã trả", "Trạng thái"],
     reconciliation: {
@@ -76,6 +84,7 @@ const SOURCE_DEFINITIONS: SourceDefinition[] = [
     phase: "purchases",
     prefix: "DanhSachChiTietNhapHang",
     codeColumn: "Mã nhập hàng",
+    zeroIfMissing: ["VAT phiếu nhập", "VAT nhập hàng"],
     requiredHeaders: ["Mã nhập hàng", "Mã nhà cung cấp", "Tổng tiền hàng", "Giảm giá phiếu nhập", "VAT phiếu nhập", "Cần trả NCC", "Tiền đã trả NCC", "Trạng thái", "Mã hàng", "Số lượng", "Thành tiền"],
     consistentHeaderColumns: ["Mã nhà cung cấp", "Cần trả NCC", "Tiền đã trả NCC", "Trạng thái"],
     reconciliation: {
@@ -90,6 +99,7 @@ const SOURCE_DEFINITIONS: SourceDefinition[] = [
     phase: "returns",
     prefix: "DanhSachChiTietTraHang",
     codeColumn: "Mã trả hàng",
+    zeroIfMissing: ["VAT hoàn lại"],
     requiredHeaders: ["Mã trả hàng", "Mã hóa đơn", "Tổng tiền hàng trả", "Giảm giá phiếu trả", "VAT hoàn lại", "Thu khác hoàn lại", "Phí trả hàng", "Cần trả khách", "Đã trả khách", "Tiền mặt", "Thẻ", "Chuyển khoản", "Ví", "Điểm", "Trạng thái", "Mã hàng", "Số lượng", "Giá nhập lại"],
     consistentHeaderColumns: ["Mã hóa đơn", "Cần trả khách", "Đã trả khách", "Trạng thái"],
     reconciliation: {
@@ -109,6 +119,7 @@ const SOURCE_DEFINITIONS: SourceDefinition[] = [
     phase: "purchase-returns",
     prefix: "DanhSachChiTietTraHangNhap",
     codeColumn: "Mã trả hàng nhập",
+    zeroIfMissing: ["VAT trả hàng nhập"],
     requiredHeaders: ["Mã trả hàng nhập", "Mã nhà cung cấp", "Tổng tiền hàng trả", "Giảm giá", "VAT trả hàng nhập", "NCC cần trả", "Tiền NCC trả", "Trạng thái", "Mã hàng", "Số lượng", "Thành tiền"],
     consistentHeaderColumns: ["Mã nhà cung cấp", "NCC cần trả", "Tiền NCC trả", "Trạng thái"],
     reconciliation: {
@@ -219,7 +230,17 @@ export function readKiotVietDataBundle(directory: string): KiotVietDataBundle {
     const filename = selected[definition.phase];
     const path = join(directory, filename);
     const buffer = readFileSync(path);
-    const { headers, rows } = workbookRows(buffer, filename);
+    const workbook = workbookRows(buffer, filename);
+    const rows = workbook.rows;
+    // An export of an empty period has no header row at all.
+    const headers = rows.length === 0 && workbook.headers.every((header) => !header)
+      ? [...definition.requiredHeaders]
+      : [...workbook.headers];
+    for (const column of definition.zeroIfMissing ?? []) {
+      if (headers.includes(column)) continue;
+      headers.push(column);
+      for (const row of rows) row[column] = 0;
+    }
     validateHeaders(filename, headers, definition.requiredHeaders);
 
     let documentCount: number;

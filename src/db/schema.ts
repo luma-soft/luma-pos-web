@@ -899,7 +899,7 @@ export const kiotvietSourceMappings = pgTable("kiotviet_source_mappings", {
     .on(t.storeId, t.provider, t.entityType, t.localId),
   index("kiotviet_source_mappings_store_run_idx").on(t.storeId, t.lastSeenRunId),
   check("kiotviet_source_mappings_source_sha256_check", sql`${t.sourceSha256} ~ '^[0-9a-f]{64}$'`),
-  check("kiotviet_source_mappings_adoption_method_check", sql`${t.adoptionMethod} in ('mapped', 'created', 'legacy_adopted')`),
+  check("kiotviet_source_mappings_adoption_method_check", sql`${t.adoptionMethod} in ('mapped', 'created', 'legacy_adopted', 'linked')`),
   check("kiotviet_source_mappings_entity_type_check", sql`${t.entityType} in ('customer', 'supplier', 'booking', 'booking_line', 'booking_payment', 'sale', 'sale_line', 'sale_payment', 'purchase', 'purchase_line', 'customer_return', 'customer_return_line', 'supplier_return', 'supplier_return_line')`),
   foreignKey({
     columns: [t.storeId, t.lastSeenRunId],

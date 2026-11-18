@@ -43,6 +43,11 @@ export interface KiotVietCurrentEntitySnapshot {
 export interface KiotVietEntityMappingSnapshot {
   externalId: string;
   localId: string;
+  /**
+   * A KiotViet document Luma POS had already recorded itself. The link only
+   * prevents a duplicate; the POS record is never updated from KiotViet.
+   */
+  linked?: boolean;
 }
 
 export interface KiotVietEntitySyncPlan {

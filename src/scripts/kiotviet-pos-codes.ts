@@ -13,6 +13,9 @@ import { kiotVietPosCode, type KiotVietPosCodeEntity } from "../lib/kiotviet/pos
  *     --run=<kiotviet_sync_runs.id> [--run=...] [--product=SP053538 ...] \
  *     [--units-from=DanhSachSanPham_KV....xlsx --unit=SP053532 ...] [--apply]
  *
+ * --map-product=SP053543=SPMW... links a KiotViet product SKU to a product
+ * created in Luma POS (with its own POS SKU) for a new KiotViet product.
+ *
  * --unit links a KiotViet alternate-unit SKU (Hộp, Viên…) to its base product.
  * Luma POS has no code of its own for a unit, so the KiotViet unit SKU is kept
  * on the unit; unit name, conversion and price come from the reviewed product
@@ -31,6 +34,7 @@ export interface KiotVietPosCodeArgs {
   productSkus: string[];
   unitSkus: string[];
   unitsFrom: string | null;
+  productLinks: Array<{ externalId: string; posSku: string }>;
   apply: boolean;
 }
 
@@ -42,6 +46,7 @@ export function parseKiotVietPosCodeArgs(argv: string[]): KiotVietPosCodeArgs {
   const productSkus: string[] = [];
   const unitSkus: string[] = [];
   let unitsFrom: string | null = null;
+  const productLinks: Array<{ externalId: string; posSku: string }> = [];
   let apply = false;
   for (const argument of argv) {
     if (argument === "--apply") apply = true;
@@ -58,18 +63,22 @@ export function parseKiotVietPosCodeArgs(argv: string[]): KiotVietPosCodeArgs {
       const sku = argument.slice("--unit=".length).trim();
       if (!sku) throw new Error("--unit expects a KiotViet unit SKU");
       unitSkus.push(sku);
+    } else if (argument.startsWith("--map-product=")) {
+      const [externalId, posSku, extra] = argument.slice("--map-product=".length).split("=").map((part) => part.trim());
+      if (!externalId || !posSku || extra !== undefined) throw new Error("--map-product expects KIOTVIET_SKU=POS_SKU");
+      productLinks.push({ externalId, posSku });
     } else if (argument.startsWith("--units-from=")) {
       unitsFrom = argument.slice("--units-from=".length).trim() || null;
     } else throw new Error(`Unsupported option: ${argument}`);
   }
   if (storeSlug !== "hai-dang") throw new Error("--store=hai-dang is required");
   if (unitSkus.length > 0 && !unitsFrom) throw new Error("--unit requires --units-from=<KiotViet product export>");
-  if (runIds.length === 0 && productSkus.length === 0 && unitSkus.length === 0) {
-    throw new Error("Nothing to do: pass --run, --product and/or --unit");
+  if (runIds.length === 0 && productSkus.length === 0 && unitSkus.length === 0 && productLinks.length === 0) {
+    throw new Error("Nothing to do: pass --run, --product, --map-product and/or --unit");
   }
   return {
     storeSlug, runIds: [...new Set(runIds)], productSkus: [...new Set(productSkus)],
-    unitSkus: [...new Set(unitSkus)], unitsFrom, apply,
+    unitSkus: [...new Set(unitSkus)], unitsFrom, productLinks, apply,
   };
 }
 
@@ -98,6 +107,8 @@ export async function runKiotVietPosCodes(argv: string[]) {
     kind: "record"; entity: KiotVietPosCodeEntity; localId: string; externalId: string; from: string; to: string;
   } | {
     kind: "product"; productId: string; from: string; to: string;
+  } | {
+    kind: "product_link"; productId: string; externalId: string; posSku: string;
   } | {
     kind: "unit"; productId: string; baseSku: string; sku: string; unitName: string; multiplier: number;
     priceOverride: number | null; directSale: boolean; barcode: string | null;
@@ -188,6 +199,25 @@ export async function runKiotVietPosCodes(argv: string[]) {
       changes.push({ kind: "product", productId: product.id, from: sku, to: next });
     }
 
+    for (const link of args.productLinks) {
+      const [product] = await tx.select({ id: schema.products.id }).from(schema.products)
+        .where(and(eq(schema.products.storeId, storeId), eq(schema.products.sku, link.posSku))).limit(2);
+      if (!product) throw new Error(`POS product ${link.posSku} not found`);
+      const existing = await tx.select({ productId: schema.productSourceMappings.productId, externalId: schema.productSourceMappings.externalId })
+        .from(schema.productSourceMappings).where(and(
+          eq(schema.productSourceMappings.storeId, storeId), eq(schema.productSourceMappings.provider, "kiotviet"),
+        ));
+      if (existing.some((item) => item.externalId === link.externalId && item.productId === product.id)) continue;
+      if (existing.some((item) => item.externalId === link.externalId)) throw new Error(`KiotViet product ${link.externalId} is already mapped`);
+      if (existing.some((item) => item.productId === product.id)) throw new Error(`POS product ${link.posSku} already has a KiotViet mapping`);
+      const clash = await tx.select({ id: schema.products.id }).from(schema.products)
+        .where(and(eq(schema.products.storeId, storeId), eq(schema.products.sku, link.externalId))).limit(1);
+      const unitClash = await tx.select({ id: schema.productUnits.id }).from(schema.productUnits)
+        .where(and(eq(schema.productUnits.storeId, storeId), eq(schema.productUnits.sku, link.externalId))).limit(1);
+      if (clash.length > 0 || unitClash.length > 0) throw new Error(`KiotViet SKU ${link.externalId} is already used by another POS product or unit`);
+      changes.push({ kind: "product_link", productId: product.id, externalId: link.externalId, posSku: link.posSku });
+    }
+
     if (args.unitSkus.length > 0) {
       const XLSX = await import("xlsx");
       const { readFileSync } = await import("node:fs");
@@ -251,6 +281,14 @@ export async function runKiotVietPosCodes(argv: string[]) {
             entityId: change.localId, status: "succeeded",
             before: { code: change.from }, after: { code: change.to, kiotvietCode: change.externalId },
           });
+        } else if (change.kind === "product_link") {
+          await tx.insert(schema.productSourceMappings).values({
+            storeId, productId: change.productId, provider: "kiotviet", externalId: change.externalId, lastSeenAt: new Date(),
+          });
+          await tx.insert(schema.auditLogs).values({
+            storeId, source: "system", action: "kiotviet.product.linked", entityType: "product",
+            entityId: change.productId, status: "succeeded", after: { sku: change.posSku, kiotvietSku: change.externalId },
+          });
         } else if (change.kind === "unit") {
           const [last] = await tx.select({ sortOrder: schema.productUnits.sortOrder }).from(schema.productUnits)
             .where(and(eq(schema.productUnits.storeId, storeId), eq(schema.productUnits.productId, change.productId)))
@@ -291,6 +329,7 @@ async function main() {
   console.log(`${result.applied ? "APPLIED" : "DRY-RUN"} · ${result.changes.length} change(s)`);
   for (const change of result.changes) {
     if (change.kind === "record") console.log(`${change.entity.padEnd(15)} ${change.from} -> ${change.to}`);
+    else if (change.kind === "product_link") console.log(`product link    ${change.externalId} -> ${change.posSku}`);
     else if (change.kind === "product") console.log(`product         ${change.from} -> ${change.to} (KiotViet SKU kept as mapping)`);
     else console.log(`unit            ${change.sku}: ${change.unitName} x${change.multiplier} of ${change.baseSku}${change.priceOverride == null ? "" : ` @${change.priceOverride}`}`);
   }

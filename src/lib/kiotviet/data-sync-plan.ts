@@ -313,7 +313,7 @@ export function planKiotVietEntities(input: {
         continue;
       }
       usedLocalIds.add(local.localId);
-      if (local.fingerprint === source.fingerprint) {
+      if (mapping.linked || local.fingerprint === source.fingerprint) {
         plan.unchanged.push({ externalId, localId: local.localId });
       } else {
         plan.updates.push({ externalId, localId: local.localId });

@@ -9,8 +9,6 @@ import {
 
 const SUPPLIER_CODE = "Mã nhà cung cấp";
 const UNKNOWN_SUPPLIER_EXTERNAL_ID = "__kiotviet_unknown_supplier__";
-const REVIEWED_SUPPLIER_DEBT_TOTAL = 92_266_744;
-const REVIEWED_SUPPLIER_NET_PURCHASES_TOTAL = 4_227_045_932;
 const LEGACY_SUPPLIER_MARKER = "Tạo từ import lịch sử KiotViet";
 
 export function hasKiotVietLegacySupplierMarker(note: string | null | undefined): boolean {
@@ -213,19 +211,23 @@ export function parseKiotVietSupplierSources(rows: KiotVietDataRow[]): KiotVietS
   }).sort((left, right) => left.externalId.localeCompare(right.externalId));
 }
 
-export function assertKiotVietSupplierSourceTotals(suppliers: KiotVietSupplierSource[]): void {
+/** The export must add up to the totals read off the KiotViet supplier list. */
+export function assertKiotVietSupplierSourceTotals(
+  suppliers: KiotVietSupplierSource[],
+  reviewed: { debt: number; net: number },
+): void {
   const totals = suppliers.reduce((sum, supplier) => ({
     currentDebt: sum.currentDebt + supplier.currentDebt,
     netPurchases: sum.netPurchases + supplier.netPurchases,
   }), { currentDebt: 0, netPurchases: 0 });
-  if (totals.currentDebt !== REVIEWED_SUPPLIER_DEBT_TOTAL) {
+  if (totals.currentDebt !== reviewed.debt) {
     throw new Error(
-      `KiotViet supplier debt total must be ${REVIEWED_SUPPLIER_DEBT_TOTAL}, received ${totals.currentDebt}`,
+      `KiotViet supplier debt total must be ${reviewed.debt}, received ${totals.currentDebt}`,
     );
   }
-  if (totals.netPurchases !== REVIEWED_SUPPLIER_NET_PURCHASES_TOTAL) {
+  if (totals.netPurchases !== reviewed.net) {
     throw new Error(
-      `KiotViet supplier net purchases total must be ${REVIEWED_SUPPLIER_NET_PURCHASES_TOTAL}, received ${totals.netPurchases}`,
+      `KiotViet supplier net purchases total must be ${reviewed.net}, received ${totals.netPurchases}`,
     );
   }
 }

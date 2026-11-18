@@ -8,6 +8,7 @@ import {
   assertKiotVietDataSyncApplyGuard,
   executeKiotVietDataSyncPhase,
   parseKiotVietDataSyncArgs,
+  type KiotVietReviewedTotals,
   type KiotVietSyncPhase,
   type KiotVietSyncPhaseArg,
 } from "../lib/kiotviet/data-sync-runner";
@@ -127,6 +128,7 @@ export interface KiotVietDataSyncCliDependencies {
     reviewedSha256: string;
     bundle: KiotVietDataBundle;
     plan: KiotVietCliExecutablePhasePlan;
+    reviewedTotals: KiotVietReviewedTotals;
   }) => Promise<{ postApplyPlan: KiotVietCliPhasePlan }>;
 }
 
@@ -136,9 +138,10 @@ export async function applyKiotVietPhaseWithDatabase(database: ProductionDatabas
   reviewedSha256: string;
   bundle: KiotVietDataBundle;
   plan: KiotVietCliExecutablePhasePlan;
+  reviewedTotals: KiotVietReviewedTotals;
 }): Promise<{ postApplyPlan: KiotVietCliPhasePlan }> {
   if (!input.plan.typedPlan) throw new Error(`KiotViet ${input.phase} plan is not executable`);
-  assertReviewedMasterTotalsForPhase(input.bundle, input.phase);
+  assertReviewedMasterTotalsForPhase(input.bundle, input.phase, input.reviewedTotals);
   const db = database;
   const { createKiotVietDataSyncAuditRepository, createKiotVietDataSyncTransaction } = await import("../lib/kiotviet/data-sync-database");
   const { applyKiotVietTypedPhasePlan } = await import("../lib/kiotviet/data-sync-apply");
@@ -282,12 +285,18 @@ function managedChangeCount(plan: KiotVietCliPhasePlan): number {
     + plan.blockers.reduce((sum, blocker) => sum + blocker.count, 0);
 }
 
-function assertReviewedMasterTotalsForPhase(bundle: KiotVietDataBundle, phase: KiotVietSyncPhase): void {
+function assertReviewedMasterTotalsForPhase(
+  bundle: KiotVietDataBundle,
+  phase: KiotVietSyncPhase,
+  reviewed: KiotVietReviewedTotals,
+): void {
   if (phase === "customers") {
-    assertKiotVietCustomerSourceTotals(parseKiotVietCustomerSources(source(bundle, "customers").rows));
+    if (!reviewed.customers) throw new Error("Reviewed KiotViet customer totals are required");
+    assertKiotVietCustomerSourceTotals(parseKiotVietCustomerSources(source(bundle, "customers").rows), reviewed.customers);
   }
   if (phase === "suppliers") {
-    assertKiotVietSupplierSourceTotals(parseKiotVietSupplierSources(source(bundle, "suppliers").rows));
+    if (!reviewed.suppliers) throw new Error("Reviewed KiotViet supplier totals are required");
+    assertKiotVietSupplierSourceTotals(parseKiotVietSupplierSources(source(bundle, "suppliers").rows), reviewed.suppliers);
   }
 }
 
@@ -636,6 +645,7 @@ export async function loadKiotVietPlanningStateFromDatabase(
       entityType: schema.kiotvietSourceMappings.entityType,
       externalId: schema.kiotvietSourceMappings.externalId,
       localId: schema.kiotvietSourceMappings.localId,
+      adoptionMethod: schema.kiotvietSourceMappings.adoptionMethod,
       deletedAt: schema.kiotvietSourceMappings.deletedAt,
     })
       .from(schema.kiotvietSourceMappings).where(and(
@@ -645,7 +655,9 @@ export async function loadKiotVietPlanningStateFromDatabase(
     for (const row of rows) {
       if (row.deletedAt && row.entityType !== "customer" && row.entityType !== "supplier") continue;
       const values = mappingState[row.entityType] ?? [];
-      values.push({ externalId: row.externalId, localId: row.localId });
+      values.push(row.adoptionMethod === "linked"
+        ? { externalId: row.externalId, localId: row.localId, linked: true }
+        : { externalId: row.externalId, localId: row.localId });
       mappingState[row.entityType] = values;
     }
   }
@@ -690,9 +702,14 @@ export async function loadKiotVietPlanningStateFromDatabase(
   withKiotVietSourceIdentities(returnRows, externalByLocal("customer_return"));
   if (effectiveReturnRows !== returnRows) withKiotVietSourceIdentities(effectiveReturnRows, externalByLocal("customer_return"));
   withKiotVietSourceIdentities(purchaseReturnRows, externalByLocal("supplier_return"));
+  // Linked documents are owned by Luma POS: they carry no importer snapshot and
+  // are never managed, so only importer-managed parents are validated here.
+  const managedExternalByLocal = (entityType: string) => new Map(
+    (mappingState[entityType] ?? []).filter((mapping) => !mapping.linked).map((mapping) => [mapping.localId, mapping.externalId]),
+  );
   const parentMappings = {
-    booking: externalByLocal("booking"), sale: externalByLocal("sale"), purchase: externalByLocal("purchase"),
-    customerReturn: externalByLocal("customer_return"), supplierReturn: externalByLocal("supplier_return"),
+    booking: managedExternalByLocal("booking"), sale: managedExternalByLocal("sale"), purchase: managedExternalByLocal("purchase"),
+    customerReturn: managedExternalByLocal("customer_return"), supplierReturn: managedExternalByLocal("supplier_return"),
   };
   const childMappings = {
     bookingLine: externalByLocal("booking_line"), bookingPayment: externalByLocal("booking_payment"),
@@ -1241,7 +1258,7 @@ export async function runKiotVietDataSyncCli(argv: string[], dependencies: KiotV
     if (prerequisite.length > 0) throw new Error(`Cannot apply: ${prerequisite.map((item) => item.reason).join(", ")}`);
     if (!selected || selected.blockers.length > 0) throw new Error("Cannot apply a KiotViet phase with unresolved blockers");
     assertKiotVietExecutablePlan(selected);
-    assertReviewedMasterTotalsForPhase(bundle, args.phase as KiotVietSyncPhase);
+    assertReviewedMasterTotalsForPhase(bundle, args.phase as KiotVietSyncPhase, args.reviewedTotals);
     const applyPhase = dependencies.applyPhase ?? applyProductionKiotVietPhase;
     const applied = await applyPhase({
       phase: args.phase as KiotVietSyncPhase,
@@ -1249,6 +1266,7 @@ export async function runKiotVietDataSyncCli(argv: string[], dependencies: KiotV
       reviewedSha256: reviewedHashForPhase(bundle, args.phase as KiotVietSyncPhase),
       bundle,
       plan: selected,
+      reviewedTotals: args.reviewedTotals,
     });
     const remaining = managedChangeCount(applied.postApplyPlan);
     if (remaining !== 0) throw new Error(`KiotViet post-apply dry-run is not zero-diff: ${remaining} managed changes/blockers remain`);

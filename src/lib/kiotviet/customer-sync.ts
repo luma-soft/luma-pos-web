@@ -8,8 +8,6 @@ import {
 } from "./data-sync-plan";
 
 const CUSTOMER_CODE = "Mã khách hàng";
-const REVIEWED_CUSTOMER_DEBT_TOTAL = 187_599_720;
-const REVIEWED_CUSTOMER_NET_SALES_TOTAL = 3_647_380_690;
 
 export interface KiotVietCustomerSource {
   externalId: string;
@@ -199,19 +197,27 @@ export function parseKiotVietCustomerSources(rows: KiotVietDataRow[]): KiotVietC
   }).sort((left, right) => left.externalId.localeCompare(right.externalId));
 }
 
-export function assertKiotVietCustomerSourceTotals(customers: KiotVietCustomerSource[]): void {
+/**
+ * The export must add up to the totals the reviewer read off the KiotViet
+ * customer list ("Nợ hiện tại" / "Tổng bán trừ trả hàng"), so a partial or
+ * stale export cannot rewrite balances.
+ */
+export function assertKiotVietCustomerSourceTotals(
+  customers: KiotVietCustomerSource[],
+  reviewed: { debt: number; net: number },
+): void {
   const totals = customers.reduce((sum, customer) => ({
     currentDebt: sum.currentDebt + customer.currentDebt,
     totalSpent: sum.totalSpent + customer.totalSpent,
   }), { currentDebt: 0, totalSpent: 0 });
-  if (totals.currentDebt !== REVIEWED_CUSTOMER_DEBT_TOTAL) {
+  if (totals.currentDebt !== reviewed.debt) {
     throw new Error(
-      `KiotViet customer debt total must be ${REVIEWED_CUSTOMER_DEBT_TOTAL}, received ${totals.currentDebt}`,
+      `KiotViet customer debt total must be ${reviewed.debt}, received ${totals.currentDebt}`,
     );
   }
-  if (totals.totalSpent !== REVIEWED_CUSTOMER_NET_SALES_TOTAL) {
+  if (totals.totalSpent !== reviewed.net) {
     throw new Error(
-      `KiotViet customer net sales total must be ${REVIEWED_CUSTOMER_NET_SALES_TOTAL}, received ${totals.totalSpent}`,
+      `KiotViet customer net sales total must be ${reviewed.net}, received ${totals.totalSpent}`,
     );
   }
 }

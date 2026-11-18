@@ -549,7 +549,9 @@ export function planKiotVietBookingSync(input: {
     mappings: input.mappings,
   });
   const bookingByCode = new Map(bookings.map((booking) => [booking.code, booking]));
+  const linkedExternalIds = new Set(input.mappings.filter((mapping) => mapping.linked).map((mapping) => mapping.externalId));
   const needsChildProvenance = (externalId: string): boolean => {
+    if (linkedExternalIds.has(externalId)) return false;
     const booking = bookingByCode.get(externalId);
     return booking?.lines.some((line) => !lineMappings.has(line.externalId)) === true
       || booking?.payments.some((payment) => !paymentMappings.has(payment.externalId)) === true;

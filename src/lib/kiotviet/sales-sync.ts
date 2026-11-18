@@ -752,7 +752,9 @@ export function planKiotVietSalesSync(input: {
     })),
     mappings: input.mappings,
   });
+  const linkedExternalIds = new Set(input.mappings.filter((mapping) => mapping.linked).map((mapping) => mapping.externalId));
   const needsChildProvenance = (externalId: string): boolean => {
+    if (linkedExternalIds.has(externalId)) return false;
     const sale = salesByCode.get(externalId);
     return sale?.lines.some((line) => !lineMappings.has(line.externalId)) === true
       || sale?.payments.some((payment) => !paymentMappings.has(payment.externalId)) === true;

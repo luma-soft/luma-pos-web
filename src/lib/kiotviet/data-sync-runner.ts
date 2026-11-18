@@ -69,7 +69,7 @@ export type KiotVietMappingEntityType =
   | "supplier_return"
   | "supplier_return_line";
 
-export type KiotVietMappingAdoptionMethod = "mapped" | "created" | "legacy_adopted";
+export type KiotVietMappingAdoptionMethod = "mapped" | "created" | "legacy_adopted" | "linked";
 
 export interface KiotVietSourceMappingRecord {
   id: string;
@@ -124,6 +124,22 @@ export interface KiotVietDataSyncArgs {
    * customer keeps its own code; the KiotViet code is stored as its mapping.
    */
   customerLinks: Array<{ externalId: string; localCode: string }>;
+  /** Totals read off the KiotViet customer / supplier lists; required to apply those phases. */
+  reviewedTotals: KiotVietReviewedTotals;
+}
+
+export interface KiotVietReviewedTotals {
+  customers: { debt: number; net: number } | null;
+  suppliers: { debt: number; net: number } | null;
+}
+
+function parseReviewedTotals(flag: string, value: string): { debt: number; net: number } {
+  const parts = value.split(":").map((part) => part.trim().replace(/[.,_\s]/g, ""));
+  const [debt, net] = parts.map(Number);
+  if (parts.length !== 2 || !parts.every((part) => /^-?\d+$/.test(part)) || !Number.isSafeInteger(debt) || !Number.isSafeInteger(net)) {
+    throw new Error(`${flag} expects DEBT:NET in whole VND, e.g. 187599720:3647380690`);
+  }
+  return { debt: debt!, net: net! };
 }
 
 export interface KiotVietDataSyncSourceMetadata {
@@ -148,6 +164,7 @@ export function parseKiotVietDataSyncArgs(argv: string[]): KiotVietDataSyncArgs 
   let reviewedSourceSha256: string | null = null;
   let sawDirectory = false;
   const customerLinks: Array<{ externalId: string; localCode: string }> = [];
+  const reviewedTotals: KiotVietReviewedTotals = { customers: null, suppliers: null };
 
   for (const argument of argv) {
     if (argument === "--apply") {
@@ -160,6 +177,10 @@ export function parseKiotVietDataSyncArgs(argv: string[]): KiotVietDataSyncArgs 
       phase = value;
     } else if (argument.startsWith("--source-sha256=")) {
       reviewedSourceSha256 = argument.slice("--source-sha256=".length).toLowerCase() || null;
+    } else if (argument.startsWith("--reviewed-customer-totals=")) {
+      reviewedTotals.customers = parseReviewedTotals("--reviewed-customer-totals", argument.slice("--reviewed-customer-totals=".length));
+    } else if (argument.startsWith("--reviewed-supplier-totals=")) {
+      reviewedTotals.suppliers = parseReviewedTotals("--reviewed-supplier-totals", argument.slice("--reviewed-supplier-totals=".length));
     } else if (argument.startsWith("--map-customer=")) {
       const [externalId, localCode, extra] = argument.slice("--map-customer=".length).split("=").map((part) => part.trim());
       if (!externalId || !localCode || extra !== undefined) {
@@ -192,8 +213,14 @@ export function parseKiotVietDataSyncArgs(argv: string[]): KiotVietDataSyncArgs 
     if (customerLinks.length > 0 && phase !== "customers") {
       throw new Error("--map-customer can only be applied with --phase=customers");
     }
+    if (phase === "customers" && !reviewedTotals.customers) {
+      throw new Error("--apply --phase=customers requires --reviewed-customer-totals=DEBT:NET_SALES from the KiotViet customer list");
+    }
+    if (phase === "suppliers" && !reviewedTotals.suppliers) {
+      throw new Error("--apply --phase=suppliers requires --reviewed-supplier-totals=DEBT:NET_PURCHASES from the KiotViet supplier list");
+    }
   }
-  return { directory, phase, storeSlug, apply, reviewedSourceSha256, customerLinks };
+  return { directory, phase, storeSlug, apply, reviewedSourceSha256, customerLinks, reviewedTotals };
 }
 
 export function createEmptyKiotVietInvariantSnapshot(): KiotVietInvariantSnapshot {

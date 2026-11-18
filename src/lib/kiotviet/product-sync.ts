@@ -165,6 +165,13 @@ function parseComboComponents(value: unknown): KiotVietComboComponent[] {
 }
 
 export function parseKiotVietProductRows(rows: SourceRow[]): KiotVietProductSnapshot {
+  // KiotViet's current export splits the price into "Giá bán trước/sau thuế".
+  // This full-catalog sync would read the missing "Giá bán" as 0 for every
+  // product, so refuse it; kiotviet-sync-run creates new products safely.
+  const first = rows[0];
+  if (first && !("Giá bán" in first)) {
+    throw new Error("Unsupported KiotViet product export: no \"Giá bán\" column. Use src/scripts/kiotviet-sync-run.ts instead.");
+  }
   const products: KiotVietProduct[] = [];
   const units: KiotVietUnit[] = [];
 
