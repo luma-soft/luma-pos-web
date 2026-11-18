@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import type { ReactNode } from "react";
 import { FileX2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -13,16 +14,20 @@ import { MobileDocumentRow } from "./mobile-document-row";
 import { mobileDocumentDayGroups, mobileDocumentTimestamp } from "./mobile-document-day";
 
 export function ReturnsTable({
-  rows,
+  rows: serverRows,
+  loadMore,
   expandedId,
   expandedContent,
   expandedFooter,
 }: {
   rows: ReturnListRow[];
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<ReturnListRow>;
   expandedId?: string | null;
   expandedContent?: ReactNode;
   expandedFooter?: ReactNode;
 }) {
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
   const locale = useLocale();
   const dayGroups = mobileDocumentDayGroups(rows, (row) => row.createdAt, (row) => Number(row.totalRefund), {
@@ -102,6 +107,7 @@ export function ReturnsTable({
   ];
 
   return (
+    <>
     <DataTableShell
       tableId="sales.returns"
       rows={rows}
@@ -175,6 +181,8 @@ export function ReturnsTable({
             )
       )}
     />
+    {loadMoreFooter}
+    </>
   );
 }
 

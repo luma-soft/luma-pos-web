@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -277,17 +278,21 @@ export function OrderMobileRow({
 }
 
 export function OrdersTable({
-  rows,
+  rows: serverRows,
+  loadMore,
   printTemplates,
   selection,
 }: {
   rows: OrderListRow[];
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<OrderListRow>;
   printTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
   selection?: {
     selectedIds: Set<string>;
     onChange: (next: Set<string>) => void;
   };
 }) {
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
   const router = useRouter();
   const dialog = useConfirmDialog();
@@ -554,6 +559,7 @@ export function OrdersTable({
           />
         )}
       />
+      {loadMoreFooter}
     </form>
   );
 }

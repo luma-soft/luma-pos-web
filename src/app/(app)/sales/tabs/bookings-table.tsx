@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { ClipboardList } from "lucide-react";
@@ -22,10 +23,14 @@ type BookingRow = {
 };
 
 export function BookingsTable({
-  rows,
+  rows: serverRows,
+  loadMore,
 }: {
   rows: BookingRow[];
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<BookingRow>;
 }) {
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
@@ -53,6 +58,7 @@ export function BookingsTable({
     { key: "value", label: t("bookings.cols.value"), defaultVisible: true, align: "right", width: "140px", cellClassName: "font-semibold", render: (row) => formatCurrency(Number(row.total)) },
   ];
   return (
+    <>
     <DataTableShell
       tableId="sales.bookings"
       rows={rows}
@@ -100,5 +106,7 @@ export function BookingsTable({
         />
       )}
     />
+    {loadMoreFooter}
+    </>
   );
 }

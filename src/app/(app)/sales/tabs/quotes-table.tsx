@@ -1,5 +1,6 @@
 "use client";
 
+import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { FileSpreadsheet } from "lucide-react";
@@ -21,10 +22,14 @@ type QuoteRow = {
 };
 
 export function QuotesTable({
-  rows,
+  rows: serverRows,
+  loadMore,
 }: {
   rows: QuoteRow[];
+  /** Phones: append further pages automatically (desktop keeps pagination). */
+  loadMore?: LoadMoreSource<QuoteRow>;
 }) {
+  const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
@@ -50,6 +55,7 @@ export function QuotesTable({
     { key: "value", label: t("quotes.cols.value"), defaultVisible: true, align: "right", width: "180px", cellClassName: "font-semibold", render: (row) => formatCurrency(Number(row.total)) },
   ];
   return (
+    <>
     <DataTableShell
       tableId="sales.quotes"
       rows={rows}
@@ -90,5 +96,7 @@ export function QuotesTable({
         />
       )}
     />
+    {loadMoreFooter}
+    </>
   );
 }

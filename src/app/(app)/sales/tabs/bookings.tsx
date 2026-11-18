@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { Pagination } from "@/components/pagination";
+import { DesktopPagination } from "@/components/mobile-load-more";
+import { loadBookingsPage } from "./load-more-actions";
 import { TableSkeleton } from "@/components/table-skeleton";
 import {
   getOrders,
@@ -63,17 +65,14 @@ export async function BookingsTab({ searchParams }: { searchParams: SP }) {
   );
 }
 
-async function BookingsContent({ searchParams }: { searchParams: SP }) {
-  const context = await requireStoreContext();
-  const t = await getTranslations();
+/** List filters shared by the server page and the phone load-more action. */
+export function bookingsListFilters(searchParams: SP) {
   const status = resolveBookingStatus(searchParams.status);
   const payment = validValue(searchParams.payment, PAYMENT_STATUSES, "all");
   const created = resolveDateFilter(searchParams);
   const delivery = resolveDeliveryFilter(searchParams);
-  const page = positiveInteger(searchParams.page);
-  const pageSize = parsePageSize(searchParams.size);
-  const { rows, total, pageCount } = await getOrders(context.storeId, {
-    documentType: "booking",
+  return {
+    documentType: "booking" as const,
     q: searchParams.q,
     customerId: searchParams.customerId,
     productId: searchParams.productId,
@@ -87,14 +86,26 @@ async function BookingsContent({ searchParams }: { searchParams: SP }) {
     deliveryTo: delivery.deliveryTo,
     minTotal: optionalNumber(searchParams.minTotal),
     maxTotal: optionalNumber(searchParams.maxTotal),
+  };
+}
+
+async function BookingsContent({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
+  const t = await getTranslations();
+  const page = positiveInteger(searchParams.page);
+  const pageSize = parsePageSize(searchParams.size);
+  const { rows, total, pageCount } = await getOrders(context.storeId, {
+    ...bookingsListFilters(searchParams),
     page,
     pageSize,
   });
 
   return (
     <>
-      <BookingsTable rows={rows} />
-      <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("bookings.title")} />
+      <BookingsTable rows={rows} loadMore={{ page, pageCount, loadPage: loadBookingsPage.bind(null, searchParams) }} />
+      <DesktopPagination>
+        <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("bookings.title")} />
+      </DesktopPagination>
     </>
   );
 }

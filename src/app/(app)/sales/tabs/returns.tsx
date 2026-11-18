@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { Pagination } from "@/components/pagination";
+import { DesktopPagination } from "@/components/mobile-load-more";
+import { loadReturnsPage } from "./load-more-actions";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { getReturn, getReturns } from "@/lib/data/returns";
 import {
@@ -58,31 +60,34 @@ export async function ReturnsTab({ searchParams }: { searchParams: SP }) {
   );
 }
 
+/** List filters shared by the server page and the phone load-more action. */
+export function returnsListFilters(searchParams: SP) {
+  const reason: ReturnReasonFilter = validValue(searchParams.reason, returnReasons, "all");
+  const refundMethod: RefundMethod = validValue(searchParams.refundMethod, returnRefundMethods, "all");
+  const { from, to } = resolveDateFilter(searchParams);
+  return {
+    q: searchParams.q,
+    customerId: searchParams.customerId,
+    productId: searchParams.productId,
+    orderId: searchParams.orderId,
+    reason,
+    refundMethod,
+    from,
+    to,
+    minTotal: optionalNumber(searchParams.minTotal),
+    maxTotal: optionalNumber(searchParams.maxTotal),
+    includeCancelled: searchParams.includeCancelled === "1",
+  };
+}
+
 async function ReturnsContent({ searchParams }: { searchParams: SP }) {
   const context = await requireStoreContext();
   const t = await getTranslations();
   const page = positiveInteger(searchParams.page);
   const pageSize = parsePageSize(searchParams.size);
   const expandedId = searchParams.expandedReturn ?? null;
-  const reason: ReturnReasonFilter = validValue(searchParams.reason, returnReasons, "all");
-  const refundMethod: RefundMethod = validValue(searchParams.refundMethod, returnRefundMethods, "all");
-  const { from, to } = resolveDateFilter(searchParams);
   const [{ rows, total, pageCount }, expandedReturn] = await Promise.all([
-    getReturns(context.storeId, {
-      q: searchParams.q,
-      customerId: searchParams.customerId,
-      productId: searchParams.productId,
-      orderId: searchParams.orderId,
-      reason,
-      refundMethod,
-      from,
-      to,
-      minTotal: optionalNumber(searchParams.minTotal),
-      maxTotal: optionalNumber(searchParams.maxTotal),
-      includeCancelled: searchParams.includeCancelled === "1",
-      page,
-      pageSize,
-    }),
+    getReturns(context.storeId, { ...returnsListFilters(searchParams), page, pageSize }),
     expandedId ? getReturn(context.storeId, expandedId).catch(() => null) : Promise.resolve(null),
   ]);
 
@@ -93,8 +98,11 @@ async function ReturnsContent({ searchParams }: { searchParams: SP }) {
         expandedId={expandedReturn?.id ?? expandedId}
         expandedContent={expandedReturn ? <ReturnDetailPanel ret={expandedReturn} compact /> : null}
         expandedFooter={expandedReturn ? <ReturnDetailFooter ret={expandedReturn} /> : null}
+        loadMore={{ page, pageCount, loadPage: loadReturnsPage.bind(null, searchParams) }}
       />
-      <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("returns.title")} />
+      <DesktopPagination>
+        <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("returns.title")} />
+      </DesktopPagination>
     </>
   );
 }

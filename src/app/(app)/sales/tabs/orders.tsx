@@ -8,6 +8,8 @@ import {
   type OrderSourceFilter,
 } from "@/lib/data/orders";
 import { Pagination } from "@/components/pagination";
+import { DesktopPagination } from "@/components/mobile-load-more";
+import { loadOrdersPage } from "./load-more-actions";
 import { parsePageSize } from "@/lib/pagination";
 import {
   DEFAULT_TIME_FILTER_PRESET,
@@ -99,10 +101,8 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
   );
 }
 
-async function OrdersContent({ searchParams }: { searchParams: SP }) {
-  const context = await requireStoreContext();
-  const t = await getTranslations();
-  const params = searchParams;
+/** List filters shared by the server page and the phone load-more action. */
+export function ordersListFilters(params: SP) {
   const status = (
     STATUS.includes(params.status as OrderStatusFilter) ? params.status : "all"
   ) as OrderStatusFilter;
@@ -120,44 +120,51 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
     SOURCES.includes(params.source as OrderSourceFilter) ? params.source : "all"
   ) as OrderSourceFilter;
   const { from, to } = resolveOrderDateFilter(params);
-  const page = Number(params.page) || 1;
-  const pageSize = parsePageSize(params.size);
-  const includeCancelled = params.includeCancelled === "1";
-  const minTotal = optionalNumber(params.minTotal);
-  const maxTotal = optionalNumber(params.maxTotal);
+  return {
+    orderId: params.orderId,
+    q: params.q,
+    customerId: params.customerId,
+    productId: params.productId,
+    status,
+    payment,
+    paymentMethod,
+    source,
+    from,
+    to,
+    minTotal: optionalNumber(params.minTotal),
+    maxTotal: optionalNumber(params.maxTotal),
+    includeCancelled: params.includeCancelled === "1",
+  };
+}
+
+async function OrdersContent({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
+  const t = await getTranslations();
+  const page = Number(searchParams.page) || 1;
+  const pageSize = parsePageSize(searchParams.size);
 
   const [{ rows, total, pageCount }, printTemplates] = await Promise.all([
-    getOrders(context.storeId, {
-      orderId: params.orderId,
-      q: params.q,
-      customerId: params.customerId,
-      productId: params.productId,
-      status,
-      payment,
-      paymentMethod,
-      source,
-      from,
-      to,
-      minTotal,
-      maxTotal,
-      includeCancelled,
-      page,
-      pageSize,
-    }),
+    getOrders(context.storeId, { ...ordersListFilters(searchParams), page, pageSize }),
     getPrintTemplatesForDoc(context.storeId, "order"),
   ]);
 
   return (
     <>
-      <OrdersTable rows={rows} printTemplates={printTemplates} />
-
-      <Pagination
-        page={page}
-        pageCount={pageCount}
-        total={total}
-        pageSize={pageSize}
-        unitLabel={t("orders.unitLabel")}
+      <OrdersTable
+        rows={rows}
+        printTemplates={printTemplates}
+        loadMore={{ page, pageCount, loadPage: loadOrdersPage.bind(null, searchParams) }}
       />
+
+      <DesktopPagination>
+        <Pagination
+          page={page}
+          pageCount={pageCount}
+          total={total}
+          pageSize={pageSize}
+          unitLabel={t("orders.unitLabel")}
+        />
+      </DesktopPagination>
     </>
   );
 }

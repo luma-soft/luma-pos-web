@@ -1,29 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { Building2, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleX, FileText, ListFilter, Package, Search } from "lucide-react";
 import { isOrderDateRangeValid } from "@/lib/orders/filter-date-range";
 import { cn } from "@/lib/utils";
 import type { EntityPickerKind, EntityPickerOption, PickerOption } from "./filter-drawer-shared";
-
-const PHONE_QUERY = "(max-width: 1023px)";
-
-function subscribePhone(onChange: () => void) {
-  const query = window.matchMedia(PHONE_QUERY);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-
-/** True below the desktop breakpoint, where filters push native-style screens. */
-export function usePhoneLayout() {
-  return useSyncExternalStore(
-    subscribePhone,
-    () => window.matchMedia(PHONE_QUERY).matches,
-    () => false,
-  );
-}
 
 /**
  * Full-screen pushed screen used by phone filters (LumaProductSelectionHeader on
