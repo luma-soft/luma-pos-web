@@ -3,6 +3,7 @@
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
+import { DetailCloseContext } from "@/components/mobile-detail-nav";
 
 export function OrderDetailDialog({
   orderId,
@@ -60,10 +61,11 @@ export function OrderDetailDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="order-detail-title"
-        className="flex h-dvh w-full max-w-[1600px] flex-col overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl"
+        className="flex h-dvh w-full max-w-[1600px] flex-col overflow-hidden bg-surface shadow-2xl max-lg:bg-canvas sm:h-[min(92dvh,920px)] sm:rounded-2xl"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-6">
+        {/* Phones use the detail's own native nav bar (MobileDetailNav). */}
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border-soft px-4 py-3 max-lg:hidden sm:px-6">
           <div className="min-w-0">
             <h2 id="order-detail-title" className="truncate text-lg font-bold text-slate-900 dark:text-slate-100">
               {title}
@@ -79,7 +81,9 @@ export function OrderDetailDialog({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <DetailCloseContext.Provider value={close}>{children}</DetailCloseContext.Provider>
+        </div>
       </div>
     </div>
   );

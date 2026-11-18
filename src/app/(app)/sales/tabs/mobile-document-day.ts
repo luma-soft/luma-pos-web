@@ -95,10 +95,26 @@ export function mobileDocumentDayGroups<T extends { id: string }>(
   return groups;
 }
 
-/** DateFormatter(dateStyle: .medium, timeStyle: .short) used by native invoice rows. */
+const EN_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * DateFormatter(dateStyle: .medium, timeStyle: .short) as iOS renders it:
+ * "20:14 ngày 17 thg 11, 2026" / "Nov 17, 2026 at 8:14 PM". Built from date
+ * parts instead of Intl so server (Node ICU) and Safari produce identical text
+ * and hydration never diverges.
+ */
 export function mobileDocumentTimestamp(value: Date | string | null | undefined, locale: string): string {
   if (!value) return "";
   const date = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(date.getTime())) return "";
-  return new Intl.DateTimeFormat(locale.startsWith("en") ? "en-US" : "vi-VN", { dateStyle: "medium", timeStyle: "short" }).format(date);
+  const day = date.getDate();
+  const month = date.getMonth();
+  const year = date.getFullYear();
+  const hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  if (locale.startsWith("en")) {
+    const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+    return `${EN_MONTHS[month]} ${day}, ${year} at ${hour12}:${minutes} ${hours < 12 ? "AM" : "PM"}`;
+  }
+  return `${String(hours).padStart(2, "0")}:${minutes} ngày ${day} thg ${month + 1}, ${year}`;
 }

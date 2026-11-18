@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { ExternalLink } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
@@ -22,6 +22,9 @@ import { productDisplayName } from "@/lib/products/variant-presentation";
 import { BookingCreateOrderButton, QuoteDeleteButton } from "../../quotes/quote-actions";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { MobileDetailNav } from "@/components/mobile-detail-nav";
+import { mobileDocumentTimestamp } from "@/app/(app)/sales/tabs/mobile-document-day";
+import { Package } from "lucide-react";
 
 export async function OrderDetailPanel({
   order,
@@ -32,7 +35,7 @@ export async function OrderDetailPanel({
   compact?: boolean;
   showOpenAction?: boolean;
 }) {
-  const t = await getTranslations();
+  const [t, locale] = await Promise.all([getTranslations(), getLocale()]);
   const context = await requireStoreContext();
   const store = await getStoreSettings(context.storeId);
   const total = Number(order.total);
@@ -93,9 +96,215 @@ export async function OrderDetailPanel({
       : store.prefs.zalo.invoiceTemplateId && order.customerPhone)
   );
 
+  const secondaryActions = (
+    <OrderDetailActionGroup label={t("common.actions")}>
+      {isQuote && !cancelled ? <QuoteDeleteButton quoteId={order.id} /> : !cancelled && <OrderActions orderId={order.id} />}
+      {!isQuote && canSendZalo && <SendOrderZaloButton orderId={order.id} />}
+    </OrderDetailActionGroup>
+  );
+  const primaryActions = (
+      <OrderDetailActionGroup label={t("common.actions")} alignEnd>
+        {canCreateInvoiceFromDraft && (order.isPosCartDraft || !order.warehouseId ? (
+          <Link
+            href={posSourceHref("edit", "invoice")}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(buttonVariants({ variant: "default", size: "sm" }), modalActionSizeClassName)}
+          >
+            {t("orders.createInvoiceFromDraft")}
+          </Link>
+        ) : <CreateInvoiceFromDraftButton orderId={order.id} />)}
+        {!isQuote && !cancelled && remaining > 0 && <PaymentForm key={`${order.id}:${remaining}`} orderId={order.id} remaining={remaining} />}
+        {isQuote && !order.hasCreatedOrder && (
+          <Link href={posSourceHref("copy", "invoice")} className={cn(buttonVariants({ variant: "default", size: "sm" }), modalActionSizeClassName)}>
+            {t("quotes.convert")}
+          </Link>
+        )}
+        {isBooking && !cancelled && <BookingCreateOrderButton bookingId={order.id} />}
+        {shareDocType && shareHref && <SharePrintDocButton href={shareHref} code={order.code} docType={shareDocType} />}
+        <PrintTemplateMenu
+          baseHref={`${Routes.order(order.id)}/print`}
+          templates={printTemplates}
+          label={t("print.printBtn")}
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}
+        />
+        {(order.status === "completed" || order.status === "quote" || order.status === "confirmed" || (order.status === "returned" && order.returns.length > 0) || editableDraft) && (
+          order.returns.length > 0 ? (
+            <DisabledEditTooltip
+              reason={t("orderEdit.errors.hasReturns")}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName, "bg-white dark:bg-surface")}
+            >
+              {isBooking ? t("bookings.edit") : t("orderEdit.action")}
+            </DisabledEditTooltip>
+          ) : (
+            <Link href={posSourceHref(editableDraft ? "draft_edit" : "edit")} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName, "bg-white dark:bg-surface")}>
+              {isQuote
+                ? t("quotes.edit")
+                : isBooking
+                  ? t("bookings.edit")
+                  : editableDraft
+                    ? t("orderEdit.editDraftAction")
+                    : t("orderEdit.action")}
+            </Link>
+          )
+        )}
+        {!cancelled && (
+          <Link href={posSourceHref("copy")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}>
+            {t("pos.modes.copyShort")}
+          </Link>
+        )}
+        {order.status === "completed" && (
+          <Link href={posSourceHref("return")} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}>
+            {t("returns.action")}
+          </Link>
+        )}
+        {showOpenAction && (
+          <Link href={openInListHref} className={cn(buttonVariants({ variant: "default", size: "sm" }), modalActionSizeClassName)}>
+            Mở phiếu
+          </Link>
+        )}
+      </OrderDetailActionGroup>
+  );
+  const actionGroups = <>{secondaryActions}{primaryActions}</>;
+  // The native "…" menu lists everyday actions first and destructive ones (cancel) last.
+  const mobileActions = <>{primaryActions}{secondaryActions}</>;
+  const lastPaymentMethod = order.payments.length > 0 ? order.payments[order.payments.length - 1]?.method : null;
+
   return (
-    <div className={cn("bg-surface", compact && "flex h-full min-h-0 flex-col")}>
-      <div className={cn(compact ? "min-h-0 flex-1 overflow-y-auto p-4 sm:p-5" : "space-y-4")}>
+    <div className={cn("bg-surface max-lg:bg-canvas", compact && "flex h-full min-h-0 flex-col")}>
+      <div className={cn(compact ? "min-h-0 flex-1 overflow-y-auto p-4 sm:p-5 max-lg:p-0" : "space-y-4")}>
+      <MobileDetailNav title={order.code} actions={mobileActions} />
+      {/* NativeInvoiceDetailView: summary, products, payment info, totals, history and note cards. */}
+      <div className="space-y-ios-section px-ios-inset pb-8 pt-3 lg:hidden">
+        <section className="rounded-[22px] bg-surface p-ios-inset">
+          <div className="break-words text-[22px] font-bold leading-7">{order.code}</div>
+          <div className="mt-1.5 text-[17px]">
+            <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} openInCurrentTab className="!min-h-0 text-ios-accent" />
+          </div>
+          <div className="mt-1.5 text-[13px] text-ios-label-secondary">{mobileDocumentTimestamp(order.createdAt, locale)}</div>
+          <div className="mt-3 flex items-center gap-1.5">
+            {/* iOS status capsules: full labels, 15pt semibold, tinted. */}
+            <span className={cn("inline-flex h-[25px] shrink-0 items-center rounded-full px-2.5 text-[12px] font-semibold", order.status === "completed" ? "bg-ios-green/12 text-ios-green" : order.status === "cancelled" ? "bg-ios-red/12 text-ios-red" : order.status === "returned" ? "bg-ios-orange/12 text-ios-orange" : "bg-ios-accent/12 text-ios-accent")}>
+              {t(`mobile.orderDetail.status.${["completed", "cancelled", "returned", "draft", "quote", "confirmed", "delivering", "merged"].includes(order.status) ? order.status : "draft"}`)}
+            </span>
+            {!isQuote && !cancelled && (
+              <span className={cn("inline-flex h-[25px] min-w-0 items-center truncate rounded-full px-2.5 text-[12px] font-semibold", order.paymentStatus === "paid" ? "bg-ios-green/12 text-ios-green" : "bg-ios-orange/12 text-ios-orange")}>
+                {t(`mobile.orderDetail.payment.${order.paymentStatus === "paid" ? "paid" : order.paymentStatus === "partial" || order.paymentStatus === "deposit" ? "partial" : "unpaid"}`)}
+              </span>
+            )}
+            <span className="ml-auto shrink-0 whitespace-nowrap text-[20px] font-bold tabular-nums text-ios-accent">{formatCurrency(total)}</span>
+          </div>
+          {(mergedSource && order.replacedByOrderId) || order.returns.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-3 text-[15px] font-semibold">
+              {mergedSource && order.replacedByOrderId && <Link href={Routes.order(order.replacedByOrderId)} className="text-ios-accent">Xem đơn gộp</Link>}
+              {order.returns.length > 0 && <Link href="#order-returns-mobile" className="text-ios-orange">Đã trả hàng ({order.returns.length})</Link>}
+            </div>
+          ) : null}
+        </section>
+
+        <section className="rounded-[22px] bg-surface p-ios-inset">
+          <h2 className="text-[17px] font-bold">{t("mobile.orderDetail.products", { count: order.items.length })}</h2>
+          <div className="mt-2 divide-y divide-border">
+            {order.items.map((item) => {
+              const pricing = readOrderLinePricing(item);
+              const image = Array.isArray(item.productImageUrls) && typeof item.productImageUrls[0] === "string" ? item.productImageUrls[0] : null;
+              return (
+                <div key={item.id} className="flex items-start gap-3 py-3">
+                  {image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={image} alt="" className="size-16 shrink-0 rounded-[14px] border border-border bg-white object-cover" />
+                  ) : (
+                    <span className="grid size-16 shrink-0 place-items-center rounded-[14px] border border-border bg-black/[0.05] text-ios-label-tertiary dark:bg-white/10" aria-hidden="true">
+                      <Package className="size-7" strokeWidth={1.6} />
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] leading-5 [&_a]:!min-h-0 [&_a]:!text-ios-label">
+                      <OrderProductLink productId={item.productId} productName={productDisplayName({ name: item.productName, variantName: item.productVariantName, specs: item.productSpecs })} />
+                    </div>
+                    <div className="mt-1 text-[13px] text-ios-label-secondary">{formatNumber(Number(item.quantity))} {item.unitName} · {formatCurrency(pricing.unitPrice)}</div>
+                    {pricing.discount > 0 && (
+                      <div className="mt-1 text-[11px] text-ios-label-secondary">{t("mobile.orderDetail.discount", { amount: `${pricing.lineDiscountMode === "pct" ? `${formatNumber(pricing.lineDiscountValue)}% · ` : ""}${formatCurrency(pricing.discount)}` })}</div>
+                    )}
+                    <div className="mt-1 text-[11px] text-ios-label-secondary">{t("mobile.orderDetail.netUnitPrice", { amount: formatCurrency(pricing.netUnitPrice) })}</div>
+                    {item.priceBookName && <div className="mt-1 text-[13px] text-ios-label-secondary">{item.priceBookName}</div>}
+                    {(order.returnedByItem[item.id] ?? 0) > 0 && (
+                      <div className="mt-1 text-[13px] text-ios-orange">{t("returns.returnedQty", { qty: formatNumber(order.returnedByItem[item.id]), unit: item.unitName })}</div>
+                    )}
+                  </div>
+                  <div className="shrink-0 text-right text-[15px] tabular-nums">{formatCurrency(Number(item.total))}</div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {!isQuote && (
+          <section className="space-y-2.5 rounded-[22px] bg-surface p-ios-inset text-[15px]">
+            <h2 className="text-[17px] font-bold">{t("mobile.orderDetail.paymentInfo")}</h2>
+            <MobileInfoRow label={t("orders.detail.paid")} value={formatCurrency(paid)} />
+            <MobileInfoRow label={t("mobile.orderDetail.paymentMethod")} value={lastPaymentMethod ? t(`pos.payMethods.${lastPaymentMethod}` as never) : t("mobile.orderDetail.notSpecified")} />
+          </section>
+        )}
+
+        <section className="space-y-2.5 rounded-[22px] bg-surface p-ios-inset text-[15px]">
+          <h2 className="text-[17px] font-bold">{t("mobile.orderDetail.totals")}</h2>
+          <MobileInfoRow label={t("pos.subtotal")} value={formatCurrency(Number(order.subtotal))} />
+          <MobileInfoRow label={t("pos.discount")} value={formatCurrency(Number(order.discount))} />
+          <MobileInfoRow label={effectiveTaxRate === null ? t("pos.tax") : t("mobile.orderDetail.taxRate", { rate: formatNumber(effectiveTaxRate) })} value={formatCurrency(taxAmount)} />
+          <MobileInfoRow label={t("mobile.orderDetail.shipping")} value={formatCurrency(Number(order.shippingFee))} />
+          <div className="border-t border-border pt-2.5">
+            <MobileInfoRow label={t("pos.total")} value={formatCurrency(total)} valueClassName="font-semibold text-ios-accent" />
+          </div>
+          {!isQuote && !mergedSource && <MobileInfoRow label={t("orders.detail.paid")} value={formatCurrency(paid)} valueClassName="font-semibold text-ios-green" />}
+          {!isQuote && !mergedSource && <MobileInfoRow label={t("mobile.orderDetail.remaining")} value={formatCurrency(remaining)} valueClassName={remaining > 0 ? undefined : "text-ios-green"} />}
+          {order.grossProfit !== null && <ProfitVisibility label={t("dashboard.grossProfit")} value={Number(order.grossProfit)} className="pt-1 [&>div:first-child]:text-[17px]" />}
+        </section>
+
+        {order.returns.length > 0 && (
+          <section id="order-returns-mobile" className="rounded-[22px] bg-surface p-ios-inset">
+            <h2 className="text-[17px] font-bold">{t("returns.sectionTitle")} ({order.returns.length})</h2>
+            <div className="mt-2 divide-y divide-border">
+              {order.returns.map((row) => (
+                <div key={row.id} className="flex items-start justify-between gap-3 py-3 text-[15px]">
+                  <div className="min-w-0">
+                    <Link href={`/sales?tab=returns&expandedReturn=${encodeURIComponent(row.id)}`} className="font-semibold text-ios-accent">{row.code}</Link>
+                    <div className="mt-0.5 text-[13px] text-ios-label-secondary">{mobileDocumentTimestamp(row.createdAt, locale)} · {t(`returns.reasons.${row.reason}` as never)}</div>
+                  </div>
+                  <div className={cn("shrink-0 font-semibold tabular-nums", row.status === "cancelled" ? "text-ios-label-tertiary line-through" : "text-ios-red")}>- {formatCurrency(Number(row.totalRefund))}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className="rounded-[22px] bg-surface p-ios-inset">
+          <h2 className="text-[17px] font-bold">{t("mobile.orderDetail.paymentHistory")}</h2>
+          {isQuote || order.payments.length === 0 ? (
+            <p className="mt-2 text-[15px] text-ios-label-secondary">{t("mobile.orderDetail.noPayments")}</p>
+          ) : (
+            <div className="mt-1 divide-y divide-border">
+              {order.payments.map((payment) => (
+                <div key={payment.id} className="flex items-start justify-between gap-3 py-2.5">
+                  <div className="min-w-0">
+                    <div className="text-[15px]">{t(`pos.payMethods.${payment.method}` as never)}</div>
+                    <div className="mt-0.5 text-[13px] text-ios-label-secondary">
+                      {[mobileDocumentTimestamp(payment.createdAt, locale), payment.reference, payment.note].filter(Boolean).join(" · ")}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-[15px] font-semibold tabular-nums text-ios-green">+ {formatCurrency(Number(payment.amount))}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-3 border-t border-border pt-3">
+            <h2 className="text-[17px] font-bold">{t("mobile.orderDetail.note")}</h2>
+            <p className={cn("mt-2 whitespace-pre-wrap text-[15px]", !order.note && "text-ios-label-secondary")}>{order.note || t("mobile.orderDetail.noNote")}</p>
+            {order.systemNote && <p className="mt-2 whitespace-pre-wrap text-[13px] text-ios-label-secondary">{order.systemNote}</p>}
+          </div>
+        </section>
+      </div>
+      <div className="max-lg:hidden">
       <div className={cn("mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between", compact && "mb-4")}>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -348,80 +557,17 @@ export async function OrderDetailPanel({
 
         </div>
       </div>
+      </div>
 
       </div>
 
       <div
         className={cn(
-          "flex shrink-0 flex-col gap-3 border-t border-border-soft xl:flex-row xl:items-center xl:justify-between",
+          "flex shrink-0 flex-col gap-3 border-t border-border-soft max-lg:hidden xl:flex-row xl:items-center xl:justify-between",
           compact ? "bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-4" : "mt-4 pt-4",
         )}
       >
-        <OrderDetailActionGroup label={t("common.actions")}>
-          {isQuote && !cancelled ? <QuoteDeleteButton quoteId={order.id} /> : !cancelled && <OrderActions orderId={order.id} />}
-          {!isQuote && canSendZalo && <SendOrderZaloButton orderId={order.id} />}
-        </OrderDetailActionGroup>
-        <OrderDetailActionGroup label={t("common.actions")} alignEnd>
-          {canCreateInvoiceFromDraft && (order.isPosCartDraft || !order.warehouseId ? (
-            <Link
-              href={posSourceHref("edit", "invoice")}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(buttonVariants({ variant: "default", size: "sm" }), modalActionSizeClassName)}
-            >
-              {t("orders.createInvoiceFromDraft")}
-            </Link>
-          ) : <CreateInvoiceFromDraftButton orderId={order.id} />)}
-          {!isQuote && !cancelled && remaining > 0 && <PaymentForm key={`${order.id}:${remaining}`} orderId={order.id} remaining={remaining} />}
-          {isQuote && !order.hasCreatedOrder && (
-            <Link href={posSourceHref("copy", "invoice")} className={cn(buttonVariants({ variant: "default", size: "sm" }), modalActionSizeClassName)}>
-              {t("quotes.convert")}
-            </Link>
-          )}
-          {isBooking && !cancelled && <BookingCreateOrderButton bookingId={order.id} />}
-          {shareDocType && shareHref && <SharePrintDocButton href={shareHref} code={order.code} docType={shareDocType} />}
-          <PrintTemplateMenu
-            baseHref={`${Routes.order(order.id)}/print`}
-            templates={printTemplates}
-            label={t("print.printBtn")}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}
-          />
-          {(order.status === "completed" || order.status === "quote" || order.status === "confirmed" || (order.status === "returned" && order.returns.length > 0) || editableDraft) && (
-            order.returns.length > 0 ? (
-              <DisabledEditTooltip
-                reason={t("orderEdit.errors.hasReturns")}
-                className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName, "bg-white dark:bg-surface")}
-              >
-                {isBooking ? t("bookings.edit") : t("orderEdit.action")}
-              </DisabledEditTooltip>
-            ) : (
-              <Link href={posSourceHref(editableDraft ? "draft_edit" : "edit")} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName, "bg-white dark:bg-surface")}>
-                {isQuote
-                  ? t("quotes.edit")
-                  : isBooking
-                    ? t("bookings.edit")
-                    : editableDraft
-                      ? t("orderEdit.editDraftAction")
-                      : t("orderEdit.action")}
-              </Link>
-            )
-          )}
-          {!cancelled && (
-            <Link href={posSourceHref("copy")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}>
-              {t("pos.modes.copyShort")}
-            </Link>
-          )}
-          {order.status === "completed" && (
-            <Link href={posSourceHref("return")} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), modalActionSizeClassName)}>
-              {t("returns.action")}
-            </Link>
-          )}
-          {showOpenAction && (
-            <Link href={openInListHref} className={cn(buttonVariants({ variant: "default", size: "sm" }), modalActionSizeClassName)}>
-              Mở phiếu
-            </Link>
-          )}
-        </OrderDetailActionGroup>
+        {actionGroups}
       </div>
     </div>
   );
@@ -454,6 +600,15 @@ function InfoLine({
       <span className={cn("text-right tabular-nums", strong && "font-semibold", valueClassName)}>
         {children ?? value ?? "—"}
       </span>
+    </div>
+  );
+}
+
+function MobileInfoRow({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-ios-label-secondary">{label}</span>
+      <span className={cn("text-right tabular-nums", valueClassName)}>{value}</span>
     </div>
   );
 }

@@ -1214,6 +1214,37 @@
     }
   },
   "mobile": {
+    "orderDetail": {
+      "shipping": "Phí giao hàng",
+      "remaining": "Còn lại",
+      "status": {
+        "completed": "Hoàn thành",
+        "cancelled": "Đã hủy",
+        "returned": "Đã trả hàng",
+        "draft": "Nháp",
+        "quote": "Báo giá",
+        "confirmed": "Đặt hàng",
+        "delivering": "Đang giao",
+        "merged": "Đã gộp"
+      },
+      "payment": {
+        "paid": "Đã thanh toán",
+        "partial": "Thanh toán một phần",
+        "unpaid": "Chưa thanh toán"
+      },
+      "products": "Sản phẩm ({count})",
+      "discount": "Giảm giá: {amount}",
+      "netUnitPrice": "Đơn giá sau giảm: {amount}",
+      "paymentInfo": "Thông tin thanh toán",
+      "paymentMethod": "Phương thức thanh toán",
+      "notSpecified": "Chưa xác định",
+      "totals": "Tổng kết đơn hàng",
+      "taxRate": "Thuế ({rate}%)",
+      "paymentHistory": "Lịch sử thanh toán",
+      "noPayments": "Chưa có giao dịch thanh toán.",
+      "note": "Ghi chú",
+      "noNote": "Chưa có ghi chú."
+    },
     "invoices": {
       "tabSales": "Đơn bán",
       "select": "Chọn",

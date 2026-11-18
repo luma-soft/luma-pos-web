@@ -36,3 +36,11 @@ test("native day groups carry today/yesterday titles and the day's count and com
   expect(groups.get("c")).toEqual({ title: "Hôm qua · 16/11/2026", summary: "1 đơn · 300 nghìn" });
   expect(mobileDocumentCompactTotal(950, "vi")).toBe("950 ₫");
 });
+
+test("timestamps match iOS medium/short output without Intl differences", async () => {
+  const { mobileDocumentTimestamp } = await import("./mobile-document-day.ts");
+  const date = new Date(2026, 10, 17, 20, 14);
+  expect(mobileDocumentTimestamp(date, "vi")).toBe("20:14 ngày 17 thg 11, 2026");
+  expect(mobileDocumentTimestamp(date, "en")).toBe("Nov 17, 2026 at 8:14 PM");
+  expect(mobileDocumentTimestamp("bad", "vi")).toBe("");
+});

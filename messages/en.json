@@ -1214,6 +1214,37 @@
     }
   },
   "mobile": {
+    "orderDetail": {
+      "shipping": "Shipping",
+      "remaining": "Remaining",
+      "status": {
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "returned": "Returned",
+        "draft": "Draft",
+        "quote": "Quote",
+        "confirmed": "Order",
+        "delivering": "Delivering",
+        "merged": "Merged"
+      },
+      "payment": {
+        "paid": "Paid",
+        "partial": "Partially paid",
+        "unpaid": "Unpaid"
+      },
+      "products": "Products ({count})",
+      "discount": "Discount: {amount}",
+      "netUnitPrice": "Net unit price: {amount}",
+      "paymentInfo": "Payment details",
+      "paymentMethod": "Payment method",
+      "notSpecified": "Not specified",
+      "totals": "Order summary",
+      "taxRate": "Tax ({rate}%)",
+      "paymentHistory": "Payment history",
+      "noPayments": "No payments yet.",
+      "note": "Note",
+      "noNote": "No note."
+    },
     "invoices": {
       "tabSales": "Sales",
       "select": "Select",
