@@ -18,7 +18,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0C7B6B",
+  // Matches the native app's grouped background (systemGroupedBackground) so the
+  // status-bar area and launch screen blend with the mobile UI in light and dark.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F2F2F7" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
   viewportFit: "cover",
 };
 

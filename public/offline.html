@@ -3,16 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0C7B6B" />
+  <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
   <title>LumaPOS · Ngoại tuyến</title>
   <style>
     :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: Canvas; color: CanvasText; }
+    body { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: #F2F2F7; color: #000; }
+    @media (prefers-color-scheme: dark) { body { background: #000; color: #fff; } a { background: #0A84FF; } }
     main { padding: 24px; max-width: 420px; text-align: center; }
     h1 { font-size: 22px; line-height: 1.25; }
     p { font-size: 16px; line-height: 1.55; opacity: .8; }
-    a { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; margin-top: 12px; padding: 0 24px; border-radius: 12px; background: #0C7B6B; color: white; font-weight: 700; text-decoration: none; }
-    a:focus-visible { outline: 3px solid #0C7B6B; outline-offset: 3px; }
+    a { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; margin-top: 12px; padding: 0 24px; border-radius: 14px; background: #007AFF; color: white; font-weight: 700; text-decoration: none; }
+    a:focus-visible { outline: 3px solid #007AFF; outline-offset: 3px; }
   </style>
 </head>
 <body>
