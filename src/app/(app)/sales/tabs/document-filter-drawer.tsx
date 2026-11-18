@@ -1,6 +1,5 @@
 "use client";
 
-import { MoneyInput, type MoneyInputProps } from "@/components/ui/money-input";
 import { Toggle } from "@/components/ui/toggle";
 import {
   useCallback,
@@ -8,13 +7,14 @@ import {
   useRef,
   useState,
   type FormEvent,
-  type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Barcode,
   Building2,
   FileText,
+  Package,
   UserRound,
   X,
 } from "lucide-react";
@@ -44,6 +44,17 @@ import {
   LumaWebPicker,
   collectFocusableElements,
 } from "./filter-drawer-shared";
+import { MobileDateRangeScreen } from "./filter-mobile-screens";
+import {
+  AmountRangeRows,
+  ChipSection,
+  FilterDrawerFooter,
+  FilterSection,
+  LabeledInput,
+  MobileDateRangeRow,
+  MobileFilterHeader,
+  MobileSwitchRow,
+} from "./filter-drawer-sections";
 
 export type DocumentFilterKind = "returns" | "quotes" | "bookings";
 
@@ -290,6 +301,32 @@ function amountRangeInvalid(draft: DocumentFilterDraft) {
   return hasMin && hasMax && min > max;
 }
 
+/** Phone header count (NativeInvoiceFilterState / NativeReturnsFilterState activeCount). */
+function activeConditionCount(kind: DocumentFilterKind, draft: DocumentFilterDraft) {
+  return [
+    Boolean(draft.customerId || draft.customerLabel),
+    Boolean(draft.productId || draft.productLabel),
+    kind !== "returns" && Boolean(draft.projectId || draft.projectLabel || draft.projectQuery),
+    kind === "returns" && Boolean(draft.orderId || draft.orderLabel),
+    draft.timePreset !== DEFAULT_TIME_FILTER_PRESET,
+    kind === "bookings" && draft.deliveryPreset !== "all",
+    kind === "quotes" && draft.status !== "quote",
+    kind === "bookings" && draft.status !== "all",
+    kind === "bookings" && draft.payment !== "all",
+    kind === "returns" && draft.reason !== "all",
+    kind === "returns" && draft.refundMethod !== "all",
+    Boolean(draft.minTotal.trim()),
+    Boolean(draft.maxTotal.trim()),
+    draft.includeCancelled,
+  ].filter(Boolean).length;
+}
+
+const mobileTitleKey = {
+  returns: "mobile.invoices.filters.titleReturns",
+  quotes: "mobile.invoices.filters.titleQuotes",
+  bookings: "mobile.invoices.filters.titleBookings",
+} as const;
+
 export function hasActiveDocumentFilters(
   kind: DocumentFilterKind,
   values: DocumentFilterValues,
@@ -337,7 +374,9 @@ export function DocumentFilterDrawer({
   values: DocumentFilterValues;
 }) {
   const router = useRouter();
+  const t = useTranslations();
   const labels = copy[kind];
+  const [dateScreen, setDateScreen] = useState<"created" | "delivery" | null>(null);
   const panelRef = useRef<HTMLElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const requestId = useRef(0);
@@ -366,6 +405,7 @@ export function DocumentFilterDrawer({
 
   const closeDrawer = useCallback(() => {
     setDraft(createDraftFromValues(kind, values));
+    setDateScreen(null);
     setOpen(false);
   }, [kind, values]);
 
@@ -374,6 +414,8 @@ export function DocumentFilterDrawer({
     const panel = panelRef.current;
     const focusElements = () => collectFocusableElements(panel);
     window.requestAnimationFrame(() => {
+      // Phones open like the native sheet: no field focused, no focus ring on Cancel.
+      if (window.matchMedia("(max-width: 1023px)").matches) return;
       focusElements()[0]?.focus();
     });
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -454,10 +496,17 @@ export function DocumentFilterDrawer({
     return () => window.clearTimeout(debounceTimer);
   }, [invalid, open, runDocumentCountQuery]);
 
+  // Return focus to the trigger only after the drawer actually closed, not on first render.
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (!open) {
-      window.requestAnimationFrame(() => openButtonRef.current?.focus());
+    if (open) {
+      wasOpen.current = true;
+      return;
     }
+    if (!wasOpen.current) return;
+    wasOpen.current = false;
+    if (window.matchMedia("(max-width: 1023px)").matches) return;
+    window.requestAnimationFrame(() => openButtonRef.current?.focus());
   }, [open]);
 
   function updateDraft(partial: Partial<DocumentFilterDraft>) {
@@ -616,10 +665,15 @@ export function DocumentFilterDrawer({
             role="dialog"
             aria-modal="true"
             aria-labelledby={`${kind}-filter-title`}
-            className="ml-auto flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-surface shadow-2xl lg:h-full lg:max-w-md lg:overflow-visible"
+            className="ml-auto flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-surface shadow-2xl max-lg:bg-canvas lg:h-full lg:max-w-md lg:overflow-visible"
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <header className="flex shrink-0 items-start border-b border-border px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-4 lg:px-6 lg:py-5">
+            <MobileFilterHeader
+              title={t(mobileTitleKey[kind])}
+              conditionCount={activeConditionCount(kind, draft)}
+              onCancel={closeDrawer}
+            />
+            <header className="flex shrink-0 items-start border-b border-border px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-4 max-lg:hidden lg:px-6 lg:py-5">
               <div className="min-w-0 flex-1">
                 <h2
                   id={`${kind}-filter-title`}
@@ -650,9 +704,13 @@ export function DocumentFilterDrawer({
               <input type="hidden" name="tab" value={kind} />
               {values.q && <input type="hidden" name="q" value={values.q} />}
 
-              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 lg:space-y-6 lg:px-6 lg:py-5">
-                <FilterSection title="Tìm theo">
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 max-lg:space-y-ios-section max-lg:pb-6 max-lg:pt-1 lg:space-y-6 lg:px-6 lg:py-5">
+                <FilterSection
+                  title="Tìm theo"
+                  mobileTitle={t(kind === "returns" ? "mobile.invoices.filters.partySection" : "mobile.invoices.filters.findBy")}
+                >
                   <LumaEntityPicker
+                    mobileIcon={<UserRound />}
                     label="Khách hàng"
                     name="customerId"
                     labelName="customerLabel"
@@ -667,6 +725,7 @@ export function DocumentFilterDrawer({
                     }
                   />
                   <LumaEntityPicker
+                    mobileIcon={<Package />}
                     label="Sản phẩm"
                     name="productId"
                     labelName="productLabel"
@@ -683,6 +742,7 @@ export function DocumentFilterDrawer({
                   {kind === "returns" && (
                     <>
                       <LumaEntityPicker
+                        mobileIcon={<FileText />}
                         label="Đơn gốc"
                         name="orderId"
                         labelName="orderLabel"
@@ -700,6 +760,7 @@ export function DocumentFilterDrawer({
                   )}
                   {kind !== "returns" && (
                     <LumaEntityPicker
+                      mobileIcon={<Building2 />}
                       label="Công trình"
                       name="projectId"
                       labelName="projectLabel"
@@ -716,7 +777,16 @@ export function DocumentFilterDrawer({
                   )}
                 </FilterSection>
 
-                <FilterSection title="Thời gian">
+                <FilterSection title="Thời gian" mobileTitle={t("mobile.invoices.filters.time")}>
+                  <MobileDateRangeRow
+                    label={t("mobile.invoices.filters.range")}
+                    valueLabel={ORDER_TIME_PRESETS.find((option) => option.value === draft.timePreset)?.label}
+                    from={draft.from}
+                    to={draft.to}
+                    showRange={draft.timePreset !== "all"}
+                    onOpen={() => setDateScreen("created")}
+                  />
+                  <div className="space-y-3 max-lg:hidden">
                   <LumaWebPicker
                     name="timePreset"
                     ariaLabel="Khoảng thời gian"
@@ -745,12 +815,14 @@ export function DocumentFilterDrawer({
                       }
                     />
                   )}
+                  </div>
                 </FilterSection>
 
                 {kind === "returns" && (
                   <>
-                    <FilterSection title="Lý do trả hàng">
+                    <FilterSection title="Lý do trả hàng" mobileTitle={t("mobile.invoices.filters.returnSection")}>
                       <LumaWebPicker
+                        rowLabel={t("mobile.invoices.filters.reason")}
                         name="reason"
                         ariaLabel="Lý do trả hàng"
                         value={draft.reason}
@@ -760,7 +832,27 @@ export function DocumentFilterDrawer({
                         }))}
                         onChange={(value) => updateDraft({ reason: value })}
                       />
+                      {/* Phones keep the refund method and cancelled switch in this card. */}
+                      <div className="lg:hidden">
+                        <LumaWebPicker
+                          rowLabel={t("mobile.invoices.filters.refundMethod")}
+                          name="refundMethod"
+                          ariaLabel={t("mobile.invoices.filters.refundMethod")}
+                          value={draft.refundMethod}
+                          options={returnRefundMethods.map((value) => ({
+                            value,
+                            label: refundMethodLabels[value],
+                          }))}
+                          onChange={(value) => updateDraft({ refundMethod: value })}
+                        />
+                      </div>
+                      <MobileSwitchRow
+                        label={t("mobile.invoices.filters.includeCancelledReturns")}
+                        checked={draft.includeCancelled}
+                        onChange={(checked) => updateDraft({ includeCancelled: checked })}
+                      />
                     </FilterSection>
+                    <div className="max-lg:hidden">
                     <ChipSection
                       title="Phương thức hoàn tiền"
                       name="refundMethod"
@@ -771,7 +863,8 @@ export function DocumentFilterDrawer({
                       }))}
                       onChange={(value) => updateDraft({ refundMethod: value })}
                     />
-                    <label className="flex items-center gap-4 border-y border-border py-4 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">
+                    </div>
+                    <label className="flex items-center gap-4 border-y border-border py-4 max-lg:hidden min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-bold">
                           Hiện phiếu đã hủy
@@ -791,8 +884,9 @@ export function DocumentFilterDrawer({
                 )}
 
                 {kind === "quotes" && (
-                  <FilterSection title="Trạng thái">
+                  <FilterSection title="Trạng thái" mobileTitle={t("mobile.invoices.filters.statusSection")}>
                     <LumaWebPicker
+                      rowLabel={t("mobile.invoices.filters.quoteStatus")}
                       name="status"
                       ariaLabel="Trạng thái báo giá"
                       value={draft.status}
@@ -804,7 +898,16 @@ export function DocumentFilterDrawer({
 
                 {kind === "bookings" && (
                   <>
-                    <FilterSection title="Ngày giao">
+                    <FilterSection title="Ngày giao" mobileTitle={t("mobile.invoices.filters.deliverySection")}>
+                      <MobileDateRangeRow
+                        label={t("mobile.invoices.filters.deliveryRange")}
+                        valueLabel={BOOKING_DELIVERY_PRESETS.find((option) => option.value === draft.deliveryPreset)?.label}
+                        from={draft.deliveryFrom}
+                        to={draft.deliveryTo}
+                        showRange={draft.deliveryPreset !== "all" && draft.deliveryPreset !== "overdue"}
+                        onOpen={() => setDateScreen("delivery")}
+                      />
+                      <div className="space-y-3 max-lg:hidden">
                       <LumaWebPicker
                         name="deliveryPreset"
                         ariaLabel="Khoảng ngày giao"
@@ -833,9 +936,11 @@ export function DocumentFilterDrawer({
                           }
                         />
                       )}
+                      </div>
                     </FilterSection>
-                    <FilterSection title="Trạng thái">
+                    <FilterSection title="Trạng thái" mobileTitle={t("mobile.invoices.filters.statusSection")}>
                       <LumaWebPicker
+                        rowLabel={t("mobile.invoices.filters.bookingStatus")}
                         name="status"
                         ariaLabel="Trạng thái đặt hàng"
                         value={draft.status}
@@ -843,8 +948,9 @@ export function DocumentFilterDrawer({
                         onChange={(value) => updateDraft({ status: value })}
                       />
                     </FilterSection>
-                    <FilterSection title="Trạng thái thanh toán">
+                    <FilterSection title="Trạng thái thanh toán" mobileTitle={t("mobile.invoices.filters.paymentSection")}>
                       <LumaWebPicker
+                        rowLabel={t("mobile.invoices.filters.paymentStatus")}
                         name="payment"
                         ariaLabel="Trạng thái thanh toán"
                         value={draft.payment}
@@ -855,9 +961,13 @@ export function DocumentFilterDrawer({
                   </>
                 )}
 
-                <FilterSection title={kind === "returns" ? "Khoảng tiền hoàn" : "Khoảng giá trị"}>
-                  <div className="grid grid-cols-2 gap-3">
+                <FilterSection
+                  title={kind === "returns" ? "Khoảng tiền hoàn" : "Khoảng giá trị"}
+                  mobileTitle={t(kind === "returns" ? "mobile.invoices.filters.refundAmount" : "mobile.invoices.filters.orderValue")}
+                >
+                  <AmountRangeRows>
                     <LabeledInput
+                      mobileLabel={t("mobile.invoices.filters.minimum")}
                       label="Từ"
                       name="minTotal"
                       value={draft.minTotal}
@@ -868,6 +978,7 @@ export function DocumentFilterDrawer({
                       }
                     />
                     <LabeledInput
+                      mobileLabel={t("mobile.invoices.filters.maximum")}
                       label="Đến"
                       name="maxTotal"
                       value={draft.maxTotal}
@@ -877,36 +988,52 @@ export function DocumentFilterDrawer({
                         updateDraft({ maxTotal: value == null ? "" : String(value) })
                       }
                     />
-                  </div>
+                  </AmountRangeRows>
                   {amountError && (
-                    <p className="text-xs font-semibold text-red-600">
+                    <p className="text-xs font-semibold text-red-600 max-lg:px-4 max-lg:pb-2.5 max-lg:text-[13px] max-lg:font-normal">
                       Giá trị từ không được lớn hơn giá trị đến.
                     </p>
                   )}
                 </FilterSection>
               </div>
 
-              <footer className="grid shrink-0 grid-cols-2 gap-3 border-t border-border bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] lg:px-6 lg:py-4 lg:pb-[calc(1rem+env(safe-area-inset-bottom))]">
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary-600 font-bold text-primary-700 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0"
-              >
-                  Xóa lọc
-                </button>
-                <button
-                  type="submit"
-                  disabled={invalid}
-                  aria-busy={countPending && !invalid}
-                  className="min-h-11 rounded-xl bg-primary-600 px-4 font-bold text-white hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0"
-                >
-                  <span aria-live="polite">
-                    {invalid || count === null
-                      ? `Xem … ${labels.unit}`
-                      : `Xem ${count} ${labels.unit}`}
-                  </span>
-                </button>
-              </footer>
+              <FilterDrawerFooter
+                onClear={clearFilters}
+                invalid={invalid}
+                pending={countPending}
+                desktopApplyLabel={invalid || count === null ? `Xem … ${labels.unit}` : `Xem ${count} ${labels.unit}`}
+                mobileApplyLabel={kind === "returns"
+                  ? invalid || count === null
+                    ? t("mobile.invoices.filters.resultCountPending")
+                    : t("mobile.invoices.filters.resultCount", { count })
+                  : invalid || count === null
+                    ? t("mobile.invoices.filters.resultsPending")
+                    : t("mobile.invoices.filters.results", { count })}
+              />
+              {dateScreen === "created" && (
+                <MobileDateRangeScreen
+                  title={t("mobile.invoices.filters.range")}
+                  presets={ORDER_TIME_PRESETS}
+                  preset={draft.timePreset}
+                  from={draft.from}
+                  to={draft.to}
+                  resolvePreset={(preset) => resolveOrderTimePreset(preset as OrderTimePreset) ?? null}
+                  onApply={({ preset, from, to }) => updateDraft({ timePreset: preset as OrderTimePreset | "custom", from, to })}
+                  onClose={() => setDateScreen(null)}
+                />
+              )}
+              {dateScreen === "delivery" && (
+                <MobileDateRangeScreen
+                  title={t("mobile.invoices.filters.deliveryRange")}
+                  presets={BOOKING_DELIVERY_PRESETS}
+                  preset={draft.deliveryPreset}
+                  from={draft.deliveryFrom}
+                  to={draft.deliveryTo}
+                  resolvePreset={(preset) => resolveBookingDeliveryPreset(preset as BookingDeliveryPreset)}
+                  onApply={({ preset, from, to }) => updateDraft({ deliveryPreset: preset as BookingDeliveryPreset, deliveryFrom: from, deliveryTo: to })}
+                  onClose={() => setDateScreen(null)}
+                />
+              )}
 
               <input type="hidden" name="tab" value={kind} />
               <input type="hidden" name="customerId" value={draft.customerId} />
@@ -970,78 +1097,5 @@ export function DocumentFilterDrawer({
         </div>
       )}
     </>
-  );
-}
-
-function FilterSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="space-y-3">
-      <h3 className="text-sm font-extrabold">{title}</h3>
-      {children}
-    </section>
-  );
-}
-
-function LabeledInput({
-  label,
-  suffix,
-  ...props
-}: MoneyInputProps & {
-  label: string;
-  suffix?: string;
-}) {
-  return (
-    <label className="block rounded-xl border border-border px-3 pb-2 pt-1 focus-within:border-primary-500 focus-within:ring-2 focus-visible:ring-primary-100">
-      <span className="block text-xs text-slate-500">{label}</span>
-      <span className="flex items-center gap-2">
-        <MoneyInput
-          {...props}
-          className="min-w-0 flex-1 border-0 rounded-none px-0 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
-        />
-        {suffix && <span className="text-sm font-semibold">{suffix}</span>}
-      </span>
-    </label>
-  );
-}
-
-function ChipSection({
-  title,
-  name,
-  value,
-  options,
-  onChange,
-}: {
-  title: string;
-  name: string;
-  value: string;
-  options: Array<{ value: string; label: string }>;
-  onChange?: (value: string) => void;
-}) {
-  return (
-    <FilterSection title={title}>
-      <div className="flex flex-wrap gap-2">
-        {options.map((option) => (
-          <label key={option.value} className="cursor-pointer min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">
-            <input
-              type="radio"
-              name={name}
-              value={option.value}
-              checked={value === option.value}
-              onChange={(event) => onChange?.(event.currentTarget.value)}
-              className="peer sr-only"
-            />
-            <span className="inline-flex min-h-10 items-center rounded-xl border border-border px-3 text-xs font-semibold transition hover:border-primary-300 peer-checked:border-primary-600 peer-checked:bg-primary-50 peer-checked:text-primary-700">
-              {option.label}
-            </span>
-          </label>
-        ))}
-      </div>
-    </FilterSection>
   );
 }

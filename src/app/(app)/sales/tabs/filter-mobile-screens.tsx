@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
-import { Check, CheckCircle2, ChevronLeft, ChevronRight, CircleX, ListFilter, Package, Search } from "lucide-react";
+import { Building2, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleX, FileText, ListFilter, Package, Search } from "lucide-react";
 import { isOrderDateRangeValid } from "@/lib/orders/filter-date-range";
 import { cn } from "@/lib/utils";
 import type { EntityPickerKind, EntityPickerOption, PickerOption } from "./filter-drawer-shared";
@@ -234,6 +234,14 @@ function ChoiceThumbnail({ kind, option }: { kind: EntityPickerKind; option: Ent
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={option.imageUrl} alt="" className="size-full object-cover" onError={() => setFailed(true)} />
           : <Package className="size-5" strokeWidth={2} aria-hidden="true" />}
+      </span>
+    );
+  }
+  if (kind !== "customer") {
+    const Icon = kind === "order" ? FileText : kind === "project" ? Building2 : Package;
+    return (
+      <span className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-ios-accent/12 text-ios-accent">
+        <Icon className="size-5" strokeWidth={2} aria-hidden="true" />
       </span>
     );
   }

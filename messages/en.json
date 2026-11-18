@@ -1294,7 +1294,24 @@
         "apply": "Apply",
         "fromDate": "From",
         "toDate": "To",
-        "invalidRange": "The date range is invalid or longer than one year."
+        "invalidRange": "The date range is invalid or longer than one year.",
+        "titleReturns": "Return filters",
+        "titleQuotes": "Quote filters",
+        "titleBookings": "Booking filters",
+        "partySection": "Customer and transaction",
+        "order": "Invoice",
+        "project": "Project",
+        "deliverySection": "Delivery date",
+        "deliveryRange": "Delivery period",
+        "quoteStatus": "Quote status",
+        "bookingStatus": "Booking status",
+        "returnSection": "Reason and refund",
+        "reason": "Return reason",
+        "refundMethod": "Refund method",
+        "includeCancelledReturns": "Include cancelled returns",
+        "refundAmount": "Refund amount",
+        "resultCount": "{count} results",
+        "resultCountPending": "… results"
       }
     },
     "dashboard": {

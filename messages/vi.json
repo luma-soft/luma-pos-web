@@ -1294,7 +1294,24 @@
         "apply": "Áp dụng",
         "fromDate": "Từ ngày",
         "toDate": "Đến ngày",
-        "invalidRange": "Khoảng ngày không hợp lệ hoặc vượt quá 1 năm."
+        "invalidRange": "Khoảng ngày không hợp lệ hoặc vượt quá 1 năm.",
+        "titleReturns": "Bộ lọc phiếu trả",
+        "titleQuotes": "Bộ lọc báo giá",
+        "titleBookings": "Bộ lọc đơn đặt hàng",
+        "partySection": "Khách hàng và giao dịch",
+        "order": "Hóa đơn",
+        "project": "Công trình",
+        "deliverySection": "Ngày giao hàng",
+        "deliveryRange": "Thời gian giao",
+        "quoteStatus": "Trạng thái báo giá",
+        "bookingStatus": "Trạng thái đặt hàng",
+        "returnSection": "Lý do và hoàn tiền",
+        "reason": "Lý do trả hàng",
+        "refundMethod": "Phương thức hoàn tiền",
+        "includeCancelledReturns": "Hiện phiếu đã hủy",
+        "refundAmount": "Giá trị hoàn tiền",
+        "resultCount": "{count} kết quả",
+        "resultCountPending": "… kết quả"
       }
     },
     "dashboard": {
