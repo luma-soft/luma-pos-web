@@ -129,6 +129,8 @@ export function ProductSearchPicker<T>({
   }
 
   function close({ clear = true }: { clear?: boolean } = {}) {
+    // Leaving the full-screen search must not leave the inline field focused (keyboard up).
+    if (fullScreen && document.activeElement instanceof HTMLElement) document.activeElement.blur();
     setOpen(false);
     setActiveIndex(-1);
     if (clear) onQueryChange("");
@@ -180,7 +182,9 @@ export function ProductSearchPicker<T>({
       disabled: isItemDisabled?.(item) ?? false,
     })) return;
     onSelect(item);
-    if (!keepOpenOnSelect) close();
+    // The full-screen phone search stays open for multi-add, like the native picker.
+    const keepOpen = keepOpenOnSelect || (fullScreen && window.matchMedia("(max-width: 1023px)").matches);
+    if (!keepOpen) close();
     else {
       setOpen(true);
       setActiveIndex(-1);

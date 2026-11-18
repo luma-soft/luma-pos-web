@@ -612,6 +612,13 @@ export function PurchaseForm({
                 )}
                 keepOpenOnSelect
                 placeholder={t("purchases.searchProduct")}
+                mobileFullScreen={{
+                  title: t("mobile.pos.productSearchTitle"),
+                  subtitle: t("mobile.pos.productSearchSubtitle"),
+                  backLabel: t("common.back"),
+                  doneLabel: t("mobile.invoices.selectDone"),
+                  selectedCount: lines.length,
+                }}
                 emptyMessage={t("common.noResults")}
                 loadingMessage={t("common.loading")}
                 unavailableMessage={t("common.error")}

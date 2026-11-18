@@ -227,6 +227,13 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
                     line.productId === result.product.id && line.unitName === (result.unitName ?? result.product.baseUnit),
                   )}
                   placeholder={t("internalUse.searchProduct")}
+                  mobileFullScreen={{
+                    title: t("mobile.pos.productSearchTitle"),
+                    subtitle: t("mobile.pos.productSearchSubtitle"),
+                    backLabel: t("common.back"),
+                    doneLabel: t("mobile.invoices.selectDone"),
+                    selectedCount: lines.length,
+                  }}
                   emptyMessage={t("common.noResults")}
                   loadingMessage={t("common.loading")}
                   unavailableMessage={t("common.error")}

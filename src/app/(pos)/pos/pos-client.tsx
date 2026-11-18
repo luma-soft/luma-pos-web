@@ -11,7 +11,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Plus, ListPlus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ChevronDown, ShieldCheck, SlidersHorizontal, Star, UserRound, PackagePlus, Sparkles } from "lucide-react";
+import { Search, Plus, ListPlus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ChevronDown, ShieldCheck, SlidersHorizontal, Star, UserRound, PackagePlus, Sparkles, Package, Minus, AlertTriangle } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import { Combobox } from "@/components/combobox";
@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { LumaActionMenu } from "@/components/ui/action-menu";
 import { RowPreviewModal } from "@/components/data-table";
 import { QuantityInput } from "@/components/ui/quantity-input";
+import { TouchTargetToggle } from "@/components/mobile-ui";
 import { PrintDoc, type PrintLine } from "@/components/print/print-doc";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
@@ -527,6 +528,64 @@ function currentTimestamp(): number {
   return Date.now();
 }
 
+/** POSProductThumbnail: image, or the accent-tinted cube tile used by the native app. */
+function PosLineThumbnail({ product, size = "row" }: { product: PosProduct; size?: "row" | "large" }) {
+  const image = Array.isArray(product.imageUrls) && typeof product.imageUrls[0] === "string" ? product.imageUrls[0].trim() : "";
+  const box = size === "large" ? "size-[76px] rounded-[16px]" : "size-[60px] rounded-[14px]";
+  return image ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={image} alt="" className={cn(box, "shrink-0 bg-surface object-cover")} />
+  ) : (
+    <span className={cn(box, "grid shrink-0 place-items-center bg-ios-accent/15 text-ios-accent")} aria-hidden="true">
+      <Package className={size === "large" ? "size-8" : "size-7"} strokeWidth={1.8} />
+    </span>
+  );
+}
+
+/** POSQuantityStepper: tinted capsule with − value + (value in accent). */
+function PosLineStepper({
+  value, max, disabled, invalid, onChange, decreaseLabel, increaseLabel, quantityLabel,
+}: {
+  value: number;
+  max?: number;
+  disabled?: boolean;
+  invalid?: boolean;
+  onChange: (value: number) => void;
+  decreaseLabel: string;
+  increaseLabel: string;
+  quantityLabel: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft == null) return;
+    const parsed = Number(draft.replace(",", "."));
+    if (Number.isFinite(parsed)) onChange(parsed);
+    setDraft(null);
+  };
+  return (
+    <div className={cn("flex h-[30px] w-[102px] shrink-0 items-center rounded-[9px] bg-ios-accent/15 text-ios-accent", disabled && "opacity-50")}>
+      <button type="button" disabled={disabled} onClick={() => onChange(value - 1)} aria-label={decreaseLabel} className="grid h-11 w-[34px] place-items-center">
+        <Minus className="size-4" strokeWidth={2.4} aria-hidden="true" />
+      </button>
+      <input
+        type="text"
+        inputMode="decimal"
+        disabled={disabled}
+        aria-label={quantityLabel}
+        value={draft ?? formatNumber(value)}
+        onFocus={(event) => { setDraft(String(value)); event.currentTarget.select(); }}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+        className={cn("h-[30px] min-h-0 w-[34px] min-w-0 border-0 bg-transparent p-0 text-center font-mono text-[15px] font-bold outline-none", invalid ? "text-ios-red" : "text-ios-accent")}
+      />
+      <button type="button" disabled={disabled || (max != null && value >= max)} onClick={() => onChange(value + 1)} aria-label={increaseLabel} className="grid h-11 w-[34px] place-items-center disabled:opacity-40">
+        <Plus className="size-4" strokeWidth={2.4} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 /** Borderless 17pt trigger used by the iOS-style customer/price-book row on phones. */
 const nativePickerTrigger = "h-12 border-0 bg-transparent px-0 pr-7 text-[17px] font-semibold shadow-none hover:bg-transparent [&>span]:!text-ios-label [&>svg]:right-0 [&>svg]:size-[18px] [&>svg]:text-ios-label-secondary";
 
@@ -636,6 +695,8 @@ export function PosClient({
   // Phones keep the order note behind the bottom bar's "More" button, as on iOS.
   const [mobileNoteOpen, setMobileNoteOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  // Phones edit a cart line on a full-screen editor (iOS POSLineEditor); desktop keeps the popover.
+  const [editScreen, setEditScreen] = useState(false);
   const addMenuButtonRef = useRef<HTMLButtonElement>(null);
   const [addMenuPosition, setAddMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [printSize, setPrintSize] = useState<PaperSize | null>(null); // đang in phiếu tạm
@@ -2157,6 +2218,11 @@ export function PosClient({
     }));
   }
 
+  function openLineEditorScreen(key: string) {
+    setEditScreen(true);
+    setEditKey(key);
+  }
+
   function setLineNote(key: string, note: string) {
     setCart((c) => c.map((l) => (l.key === key ? { ...l, note } : l)));
   }
@@ -2965,103 +3031,80 @@ export function PosClient({
                 setOverKey(null);
               }}
               className={cn(
-                "border-b border-border-soft last:border-0 transition-colors",
+                "border-b border-border-soft last:border-0 transition-colors max-lg:border-0",
                 aiHighlightedProductIds.includes(l.product.id) && "bg-primary-50/80 shadow-[inset_3px_0_0_var(--primary-500)] dark:bg-primary-950/30",
                 dragKey === l.key && "opacity-50",
                 overKey === l.key && dragKey && dragKey !== l.key && "bg-primary-50/40 dark:bg-primary-950/20"
               )}
             >
-              {/* iOS POSSelectedLine: thumbnail, name and stock with delete; then price, quantity and line total. */}
-              <div className="px-4 py-3.5 lg:hidden">
+              {/* iOS POSSelectedLine: thumbnail, name and stock with delete; then price, unit,
+                  stepper and line total. Tapping the line opens the full-screen line editor. */}
+              <div className={cn("mx-4 border-b border-border py-3.5 lg:hidden", idx === cart.length - 1 && "border-b-0")}>
                 <div className="flex items-start gap-2.5">
-                  <div className="shrink-0 [&>*]:!size-[60px] [&>*]:!rounded-xl">
-                    <PosProductThumbnail product={l.product} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    {l.isQuickLine ? (
-                      <p className={cn("line-clamp-2 text-[15px] font-semibold leading-5", stockInsufficient && "text-ios-red")}>
+                  <button
+                    type="button"
+                    disabled={isCameraQuoteDraft}
+                    onClick={() => openLineEditorScreen(l.key)}
+                    aria-label={t("mobile.pos.editLine", { name: productDisplayName(l.product) })}
+                    className="flex min-w-0 flex-1 items-start gap-2.5 text-left disabled:cursor-default"
+                  >
+                    <PosLineThumbnail product={l.product} />
+                    <span className="min-w-0 flex-1">
+                      <span className={cn("line-clamp-2 text-[15px] font-semibold leading-5", stockInsufficient && "text-ios-red")}>
                         {productDisplayName(l.product)}
-                        <span className="ml-1.5 inline-flex rounded-full bg-ios-orange/12 px-1.5 py-0.5 align-middle text-[11px] font-semibold text-ios-orange">{t("pos.quickLine.badge")}</span>
-                      </p>
-                    ) : (
-                      <Link
-                        href={Routes.productDetail(l.product.id)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={cn("line-clamp-2 text-[15px] font-semibold leading-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ios-accent", stockInsufficient && "text-ios-red")}
-                      >
-                        {productDisplayName(l.product)}
-                      </Link>
-                    )}
-                    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                      {stockManaged && (
-                        <span className={cn("text-[13px]", Number(l.product.stock) <= 0 ? "text-ios-red" : "text-ios-label-secondary")}>
-                          {t("mobile.inventory.onHand", { stock: `${formatNumber(Number(l.product.stock) / (l.unitMultiplier || 1))} ${l.unitName}` })}
-                        </span>
-                      )}
+                        {l.isQuickLine && (
+                          <span className="ml-1.5 inline-flex rounded-full bg-ios-orange/12 px-1.5 py-0.5 align-middle text-[11px] font-semibold text-ios-orange">{t("pos.quickLine.badge")}</span>
+                        )}
+                      </span>
+                      <span className={cn("mt-1 block text-[13px]", stockManaged && Number(l.product.stock) <= 0 ? "text-ios-red" : "text-ios-label-secondary")}>
+                        {stockManaged
+                          ? t("mobile.pos.stock", { stock: formatNumber(Number(l.product.stock) / (l.unitMultiplier || 1)), unit: l.unitName })
+                          : (l.product.sku ?? "")}
+                      </span>
                       {linePriceBookName && (
-                        <span className="rounded-full bg-ios-accent/10 px-1.5 py-0.5 text-[11px] font-semibold text-ios-accent">{linePriceBookName}</span>
+                        <span className="mt-1 inline-flex rounded-full bg-ios-accent/10 px-1.5 py-0.5 text-[11px] font-semibold text-ios-accent">{linePriceBookName}</span>
                       )}
-                    </div>
-                    {unitOptions.length > 0 && (
-                      <div className="mt-1.5 w-32">
-                        <Select
-                          value={l.unitName}
-                          onChange={(e) => changeUnit(l.key, e.target.value)}
-                          disabled={isCameraQuoteDraft}
-                          size="sm"
-                          options={unitOptions}
-                          menuMinWidth={192}
-                          className="w-full min-w-0 font-medium text-slate-700 dark:text-slate-200"
-                        />
-                      </div>
-                    )}
-                  </div>
+                    </span>
+                  </button>
                   <button
                     type="button"
                     disabled={isCameraQuoteDraft}
                     onClick={() => setCart((current) => current.filter((item) => item.key !== l.key))}
-                    className="-mr-2 -mt-2 grid size-11 shrink-0 place-items-center text-ios-label/70 disabled:cursor-not-allowed disabled:opacity-40"
-                    aria-label={t("common.delete")}
+                    className="-mr-3 -mt-2.5 grid size-11 shrink-0 place-items-center text-ios-label/70 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label={t("mobile.pos.removeLine")}
                   >
-                    <Trash2 className="size-[18px]" aria-hidden="true" />
+                    <Trash2 className="size-[19px]" strokeWidth={1.8} aria-hidden="true" />
                   </button>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   <button
                     type="button"
                     disabled={isCameraQuoteDraft}
-                    onClick={() => setEditKey(editKey === l.key ? null : l.key)}
-                    className={cn("min-h-11 min-w-0 flex-1 text-left text-[14px] font-bold tabular-nums [overflow-wrap:anywhere]", belowPurchasePrice && "text-ios-red")}
+                    onClick={() => openLineEditorScreen(l.key)}
+                    className={cn("min-w-0 flex-1 truncate text-left text-[15px] font-bold tabular-nums", belowPurchasePrice && "text-ios-red")}
                   >
                     {formatCurrency(eff.price)}
                   </button>
-                  <QuantityInput
+                  <button
+                    type="button"
+                    disabled={isCameraQuoteDraft}
+                    onClick={() => openLineEditorScreen(l.key)}
+                    className="w-[74px] shrink-0 truncate text-center text-[13px] text-ios-label-secondary"
+                  >
+                    {l.unitName}
+                  </button>
+                  <PosLineStepper
                     value={l.quantity}
-                    onChange={(quantity) => setQty(l.key, quantity)}
-                    min={0}
                     max={l.returnSoldQuantity}
-                    suffix={isReturnDraft && l.returnSoldQuantity != null ? `/${formatNumber(l.returnSoldQuantity)}` : undefined}
-                    suffixBelow={isReturnDraft && l.returnSoldQuantity != null}
-                    clearZeroOnFocus={isReturnDraft && l.returnSoldQuantity != null}
-                    readOnly={isCameraQuoteDraft}
-                    size="sm"
-                    className={cn("w-[132px] rounded-xl", stockInsufficient && "border-er text-er focus-within:border-er")}
-                    inputClassName={cn("font-bold text-ios-accent", stockInsufficient && "border-er text-er")}
+                    disabled={isCameraQuoteDraft}
+                    invalid={stockInsufficient}
+                    onChange={(quantity) => setQty(l.key, quantity)}
+                    decreaseLabel={l.quantity <= 1 && !isReturnDraft ? t("mobile.pos.removeLine") : t("mobile.pos.decrease")}
+                    increaseLabel={t("mobile.pos.increase")}
+                    quantityLabel={t("mobile.pos.quantity")}
                   />
-                  <span className="min-w-0 flex-1 text-right text-[14px] font-bold tabular-nums [overflow-wrap:anywhere]">{formatCurrency(eff.price * l.quantity)}</span>
+                  <span className="min-w-0 flex-1 truncate text-right text-[15px] font-bold tabular-nums">{formatCurrency(eff.price * l.quantity)}</span>
                 </div>
-                <textarea
-                  rows={1}
-                  value={l.note ?? ""}
-                  onChange={(e) => setLineNote(l.key, e.target.value)}
-                  onInput={(e) => {
-                    e.currentTarget.style.height = "auto";
-                    e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 64)}px`;
-                  }}
-                  placeholder={t("pos.lineNotePlaceholder")}
-                  className="mt-2 block min-h-11 max-h-24 w-full resize-none overflow-y-auto rounded-lg border border-transparent bg-transparent px-3 py-2 text-base leading-6 text-slate-600 outline-none [scrollbar-width:none] focus:border-primary-600 focus:bg-primary-50/30 [&::-webkit-scrollbar]:hidden dark:text-slate-300 dark:focus:bg-primary-950/20 placeholder:text-slate-400 dark:placeholder:text-slate-500 lg:min-h-4"
-                />
               </div>
               <div className="hidden items-center gap-2 px-3 py-2 lg:flex">
                 <span className="w-5 text-center text-xs text-slate-400 shrink-0 tabular-nums">{idx + 1}</span>
@@ -3148,7 +3191,7 @@ export function PosClient({
                 <div className="relative flex h-8 w-28 shrink-0 items-center justify-end">
                   <button
                     disabled={isCameraQuoteDraft}
-                    onClick={() => setEditKey(editKey === l.key ? null : l.key)}
+                    onClick={() => { setEditScreen(false); setEditKey(editKey === l.key ? null : l.key); }}
                     title={t("pos.priceEditor.editHint")}
                     className={cn("w-full text-right text-base leading-6 tabular-nums hover:text-primary-600", belowPurchasePrice ? "font-semibold text-er" : "text-slate-500")}
                   >
@@ -3198,6 +3241,31 @@ export function PosClient({
                   priceBooks={data.priceBooks}
                   onChange={(book, price, disc, free, mode, value) => applyLinePrice(l.key, book, price, disc, free, mode, value)}
                   onClose={() => setEditKey(null)}
+                  screen={editScreen ? {
+                    thumbnail: <PosLineThumbnail product={l.product} size="large" />,
+                    code: l.product.sku ?? "",
+                    quantity: l.quantity,
+                    maxQuantity: l.returnSoldQuantity,
+                    onQuantityChange: (quantity) => setQty(l.key, quantity),
+                    stockSummary: stockManaged
+                      ? t("mobile.pos.stockSummary", {
+                        stock: formatNumber(Number(l.product.stock) / (l.unitMultiplier || 1)),
+                        booked: formatNumber(Number(l.product.booked) / (l.unitMultiplier || 1)),
+                        ordered: formatNumber(ordered / (l.unitMultiplier || 1)),
+                        unit: l.unitName,
+                      })
+                      : null,
+                    stockInsufficient,
+                    unitOptions,
+                    unitName: l.unitName,
+                    onUnitChange: (unitName) => changeUnit(l.key, unitName),
+                    note: l.note ?? "",
+                    onNoteChange: (note) => setLineNote(l.key, note),
+                    onRemove: () => {
+                      setCart((current) => current.filter((item) => item.key !== l.key));
+                      setEditKey(null);
+                    },
+                  } : undefined}
                 />
               )}
             </div>
@@ -4387,14 +4455,32 @@ function CompanyLineDiscount({ count, onApply }: { count: number; onApply: (valu
 }
 
 /** Popup sửa đơn giá + giảm giá (VND/%) cho 1 dòng — giống KiotViet. */
+type LineEditorScreenProps = {
+  thumbnail: React.ReactNode;
+  code: string;
+  quantity: number;
+  maxQuantity?: number;
+  onQuantityChange: (quantity: number) => void;
+  stockSummary: string | null;
+  stockInsufficient: boolean;
+  unitOptions: { value: string; label: string; disabled?: boolean }[];
+  unitName: string;
+  onUnitChange: (unitName: string) => void;
+  note: string;
+  onNoteChange: (note: string) => void;
+  onRemove: () => void;
+};
+
 function LinePriceEditor({
-  line, invoicePriceBook, priceBooks, onChange, onClose,
+  line, invoicePriceBook, priceBooks, onChange, onClose, screen,
 }: {
   line: CartLine;
   invoicePriceBook: PriceBook;
   priceBooks: PosData["priceBooks"];
   onChange: (priceBook: PriceBook | undefined, unitPrice: number, lineDiscount: number, free: boolean, discountMode: LineDiscountMode, discountValue: number) => void;
   onClose: () => void;
+  /** Full-screen phone layout mirroring the native POS line editor. */
+  screen?: LineEditorScreenProps;
 }) {
   const t = useTranslations();
   const defaultBook = priceBooks.find((book) => book.isDefault) ?? priceBooks[0];
@@ -4505,6 +4591,175 @@ function LinePriceEditor({
   function setDiscountMode(mode: "vnd" | "pct") {
     markChanged();
     setEditor((state) => setLineDiscountMode(state, mode));
+  }
+
+  if (screen) {
+    const invoiceBookName = priceBooks.find((book) => (book.isDefault ? "" : book.id) === invoicePriceBook)?.name ?? "Giá Chung";
+    const label = "mb-2 block text-[17px] font-semibold";
+    const card = "rounded-[14px] bg-surface";
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pos-line-screen-title"
+        className="fixed inset-0 z-[90] flex flex-col bg-canvas pt-[env(safe-area-inset-top)]"
+      >
+        <div className="relative flex h-14 shrink-0 items-center justify-center px-4">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("common.close")}
+            data-button-radius="pill"
+            className="absolute left-4 grid size-11 place-items-center rounded-full border border-border bg-surface text-ios-accent shadow-sm"
+          >
+            <X className="size-6" strokeWidth={2.2} aria-hidden="true" />
+          </button>
+          <h2 id="pos-line-screen-title" className="text-[17px] font-semibold">{t("mobile.pos.editLineTitle")}</h2>
+        </div>
+        <div className="flex shrink-0 items-center gap-3.5 border-b border-border px-5 pb-4 pt-2">
+          {screen.thumbnail}
+          <div className="min-w-0 flex-1">
+            <div className="line-clamp-2 text-[19px] font-bold leading-6">{productDisplayName(line.product)}</div>
+            {screen.code && <div className="mt-1 truncate font-mono text-[14px] text-ios-label-secondary">{screen.code}</div>}
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-6 pt-5">
+          {priceError && <p role="alert" className="text-[15px] font-semibold text-ios-red">{priceError}</p>}
+          <section>
+            <span className={label}>{t("mobile.pos.quantity")}</span>
+            <QuantityInput
+              value={screen.quantity}
+              onChange={screen.onQuantityChange}
+              min={0}
+              max={screen.maxQuantity}
+              touchTargets
+              className={cn("h-[52px] w-full rounded-[14px] border-ios-stroke/50 [&_button]:text-ios-red", screen.stockInsufficient && "text-ios-red")}
+              inputClassName={cn("text-[22px] font-extrabold", screen.stockInsufficient && "text-ios-red")}
+            />
+            {screen.stockSummary && (
+              <p className={cn("mt-2 text-[15px]", screen.stockInsufficient ? "font-bold text-ios-red" : "font-semibold text-ios-label/75")}>{screen.stockSummary}</p>
+            )}
+            {screen.stockInsufficient && (
+              <p className="mt-1 flex items-center gap-2 text-[15px] font-bold text-ios-red">
+                <AlertTriangle className="size-[18px] fill-current text-ios-red [&>path:not(:first-child)]:stroke-white" aria-hidden="true" />
+                {t("mobile.pos.stockWarning")}
+              </p>
+            )}
+          </section>
+          {screen.unitOptions.length > 1 && (
+            <section>
+              <span className={label}>{t("mobile.pos.unit")}</span>
+              <div className="inline-flex max-w-full gap-0 overflow-x-auto rounded-full bg-ios-accent/[0.075] p-[3px]">
+                {screen.unitOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={option.disabled}
+                    onClick={() => screen.onUnitChange(option.value)}
+                    aria-pressed={option.value === screen.unitName}
+                    data-button-radius="pill"
+                    className={cn(
+                      "min-h-[42px] shrink-0 whitespace-nowrap rounded-full px-3.5 text-[17px] font-semibold disabled:opacity-40",
+                      option.value === screen.unitName ? "bg-ios-accent text-white" : "text-ios-label/85",
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+          <section>
+            <span className={label}>{t("mobile.pos.priceBook")}</span>
+            <div className={cn(card, "p-3.5")}>
+              <Select
+                value={selectedBook}
+                wrapLabel
+                menuMinWidth={240}
+                onChange={(event) => { void changeBook(event.target.value); }}
+                disabled={editor.free || line.isQuickLine}
+                rootClassName="w-full"
+                className="w-full text-[17px]"
+                options={[
+                  { value: inheritedValue, label: t("mobile.pos.followInvoice", { name: invoiceBookName }) },
+                  ...priceBooks.map((book) => ({ value: book.id, label: book.name })),
+                ]}
+              />
+            </div>
+          </section>
+          <section>
+            <span className={label}>{t("pos.priceEditor.unitPrice")}</span>
+            <MoneyInput
+              ref={priceInputRef}
+              value={editor.price}
+              onChange={setPrice}
+              disabled={editor.free}
+              aria-invalid={belowPurchasePrice}
+              className={cn(
+                "no-spinner h-[52px] w-full rounded-[14px] border-0 bg-surface px-3.5 text-right font-mono text-[29px] font-extrabold",
+                belowPurchasePrice && "text-ios-red",
+              )}
+            />
+            {belowPurchasePrice && purchaseUnitPrice != null && (
+              <p role="alert" className="mt-2 text-[12px] font-semibold text-ios-orange">
+                {t("mobile.pos.priceBelowPurchase", { price: formatCurrency(resolved.sellPrice), purchase: formatCurrency(purchaseUnitPrice) })}
+              </p>
+            )}
+          </section>
+          <section className={cn(card, "flex items-center gap-3 p-3.5")}>
+            <div className="min-w-0 flex-1">
+              <div className="text-[17px] font-semibold">{t("mobile.pos.freeItem")}</div>
+              <div className="text-[13px] text-ios-label/70">{t("mobile.pos.freeItemHint")}</div>
+            </div>
+            <TouchTargetToggle checked={editor.free} onChange={changeFree} aria-label={t("mobile.pos.freeItem")} />
+          </section>
+          <section>
+            <span className={label}>{t("mobile.pos.discountPerUnit", { unit: screen.unitName })}</span>
+            <fieldset disabled={editor.free} className="m-0 min-w-0 border-0 p-0 disabled:opacity-50 [&_input]:h-12 [&_input]:text-[20px] [&_input]:font-bold">
+              <PosAmountModeInput
+                value={discountInput}
+                mode={editor.discountMode}
+                onValueChange={setDiscount}
+                onModeChange={setDiscountMode}
+              />
+            </fieldset>
+          </section>
+          <section>
+            <label htmlFor="pos-line-screen-note" className={label}>{t("mobile.pos.note")}</label>
+            <textarea
+              id="pos-line-screen-note"
+              rows={3}
+              value={screen.note}
+              onChange={(event) => screen.onNoteChange(event.target.value)}
+              className="block w-full resize-none rounded-[14px] border border-ios-stroke/50 bg-surface px-3.5 py-3 text-[17px] outline-none focus:border-ios-accent"
+            />
+          </section>
+        </div>
+        <div className="shrink-0 space-y-3 border-t border-border bg-canvas px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+          <div className="flex h-[58px] items-center justify-between rounded-[14px] border border-ios-accent/25 bg-ios-accent/12 px-4 text-ios-accent">
+            <span className="text-[17px] font-semibold">{t("mobile.pos.lineTotal")}</span>
+            <span className="text-[22px] font-extrabold tabular-nums">{formatCurrency(resolved.sellPrice * screen.quantity)}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={screen.onRemove}
+              className="flex min-h-[52px] flex-1 items-center gap-2 text-[17px] font-semibold text-ios-red"
+            >
+              <Trash2 className="size-5" aria-hidden="true" />
+              {t("mobile.pos.removeLine")}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-[52px] min-w-[44%] rounded-[14px] bg-ios-accent px-6 text-[17px] font-bold text-white"
+            >
+              {t("common.done")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

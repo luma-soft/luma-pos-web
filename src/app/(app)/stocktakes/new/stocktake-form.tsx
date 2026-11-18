@@ -264,6 +264,13 @@ export function StocktakeForm({
                   open={searchOpen}
                   onOpenChange={setSearchOpen}
                   placeholder={t("stocktakes.searchPlaceholder")}
+                  mobileFullScreen={{
+                    title: t("mobile.pos.productSearchTitle"),
+                    subtitle: t("mobile.pos.productSearchSubtitle"),
+                    backLabel: t("common.back"),
+                    doneLabel: t("mobile.invoices.selectDone"),
+                    selectedCount: added.size,
+                  }}
                   emptyMessage={t("common.noResults")}
                   loadingMessage={t("common.loading")}
                   unavailableMessage={t("common.error")}

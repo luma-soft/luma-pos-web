@@ -209,6 +209,13 @@ export function TableOrder({
               line.productId === result.product.id && line.unitName === (result.unitName ?? result.product.baseUnit) && !line.sent,
             )}
             placeholder={t("pos.searchPlaceholder")}
+            mobileFullScreen={{
+              title: t("mobile.pos.productSearchTitle"),
+              subtitle: t("mobile.pos.productSearchSubtitle"),
+              backLabel: t("common.back"),
+              doneLabel: t("mobile.invoices.selectDone"),
+              selectedCount: cart.length,
+            }}
             emptyMessage={t("pos.noSearchResults")}
             loadingMessage={t("common.loading")}
             unavailableMessage={t("common.error")}
