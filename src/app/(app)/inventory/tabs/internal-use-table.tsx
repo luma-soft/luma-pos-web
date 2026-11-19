@@ -4,7 +4,9 @@ import { productLineDisplayName } from "@/lib/products/variant-presentation";
 
 import { useLocale, useTranslations } from "next-intl";
 import { catalogText } from "@/lib/i18n/catalog-text";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { usePhoneLayout } from "@/components/use-phone-layout";
+import { InternalUseMobileRow, MobileInternalUseDetail } from "./internal-use-mobile";
 import { LayoutList } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
@@ -18,6 +20,9 @@ type InternalUseRow = Awaited<ReturnType<typeof getInternalUseIssues>>[number];
 export function InternalUseTable({ rows, capabilities }: { rows: InternalUseRow[]; capabilities?: { canEdit: boolean; canDelete: boolean; canApprovePending?: boolean } }) {
   const t = useTranslations();
   const locale = useLocale();
+  const phone = usePhoneLayout();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const openRow = phone ? rows.find((row) => row.id === openId) ?? null : null;
   const columns: DataTableColumn<InternalUseRow>[] = [
     {
       key: "code",
@@ -77,39 +82,16 @@ export function InternalUseTable({ rows, capabilities }: { rows: InternalUseRow[
           </div>
         )}
         rowClassName={(row) => cn(row.status === "pending" && "bg-warn-soft/25")}
-        renderMobileRow={({ row, toggle }) => (
-          <div className="relative min-h-[94px] p-3">
-            <button
-              type="button"
-              onClick={toggle}
-              aria-label={row.code}
-              className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
-            />
-            <div className="pointer-events-none relative flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="font-semibold text-primary-600">{row.code}</div>
-                <div className="mt-1 line-clamp-2 text-sm text-slate-700 dark:text-slate-200">
-                  {internalUseReasonLabel(row.reason, locale)}
-                </div>
-              </div>
-              <div className="max-w-[45%] shrink-0 text-right">
-                <div className="text-sm font-bold tabular-nums text-warn [overflow-wrap:anywhere]">
-                  {formatCurrency(row.totalCost)}
-                </div>
-                <div className="mt-1"><StatusBadge status={row.status} /></div>
-              </div>
-            </div>
-            <div className="pointer-events-none relative mt-2 truncate text-xs text-slate-500">
-              {formatDate(row.createdAt)}
-              {row.department ? ` · ${row.department}` : ""}
-            </div>
-          </div>
-        )}
+        mobileListClassName="max-lg:-mx-4 max-lg:space-y-0 max-lg:bg-surface"
+        mobileRowClassName="max-lg:rounded-none max-lg:border-0 max-lg:bg-[linear-gradient(var(--color-border),var(--color-border))] max-lg:bg-[length:calc(100%-16px)_1px] max-lg:bg-right-bottom max-lg:bg-no-repeat"
+        // Phones push InternalUseDetailView instead of expanding the row.
+        renderMobileRow={({ row }) => <InternalUseMobileRow row={row} onOpen={() => setOpenId(row.id)} />}
         clientSideDetailNavigation
         renderDetail={(row) => <ExpandedIssue row={row} />}
         detailSize="full"
         detailFooter={(row) => <InventoryDocumentActions kind="internal-use" id={row.id} code={row.code} status={row.status} capabilities={capabilities} inFooter />}
       />
+      {openRow && <MobileInternalUseDetail row={openRow} capabilities={capabilities} onBack={() => setOpenId(null)} />}
     </section>
   );
 }

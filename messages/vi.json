@@ -2054,6 +2054,36 @@
       "delete": "Xóa phiếu",
       "deleteTitle": "Xóa phiếu {code}?",
       "deleteMessage": "Tồn kho, tiền hoàn và công nợ liên quan sẽ được cập nhật lại."
+    },
+    "internalUse": {
+      "status": {
+        "draft": "Bản nháp",
+        "pending": "Chờ duyệt",
+        "approved": "Đã xuất"
+      },
+      "documentType": "Xuất dùng nội bộ",
+      "itemCountAndCost": "{count} mặt hàng · {cost}",
+      "create": "Tạo phiếu",
+      "details": "Thông tin phiếu",
+      "statusLabel": "Trạng thái",
+      "warehouse": "Kho",
+      "department": "Phòng ban",
+      "reason": "Lý do",
+      "createdAt": "Ngày tạo",
+      "note": "Ghi chú",
+      "items": "Hàng hóa xuất · {count}",
+      "summary": "Tổng kết",
+      "totalQuantity": "Tổng số lượng",
+      "totalCost": "Tổng giá vốn",
+      "print": "In / Chia sẻ",
+      "complete": "Hoàn thành",
+      "completeTitle": "Hoàn thành phiếu {code}?",
+      "completeMessage": "Số lượng trên phiếu sẽ được trừ khỏi tồn kho.",
+      "edit": "Sửa phiếu",
+      "delete": "Xóa phiếu",
+      "deleteTitle": "Xóa phiếu {code}?",
+      "deleteUnissued": "Phiếu chưa xuất kho sẽ bị xóa. Tồn kho không thay đổi.",
+      "deleteIssued": "Phiếu sẽ bị xóa và số lượng đã xuất sẽ được hoàn lại vào kho."
     }
   },
   "toolsCenter": {

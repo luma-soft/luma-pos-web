@@ -2054,6 +2054,36 @@
       "delete": "Delete return",
       "deleteTitle": "Delete return {code}?",
       "deleteMessage": "Related stock, refund and supplier balance will be updated."
+    },
+    "internalUse": {
+      "status": {
+        "draft": "Draft",
+        "pending": "Pending approval",
+        "approved": "Issued"
+      },
+      "documentType": "Internal use",
+      "itemCountAndCost": "{count} items · {cost}",
+      "create": "Create",
+      "details": "Document information",
+      "statusLabel": "Status",
+      "warehouse": "Warehouse",
+      "department": "Department",
+      "reason": "Reason",
+      "createdAt": "Created",
+      "note": "Note",
+      "items": "Issued items · {count}",
+      "summary": "Summary",
+      "totalQuantity": "Total quantity",
+      "totalCost": "Total cost",
+      "print": "Print / Share",
+      "complete": "Complete",
+      "completeTitle": "Complete {code}?",
+      "completeMessage": "Quantities on this document will be deducted from stock.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleteTitle": "Delete {code}?",
+      "deleteUnissued": "This unissued document will be deleted. Stock is unchanged.",
+      "deleteIssued": "This document will be deleted and issued quantities returned to stock."
     }
   },
   "toolsCenter": {
