@@ -2355,6 +2355,24 @@
         "completed": "Completed",
         "cancelled": "Cancelled"
       }
+    },
+    "projects": {
+      "title": "Projects",
+      "count": "{count, number} projects",
+      "search": "Search projects, customers...",
+      "noCustomer": "No customer yet",
+      "assets": "{count} devices",
+      "filters": "Project filters",
+      "type": "Service type",
+      "status": "Status",
+      "progress": "Progress",
+      "sort": "Sort",
+      "apply": "Apply",
+      "clear": "Clear filters",
+      "create": "New project",
+      "done": "Completed",
+      "inProgress": "In progress",
+      "empty": "No projects yet"
     }
   },
   "toolsCenter": {

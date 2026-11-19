@@ -7,6 +7,7 @@ import { Section } from "@/components/ui/section";
 import { Text } from "@/components/ui/text";
 import { getServiceFormOptions, getServiceProjectsPage } from "@/lib/data/services";
 import { ProjectQuickCreate } from "../projects/project-widgets";
+import { ServiceProjectsMobile } from "./service-projects-mobile";
 import {
   ServiceDashboardFilters,
   ServiceProjectsTable,
@@ -24,11 +25,12 @@ export default async function ServicesPage({
 }) {
   await requirePageFeature("field_services");
   const [t, params, context] = await Promise.all([getTranslations(), searchParams, requireStoreContext()]);
-  const { status, serviceType, urgency, sort } = serviceProjectsFilters(params);
+  const { q, status, serviceType, urgency, sort } = serviceProjectsFilters(params);
   const page = Math.max(1, Number(params.page) || 1);
   const pageSize = parsePageSize(params.size);
   const [projectPage, options] = await Promise.all([
     getServiceProjectsPage(context.storeId, {
+      q,
       status,
       serviceType,
       urgency,
@@ -41,7 +43,16 @@ export default async function ServicesPage({
   const projectRows = projectPage.rows;
 
   return (
-    <div className="p-4 sm:p-6">
+    <>
+    <ServiceProjectsMobile
+      rows={projectRows}
+      loadMore={{ page: projectPage.page, pageCount: projectPage.pageCount, loadPage: loadServiceProjectsPage.bind(null, params) }}
+      total={projectPage.total}
+      customers={options.customerOptions}
+      filters={{ type: serviceType ?? "", status: status ?? "", urgency: urgency ?? "", sort: sort ?? "starts_desc" }}
+      query={q ?? ""}
+    />
+    <div className="p-4 sm:p-6 max-lg:hidden">
       <div className="sticky top-0 z-20 -mx-4 -mt-4 mb-5 border-b border-border bg-surface sm:-mx-6 sm:-mt-6">
         <div className="flex min-h-14 items-center px-4 sm:px-6">
           <Text as="h1" weight="bold" className="text-[17px]" text={t("services.title")} />
@@ -64,5 +75,6 @@ export default async function ServicesPage({
         </DesktopPagination>
       </div>
     </div>
+    </>
   );
 }

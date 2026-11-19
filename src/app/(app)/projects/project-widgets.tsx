@@ -24,9 +24,12 @@ import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fie
 export function ProjectQuickCreate({
   customers,
   serviceMode = false,
+  circleTrigger = false,
 }: {
   customers: { id: string; name: string }[];
   serviceMode?: boolean;
+  /** Phones: iOS nav-bar "+" circle instead of the labelled button. */
+  circleTrigger?: boolean;
 }) {
   const t = useTranslations();
   const locale = useLocale();
@@ -124,9 +127,21 @@ export function ProjectQuickCreate({
 
   return (
     <>
-      <Button type="button" onClick={() => setOpen(true)} tx={serviceMode ? "services.projects.create" : "projects.createNew"}>
-        <Plus className="w-4 h-4" />
-      </Button>
+      {circleTrigger ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label={t(serviceMode ? "services.projects.create" : "projects.createNew")}
+          data-button-radius="pill"
+          className="grid size-11 shrink-0 place-items-center rounded-full border border-black/[0.06] bg-surface/90 text-ios-accent shadow-[0_2px_10px_rgb(0_0_0/0.08)] backdrop-blur-md dark:border-white/10"
+        >
+          <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
+        </button>
+      ) : (
+        <Button type="button" onClick={() => setOpen(true)} tx={serviceMode ? "services.projects.create" : "projects.createNew"}>
+          <Plus className="w-4 h-4" />
+        </Button>
+      )}
       <RowPreviewModal
         open={open && !customerCreateOpen}
         onClose={() => {

@@ -2355,6 +2355,24 @@
         "completed": "Hoàn thành",
         "cancelled": "Đã hủy"
       }
+    },
+    "projects": {
+      "title": "Công trình",
+      "count": "{count, number} công trình",
+      "search": "Tìm công trình, khách hàng...",
+      "noCustomer": "Chưa có khách hàng",
+      "assets": "{count} thiết bị",
+      "filters": "Bộ lọc công trình",
+      "type": "Nghiệp vụ",
+      "status": "Trạng thái",
+      "progress": "Tiến độ",
+      "sort": "Sắp xếp",
+      "apply": "Áp dụng",
+      "clear": "Xóa lọc",
+      "create": "Thêm công trình",
+      "done": "Hoàn thành",
+      "inProgress": "Đang thực hiện",
+      "empty": "Chưa có công trình"
     }
   },
   "toolsCenter": {
