@@ -23,7 +23,7 @@ export function OverviewReport({ data }: { data: ReportsData }) {
   return (
     <div className="space-y-4">
       <KpiGrid>
-        <KpiCard label="Lãi gộp" value={compactMoney(data.summary.grossProfit)} delta={data.comparison.grossProfit} featured wideMobile />
+        <KpiCard label="Lãi gộp" value={compactMoney(data.summary.grossProfit)} delta={data.comparison.grossProfit} featured />
         <KpiCard label="Doanh thu thuần" value={compactMoney(data.summary.revenue)} delta={data.comparison.revenue} />
         <KpiCard label="Giá vốn" value={compactMoney(data.summary.costOfGoods)} delta={data.comparison.costOfGoods} />
         <KpiCard label="Biên lãi gộp" value={percent(data.summary.grossMargin)} delta={data.comparison.grossMargin} point />
@@ -173,7 +173,8 @@ function KpiGrid({ children, mobileCarousel }: { children: React.ReactNode; mobi
 }
 
 function KpiCard({ label, value, suffix, delta, featured, wideMobile, thirdMobile, point, inverse }: { label: string; value: string; suffix?: string; delta: number | null; featured?: boolean; wideMobile?: boolean; thirdMobile?: boolean; point?: boolean; inverse?: boolean }) {
-  return <div className={cn("col-span-3 min-h-[112px] snap-start rounded-xl border bg-surface p-4 lg:col-span-1", featured ? "border-primary-500" : "border-border", wideMobile && "col-span-6", thirdMobile && "col-span-2 p-3 lg:p-4")}><div className="text-xs font-bold text-slate-700">{label}</div><div className={cn("mt-2 font-black tabular-nums tracking-tight", featured ? "text-3xl text-primary-700" : "text-[clamp(1.3rem,2vw,1.8rem)]", thirdMobile && "text-lg lg:text-[clamp(1.3rem,2vw,1.8rem)]")}>{value}<span className="text-base">{suffix}</span></div><Delta value={delta} point={point} inverse={inverse} /></div>;
+  // Phones: NativeReportMetricCard — equal tiles, secondary label, accent value.
+  return <div className={cn("col-span-3 min-h-[112px] snap-start rounded-xl border bg-surface p-4 lg:col-span-1 max-lg:rounded-[18px]", featured ? "border-primary-500 max-lg:border-border" : "border-border", wideMobile && "col-span-6", thirdMobile && "col-span-2 p-3 lg:p-4")}><div className="text-xs font-bold text-slate-700 max-lg:text-[15px] max-lg:font-normal max-lg:text-ios-label-secondary">{label}</div><div className={cn("mt-2 font-black tabular-nums tracking-tight max-lg:font-bold max-lg:text-ios-accent", featured ? "text-3xl text-primary-700 max-lg:text-[24px]" : "text-[clamp(1.3rem,2vw,1.8rem)] max-lg:text-[24px]", thirdMobile && "text-lg lg:text-[clamp(1.3rem,2vw,1.8rem)]")}>{value}<span className="text-base">{suffix}</span></div><Delta value={delta} point={point} inverse={inverse} /></div>;
 }
 
 function Delta({ value, point, inverse }: { value: number | null; point?: boolean; inverse?: boolean }) {

@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { GroupTabs } from "@/components/group-tabs";
-import { MobileTopBar } from "@/components/mobile-ui";
+import { ChevronLeft } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { Text } from "@/components/ui/text";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -56,13 +57,20 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   return (
     <div className="min-h-full bg-canvas">
       <header className="sticky top-0 z-20 border-b border-border bg-surface">
-        <MobileTopBar
-          title={t("reports.title")}
-          subtitle={`${t(`reports.period.options.${period}`)} · cập nhật ${new Date(data.generatedAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`}
-          trailing={<ReportExportButton rows={exportRows} iconOnly />}
-          bottom={<div className="space-y-2"><ReportPeriodFilter period={period} from={dateRange.fromValue} to={dateRange.toValue} /><GroupTabs base={Routes.Reports} items={REPORT_TABS} preserveParams={REPORT_FILTER_PARAMS} edgeToEdge linkClassName="h-11" /></div>}
-          className="border-b-0 pb-2"
-        />
+        {/* Phones: ReportsView's bar — back, centred title with the period, filter button. */}
+        <div className="px-ios-inset pb-1 pt-[calc(env(safe-area-inset-top)+0.5rem)] lg:hidden">
+          <div className="grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
+            <Link href={Routes.More} aria-label={t("common.back")} data-button-radius="pill" className="grid size-11 place-items-center rounded-full border border-black/[0.06] bg-surface/90 shadow-[0_2px_10px_rgb(0_0_0/0.08)]">
+              <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden="true" />
+            </Link>
+            <div className="min-w-0 text-center">
+              <h1 className="truncate text-[17px] font-semibold">{t("reports.title")}</h1>
+              <p className="truncate text-[13px] text-ios-label-secondary">{t(`reports.period.options.${period}` as never)}</p>
+            </div>
+            <ReportPeriodFilter period={period} from={dateRange.fromValue} to={dateRange.toValue} mobileTrigger="circle" />
+          </div>
+          <div className="-mx-ios-inset mt-1"><GroupTabs base={Routes.Reports} items={REPORT_TABS} preserveParams={REPORT_FILTER_PARAMS} edgeToEdge linkClassName="h-11" /></div>
+        </div>
         <div className="hidden lg:block">
           <div className="flex min-h-[58px] items-center px-6 pt-2">
             <Text as="h1" weight="bold" className="text-2xl" text={t("reports.title")} />

@@ -2,7 +2,7 @@
 
 import { DateInput } from "@/components/ui/date-input";
 import { useState } from "react";
-import { Check, SlidersHorizontal } from "lucide-react";
+import { Check, SlidersHorizontal, ListFilter } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { RowPreviewModal } from "@/components/data-table";
@@ -29,11 +29,14 @@ export function ReportPeriodFilter({
   from,
   to,
   basePath = "/reports",
+  mobileTrigger = "row",
 }: {
   period: ReportPeriod;
   from: string;
   to: string;
   basePath?: string;
+  /** Phones: "circle" is ReportsView's toolbar filter button. */
+  mobileTrigger?: "row" | "circle";
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -90,7 +93,18 @@ export function ReportPeriodFilter({
 
   return (
     <>
-      <button
+      {mobileTrigger === "circle" ? (
+        <button
+          type="button"
+          onClick={openMobileRangePicker}
+          aria-haspopup="dialog"
+          aria-label={t("reports.period.label")}
+          data-button-radius="pill"
+          className="grid size-11 place-items-center rounded-full border border-black/[0.06] bg-surface/90 text-ios-accent shadow-[0_2px_10px_rgb(0_0_0/0.08)] lg:hidden"
+        >
+          <ListFilter className="size-[22px]" strokeWidth={2.2} aria-hidden="true" />
+        </button>
+      ) : <button
         type="button"
         onClick={openMobileRangePicker}
         aria-haspopup="dialog"
@@ -102,7 +116,7 @@ export function ReportPeriodFilter({
           <span className="truncate">{t(`reports.period.options.${period}` as never)}</span>
         </span>
         <span className="text-xs text-slate-500">{t("reports.period.label")}</span>
-      </button>
+      </button>}
       <div className="hidden lg:block">
         <ReportPeriodSelect period={period} onSelect={selectPeriod} className="h-9" />
       </div>
