@@ -2170,6 +2170,38 @@
       "sections": {
         "pricing": "Pricing"
       }
+    },
+    "finance": {
+      "title": "Finance",
+      "tabSummary": "Finance",
+      "tabCashbook": "Cashbook",
+      "range": {
+        "today": "Today",
+        "week": "7 days",
+        "month": "This month"
+      },
+      "metrics": "Overview",
+      "revenue": "Revenue",
+      "recognized": "Recognized",
+      "cost": "Cost",
+      "fromOrderLines": "From order lines",
+      "receivables": "Receivables",
+      "payables": "Payables",
+      "ordersCount": "{count} orders",
+      "purchasesCount": "{count} purchases",
+      "cashMovement": "Cash movement",
+      "cash": "Cash",
+      "bank": "Bank",
+      "receivableContext": "Customers with outstanding balances",
+      "noCustomers": "No customers with outstanding balances",
+      "loadError": "Could not load finance data",
+      "retry": "Retry",
+      "balances": "Fund balances",
+      "transactions": "Transactions",
+      "createEntry": "Create cash voucher",
+      "all": "All",
+      "in": "In",
+      "out": "Out"
     }
   },
   "toolsCenter": {

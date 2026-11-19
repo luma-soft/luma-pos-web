@@ -2170,6 +2170,38 @@
       "sections": {
         "pricing": "Giá bán"
       }
+    },
+    "finance": {
+      "title": "Tài chính",
+      "tabSummary": "Tài chính",
+      "tabCashbook": "Sổ quỹ",
+      "range": {
+        "today": "Hôm nay",
+        "week": "7 ngày",
+        "month": "Tháng này"
+      },
+      "metrics": "Tổng quan",
+      "revenue": "Doanh thu",
+      "recognized": "Đã ghi nhận",
+      "cost": "Giá vốn",
+      "fromOrderLines": "Từ dòng đơn hàng",
+      "receivables": "Công nợ phải thu",
+      "payables": "Công nợ phải trả",
+      "ordersCount": "{count} đơn hàng",
+      "purchasesCount": "{count} phiếu nhập",
+      "cashMovement": "Dòng tiền",
+      "cash": "Tiền mặt",
+      "bank": "Ngân hàng",
+      "receivableContext": "Khách hàng còn công nợ",
+      "noCustomers": "Không có khách hàng còn công nợ",
+      "loadError": "Không tải được dữ liệu tài chính",
+      "retry": "Thử lại",
+      "balances": "Số dư quỹ",
+      "transactions": "Giao dịch",
+      "createEntry": "Tạo phiếu thu chi",
+      "all": "Tất cả",
+      "in": "Thu",
+      "out": "Chi"
     }
   },
   "toolsCenter": {

@@ -104,7 +104,7 @@ export default async function MorePage() {
           <MobileListSection>
             <MobileListRow href={Routes.Notifications} icon={BellDot} title={t("nav.notifications")} />
             {manager && <MobileListRow href={Routes.Reports} icon={BarChart3} title={t("nav.reports")} />}
-            {manager && <MobileListRow href={Routes.Finance} icon={Wallet} title={t("nav.groups.finance")} />}
+            {manager && <MobileListRow href={`${Routes.Finance}?tab=summary`} icon={Wallet} title={t("nav.groups.finance")} />}
             {manager && <MobileListRow href={Routes.Accounting} icon={BookOpen} title={t("mobile.more.accountingTax")} />}
           </MobileListSection>
 
