@@ -2238,6 +2238,27 @@
       "bankAccountsCount": "Accounts in 01/BK-STK",
       "declarations": "Filings",
       "taxEmpty": "No filings yet. Prepare and update them on the web."
+    },
+    "returns": {
+      "title": "Return details",
+      "status": "Status",
+      "sourceInvoice": "Source invoice",
+      "reason": "Reason",
+      "refundMethod": "Refund method",
+      "createdBy": "Created by",
+      "phone": "Customer phone",
+      "warehouse": "Warehouse",
+      "items": "Returned items",
+      "noItems": "No item details.",
+      "note": "Note",
+      "totalRefund": "Total refund",
+      "restockYes": "Restock: Yes",
+      "restockNo": "Restock: No",
+      "edit": "Edit details",
+      "cancel": "Cancel return",
+      "print": "Print / Share",
+      "discount": "Discount",
+      "unitAfterDiscount": "Unit price after discount"
     }
   },
   "toolsCenter": {

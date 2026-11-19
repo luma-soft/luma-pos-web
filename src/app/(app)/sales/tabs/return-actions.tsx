@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Loader2, Pencil, X, XCircle } from "lucide-react";
+import { Loader2, Pencil, Printer, X, XCircle } from "lucide-react";
+import { MenuAction } from "@/app/(app)/partners/tabs/customer-mobile";
 import { cancelReturn, updateReturnMetadata } from "@/lib/actions/returns";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { Button } from "@/components/ui/button";
@@ -16,10 +17,17 @@ export function ReturnActions({
   returnId,
   reason,
   note,
+  variant = "buttons",
+  printHref,
+  cancellable = true,
 }: {
   returnId: string;
   reason: string | null;
   note: string | null;
+  /** "menu": rows of the phone "…" sheet (NativeReturnDetailView's menu). */
+  variant?: "buttons" | "menu";
+  printHref?: string;
+  cancellable?: boolean;
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -64,7 +72,13 @@ export function ReturnActions({
     router.refresh();
   }
 
-  return (
+  const triggers = variant === "menu" ? (
+    <div className="space-y-2">
+      {cancellable && <MenuAction icon={Pencil} label={t("mobile.returns.edit")} disabled={Boolean(busy)} onSelect={() => setEditOpen(true)} />}
+      {cancellable && <MenuAction icon={XCircle} label={t("mobile.returns.cancel")} destructive disabled={Boolean(busy)} onSelect={() => void onCancel()} />}
+      {printHref && <MenuAction icon={Printer} label={t("mobile.returns.print")} onSelect={() => router.push(printHref)} />}
+    </div>
+  ) : (
     <>
       <Button type="button" variant="outline" size="sm" className={modalActionSizeClassName} onClick={() => setEditOpen(true)} disabled={Boolean(busy)}>
         <Pencil className="h-4 w-4" />
@@ -74,7 +88,12 @@ export function ReturnActions({
         {busy === "cancel" ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
         {t("returns.cancel")}
       </Button>
+    </>
+  );
 
+  return (
+    <>
+      {triggers}
       {editOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-[2px]" onMouseDown={() => !busy && setEditOpen(false)}>
           <div role="dialog" aria-modal="true" aria-labelledby="return-edit-title" className="w-full max-w-lg rounded-card border border-border bg-surface shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>

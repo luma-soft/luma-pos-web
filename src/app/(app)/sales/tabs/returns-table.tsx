@@ -2,6 +2,8 @@
 
 import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import type { ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePhoneLayout } from "@/components/use-phone-layout";
 import { FileX2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
@@ -19,6 +21,7 @@ export function ReturnsTable({
   expandedId,
   expandedContent,
   expandedFooter,
+  mobileDetail,
 }: {
   rows: ReturnListRow[];
   /** Phones: append further pages automatically (desktop keeps pagination). */
@@ -26,10 +29,22 @@ export function ReturnsTable({
   expandedId?: string | null;
   expandedContent?: ReactNode;
   expandedFooter?: ReactNode;
+  /** Phones: the pushed NativeReturnDetailView for the open return. */
+  mobileDetail?: ReactNode;
 }) {
   const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
   const locale = useLocale();
+  const phone = usePhoneLayout();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // Phones push NativeReturnDetailView instead of the table's detail modal.
+  function openMobile(id: string) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("expandedReturn", id);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  }
   const dayGroups = mobileDocumentDayGroups(rows, (row) => row.createdAt, (row) => Number(row.totalRefund), {
     locale,
     today: (date) => t("mobile.invoices.groupToday", { date }),
@@ -115,8 +130,8 @@ export function ReturnsTable({
       getRowId={(row) => row.id}
       mobileListClassName="-mx-4 space-y-0 border-t border-border bg-surface"
       mobileRowClassName="!rounded-none !border-0"
-      expandedParam="expandedReturn"
-      initialExpandedId={expandedId}
+      expandedParam={phone ? "expandedReturnModal" : "expandedReturn"}
+      initialExpandedId={phone ? null : expandedId}
       detailSize="full"
       detailFooter={(row) => expandedId === row.id ? expandedFooter : null}
       minWidth="1120px"
@@ -144,7 +159,7 @@ export function ReturnsTable({
           amount={formatCurrency(Number(row.totalRefund))}
           amountTone="danger"
           createdAt={mobileDocumentTimestamp(row.createdAt, locale)}
-          onOpen={toggle}
+          onOpen={phone ? () => openMobile(row.id) : toggle}
           details={(
             <>
               <span className="block text-xs">
@@ -182,6 +197,7 @@ export function ReturnsTable({
       )}
     />
     {loadMoreFooter}
+    {phone && expandedId && mobileDetail}
     </>
   );
 }

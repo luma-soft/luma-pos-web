@@ -9,6 +9,7 @@ import { getPrintTemplatesForDoc } from "@/lib/print/template";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { ReturnActions } from "./return-actions";
+import { ReturnMobileScreen } from "./return-mobile-screen";
 import { productDisplayName } from "@/lib/products/variant-presentation";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 
@@ -219,5 +220,85 @@ function InfoLine({
         {children ?? value ?? "—"}
       </span>
     </div>
+  );
+}
+
+/** NativeReturnDetailView pushed on phones: header card, info rows, items, note and total refund. */
+export async function ReturnDetailMobile({ ret }: { ret: ReturnDetail }) {
+  const t = await getTranslations();
+  const m = await getTranslations("mobile.returns");
+  const cancelled = ret.status === "cancelled";
+  const card = "rounded-[16px] bg-surface";
+  const info = (label: string, value: ReactNode) => (
+    <div className="flex items-baseline gap-3 py-2 text-[15px]">
+      <span className="shrink-0 text-ios-label-secondary">{label}</span>
+      <span className="min-w-0 flex-1 text-right [overflow-wrap:anywhere]">{value}</span>
+    </div>
+  );
+  return (
+    <ReturnMobileScreen
+      title={ret.code}
+      actions={<ReturnActions returnId={ret.id} reason={ret.reason} note={ret.note} variant="menu" cancellable={!cancelled} printHref={`/returns/${ret.id}/print`} />}
+    >
+      <div className="space-y-ios-section px-ios-inset pt-2">
+        <div className={cn(card, "space-y-2.5 p-4")}>
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-[22px] font-bold [overflow-wrap:anywhere]">{ret.code}</div>
+              <div className="mt-1 text-ios-label-secondary">{ret.customerName ?? t("orders.walkIn")}</div>
+            </div>
+            <div className="shrink-0 text-[20px] font-bold tabular-nums text-ios-red">{formatCurrency(Number(ret.totalRefund))}</div>
+          </div>
+          <div className="flex items-center gap-2 text-[12px]">
+            <span className={cn("font-semibold", cancelled ? "text-ios-red" : "text-ios-green")}>{t(`returns.status.${ret.status}` as never)}</span>
+            <span className="text-ios-label-tertiary">·</span>
+            <span className="text-ios-label-secondary">{formatDate(ret.createdAt)}</span>
+          </div>
+        </div>
+        <div className={cn(card, "px-4 py-1.5")}>
+          {info(m("status"), t(`returns.status.${ret.status}` as never))}
+          {info(m("sourceInvoice"), ret.orderId && ret.orderCode ? <OrderDetailLink orderId={ret.orderId} className="text-ios-accent">{ret.orderCode}</OrderDetailLink> : "—")}
+          {info(m("reason"), ret.reason ? t(`returns.reasons.${ret.reason}` as never) : "—")}
+          {info(m("refundMethod"), t(`returns.refundMethods.${ret.refundMethod}`))}
+          {info(m("createdBy"), ret.createdByName ?? "—")}
+          {info(m("phone"), ret.customerPhone ?? "—")}
+          {info(m("warehouse"), ret.warehouseName ?? "—")}
+        </div>
+        <div className={cn(card, "p-4")}>
+          <h3 className="pb-2 text-[17px] font-semibold">{m("items")}</h3>
+          {ret.items.length === 0 && <p className="py-2.5 text-ios-label-secondary">{m("noItems")}</p>}
+          <div className="divide-y divide-border">
+            {ret.items.map((item) => {
+              const pricing = returnLinePricing(item);
+              const discount = pricing.lineDiscount * Number(item.quantity);
+              return (
+                <div key={item.id} className="space-y-1.5 py-2.5">
+                  <div className="text-[15px] font-semibold">{productDisplayName({ name: item.productName, variantName: item.productVariantName, specs: item.productSpecs })}</div>
+                  <div className="flex items-baseline gap-2.5">
+                    <span className={cn("text-[12px]", item.restock ? "text-ios-green" : "text-ios-red")}>{m(item.restock ? "restockYes" : "restockNo")}</span>
+                    <span className="min-w-0 flex-1 text-right text-[12px] text-ios-label-secondary">
+                      <span className="block">{formatNumber(Number(item.quantity))} {item.unitName} × {formatCurrency(pricing.unitPrice)}</span>
+                      {discount > 0 && <span className="block text-[11px]">{m("discount")}: {pricing.lineDiscountMode === "pct" ? `${formatNumber(pricing.lineDiscountValue)}% · ` : ""}{formatCurrency(discount)}</span>}
+                      <span className="block text-[11px]">{m("unitAfterDiscount")}: {formatCurrency(pricing.netUnitPrice)}</span>
+                    </span>
+                    <span className="shrink-0 text-[15px] font-semibold tabular-nums">{formatCurrency(Number(item.total))}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {ret.note && (
+          <div className={cn(card, "space-y-1.5 p-4")}>
+            <h3 className="text-[17px] font-semibold">{m("note")}</h3>
+            <p className="text-ios-label-secondary">{ret.note}</p>
+          </div>
+        )}
+        <div className={cn(card, "flex items-center justify-between p-4")}>
+          <span className="font-semibold">{m("totalRefund")}</span>
+          <span className="text-[22px] font-bold tabular-nums text-ios-red">{formatCurrency(Number(ret.totalRefund))}</span>
+        </div>
+      </div>
+    </ReturnMobileScreen>
   );
 }

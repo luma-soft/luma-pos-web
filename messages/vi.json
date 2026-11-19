@@ -2238,6 +2238,27 @@
       "bankAccountsCount": "Tài khoản trong bảng kê 01/BK-STK",
       "declarations": "Tờ khai",
       "taxEmpty": "Chưa có tờ khai. Hãy chuẩn bị và cập nhật trạng thái trên web."
+    },
+    "returns": {
+      "title": "Chi tiết phiếu trả",
+      "status": "Trạng thái",
+      "sourceInvoice": "Hóa đơn gốc",
+      "reason": "Lý do",
+      "refundMethod": "Hình thức hoàn tiền",
+      "createdBy": "Người tạo",
+      "phone": "Số điện thoại khách",
+      "warehouse": "Kho",
+      "items": "Sản phẩm trả",
+      "noItems": "Không có thông tin mặt hàng.",
+      "note": "Ghi chú",
+      "totalRefund": "Tổng hoàn tiền",
+      "restockYes": "Nhập lại kho: Có",
+      "restockNo": "Nhập lại kho: Không",
+      "edit": "Sửa thông tin",
+      "cancel": "Hủy phiếu trả",
+      "print": "In / Chia sẻ",
+      "discount": "Giảm giá",
+      "unitAfterDiscount": "Đơn giá sau giảm"
     }
   },
   "toolsCenter": {

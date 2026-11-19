@@ -18,7 +18,7 @@ import {
   type ReturnReasonFilter,
 } from "@/lib/returns/list-filter-schema";
 import { DocumentFilterDrawer } from "./document-filter-drawer";
-import { ReturnDetailFooter, ReturnDetailPanel } from "./return-detail-panel";
+import { ReturnDetailFooter, ReturnDetailMobile, ReturnDetailPanel } from "./return-detail-panel";
 import { ReturnsTable } from "./returns-table";
 import { requireStoreContext } from "@/lib/auth/store-context";
 
@@ -98,6 +98,7 @@ async function ReturnsContent({ searchParams }: { searchParams: SP }) {
         expandedId={expandedReturn?.id ?? expandedId}
         expandedContent={expandedReturn ? <ReturnDetailPanel ret={expandedReturn} compact /> : null}
         expandedFooter={expandedReturn ? <ReturnDetailFooter ret={expandedReturn} /> : null}
+        mobileDetail={expandedReturn ? <ReturnDetailMobile ret={expandedReturn} /> : null}
         loadMore={{ page, pageCount, loadPage: loadReturnsPage.bind(null, searchParams) }}
       />
       <DesktopPagination>
