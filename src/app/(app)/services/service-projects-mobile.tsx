@@ -99,7 +99,7 @@ export function ServiceProjectsMobile({
 
       <div className="px-ios-inset">
         <p className="pb-3 pt-2 text-[15px] text-ios-label-secondary">{t("count", { count: total })}</p>
-        <div className="flex items-center gap-2.5 border-b border-border pb-3">
+        <div className="flex items-center gap-2.5 pb-3">
           <label className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-[19px] -translate-y-1/2 text-ios-label-secondary" strokeWidth={2.2} aria-hidden="true" />
             <input
@@ -123,6 +123,7 @@ export function ServiceProjectsMobile({
         </div>
       </div>
 
+      <div className="h-px bg-border" aria-hidden="true" />
       {rows.length === 0 ? (
         <p className="px-ios-inset py-16 text-center text-[15px] text-ios-label-secondary">{t("empty")}</p>
       ) : (
@@ -178,7 +179,7 @@ function ProjectRow({ row }: { row: ServiceProjectRow }) {
   const Icon = trade.icon;
   const done = row.status === "done";
   return (
-    <Link href={Routes.project(row.id)} className="relative block px-ios-inset py-4 after:absolute after:bottom-0 after:left-ios-inset after:right-0 after:h-px after:bg-border active:bg-black/[0.04] dark:active:bg-white/[0.06]">
+    <Link href={Routes.project(row.id)} className="relative block px-ios-inset py-4 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border active:bg-black/[0.04] dark:active:bg-white/[0.06]">
       <span className="flex items-center gap-3">
         <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl", trade.tone)}>
           <Icon className="size-5" strokeWidth={2} aria-hidden="true" />
