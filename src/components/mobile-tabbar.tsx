@@ -7,6 +7,7 @@ import { Ellipsis, FileText, House, Package, ShoppingCart, type LucideIcon } fro
 import { Routes } from "@/lib/routes";
 import type { Role } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
+import { useMobileTabBarHideRequested } from "@/components/mobile-tabbar-visibility";
 
 type Tab = {
   id: "overview" | "sales" | "inventory" | "invoices" | "more";
@@ -26,6 +27,18 @@ const TABS: readonly Tab[] = [
 ];
 
 /**
+ * Tab roots keep the tab bar, like the native tab roots. Every other screen is a
+ * pushed sub-screen (all of More's destinations, details, forms), where the
+ * native app hides the tab bar.
+ */
+const TAB_ROOT_ROUTES: readonly string[] = [
+  Routes.Dashboard, Routes.POS, Routes.Inventory, Routes.Products, Routes.Purchases, Routes.PurchaseReturns,
+  Routes.Stocktakes, Routes.Pricing, "/internal-use",
+  Routes.Sales, Routes.Orders, Routes.Quotes, "/returns", "/bookings", "/invoices",
+  Routes.More,
+];
+
+/**
  * Floating capsule tab bar matching the native iOS 26 tab bar: translucent
  * material, a highlighted pill behind the selected tab, accent-tinted selection
  * and primary-label inactive items.
@@ -35,6 +48,8 @@ export function MobileTabBar({ role }: { role: Role }) {
   const pathname = usePathname();
   const isTechnician = role === "technician";
   const matches = (route: string) => pathname === route || pathname.startsWith(`${route}/`);
+  const hideRequested = useMobileTabBarHideRequested();
+  const hidden = hideRequested || !TAB_ROOT_ROUTES.includes(pathname);
 
   const sectionActive: Record<Tab["id"], boolean> = {
     overview: matches(Routes.Dashboard),
@@ -55,8 +70,17 @@ export function MobileTabBar({ role }: { role: Role }) {
   return (
     <nav
       aria-label={t("common.primaryNavigation")}
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-5 pb-[max(0.75rem,calc(env(safe-area-inset-bottom)-0.75rem))] lg:hidden"
+      aria-hidden={hidden || undefined}
+      inert={hidden}
+      className={cn(
+        "pointer-events-none fixed inset-x-0 bottom-0 z-40 px-5 pb-[max(0.75rem,calc(env(safe-area-inset-bottom)-0.75rem))] lg:hidden",
+        // Slide with the iOS navigation curve, the way a hidden UITabBar moves with a push/pop.
+        "transition-[translate,opacity] duration-[350ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+        hidden ? "translate-y-[calc(100%+12px)] opacity-0" : "translate-y-0 opacity-100",
+      )}
     >
+      {/* While hidden, content and bottom bars only keep the home-indicator inset. */}
+      {hidden && <style>{":root{--mobile-tabbar-space:env(safe-area-inset-bottom,0px)}"}</style>}
       <div className="pointer-events-auto mx-auto flex h-[62px] max-w-[480px] items-stretch gap-0.5 rounded-full border border-white/60 bg-white/72 p-1 font-ios shadow-[0_8px_30px_rgb(0_0_0/0.12),0_1px_2px_rgb(0_0_0/0.06)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-[#1C1C1E]/78 dark:shadow-[0_8px_30px_rgb(0_0_0/0.5)]">
         {(isTechnician ? TABS.filter((tab) => tab.id === "more") : TABS).map((tab) => {
           const active = sectionActive[tab.id];

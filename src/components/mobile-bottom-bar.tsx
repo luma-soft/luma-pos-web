@@ -18,6 +18,8 @@ export function MobileBottomSearchBar({ children, className }: { children: React
       <div
         className={cn(
           "fixed inset-x-0 z-30 border-t border-border bg-surface px-ios-inset py-2 lg:hidden",
+          // Follows the tab bar as it slides away on sub-screens.
+          "transition-[bottom] duration-[350ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
           keyboardInset === 0 && "bottom-(--mobile-tabbar-space)",
           className,
         )}

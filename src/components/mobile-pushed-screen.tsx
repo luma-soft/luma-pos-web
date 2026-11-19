@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { DetailCloseContext, MobileDetailNav } from "@/components/mobile-detail-nav";
 import { cn } from "@/lib/utils";
+import { useHideMobileTabBar } from "@/components/mobile-tabbar-visibility";
 
 /**
  * A screen pushed onto the phone navigation stack (SwiftUI navigationDestination):
@@ -27,6 +28,7 @@ export function MobilePushedScreen({
   /** Nesting depth, so a screen pushed from a pushed screen stacks above it. */
   layer?: number;
 }) {
+  useHideMobileTabBar();
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
