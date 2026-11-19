@@ -224,7 +224,7 @@ export async function OrderDetailPanel({
                     </div>
                     <div className="mt-1 text-[13px] text-ios-label-secondary">{formatNumber(Number(item.quantity))} {item.unitName} · {formatCurrency(pricing.unitPrice)}</div>
                     {pricing.discount > 0 && (
-                      <div className="mt-1 text-[11px] text-ios-label-secondary">{t("mobile.orderDetail.discount", { amount: `${pricing.lineDiscountMode === "pct" ? `${formatNumber(pricing.lineDiscountValue)}% · ` : ""}${formatCurrency(pricing.discount)}` })}</div>
+                      <div className="mt-1 text-[11px] text-ios-label-secondary">{t("mobile.orderDetail.discount", { amount: `${pricing.lineDiscountMode === "pct" ? `${formatNumber(pricing.lineDiscountValue)}% · ` : ""}${formatCurrency(pricing.lineDiscount)}` })}</div>
                     )}
                     <div className="mt-1 text-[11px] text-ios-label-secondary">{t("mobile.orderDetail.netUnitPrice", { amount: formatCurrency(pricing.netUnitPrice) })}</div>
                     {item.priceBookName && <div className="mt-1 text-[13px] text-ios-label-secondary">{item.priceBookName}</div>}
