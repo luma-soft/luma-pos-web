@@ -100,7 +100,8 @@ export function nativeCurrency(value: number) {
  */
 export function MobileListTotalsCard({ metrics, large = false }: { metrics: Array<{ id: string; title: string; value: string; tone?: string }>; large?: boolean }) {
   return (
-    <div className="mx-ios-inset mb-1.5 flex items-start rounded-[8px] bg-surface px-3.5 py-3 lg:hidden">
+    // Full-bleed like the iOS list row (listRowInsets 0); -mb-0.5 offsets the list shell's 8px gap to iOS's 6pt.
+    <div className="-mx-ios-inset -mb-0.5 flex items-start rounded-[8px] bg-surface px-3.5 py-3 lg:hidden">
       {metrics.map((metric, index) => (
         <div key={metric.id} className="contents">
           {index > 0 && (
@@ -120,7 +121,7 @@ export function MobileListTotalsCard({ metrics, large = false }: { metrics: Arra
             <div
               className={cn(
                 "whitespace-nowrap font-semibold tabular-nums",
-                large ? "mt-0.5 text-[clamp(13px,4.4vw,17px)] leading-[22px]" : "mt-[5px] text-[clamp(10px,3vw,13px)] leading-[18px]",
+                large ? "mt-0.5 text-[length:clamp(13px,4.4vw,17px)] leading-[22px]" : "mt-[5px] text-[length:clamp(10px,3.25vw,13px)] leading-[18px]",
                 metric.tone,
               )}
             >

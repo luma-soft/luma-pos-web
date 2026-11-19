@@ -26,7 +26,7 @@ export default async function PartnersPage({ searchParams }: { searchParams: Pro
     <div className="p-4 sm:p-6 max-lg:min-h-full max-lg:bg-surface max-lg:pt-0">
       {/* Phones: pushed from "Thêm" like CustomersView/SuppliersView — back button and large title. */}
       <MobileTopBar
-        className="-mx-4 bg-surface"
+        className="-mx-4 bg-surface pb-[3px]"
         leading={(
           <Link
             href={Routes.More}

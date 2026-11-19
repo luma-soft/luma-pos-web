@@ -91,10 +91,16 @@ export function MobileTopBar({
 }) {
   return (
     // Native large-title navigation header: 34pt bold title on the grouped background, no bar or divider.
-    <header className={cn("bg-canvas px-ios-inset pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] lg:hidden", className)}>
-      {/* iOS large title: the back button sits in the navigation bar row above the title, not beside it. */}
+    <header
+      className={cn(
+        "bg-canvas px-ios-inset pb-3 lg:hidden",
+        leading ? "pt-[env(safe-area-inset-top)]" : "pt-[calc(env(safe-area-inset-top)+0.75rem)]",
+        className,
+      )}
+    >
+      {/* iOS large title: the back button sits in the 44pt navigation bar row above the title, not beside it. */}
       {leading && <div className="flex min-h-11 items-center">{leading}</div>}
-      <div className={cn("flex min-h-[52px] items-center gap-2", leading && "mt-2")}>
+      <div className={cn("flex min-h-[52px] items-center gap-2", leading && "mt-[11px]")}>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-[34px] font-bold leading-[41px] tracking-[0.01em]">{title}</h1>
           {subtitle && <p className="mt-0.5 text-[13px] font-normal leading-[18px] text-ios-label-secondary">{subtitle}</p>}
