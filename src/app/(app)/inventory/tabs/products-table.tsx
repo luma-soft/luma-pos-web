@@ -1710,25 +1710,8 @@ function ProductStockPanel({
 
   return (
     <>
-    <div className="space-y-2 lg:hidden" data-mobile-audit="product-stock-location">
-      {rows.map((row) => {
-        const low = row.minLevel > 0 && row.quantity <= row.minLevel;
-        return (
-          <article key={row.warehouseId} className="rounded-card border border-border-soft p-3 text-sm">
-            <div className="flex items-start justify-between gap-3">
-              <span className={cn("shrink-0 rounded-md px-2 py-1 text-xs font-semibold", effectiveActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500")}>
-                {effectiveActive ? t("products.expand.selling") : t("products.expand.stopped")}
-              </span>
-            </div>
-            <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div><dt className="text-slate-500">{t("products.expand.cols.stock")}</dt><dd className="mt-0.5 font-semibold tabular-nums">{formatNumber(row.quantity)}</dd></div>
-              <div><dt className="text-right text-slate-500">{t("products.expand.cols.reserved")}</dt><dd className="mt-0.5 text-right font-semibold tabular-nums">{formatNumber(row.reserved)}</dd></div>
-              <div className="col-span-2"><dt className="text-slate-500">{t("products.expand.cols.daysToOut")}</dt><dd className={cn("mt-0.5", low ? "font-semibold text-warn" : "text-slate-500")}>{low ? t("products.expand.lowStock") : "—"}</dd></div>
-            </dl>
-          </article>
-        );
-      })}
-    </div>
+    {/* Phones: NativeProductInventoryTab — stock cells and the level bar. */}
+    <ProductMobileInventory product={product} />
     <div className="hidden overflow-x-auto lg:block">
       <table className="w-full min-w-[760px] text-sm">
         <thead>
@@ -2619,6 +2602,36 @@ function ProductMobileInfo({ product }: { product: ProductRow }) {
       </div>
       {row(t("mobile.products.costPrice"), formatCurrency(Number(product.costPrice)), "font-semibold text-ios-accent")}
       {row(t("mobile.products.retailPrice"), formatCurrency(Number(product.retailPrice)), "font-semibold text-ios-accent")}
+    </div>
+  );
+}
+
+/** NativeProductInventoryTab on phones: 2×2 stock cells and a progress bar toward the minimum. */
+function ProductMobileInventory({ product }: { product: ProductRow }) {
+  const t = useTranslations("mobile.products");
+  const stock = Number(product.totalStock);
+  const minimum = Number(product.minLevel);
+  const tone = nativeStockTone(true, stock, minimum);
+  const ratio = minimum > 0 ? stock / minimum : 1;
+  const progress = Math.min(1, Math.max(0, ratio > 1 ? ratio / 2 : ratio));
+  const cell = (label: string, value: string, tint?: string) => (
+    <div className="min-h-[68px] rounded-[14px] bg-surface p-3">
+      <div className="truncate text-[11px] font-bold uppercase text-ios-label-secondary">{label}</div>
+      <div className={cn("mt-1 truncate text-[15px] font-bold tabular-nums", tint)}>{value}</div>
+    </div>
+  );
+  const barTone = { information: "bg-ios-accent", critical: "bg-ios-red", warning: "bg-ios-orange", positive: "bg-ios-green" }[tone];
+  return (
+    <div className="space-y-3 py-5 lg:hidden" data-mobile-audit="product-stock-location">
+      <div className="grid grid-cols-2 gap-2.5">
+        {cell(t("onHand"), `${formatNumber(stock)} ${product.baseUnit}`, NATIVE_STOCK_TEXT[tone])}
+        {cell(t("minimum"), `${formatNumber(minimum)} ${product.baseUnit}`)}
+        {cell(t("reserved"), `${formatNumber(Number(product.reservedStock ?? 0))} ${product.baseUnit}`)}
+        {cell(t("location"), product.location?.trim() || "–")}
+      </div>
+      <div className="h-1 overflow-hidden rounded-full bg-black/[0.08] dark:bg-white/[0.12]" role="progressbar" aria-label={t("stock")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
+        <div className={cn("h-full rounded-full", barTone)} style={{ width: `${progress * 100}%` }} />
+      </div>
     </div>
   );
 }

@@ -64,7 +64,8 @@ export function Section({
           )}
         </div>
       </div>
-      {open && (
+      {/* A non-collapsible section always shows its content. */}
+      {(open || !collapsible) && (
         <div className="px-4 pb-4 pt-0 border-t border-border-soft">
           <div className="pt-4">
             {children}

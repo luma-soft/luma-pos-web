@@ -17,6 +17,7 @@ import { useTranslations } from "next-intl";
 import {
   ArrowLeft,
   ChevronDown,
+  ChevronRight,
   ImagePlus,
   Info,
   Link2,
@@ -887,14 +888,23 @@ function InfoTab({
   const productKind = watch("productKind") ?? "product";
   const groupAdding = groupEditing && watch("variantOperation") === "add";
   const groupManaging = groupEditing && !groupAdding;
+  const isPhone = usePhoneLayout();
+  // Phones: ProductEditorView's flat sections — hairline, bold title, always open.
+  const sectionClass = cn(
+    "rounded-none border-x-0 border-b-0 shadow-none",
+    "max-lg:bg-transparent max-lg:[&>div:first-child]:px-0 max-lg:[&>div:first-child]:pb-3 max-lg:[&>div:first-child]:pt-4",
+    "max-lg:[&>div:first-child>div>div:first-child]:text-[20px] max-lg:[&>div:first-child>div>div:first-child]:font-bold",
+    "max-lg:[&>div:last-child]:border-t-0 max-lg:[&>div:last-child]:px-0 max-lg:[&>div:last-child>div]:pt-0",
+  );
   return (
-    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">
-      <div className="min-w-0 space-y-5">
-        <BasicInfoSection categories={categories} brands={brands} groupEditing={groupManaging} />
-        {productKind === "combo" && <ComboItemsField />}
+    <div className="grid grid-cols-1 items-start gap-6 max-lg:flex max-lg:flex-col max-lg:items-stretch max-lg:gap-5 lg:grid-cols-[minmax(0,1fr)_240px]">
+      <div className="min-w-0 space-y-5 max-lg:contents">
+        <div className="max-lg:order-1"><BasicInfoSection categories={categories} brands={brands} groupEditing={groupManaging} /></div>
+        {productKind === "combo" && <div className="max-lg:order-3"><ComboItemsField /></div>}
         {!groupManaging && <Section
-          titleTx="products.sections.pricing"
-          className="rounded-none border-x-0 border-b-0 shadow-none"
+          titleTx={isPhone ? "mobile.products.sections.pricing" : "products.sections.pricing"}
+          collapsible={!isPhone}
+          className={cn(sectionClass, "max-lg:order-4")}
         >
           <PricingFields priceBooks={priceBooks ?? []} />
         </Section>}
@@ -902,7 +912,8 @@ function InfoTab({
           <>
             <Section
               titleTx="products.sections.stock"
-              className="rounded-none border-x-0 border-b-0 shadow-none"
+              collapsible={!isPhone}
+              className={cn(sectionClass, "max-lg:order-5")}
             >
               <StockFields />
             </Section>
@@ -910,14 +921,16 @@ function InfoTab({
               titleTx="products.sections.physical"
               descriptionTx="products.sections.physicalDesc"
               defaultOpen={false}
-              className="rounded-none border-x-0 border-b-0 shadow-none"
+              collapsible={!isPhone}
+              className={cn(sectionClass, "max-lg:order-6")}
             >
               <PhysicalFields />
             </Section>}
           </>
         )}
       </div>
-      <aside className="min-w-0 border-t border-border pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+      {/* Phones: images sit right after the basic fields, as in ProductEditorView. */}
+      <aside className="min-w-0 border-t border-border pt-5 max-lg:order-2 max-lg:border-t-0 max-lg:pt-0 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
         <ImageUploadGrid
           storeId={storeId}
           publicMediaBaseUrl={publicMediaBaseUrl}
@@ -1814,7 +1827,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
 
   return (
     <>
-      <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-[1fr_1fr_auto] lg:grid-cols-[1fr_1fr_auto]">
+      <div className="grid grid-cols-1 items-start gap-4 max-lg:grid-cols-2 max-lg:gap-3.5 md:grid-cols-[1fr_1fr_auto] lg:grid-cols-[1fr_1fr_auto]">
         <Field
           labelTx="products.pricing.costPrice"
           hintTx={isCombo ? "products.combo.costAutoHint" : undefined}
@@ -1844,10 +1857,11 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
           type="button"
           onClick={openPriceBooks}
           disabled={activeBooks.length === 0}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-primary-600 hover:bg-primary-50 md:mt-[30px] dark:hover:bg-primary-950/30 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-primary-600 hover:bg-primary-50 md:mt-[30px] dark:hover:bg-primary-950/30 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0 max-lg:col-span-2 max-lg:min-h-12 max-lg:justify-start max-lg:rounded-[8px] max-lg:border max-lg:border-border max-lg:px-3 max-lg:text-[15px]"
         >
-          <Tag className="h-4 w-4" />
-          {t("products.pricing.setupPriceBooks")}
+          <Tag className="h-4 w-4 max-lg:size-[18px] max-lg:text-ios-label-secondary" />
+          <span className="max-lg:min-w-0 max-lg:flex-1 max-lg:text-left">{t("products.pricing.setupPriceBooks")}</span>
+          <ChevronRight className="size-4 text-ios-label lg:hidden" aria-hidden="true" />
         </button>
       </div>
 
@@ -1982,7 +1996,7 @@ function StockFields() {
   const hasVariants = (groupEditing && !groupAdding) || (!groupAdding && !editingStock && (watch("attributes") ?? []).some((attribute) => attribute.createsVariants !== false));
   if (hasVariants) return <p className="text-sm text-slate-500">Tồn được quản lý trên từng SKU trong tab Đơn vị & thuộc tính. Nhóm không có tồn riêng.</p>;
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 max-lg:grid-cols-[10fr_14fr_14fr] max-lg:items-end max-lg:gap-2.5 md:grid-cols-3 gap-4">
       <Field labelTx="products.stock.current">
         <NumberInput
           value={editingStock ? currentStock : watch("initialStock")}
