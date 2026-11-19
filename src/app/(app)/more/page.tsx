@@ -8,7 +8,6 @@ import {
   Cpu,
   Images,
   Lightbulb,
-  Printer,
   Settings,
   Sparkles,
   Truck,
@@ -138,18 +137,17 @@ export default async function MorePage() {
             </MobileListSection>
           )}
 
-          {/* iOS keeps appearance and language inside Settings; the web settings page has no such section. */}
-          <MobileListSection title={t("mobile.more.preferences")}>
+          {/* iOS keeps appearance in Settings; staff without Settings access keep it here. */}
+          {!manager && <MobileListSection title={t("mobile.more.preferences")}>
             <div className="space-y-2 p-4">
               <ModeSwitcher current={mode} />
               <ThemeSwitcher current={theme} />
               <LanguageSwitcher />
             </div>
-          </MobileListSection>
+          </MobileListSection>}
 
           <MobileListSection title={t("mobile.more.account")}>
             {manager && <MobileListRow href={Routes.Settings} icon={Settings} title={t("nav.settings")} />}
-            {manager && <MobileListRow href={Routes.PrintSettings} icon={Printer} title={t("mobile.more.printTemplates")} />}
             <MobileLogoutRow userId={user.id} />
           </MobileListSection>
         </MobileMoreQuickSearch>
