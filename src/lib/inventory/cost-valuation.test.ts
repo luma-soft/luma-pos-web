@@ -283,7 +283,7 @@ test("customer returns use original replayed sale cost; unknown legacy cost pres
   const order = randomUUID(), returned = randomUUID();
   await movement(id, -10, saleAt, { refId: order });
   await receipt([{ productId: id, quantity: 10, unitCost: 300 }], secondAt);
-  await database.insert(schema.returns).values({ id: returned, storeId: store, code: "RETURN", orderId: order });
+  await database.insert(schema.returns).values({ id: returned, storeId: store, warehouseId: warehouse, code: "RETURN", orderId: order });
   await movement(id, 5, "2020-01-05T00:00:00Z", { type: "return_in", refType: "return", refId: returned });
   await revalue([id]);
   assert.deepEqual(await values(id), { qty: 25, cost: 210, gross: 300 });
@@ -314,7 +314,7 @@ test("replayed sale cost supersedes a stale return snapshot after receipt edits"
   const order = randomUUID(), returned = randomUUID();
   await movement(id, -10, saleAt, { refType: "exchange_order", refId: order });
   await receipt([{ productId: id, quantity: 10, unitCost: 300 }], secondAt);
-  await database.insert(schema.returns).values({ id: returned, storeId: store, code: "REPLAY-RETURN", orderId: order });
+  await database.insert(schema.returns).values({ id: returned, storeId: store, warehouseId: warehouse, code: "REPLAY-RETURN", orderId: order });
   await movement(id, 5, "2020-01-05T00:00:00Z", { type: "return_in", refType: "return", refId: returned, unitCost: 150 });
   await revalue([id]);
   assert.deepEqual(await values(id), { qty: 25, cost: 210, gross: 300 });
@@ -342,7 +342,7 @@ test("order edit cancellation restores original cost and legacy return cancellat
   await revalue([id]);
   assert.deepEqual(await values(id), { qty: 30, cost: 200, gross: 300 });
   const returned = randomUUID();
-  await database.insert(schema.returns).values({ id: returned, storeId: store, code: "OLD-RETURN", status: "cancelled" });
+  await database.insert(schema.returns).values({ id: returned, storeId: store, warehouseId: warehouse, code: "OLD-RETURN", status: "cancelled" });
   await movement(id, 5, "2019-12-31T00:00:00Z", { type: "return_in", refType: "return", refId: returned, unitCost: 999 });
   await changeStock(id, -5); // The old return is already included in the opening balance.
   await movement(id, -5, "2020-01-06T00:00:00Z", { type: "return_out", refType: "return_cancel", refId: returned });
@@ -359,7 +359,7 @@ test("same-ID order edits replace the original sale cost used by later returns",
   await movement(id, 10, "2020-01-05T00:00:00Z", { type: "return_in", refType: "order_edit_cancel", refId: order });
   await movement(id, -10, "2020-01-05T00:00:01Z", { refId: order }); // Replacement sale cost 200.
   await receipt([{ productId: id, quantity: 10, unitCost: 400 }], "2020-01-06T00:00:00Z");
-  await database.insert(schema.returns).values({ id: returned, storeId: store, code: "EDITED-RETURN", orderId: order });
+  await database.insert(schema.returns).values({ id: returned, storeId: store, warehouseId: warehouse, code: "EDITED-RETURN", orderId: order });
   await movement(id, 10, "2020-01-07T00:00:00Z", { type: "return_in", refType: "return", refId: returned });
   await revalue([id]);
   assert.deepEqual(await values(id), { qty: 40, cost: 250, gross: 400 });

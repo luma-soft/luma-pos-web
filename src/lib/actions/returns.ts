@@ -51,7 +51,6 @@ import { publishCommittedNotification } from "@/lib/notifications/outbox";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { revalueInventoryProducts } from "@/lib/inventory/cost-valuation";
-import { resolveOrderWarehouseId } from "@/lib/inventory/order-stock-restoration";
 
 const GATEWAY_REFUND_METHODS = new Set<GatewayProvider>(["momo", "zalopay", "vnpay"]);
 const isGatewayRefundMethod = (value: string): value is GatewayProvider =>
@@ -266,7 +265,6 @@ export async function createExchangeForUser(
       const [order] = await tx.select().from(orders)
         .where(and(eq(orders.storeId, storeId), eq(orders.id, v.orderId))).limit(1).for("update");
       if (!order) throw new Error("ORDER_NOT_FOUND");
-      order.warehouseId = await resolveOrderWarehouseId(tx, storeId, order.warehouseId);
       if (order.status !== "completed" && order.status !== "returned") {
         throw new Error("ORDER_CANCELLED");
       }
@@ -728,9 +726,9 @@ export async function createReturnForUser(
     const result = await db.transaction(async (tx) => {
       const [order] = await tx.select().from(orders).where(and(eq(orders.storeId, storeId), eq(orders.id, v.orderId))).limit(1).for("update");
       if (!order) throw new Error("ORDER_NOT_FOUND");
-      order.warehouseId = await resolveOrderWarehouseId(tx, storeId, order.warehouseId);
       // chỉ trả hàng trên đơn bán thật (không quote/merged/cancelled/draft)
       if (order.status !== "completed" && order.status !== "returned") throw new Error("ORDER_CANCELLED");
+      if (!order.warehouseId) throw new Error("WAREHOUSE_REQUIRED");
 
       const itemIds = v.items.map((i) => i.orderItemId);
       const sourceItems = await tx.select().from(orderItems).where(and(eq(orderItems.storeId, storeId), inArray(orderItems.id, itemIds)));

@@ -1747,7 +1747,7 @@ export const returns = pgTable("returns", {
   // nullable: trả hàng nhanh không gắn hóa đơn (vd lịch sử KiotViet)
   orderId: uuid("order_id").references(() => orders.id),
   customerId: uuid("customer_id").references(() => customers.id),
-  warehouseId: uuid("warehouse_id").references(() => warehouses.id),
+  warehouseId: uuid("warehouse_id").notNull().references(() => warehouses.id),
   reason: text("reason"),
   refundMethod: refundMethodEnum("refund_method").notNull().default("cash"),
   totalRefund: decimal("total_refund", { precision: 14, scale: 2 }).notNull().default("0"),

@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
-import { productComboItems, products, stockLevels, stockMovements, warehouses } from "@/db/schema";
+import { productComboItems, products, stockLevels, stockMovements } from "@/db/schema";
 import { restoreOrReceiveTrackedStockLots, type InventoryTransaction } from "./stock-lot-service";
 
 export type OrderStockRestoration = {
@@ -10,17 +10,6 @@ export type OrderStockRestoration = {
 };
 
 type OrderItemStockSnapshot = { productId: string; quantity: string; unitMultiplier: string };
-
-/** KiotViet-imported orders may have no warehouse; their stock was counted
- * in the store's default warehouse. */
-export async function resolveOrderWarehouseId(
-  tx: InventoryTransaction, storeId: string, warehouseId: string | null,
-): Promise<string | null> {
-  if (warehouseId) return warehouseId;
-  const [row] = await tx.select({ id: warehouses.id }).from(warehouses)
-    .where(and(eq(warehouses.storeId, storeId), eq(warehouses.isDefault, true))).limit(1);
-  return row?.id ?? null;
-}
 
 /** Resolve the physical stock actually sold, including earlier same-ID edits. */
 export async function getOrderStockRestorations(
@@ -45,13 +34,9 @@ export async function getOrderStockRestorations(
       if (movement.type === "sale") target.sourceRefType = movement.refType === "exchange_order" ? "exchange_order" : "order";
       grouped.set(key, target);
     }
-  } else if (items.length) {
+  } else if (order.warehouseId && items.length) {
     // Imported orders may have no movement ledger. Their reconciled opening
     // stock remains authoritative; resolve only physical items for restoration.
-    // KiotViet imports may also lack a warehouse: their sale was counted in the
-    // store's default warehouse, so restore there.
-    const warehouseId = await resolveOrderWarehouseId(tx, storeId, order.warehouseId);
-    if (!warehouseId) return [];
     const ids = [...new Set(items.map((item) => item.productId))];
     const productRows = await tx.select({ id: products.id, kind: products.productKind }).from(products)
       .where(and(eq(products.storeId, storeId), inArray(products.id, ids)));
@@ -70,9 +55,9 @@ export async function getOrderStockRestorations(
             .map((component) => ({ productId: component.productId, quantity: Number(component.quantity) * baseQuantity }))
           : [];
       for (const stockItem of physical) {
-        const key = `${stockItem.productId}:${warehouseId}`;
+        const key = `${stockItem.productId}:${order.warehouseId}`;
         const target = grouped.get(key) ?? {
-          productId: stockItem.productId, warehouseId: warehouseId, quantity: 0, sourceRefType: "order" as const,
+          productId: stockItem.productId, warehouseId: order.warehouseId, quantity: 0, sourceRefType: "order" as const,
         };
         target.quantity += stockItem.quantity;
         grouped.set(key, target);
