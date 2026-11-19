@@ -50,6 +50,7 @@ import {
   X,
   ZoomIn,
   type LucideIcon,
+  Layers,
 } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { AutoLinkText } from "@/components/ui/auto-link-text";
@@ -2176,7 +2177,7 @@ function ProductActionBar({ product, cameraMaterials = false, variant = "bar" }:
   }
 
   if (variant === "menu") {
-    // Phones: the native "Thao tác khác" sheet (edit, purchase, copy, labels, same type, stop, delete).
+    // Phones: the native "Thao tác khác" sheet (edit, purchase, copy, labels, manage variants, same type, stop, delete).
     const go = (href: string) => router.push(href);
     return (
       <div className="space-y-2">
@@ -2188,6 +2189,7 @@ function ProductActionBar({ product, cameraMaterials = false, variant = "bar" }:
         {!product.isVariantParent && <MobileMenuAction icon={PackagePlus} label={t("mobile.products.purchase")} onSelect={() => go(Routes.purchaseNewForProduct(product.id))} />}
         <MobileMenuAction icon={Copy} label={t("mobile.products.copy")} onSelect={() => go(productModalHref({ productModal: "copy", copyFrom: product.id }))} />
         {!product.isVariantParent && <MobileMenuAction icon={Barcode} label={t("mobile.products.printLabels")} onSelect={() => go(Routes.productLabels(product.id))} />}
+        {product.variantGroup && <MobileMenuAction icon={Layers} label={t("mobile.products.manageVariants")} onSelect={() => go(productModalHref({ productModal: "groupEdit", productId: product.variantGroup!.id }))} />}
         <MobileMenuAction icon={Plus} label={t("mobile.products.addSameType")} onSelect={() => go(productModalHref({ productModal: product.variantGroup ? "groupAdd" : "sameType", sameTypeAs: sameTypeSourceId }))} />
         <MobileMenuAction icon={Ban} label={t(nextActive ? "mobile.products.resumeSelling" : "mobile.products.stopSelling")} disabled={pending} onSelect={() => void toggleActive()} />
         <MobileMenuAction icon={Trash2} label={t("mobile.products.delete")} destructive disabled={pending} onSelect={() => void removeProduct()} />
