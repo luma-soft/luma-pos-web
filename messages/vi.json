@@ -2113,6 +2113,18 @@
       "loadError": "Không tải được phiếu kiểm kho.",
       "retry": "Thử lại",
       "minLevel": "Mức tồn tối thiểu: {value} {unit}"
+    },
+    "categories": {
+      "search": "Tìm danh mục",
+      "add": "Thêm danh mục",
+      "productCount": "{count} hàng hóa",
+      "rename": "Đổi tên",
+      "addChild": "Thêm danh mục con",
+      "remove": "Xóa",
+      "expand": "Mở rộng",
+      "collapse": "Thu gọn",
+      "actionsFor": "Thao tác với {name}",
+      "segment": "Danh mục"
     }
   },
   "toolsCenter": {

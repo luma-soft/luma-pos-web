@@ -2113,6 +2113,18 @@
       "loadError": "Couldn't load the stocktake.",
       "retry": "Retry",
       "minLevel": "Minimum stock: {value} {unit}"
+    },
+    "categories": {
+      "search": "Search categories",
+      "add": "Add category",
+      "productCount": "{count} items",
+      "rename": "Rename",
+      "addChild": "Add subcategory",
+      "remove": "Delete",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "actionsFor": "Actions for {name}",
+      "segment": "Categories"
     }
   },
   "toolsCenter": {

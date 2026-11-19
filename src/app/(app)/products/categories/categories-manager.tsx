@@ -1,9 +1,11 @@
 "use client";
 
 import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { Check, ChevronDown, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Ellipsis, Folder, FolderPlus, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { MobileActionSheet } from "@/components/mobile-detail-nav";
+import { MenuAction } from "@/app/(app)/partners/tabs/customer-mobile";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { selectAllInputOnClick } from "@/lib/input-selection";
@@ -37,6 +39,8 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
   const [busy, setBusy] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Cat | null>(null);
   const [query, setQuery] = useState("");
+  const [menuFor, setMenuFor] = useState<Cat | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   // modal tạo mới
   const [open, setOpen] = useState(false);
@@ -145,7 +149,26 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
 
   return (
     <div className="w-full min-w-0">
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      {/* Phones: CategoryManagementView's search field with the inline add-folder button. */}
+      <div className="relative mb-2 lg:hidden">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-[19px] -translate-y-1/2 text-ios-label-secondary" strokeWidth={2.2} />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t("mobile.categories.search")}
+          aria-label={t("mobile.categories.search")}
+          className="h-12 w-full rounded-2xl border border-ios-stroke/50 bg-[rgb(118_118_128/0.12)] pl-11 pr-14 text-[17px] outline-none placeholder:text-ios-label-secondary focus:border-ios-accent dark:bg-[rgb(118_118_128/0.24)]"
+        />
+        <button
+          type="button"
+          onClick={() => { setNewParent(""); setOpen(true); }}
+          aria-label={t("mobile.categories.add")}
+          className="absolute right-1.5 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-[10px] bg-ios-accent/12 text-ios-accent"
+        >
+          <FolderPlus className="size-5" strokeWidth={2.2} aria-hidden="true" />
+        </button>
+      </div>
+      <div className="mb-3 flex flex-col gap-2 max-lg:hidden sm:flex-row sm:items-center sm:justify-between">
         <label className="relative min-w-0 flex-1 sm:max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
@@ -162,7 +185,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
         </Button>
       </div>
 
-      <p className="mb-3 text-sm text-slate-500">{t("categories.count", { n: total })}</p>
+      <p className="mb-3 text-sm text-slate-500 max-lg:hidden">{t("categories.count", { n: total })}</p>
 
       {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
 
@@ -177,18 +200,44 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
         resetScrollKey={query}
         canExpand={(row) => childrenOf(row.id).length > 0}
         empty={<p className="rounded-card border border-border-soft bg-surface p-8 text-center text-sm text-slate-400">{t("categories.empty")}</p>}
-        renderMobileRow={({ row, toggle, expanded }) => (
-          <div className="flex items-center justify-between gap-3 p-3">
-            <div role="button" tabIndex={0} onClick={toggle} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") toggle(); }} className="min-h-11 min-w-11 flex-1 space-y-1 text-left lg:min-h-0 lg:min-w-0">
-              <CategoryName c={row} />
-              <div className="text-xs text-slate-500">
-                {row.parentName ?? t("categories.noParent")} · {row.productCount} {t("categories.productCount")}
-              </div>
+        mobileListClassName="max-lg:-mx-4 max-lg:space-y-0 max-lg:bg-surface"
+        mobileRowClassName="max-lg:rounded-none max-lg:border-0 max-lg:bg-[linear-gradient(var(--color-border),var(--color-border))] max-lg:bg-[length:100%_1px] max-lg:bg-left-bottom max-lg:bg-no-repeat"
+        // Phones: CategoryManagementTreeView rows with children expanding inline.
+        renderMobileRow={({ row }) => {
+          const children = childrenOf(row.id);
+          const expanded = expandedIds.has(row.id) || (normalizedQuery !== "" && children.length > 0);
+          return (
+            <div>
+              <MobileCategoryRow
+                category={row}
+                depth={0}
+                hasChildren={children.length > 0}
+                expanded={expanded}
+                editing={editing?.id === row.id}
+                name={<CategoryName c={row} />}
+                onToggle={() => setExpandedIds((current) => {
+                  const next = new Set(current);
+                  if (next.has(row.id)) next.delete(row.id); else next.add(row.id);
+                  return next;
+                })}
+                onMenu={() => setMenuFor(row)}
+              />
+              {expanded && children.map((child) => (
+                <MobileCategoryRow
+                  key={child.id}
+                  category={child}
+                  depth={1}
+                  hasChildren={false}
+                  expanded={false}
+                  editing={editing?.id === child.id}
+                  name={<CategoryName c={child} />}
+                  onToggle={() => {}}
+                  onMenu={() => setMenuFor(child)}
+                />
+              ))}
             </div>
-            <ChevronDown className={cn("h-4 w-4 shrink-0 text-slate-400 transition-transform", expanded && "rotate-180")} />
-            <Actions c={row} />
-          </div>
-        )}
+          );
+        }}
         renderExpanded={(row) => {
           const children = childrenOf(row.id);
           if (children.length === 0) return null;
@@ -207,6 +256,17 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
         }}
       />
       {loadMoreFooter}
+      <MobileActionSheet open={Boolean(menuFor)} onClose={() => setMenuFor(null)} title={menuFor?.name}>
+        {menuFor && (
+          <div className="space-y-2">
+            <MenuAction icon={Pencil} label={t("mobile.categories.rename")} onSelect={() => setEditing({ id: menuFor.id, name: menuFor.name })} />
+            {!menuFor.parentId && (
+              <MenuAction icon={FolderPlus} label={t("mobile.categories.addChild")} onSelect={() => { setNewParent(menuFor.id); setOpen(true); }} />
+            )}
+            <MenuAction icon={Trash2} label={t("mobile.categories.remove")} destructive onSelect={() => requestRemove(menuFor)} />
+          </div>
+        )}
+      </MobileActionSheet>
 
       {/* modal tạo nhóm hàng */}
       {open && (
@@ -260,6 +320,50 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** One row of CategoryManagementTreeView: chevron, folder, name with count, "…" menu. */
+function MobileCategoryRow({
+  category,
+  depth,
+  hasChildren,
+  expanded,
+  editing,
+  name,
+  onToggle,
+  onMenu,
+}: {
+  category: Cat;
+  depth: number;
+  hasChildren: boolean;
+  expanded: boolean;
+  editing: boolean;
+  name: ReactNode;
+  onToggle: () => void;
+  onMenu: () => void;
+}) {
+  const t = useTranslations("mobile.categories");
+  return (
+    <div className="flex min-h-[62px] items-center gap-2 py-2 pl-ios-inset pr-2" style={{ paddingLeft: 16 + depth * 18 }}>
+      {hasChildren ? (
+        <button type="button" onClick={onToggle} aria-label={t(expanded ? "collapse" : "expand")} aria-expanded={expanded} className="grid h-9 w-[30px] shrink-0 place-items-center text-ios-label-secondary">
+          <ChevronRight className={cn("size-[14px] transition-transform", expanded && "rotate-90")} strokeWidth={2.8} aria-hidden="true" />
+        </button>
+      ) : null}
+      <Folder className={cn("size-[22px] shrink-0 text-ios-accent", depth === 0 && "fill-current")} strokeWidth={2} aria-hidden="true" />
+      <div className="min-w-0 flex-1 pl-1 [&_span.font-medium]:pl-0 [&_span.font-medium]:text-[17px]">
+        {name}
+        {!editing && (
+          <div className="mt-0.5 text-[12px] text-ios-label-secondary">
+            {t("productCount", { count: category.productCount })}{category.parentName ? ` · ${category.parentName}` : ""}
+          </div>
+        )}
+      </div>
+      <button type="button" onClick={onMenu} aria-label={t("actionsFor", { name: category.name })} className="grid size-9 shrink-0 place-items-center text-ios-accent">
+        <Ellipsis className="size-5" strokeWidth={2.6} aria-hidden="true" />
+      </button>
     </div>
   );
 }

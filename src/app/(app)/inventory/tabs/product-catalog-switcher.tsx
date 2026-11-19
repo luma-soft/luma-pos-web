@@ -28,7 +28,8 @@ export function ProductCatalogSwitcher({
   const resolvedCategoryCount = categoryCount ?? catalog.snapshot?.metadata?.categories.length ?? 0;
   const options = [
     { id: "products", label: t("nav.products"), count: productCount },
-    { id: "categories", label: t("categories.title"), count: resolvedCategoryCount },
+    // Phones use the native segment name ("Danh mục").
+    { id: "categories", label: <><span className="lg:hidden">{t("mobile.categories.segment")}</span><span className="max-lg:hidden">{t("categories.title")}</span></>, count: resolvedCategoryCount },
   ] as const;
 
   return (
