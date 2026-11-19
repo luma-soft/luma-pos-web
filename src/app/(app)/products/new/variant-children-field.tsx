@@ -3,12 +3,43 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input, MoneyInput, QuantityInput, Select } from "@/components/ui";
+import { Button, Input, MoneyInput, QuantityInput, Select } from "@/components/ui";
 import { formatNumber } from "@/lib/utils";
 import { buildVariantCombinations } from "@/lib/products/variant-model";
+import { compareVariantValues } from "@/lib/products/variant-presentation";
 import type { CreateProductInput } from "./schema";
 import { initialVariantCombinationBudget, reconcileVariantChildDrafts } from "./variant-child-drafts";
 import { useTranslations } from "next-intl";
+import {
+  bulkAdjustedPrice,
+  isValidBulkPriceInput,
+  variantRowMatches,
+  type VariantBulkPriceField,
+  type VariantBulkPriceMode,
+  type VariantRowStatusFilter,
+} from "@/lib/products/variant-bulk-edit";
+
+const STATUS_OPTIONS: { value: VariantRowStatusFilter; label: string }[] = [
+  { value: "all", label: "Tất cả dòng" },
+  { value: "new", label: "SKU mới" },
+  { value: "existing", label: "SKU đã có" },
+];
+const FIELD_OPTIONS: { value: VariantBulkPriceField; label: string }[] = [
+  { value: "retailPrice", label: "Giá bán" },
+  { value: "costPrice", label: "Giá nhập" },
+];
+const MODE_OPTIONS: { value: VariantBulkPriceMode; label: string }[] = [
+  { value: "set", label: "Đặt bằng (đ)" },
+  { value: "percent", label: "Tăng/giảm %" },
+  { value: "amount", label: "Tăng/giảm (đ)" },
+];
+
+/** "10.000" and "-5.000" are đồng; a percent keeps its decimal separator ("2,5" → 2.5). */
+function parseBulkValue(text: string, mode: VariantBulkPriceMode) {
+  const trimmed = text.trim().replace(/\s/g, "");
+  if (!trimmed) return Number.NaN;
+  return Number(mode === "percent" ? trimmed.replace(",", ".") : trimmed.replace(/[.,]/g, ""));
+}
 
 type Child = NonNullable<CreateProductInput["variantChildren"]>[number];
 const EMPTY_ATTRIBUTES: NonNullable<CreateProductInput["attributes"]> = [];
@@ -24,6 +55,12 @@ export function VariantChildrenField({ visible, enabled }: { visible: boolean; e
   const excluded = useWatch({ control, name: "excludedCombinationKeys" }) ?? EMPTY_KEYS;
   const [maxCombinations] = useState(() => initialVariantCombinationBudget(getValues()));
   const cached = useRef(new Map<string, Child>());
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<VariantRowStatusFilter>("all");
+  const [bulkField, setBulkField] = useState<VariantBulkPriceField>("retailPrice");
+  const [bulkMode, setBulkMode] = useState<VariantBulkPriceMode>("set");
+  const [bulkText, setBulkText] = useState("");
+  const [bulkNotice, setBulkNotice] = useState("");
   const generated = useMemo(() => {
     if (!enabled) return { rows: [], error: "" };
     try { return { rows: buildVariantCombinations(attributes.map((attribute) => ({ ...attribute, values: attribute.values ?? [] })), { maxCombinations }), error: "" }; }
@@ -54,6 +91,30 @@ export function VariantChildrenField({ visible, enabled }: { visible: boolean; e
   const inputClass = "min-h-11 lg:min-h-0";
   const tdClass = "block p-0 lg:table-cell lg:px-3 lg:py-3";
 
+  // Display order follows option values naturally (30W, 50W, 100W); saving uses combination keys.
+  const visibleRows = generated.rows.filter((row) => {
+    const child = rowsByKey.get(row.combinationKey)?.child;
+    return variantRowMatches({ variantName: row.variantName, sku: child?.sku, persisted: Boolean(child?.productId) }, query, statusFilter);
+  }).sort((left, right) => compareVariantValues(left.variantName, right.variantName));
+  // Only rows that will be saved can take a price: excluded or unassigned combinations are skipped.
+  const bulkTargets = visibleRows.flatMap((row) => {
+    const item = rowsByKey.get(row.combinationKey);
+    return item && !excluded.includes(row.combinationKey) ? [item.index] : [];
+  });
+  const bulkValue = parseBulkValue(bulkText, bulkMode);
+  const bulkReady = bulkTargets.length > 0 && isValidBulkPriceInput(bulkMode, bulkValue);
+
+  function applyBulkPrice() {
+    if (!bulkReady) return;
+    const targets = new Set(bulkTargets);
+    const next = (getValues("variantChildren") ?? []).map((child, index) => targets.has(index)
+      ? { ...child, [bulkField]: bulkAdjustedPrice(child[bulkField], bulkMode, bulkValue) }
+      : child);
+    setValue("variantChildren", next, { shouldDirty: true });
+    setBulkNotice(`Đã cập nhật ${FIELD_OPTIONS.find((option) => option.value === bulkField)?.label.toLocaleLowerCase("vi")} cho ${targets.size} SKU.`);
+    setBulkText("");
+  }
+
   function toggle(key: string, checked: boolean) {
     setValue("excludedCombinationKeys", checked ? excluded.filter((item) => item !== key) : [...excluded, key], { shouldDirty: true });
   }
@@ -64,6 +125,27 @@ export function VariantChildrenField({ visible, enabled }: { visible: boolean; e
       <p className="text-sm text-slate-500">{generated.rows.length} tổ hợp · {savedCount} SKU đã có · {newCount} SKU mới · {excluded.length} tổ hợp bỏ chọn</p>
       <p className="text-xs text-slate-500">Giá và tồn nhập riêng từng SKU. Tồn của SKU đã lưu được thay đổi qua nhập hàng hoặc điều chỉnh kho.</p>
     </div>
+    {generated.rows.length > 1 && <div className="space-y-3 border-b border-border bg-surface-2/60 px-4 py-3" data-mobile-audit="product-variant-bulk">
+      <div className="grid grid-cols-[minmax(0,1fr)_136px] gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
+        <Input className="min-h-11 lg:min-h-0" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm biến thể, SKU" aria-label="Tìm biến thể hoặc SKU" type="search" />
+        <Select value={statusFilter} options={STATUS_OPTIONS} aria-label="Lọc dòng" onValueChange={(value) => setStatusFilter(value as VariantRowStatusFilter)} />
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-[150px_170px_minmax(0,1fr)_auto] sm:items-center">
+        <Select value={bulkField} options={FIELD_OPTIONS} aria-label="Giá cần sửa hàng loạt" onValueChange={(value) => { setBulkField(value as VariantBulkPriceField); setBulkNotice(""); }} />
+        <Select value={bulkMode} options={MODE_OPTIONS} aria-label="Cách sửa giá" onValueChange={(value) => { setBulkMode(value as VariantBulkPriceMode); setBulkNotice(""); }} />
+        <Input className="min-h-11 lg:min-h-0" inputMode={bulkMode === "set" ? "numeric" : "decimal"} value={bulkText}
+          onChange={(event) => { setBulkText(event.target.value); setBulkNotice(""); }}
+          onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); applyBulkPrice(); } }}
+          placeholder={bulkMode === "set" ? "Ví dụ 150.000" : bulkMode === "percent" ? "Ví dụ 10 hoặc -5" : "Ví dụ 10.000 hoặc -5.000"}
+          aria-label="Giá trị áp dụng" />
+        <Button type="button" className="min-h-11 lg:min-h-0" disabled={!bulkReady} onClick={applyBulkPrice}>
+          <span className="sm:hidden">Áp dụng ({bulkTargets.length})</span><span className="max-sm:hidden">Áp dụng cho {bulkTargets.length} SKU</span>
+        </Button>
+      </div>
+      <p className="text-xs text-slate-500" aria-live="polite">
+        {bulkNotice || `Đang hiển thị ${visibleRows.length}/${generated.rows.length} tổ hợp. Áp dụng cho các dòng đang hiển thị và được chọn.`}
+      </p>
+    </div>}
     {generated.error && <p role="alert" className="px-4 py-3 text-sm text-red-600">{t(generated.error)}</p>}
     {issue && <p role="alert" className="px-4 py-3 text-sm text-red-600">{t(issue)}</p>}
     {unassigned.length > 0 && <div className="space-y-3 border-b border-border bg-amber-50 p-4 dark:bg-amber-950/20">
@@ -87,7 +169,7 @@ export function VariantChildrenField({ visible, enabled }: { visible: boolean; e
           {['Chọn', 'Biến thể', 'SKU', 'Mã vạch', 'Đơn vị', 'Giá nhập', 'Giá bán', 'Tồn kho / tồn đầu', 'Bán'].map((title) => <th key={title} className="whitespace-nowrap px-3 py-2 font-semibold">{title}</th>)}
         </tr></thead>
         <tbody className="block divide-y divide-border lg:table-row-group">
-          {generated.rows.map((row) => {
+          {visibleRows.map((row) => {
             const item = rowsByKey.get(row.combinationKey);
             const child = item?.child;
             const index = item?.index ?? -1;
@@ -113,6 +195,7 @@ export function VariantChildrenField({ visible, enabled }: { visible: boolean; e
           })}
         </tbody>
       </table>
+      {visibleRows.length === 0 && <p className="px-4 py-4 text-sm text-slate-500">Không có tổ hợp phù hợp bộ lọc.</p>}
     </div>}
   </div>;
 }
