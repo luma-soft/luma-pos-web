@@ -13,7 +13,7 @@ import { TableSkeleton } from "@/components/table-skeleton";
 import { PurchasesTable } from "./purchases-table";
 import { getPrintTemplatesForDoc } from "@/lib/print/template";
 import { InventoryFilterDrawer } from "./inventory-filter-drawer";
-import { ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
+import { ListPrimaryActionProvider, ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
@@ -57,11 +57,14 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <InstantFilterForm className="flex min-w-0 flex-1 flex-wrap items-center gap-3" action={Routes.Inventory}>
           <input type="hidden" name="tab" value="purchases" />
-          <ListSearchFilterBar
-            search={<ListSearchInput name="q" defaultValue={params.q ?? ""} placeholder={t("purchases.searchPlaceholder")} />}
-            filter={<InventoryFilterDrawer title="Bộ lọc phiếu nhập" values={params} resultCount={total} resultLabel="phiếu nhập" countEndpoint="/api/inventory/purchases/count" fields={["status", "supplier", "time", "debt"]} suppliers={options.suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
-          />
-          <Link href={Routes.PurchaseNew} className="ml-auto inline-flex h-11 shrink-0 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98]"><Plus className="w-4 h-4" />{t("purchases.createNew")}</Link>
+          {/* Phones: PurchaseReceiptsView's search bar with the "+" create button. */}
+          <ListPrimaryActionProvider action={{ href: Routes.PurchaseNew, label: t("mobile.purchases.create") }}>
+            <ListSearchFilterBar
+              search={<ListSearchInput name="q" defaultValue={params.q ?? ""} placeholder={t("purchases.searchPlaceholder")} />}
+              filter={<InventoryFilterDrawer title="Bộ lọc phiếu nhập" values={params} resultCount={total} resultLabel="phiếu nhập" countEndpoint="/api/inventory/purchases/count" fields={["status", "supplier", "time", "debt"]} suppliers={options.suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
+            />
+          </ListPrimaryActionProvider>
+          <Link href={Routes.PurchaseNew} className="ml-auto max-lg:hidden inline-flex h-11 shrink-0 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98]"><Plus className="w-4 h-4" />{t("purchases.createNew")}</Link>
         </InstantFilterForm>
       </div>
 

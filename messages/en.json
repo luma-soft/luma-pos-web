@@ -1976,6 +1976,18 @@
       "today": "Today",
       "yesterday": "Yesterday",
       "purchaseCount": "{count} purchase receipts"
+    },
+    "purchases": {
+      "status": {
+        "received": "Received",
+        "draft": "Draft",
+        "returned": "Returned",
+        "cancelled": "Cancelled"
+      },
+      "itemCount": "{count} items",
+      "owed": "Owed {amount}",
+      "search": "Search code or supplier",
+      "create": "Create purchase receipt"
     }
   },
   "toolsCenter": {

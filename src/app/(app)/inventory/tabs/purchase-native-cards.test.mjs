@@ -5,7 +5,8 @@ const returns = readFileSync(new URL("./purchase-returns-table.tsx", import.meta
 test("mobile purchase row matches supplier-first native pattern and preserves modal", () => {
   expect(purchase).toContain("purchase.items.length");
   expect(purchase).toContain("purchaseOwed(purchase)");
-  expect(purchase).toContain("onClick={() => setSelectedPurchaseId(purchase.id)}");
+  // NativePurchaseReceiptRowView: the whole row opens the receipt.
+  expect(purchase).toContain("onOpen={() => setSelectedPurchaseId(purchase.id)}");
   expect(purchase).toContain("<PurchaseDetailModal");
 });
 test("mobile supplier return row preserves detail and refunds", () => {

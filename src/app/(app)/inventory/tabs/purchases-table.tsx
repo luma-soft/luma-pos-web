@@ -4,7 +4,8 @@ import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { mobileLedgerDateTime } from "@/components/partners/partner-mobile-ledger";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { PurchaseDetailModal, PurchaseStatusBadge, purchaseOwed, type PurchaseRow } from "./purchase-detail-modal";
@@ -50,40 +51,9 @@ export function PurchasesTable({ rows: serverRows, loadMore, printTemplates, det
         minWidth="1080px"
         onRowClick={(purchase) => setSelectedPurchaseId(purchase.id)}
         rowClickMode="row"
-        renderMobileRow={({ row: purchase }) => {
-          const owed = purchaseOwed(purchase);
-          return (
-            <div className="relative min-h-[112px] p-3">
-              <button type="button" onClick={() => setSelectedPurchaseId(purchase.id)}
-                aria-label={purchase.code}
-                className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500" />
-              <div className="pointer-events-none relative flex items-start justify-between gap-3">
-                <PartnerDetailLink
-                  kind="supplier"
-                  partnerId={purchase.supplierId}
-                  name={purchase.supplierName}
-                  openInCurrentTab
-                  className="pointer-events-auto relative z-10 min-w-0 flex-1 truncate text-[15px] font-semibold"
-                />
-                <PurchaseStatusBadge status={purchase.status} />
-              </div>
-              <div className="pointer-events-none relative mt-1.5 truncate text-[11px] text-slate-500">
-                {formatDate(purchase.createdAt)} · {purchase.code}
-              </div>
-              <div className="pointer-events-none relative mt-2 flex items-center justify-between gap-3">
-                <span className="text-xs text-slate-500">{t("purchases.cols.itemCount")}: {purchase.items.length}</span>
-                <span className="max-w-[55%] text-right text-sm font-semibold tabular-nums text-foreground [overflow-wrap:anywhere]">
-                  {formatCurrency(Number(purchase.total))}
-                </span>
-              </div>
-              {owed > 0 && (
-                <div className="pointer-events-none relative mt-1.5 text-right text-xs font-semibold tabular-nums text-warn">
-                  {t("purchases.cols.owed")}: {formatCurrency(owed)}
-                </div>
-              )}
-            </div>
-          );
-        }}
+        mobileListClassName="max-lg:-mx-4 max-lg:space-y-0 max-lg:bg-surface"
+        mobileRowClassName="max-lg:rounded-none max-lg:border-0 max-lg:bg-[linear-gradient(var(--color-border),var(--color-border))] max-lg:bg-[length:calc(100%-16px)_1px] max-lg:bg-right-bottom max-lg:bg-no-repeat"
+        renderMobileRow={({ row: purchase }) => <PurchaseMobileRow purchase={purchase} onOpen={() => setSelectedPurchaseId(purchase.id)} />}
       />
       {loadMoreFooter}
 
@@ -93,5 +63,26 @@ export function PurchasesTable({ rows: serverRows, loadMore, printTemplates, det
         onClose={() => setSelectedPurchaseId(null)}
       />
     </>
+  );
+}
+
+/** NativePurchaseReceiptRowView: supplier and status, date · code, items and total, owed. */
+function PurchaseMobileRow({ purchase, onOpen }: { purchase: PurchaseRow; onOpen: () => void }) {
+  const t = useTranslations("mobile.purchases");
+  const owed = purchaseOwed(purchase);
+  const statusTone = purchase.status === "cancelled" ? "text-ios-red" : purchase.status === "received" ? "text-ios-green" : "text-ios-orange";
+  return (
+    <button type="button" onClick={onOpen} aria-label={`${purchase.supplierName ?? ""} · ${purchase.code}`} className="block w-full space-y-[7px] px-4 py-ios-row text-left active:bg-black/[0.04] dark:active:bg-white/[0.06]">
+      <span className="flex items-baseline gap-2">
+        <span className="min-w-0 flex-1 truncate text-[17px] font-semibold leading-[22px]">{purchase.supplierName}</span>
+        <span className={cn("shrink-0 text-[12px] font-semibold", statusTone)}>{t(`status.${purchase.status}` as never)}</span>
+      </span>
+      <span className="block truncate text-[11px] text-ios-label-tertiary">{mobileLedgerDateTime(purchase.createdAt)} · {purchase.code}</span>
+      <span className="flex items-baseline gap-2 text-[12px] text-ios-label-secondary">
+        <span className="min-w-0 flex-1">{t("itemCount", { count: purchase.items.length })}</span>
+        <span className="font-semibold tabular-nums">{formatCurrency(Number(purchase.total))}</span>
+      </span>
+      {owed > 0 && <span className="block text-right text-[12px] font-medium tabular-nums text-ios-orange">{t("owed", { amount: formatCurrency(owed) })}</span>}
+    </button>
   );
 }

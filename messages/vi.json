@@ -1976,6 +1976,18 @@
       "today": "Hôm nay",
       "yesterday": "Hôm qua",
       "purchaseCount": "{count} phiếu nhập"
+    },
+    "purchases": {
+      "status": {
+        "received": "Đã nhập",
+        "draft": "Bản nháp",
+        "returned": "Đã trả",
+        "cancelled": "Đã hủy"
+      },
+      "itemCount": "{count} mặt hàng",
+      "owed": "Còn nợ {amount}",
+      "search": "Tìm mã phiếu, nhà cung cấp",
+      "create": "Tạo phiếu nhập"
     }
   },
   "toolsCenter": {
