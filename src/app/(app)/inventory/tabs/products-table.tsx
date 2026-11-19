@@ -2226,6 +2226,9 @@ function ProductActionBar({ product, cameraMaterials = false, variant = "bar" }:
           <ActionLink
             icon={Pencil}
             label={t("products.actions.edit")}
+            // The editor shares this URL path with the detail (`?edit=1`). A prefetch of it is
+            // cached as the detail view, so clicking would change the URL but keep the detail.
+            prefetch={false}
             href={
               pathname.startsWith("/products/")
                 ? `${Routes.productDetail(product.id)}?edit=1`
@@ -2338,6 +2341,7 @@ function ActionLink({
   label,
   tone = "neutral",
   replace = false,
+  prefetch,
   className,
   target,
 }: {
@@ -2346,6 +2350,7 @@ function ActionLink({
   label: string;
   tone?: "neutral" | "primary";
   replace?: boolean;
+  prefetch?: false;
   className?: string;
   target?: "_blank";
 }) {
@@ -2353,6 +2358,7 @@ function ActionLink({
     <Link
       href={href}
       replace={replace}
+      prefetch={prefetch}
       target={target}
       rel={target ? "noreferrer" : undefined}
       className={cn(

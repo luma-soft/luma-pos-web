@@ -53,6 +53,8 @@ test("editing from detail adds a history entry and cancel returns to detail", ()
     productsTable.indexOf('tone="primary"', editActionStart),
   );
   expect(editAction).toContain('?edit=1`');
+  // A prefetched `?edit=1` is cached as the detail view, so the click would keep the detail.
+  expect(editAction).toContain("prefetch={false}");
   expect(editAction).not.toContain("replace=");
   expect(interceptedDetailPage).toContain('cancelNavigation="back"');
   expect(interceptedDetailPage).toContain('closeNavigation="back"');
