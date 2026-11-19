@@ -1886,7 +1886,42 @@
       }
     },
     "suppliers": {
-      "title": "Suppliers"
+      "title": "Suppliers",
+      "searchPrompt": "Search supplier name, phone, or code",
+      "add": "Add supplier",
+      "totalPurchase": "Total purchases",
+      "totalDebt": "Payable",
+      "debtBadge": "Debt {amount}",
+      "debtFilter": "Debt filter",
+      "all": "All",
+      "owing": "Owing",
+      "clear": "Paid",
+      "resetFilters": "Clear filters",
+      "apply": "Apply",
+      "noContact": "No contact details",
+      "profile": "Supplier profile",
+      "phone": "Phone number",
+      "email": "Email",
+      "taxCode": "Tax code",
+      "address": "Address",
+      "note": "Note",
+      "transactionHistory": "Transaction history",
+      "activityCount": "{count} transactions",
+      "payables": "Payables",
+      "edit": "Edit",
+      "collectDebt": "Pay supplier debt",
+      "adjustDebt": "Adjust supplier debt",
+      "delete": "Delete supplier",
+      "deleteTitle": "Delete supplier?",
+      "deleteMessage": "A supplier can only be deleted when it has no outstanding debt or transactions. Linked products will no longer use this default supplier.",
+      "deleteFailed": "Couldn’t delete supplier.",
+      "create": "Add",
+      "editor": {
+        "basic": "Basic information",
+        "tax": "Tax information",
+        "contact": "Contact information",
+        "additional": "Additional information"
+      }
     }
   },
   "toolsCenter": {
@@ -3876,7 +3911,11 @@
         "balance": "Balance"
       }
     },
-    "unitLabel": "suppliers"
+    "unitLabel": "suppliers",
+    "errors": {
+      "outstandingDebt": "This supplier still has outstanding debt and can’t be deleted.",
+      "hasTransactions": "This supplier has transactions and can’t be deleted."
+    }
   },
   "purchases": {
     "saveDraft": "Save draft",

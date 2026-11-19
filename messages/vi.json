@@ -1886,7 +1886,42 @@
       }
     },
     "suppliers": {
-      "title": "Nhà cung cấp"
+      "title": "Nhà cung cấp",
+      "searchPrompt": "Tìm tên, số điện thoại, mã nhà cung cấp",
+      "add": "Thêm nhà cung cấp",
+      "totalPurchase": "Tổng mua",
+      "totalDebt": "Tổng công nợ",
+      "debtBadge": "Nợ {amount}",
+      "debtFilter": "Lọc công nợ",
+      "all": "Tất cả",
+      "owing": "Còn nợ",
+      "clear": "Đã thanh toán",
+      "resetFilters": "Xóa bộ lọc",
+      "apply": "Áp dụng",
+      "noContact": "Chưa có thông tin liên hệ",
+      "profile": "Hồ sơ nhà cung cấp",
+      "phone": "Số điện thoại",
+      "email": "Email",
+      "taxCode": "Mã số thuế",
+      "address": "Địa chỉ",
+      "note": "Ghi chú",
+      "transactionHistory": "Lịch sử giao dịch",
+      "activityCount": "{count} giao dịch",
+      "payables": "Công nợ",
+      "edit": "Sửa",
+      "collectDebt": "Thanh toán công nợ",
+      "adjustDebt": "Điều chỉnh công nợ",
+      "delete": "Xóa nhà cung cấp",
+      "deleteTitle": "Xóa nhà cung cấp?",
+      "deleteMessage": "Chỉ có thể xóa nhà cung cấp chưa có công nợ hoặc giao dịch. Sản phẩm liên kết sẽ bỏ nhà cung cấp mặc định này.",
+      "deleteFailed": "Không thể xóa nhà cung cấp.",
+      "create": "Thêm",
+      "editor": {
+        "basic": "Thông tin cơ bản",
+        "tax": "Thông tin thuế",
+        "contact": "Thông tin liên hệ",
+        "additional": "Thông tin bổ sung"
+      }
     }
   },
   "toolsCenter": {
@@ -3876,7 +3911,11 @@
         "balance": "Dư nợ"
       }
     },
-    "unitLabel": "nhà cung cấp"
+    "unitLabel": "nhà cung cấp",
+    "errors": {
+      "outstandingDebt": "Nhà cung cấp còn công nợ, không thể xóa.",
+      "hasTransactions": "Nhà cung cấp đã có giao dịch, không thể xóa."
+    }
   },
   "purchases": {
     "saveDraft": "Lưu nháp",

@@ -4,10 +4,9 @@ const customer = readFileSync(new URL("./customers-table.tsx", import.meta.url),
 const supplier = readFileSync(new URL("./suppliers-table.tsx", import.meta.url), "utf8");
 const nav = readFileSync(new URL("../../../../components/group-tabs.tsx", import.meta.url), "utf8");
 test("partner rows have full touch areas and independent deep links", () => {
-  // Phone customer rows are whole-row buttons (NativeCustomerRow) that push the profile.
+  // Phone rows are whole-row buttons (NativeCustomerRow / NativeSupplierItemRow) that push the profile.
   expect(customer).toContain("onOpen={() => openCustomer(customer)}");
-  expect(supplier).toContain("onClick={() => openSupplier(row)}");
-  expect(supplier).toContain("pointer-events-auto relative z-10");
+  expect(supplier).toContain("onOpen={() => openSupplier(row)}");
 });
 test("segmented secondary navigation is opt-in", () => {
   expect(nav).toContain("mobileSegmented = false");

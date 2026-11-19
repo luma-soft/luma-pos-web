@@ -1,6 +1,11 @@
 "use client";
 
 import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
+import { usePhoneLayout } from "@/components/use-phone-layout";
+import { MobileBottomSearchBar } from "@/components/mobile-bottom-bar";
+import { SupplierCreateDialog, type SupplierCreateResult } from "@/components/partners/supplier-create-dialog";
+import { MobileListTotalsCard } from "./customer-mobile";
+import { MobileSupplierDetail, MobileSupplierFilterScreen, SupplierMobileRow } from "./supplier-mobile";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
@@ -154,8 +159,14 @@ export function SuppliersTable({
   const [draftDebtFilter, setDraftDebtFilter] = useState<SupplierDebtFilter>(owing);
   const selectedSupplierId = searchParams.get("detailSupplierId");
   const [detailTab, setDetailTab] = useState<SupplierDetailTab>("info");
+  const phone = usePhoneLayout();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createdSupplier, setCreatedSupplier] = useState<SupplierCreateResult | null>(null);
   const selectedSupplier = rows.find((row) => row.id === selectedSupplierId)
-    ?? (initialDetailSupplier?.id === selectedSupplierId ? initialDetailSupplier : null);
+    ?? (initialDetailSupplier?.id === selectedSupplierId ? initialDetailSupplier : null)
+    ?? (createdSupplier?.id === selectedSupplierId && createdSupplier
+      ? { id: createdSupplier.id, name: createdSupplier.name, code: null, currentDebt: "0" }
+      : null);
   const { state: preview, refresh: refreshPreview } = useAppDataQuery(selectedSupplier?.id ?? null, loadSupplierPreview);
   const [draft, setDraft] = useState<SupplierDraft | null>(null);
   const [editing, setEditing] = useState(false);
@@ -293,8 +304,44 @@ export function SuppliersTable({
     router.refresh();
   }
 
+  const searchBar = (onCreate?: () => void) => (
+    <ListSearchFilterBar
+      search={(
+        <InstantFilterForm action={Routes.Partners}>
+          <input type="hidden" name="tab" value="suppliers" />
+          <input type="hidden" name="size" value={pageSize} />
+          {owing && <input type="hidden" name="owing" value={owing} />}
+          <ListSearchInput
+            name="q"
+            defaultValue={query}
+            placeholder={onCreate ? t("mobile.suppliers.searchPrompt") : t("suppliers.searchPlaceholder")}
+            aria-label={t("common.search")}
+          />
+        </InstantFilterForm>
+      )}
+      mobileAction={onCreate ? { label: t("mobile.suppliers.add"), onClick: onCreate } : undefined}
+      filter={(
+        <FilterTriggerButton
+          onClick={openFilters}
+          label={t("suppliers.filter.button")}
+          active={Boolean(owing)}
+          hideLabelOnSmallScreens
+        />
+      )}
+    />
+  );
+  const previewData = preview?.data ?? null;
+  const activity = previewData ? supplierActivity(previewData) : null;
+
   return (
     <>
+      {/* Phones: LumaListTotalsCard above the plain list (SuppliersView). */}
+      <MobileListTotalsCard
+        metrics={[
+          { id: "purchase", title: t("mobile.suppliers.totalPurchase"), value: formatCurrency(totalPurchase), tone: "text-ios-accent" },
+          { id: "debt", title: t("mobile.suppliers.totalDebt"), value: formatCurrency(totalDebt), tone: totalDebt > 0 ? "text-ios-red" : "text-ios-label-secondary" },
+        ]}
+      />
       <DataTableShell
         tableId="partners.suppliers"
         rows={rows}
@@ -314,62 +361,49 @@ export function SuppliersTable({
           </div>
         )}
         toolbar={(
-          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
-            <ListSearchFilterBar
-              search={(
-                <InstantFilterForm action={Routes.Partners}>
-                  <input type="hidden" name="tab" value="suppliers" />
-                  <input type="hidden" name="size" value={pageSize} />
-                  {owing && <input type="hidden" name="owing" value={owing} />}
-                  <ListSearchInput
-                    name="q"
-                    defaultValue={query}
-                    placeholder={t("suppliers.searchPlaceholder")}
-                    aria-label={t("common.search")}
-                  />
-                </InstantFilterForm>
-              )}
-              filter={(
-                <FilterTriggerButton
-                  onClick={openFilters}
-                  label={t("suppliers.filter.button")}
-                  active={Boolean(owing)}
-                  hideLabelOnSmallScreens
-                />
-              )}
-            />
+          <div className="flex w-full flex-col gap-3 max-lg:hidden sm:flex-row sm:items-center">
+            {searchBar()}
             <div className="shrink-0">
               <SupplierQuickCreate />
             </div>
           </div>
         )}
-        renderMobileRow={({ row }) => {
-          const debt = Number(row.currentDebt);
-          const purchase = Number(row.totalPurchase);
-          return (
-            <article className="relative w-full min-h-[76px] p-3 text-left">
-              <button type="button" onClick={() => openSupplier(row)} aria-label={row.name} className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500" />
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="min-w-0 whitespace-normal break-words font-semibold"><PartnerDetailLink kind="supplier" partnerId={row.id} name={row.name} openInCurrentTab className="pointer-events-auto relative z-10 block w-full whitespace-normal break-words" /></div>
-                  <span className="mt-1 inline-flex items-center text-xs text-slate-400">{row.phone ?? row.code ?? t("suppliers.title")}</span>
-                </div>
-                <div className="shrink-0 space-y-1 text-right">
-                  <div className="text-xs text-slate-500">
-                    {t("suppliers.cols.totalPurchase")} <span className="font-semibold tabular-nums text-primary-600">{formatCurrency(purchase)}</span>
-                  </div>
-                  <div className={cn("text-xs tabular-nums", debt > 0 ? "font-semibold text-warn" : "text-slate-400")}>
-                    {t("suppliers.cols.debt")} {debt > 0 ? formatCurrency(debt) : "—"}
-                  </div>
-                </div>
-              </div>
-            </article>
-          );
-        }}
+        mobileListClassName="max-lg:-mx-ios-inset max-lg:space-y-0 max-lg:bg-surface"
+        mobileRowClassName="max-lg:rounded-none max-lg:border-0 max-lg:bg-[linear-gradient(var(--color-border),var(--color-border))] max-lg:bg-[length:calc(100%-70px)_1px] max-lg:bg-right-bottom max-lg:bg-no-repeat"
+        renderMobileRow={({ row }) => <SupplierMobileRow supplier={row} onOpen={() => openSupplier(row)} />}
       />
       {loadMoreFooter}
+      <MobileBottomSearchBar>{searchBar(() => setCreateOpen(true))}</MobileBottomSearchBar>
+      <SupplierCreateDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={(created) => {
+          setCreateOpen(false);
+          setCreatedSupplier(created);
+          // SuppliersView pushes the new supplier's profile.
+          updateModalUrlQuery({ tab: "suppliers", detailSupplierId: created.id, detailCustomerId: null }, "push");
+          router.refresh();
+        }}
+      />
+      {phone && filterOpen && (
+        <MobileSupplierFilterScreen value={owing} onApply={applyDebtFilter} onClose={() => setFilterOpen(false)} />
+      )}
+      {phone && selectedSupplier && (
+        <MobileSupplierDetail
+          summary={{ ...selectedSupplier, phone: previewData?.supplier.phone ?? rows.find((row) => row.id === selectedSupplier.id)?.phone ?? null }}
+          profile={previewData?.supplier ?? null}
+          transactionCount={activity?.history.filter((row) => row.status !== "cancelled").length ?? 0}
+          payables={previewData?.payables ?? null}
+          loading={Boolean(preview?.loading)}
+          error={preview?.error ?? null}
+          onBack={closeSupplier}
+          onChanged={refreshSelectedSupplier}
+          history={activity && <SupplierHistoryPanel rows={activity.history} />}
+          debtLedger={activity && previewData && <SupplierDebtPanel rows={activity.debtRows} supplierId={previewData.supplier.id} onChanged={refreshSelectedSupplier} />}
+        />
+      )}
 
-      {filterOpen && (
+      {filterOpen && !phone && (
         <div
           className="fixed inset-0 z-[80] bg-slate-950/40"
           role="presentation"
@@ -453,7 +487,7 @@ export function SuppliersTable({
       )}
 
       <RowPreviewModal
-        open={Boolean(selectedSupplierId)}
+        open={Boolean(selectedSupplierId) && !phone}
         onClose={closeSupplier}
         title={preview?.data?.supplier.name ?? selectedSupplier?.name ?? t("suppliers.title")}
         subtitle={selectedSupplier ? `${preview?.data?.supplier.code ?? selectedSupplier.code ?? "—"} · ${t("suppliers.cols.debt")}: ${formatCurrency(Number(preview?.data?.supplier.currentDebt ?? selectedSupplier.currentDebt))}` : undefined}
@@ -512,26 +546,8 @@ export function SuppliersTable({
   );
 }
 
-function SupplierDetailTabs({
-  preview,
-  draft,
-  editing,
-  tab,
-  onTabChange,
-  onDebtChanged,
-  onDraftChange,
-}: {
-  preview: SupplierPreview;
-  draft: SupplierDraft;
-  editing: boolean;
-  tab: SupplierDetailTab;
-  onTabChange: (tab: SupplierDetailTab) => void;
-  onDebtChanged: () => void | Promise<void>;
-  onDraftChange: (field: keyof SupplierDraft, value: string) => void;
-}) {
-  const t = useTranslations();
-  const visibleTab: SupplierDetailTab = editing ? "info" : tab;
-
+/** Purchase/return history and the payables ledger shown in the detail. */
+function supplierActivity(preview: SupplierPreview) {
   const history: SupplierHistoryRow[] = [
     ...preview.purchases.map((purchase) => ({
       id: purchase.id,
@@ -573,6 +589,30 @@ function SupplierDetailTabs({
       }),
       { balance: Number(preview.supplier.currentDebt), rows: [] },
     ).rows;
+  return { history, debtRows };
+}
+
+function SupplierDetailTabs({
+  preview,
+  draft,
+  editing,
+  tab,
+  onTabChange,
+  onDebtChanged,
+  onDraftChange,
+}: {
+  preview: SupplierPreview;
+  draft: SupplierDraft;
+  editing: boolean;
+  tab: SupplierDetailTab;
+  onTabChange: (tab: SupplierDetailTab) => void;
+  onDebtChanged: () => void | Promise<void>;
+  onDraftChange: (field: keyof SupplierDraft, value: string) => void;
+}) {
+  const t = useTranslations();
+  const visibleTab: SupplierDetailTab = editing ? "info" : tab;
+
+  const { history, debtRows } = supplierActivity(preview);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

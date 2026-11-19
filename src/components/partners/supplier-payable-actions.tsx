@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useImperativeHandle, useMemo, useState, useTransition, type Ref } from "react";
 import { Pencil, WalletCards } from "lucide-react";
 import { createSupplierPayableEntry, paySupplierPayable } from "@/lib/actions/payables";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -34,24 +34,34 @@ function localDateTimeValue(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+export type SupplierPayableActionsHandle = { open: (mode: "pay" | "adjust") => void };
+
 export function SupplierPayableActions({
   supplierId,
   overview,
   onChanged,
+  hideTriggers = false,
+  handleRef,
 }: {
   supplierId: string;
   overview: SupplierPayableOverview;
   onChanged: () => void | Promise<void>;
+  /** Phones open the dialogs from the profile's "…" menu instead. */
+  hideTriggers?: boolean;
+  handleRef?: Ref<SupplierPayableActionsHandle>;
 }) {
   const [mode, setMode] = useState<"pay" | "adjust" | null>(null);
+  useImperativeHandle(handleRef, () => ({ open: setMode }), []);
   return (
     <>
+      {!hideTriggers && <>
       <button type="button" onClick={() => setMode("pay")} disabled={overview.currentDebt <= 0} className="inline-flex h-10 min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-primary-600 bg-primary-600 px-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:pointer-events-none disabled:opacity-50 lg:min-h-0 lg:min-w-0">
         <WalletCards className="h-4 w-4" />Thanh toán
       </button>
       <button type="button" onClick={() => setMode("adjust")} className="inline-flex h-10 min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-slate-700 hover:bg-surface-2 dark:text-slate-200 lg:min-h-0 lg:min-w-0">
         <Pencil className="h-4 w-4" />Điều chỉnh
       </button>
+      </>}
       {mode === "pay" && (
         <SupplierPaymentDialog
           supplierId={supplierId}

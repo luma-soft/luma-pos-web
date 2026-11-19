@@ -31,11 +31,8 @@ test("mobile partner creation keeps submission controls visible on long forms",(
   expect(customer).toContain("mobileDialogActions = false");
   expect(customer).toContain('formId="customer-create-form"');
   expect(customer).toContain('type="submit" loading={form.formState.isSubmitting}');
-  for(const source of [supplier]){
-    expect(source).toContain("mobileDialogActions = false");
-    expect(source).toContain("sticky bottom-0 z-10");
-    expect(source).toContain("lg:static lg:mx-0");
-    expect(source).toContain("mobileDialogActions");
-    expect(source).toContain('type="submit" loading={form.formState.isSubmitting}');
-  }
+  // Suppliers follow NativeSupplierFormView the same way.
+  expect(supplier).toContain("mobileDialogActions = false");
+  expect(supplier).toContain("formId={formId}");
+  expect(supplier).toContain('type="submit" loading={form.formState.isSubmitting}');
 });

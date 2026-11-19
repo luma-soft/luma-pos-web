@@ -153,11 +153,11 @@ export function WalkInMobileRow({ orderCount, netSales, onOpen }: { orderCount: 
   );
 }
 
-function RowChevron() {
+export function RowChevron() {
   return <ChevronRight className="size-[18px] shrink-0 text-ios-label-tertiary" strokeWidth={2.6} aria-hidden="true" />;
 }
 
-function LabeledRow({ label, value }: { label: string; value: string }) {
+export function LabeledRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex min-h-11 items-center gap-3 px-4 py-[11px] text-[17px]">
       <span className="shrink-0">{label}</span>
@@ -166,7 +166,7 @@ function LabeledRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MenuAction({ icon: Icon, label, onSelect, disabled, destructive }: { icon: typeof Pencil; label: string; onSelect: () => void; disabled?: boolean; destructive?: boolean }) {
+export function MenuAction({ icon: Icon, label, onSelect, disabled, destructive }: { icon: typeof Pencil; label: string; onSelect: () => void; disabled?: boolean; destructive?: boolean }) {
   return (
     <button
       type="button"

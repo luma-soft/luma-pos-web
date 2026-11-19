@@ -12,6 +12,7 @@ import {
 } from "@/lib/schemas/order";
 import { type ActionResult, generateCode, requireManager, requireStockAccess } from "./common";
 import { createCustomerCore, updateCustomerCore } from "@/lib/customers/write";
+import { deleteSupplierCore } from "@/lib/suppliers/write";
 import { Routes } from "@/lib/routes";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { addressWriteFields, hasValidVietnamAddressSelection } from "@/lib/addresses/vietnam-form";
@@ -77,6 +78,20 @@ export async function updateSupplier(input: UpdateSupplierInput): Promise<Action
     console.error("updateSupplier failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
+}
+
+/** Deletes a supplier with no debt or history (same rules as the native app). */
+export async function deleteSupplier(id: string): Promise<ActionResult<{ id: string }>> {
+  const gate = await requireManager(); if (!gate.ok) return gate;
+  if (!z.uuid().safeParse(id).success) return { ok: false, error: "errors.notFound" };
+  const result = await deleteSupplierCore(gate.storeId, gate.userId, id);
+  if (result.ok) {
+    revalidatePath(Routes.Suppliers);
+    revalidatePath(Routes.Partners);
+    revalidatePath(Routes.Products);
+    revalidatePath(Routes.Inventory);
+  }
+  return result;
 }
 
 export type { UpdateCustomerInput } from "@/lib/schemas/order";
