@@ -6,6 +6,9 @@ import {
   productDisplayName,
   productVariantLabel,
   selectableProductIds,
+  formatVariantOptionSummary,
+  formatVariantPriceRange,
+  variantOptionSummary,
 } from "@/lib/products/variant-presentation";
 import { productMatchesSelectionStatus } from "@/lib/product-catalog-explorer";
 import { legacyText } from "@/lib/i18n/catalog-text";
@@ -158,7 +161,7 @@ export function buildProductUnitColumns({
     unitProjection(product, selectedUnitName(product));
 
   const costRange = (product: ProductRow) => {
-    if (grouped && product.variantGroup) return `Từ ${formatCurrency(Number(product.variantGroup.minCostPrice))}`;
+    if (grouped && product.variantGroup) return formatVariantPriceRange(product.variantGroup.minCostPrice, product.variantGroup.maxCostPrice);
     const projected = projection(product);
     if (!product.isVariantParent) return formatCurrency(projected.costPrice);
     return priceRange(
@@ -169,7 +172,7 @@ export function buildProductUnitColumns({
   };
 
   const retailRange = (product: ProductRow) => {
-    if (grouped && product.variantGroup) return `Từ ${formatCurrency(Number(product.variantGroup.minRetailPrice))}`;
+    if (grouped && product.variantGroup) return formatVariantPriceRange(product.variantGroup.minRetailPrice, product.variantGroup.maxRetailPrice);
     const selectedName = selectedUnitName(product);
     const projected = unitProjection(product, selectedName);
     if (!product.isVariantParent) return formatCurrency(projected.retailPrice);
@@ -462,7 +465,15 @@ export function ProductsTable({
       required: true,
       wrap: true,
       cellClassName: "!whitespace-normal",
-      render: (product) => <div className="space-y-1"><div className="break-words font-medium text-slate-900 dark:text-slate-100">{groupOf(product)?.name ?? productDisplayName(product, " - ")}</div>{!groupOf(product) && <ProductKindBadge kind={product.productKind} />}</div>,
+      render: (product) => {
+        const group = groupOf(product);
+        const summary = group ? formatVariantOptionSummary(variantOptionSummary(group.members)) : "";
+        return <div className="space-y-1">
+          <div className="break-words font-medium text-slate-900 dark:text-slate-100">{group?.name ?? productDisplayName(product, " - ")}</div>
+          {summary && <div className="line-clamp-2 break-words text-xs text-slate-500" title={summary}>{summary}</div>}
+          {!group && <ProductKindBadge kind={product.productKind} />}
+        </div>;
+      },
     },
     { key: "category", label: t("products.list.colCategory"), defaultVisible: false, width: "130px", render: (product) => <span className="text-slate-500">{product.categoryName ?? "—"}</span> },
     ...buildProductUnitColumns({
@@ -554,7 +565,8 @@ export function ProductsTable({
                 product={product}
                 name={group.name}
                 countLabel={t("products.variants.count", { count: membersFor(product).total })}
-                priceLabel={t("products.variants.fromPrice", { price: formatCurrency(Number(group.minRetailPrice)) })}
+                priceLabel={formatVariantPriceRange(group.minRetailPrice, group.maxRetailPrice)}
+                summaryLabel={formatVariantOptionSummary(variantOptionSummary(group.members), 3, { compact: true })}
                 stockLabel={`${t("products.variants.totalStock")}: ${group.totalStock === null ? t("products.variants.multipleUnits") : `${formatNumber(Number(group.totalStock))} ${product.baseUnit}`}`}
                 expanded={expanded}
                 onToggle={mobileSelection ? () => toggleProduct(product) : () => toggleGroup(product)}
@@ -710,7 +722,7 @@ export function ProductMobileRow({
     && selectedUnit?.priceOverride !== undefined
     && Number.isFinite(Number(selectedUnit.priceOverride));
   const group = groupSummary ? product.variantGroup : undefined;
-  const retailDisplay = group ? `Từ ${formatCurrency(Number(group.minRetailPrice))}` : product.isVariantParent && !hasRetailOverride
+  const retailDisplay = group ? formatVariantPriceRange(group.minRetailPrice, group.maxRetailPrice) : product.isVariantParent && !hasRetailOverride
     ? priceRange(
         Number(product.minRetailPrice) * projected.multiplier,
         Number(product.maxRetailPrice) * projected.multiplier,
@@ -796,6 +808,7 @@ function ProductGroupMobileButton({
   name,
   countLabel,
   priceLabel,
+  summaryLabel,
   stockLabel,
   expanded,
   onToggle,
@@ -805,6 +818,7 @@ function ProductGroupMobileButton({
   name: string;
   countLabel: string;
   priceLabel: string;
+  summaryLabel?: string;
   stockLabel: string;
   expanded: boolean;
   onToggle: () => void;
@@ -822,12 +836,13 @@ function ProductGroupMobileButton({
       <ProductThumbnail product={product} largeOnMobile />
       <span className="min-w-0 flex-1">
         <span className="line-clamp-2 break-words text-[17px] font-semibold leading-[22px] text-ios-label">{name}</span>
+        {summaryLabel && <span className="mt-1 block truncate text-[15px] leading-5 text-ios-label-secondary">{summaryLabel}</span>}
         <span className="mt-1 inline-flex items-center gap-1 text-[17px] text-ios-accent">
           {countLabel}
           <ChevronRight className={cn("size-[17px] transition-transform", expanded && "rotate-90")} strokeWidth={2.5} aria-hidden="true" />
         </span>
       </span>
-      <span className="flex max-w-[45%] shrink-0 flex-col items-end gap-1.5 self-stretch text-right">
+      <span className="flex max-w-[40%] shrink-0 flex-col items-end gap-1.5 self-stretch text-right">
         <span className="text-[17px] font-semibold leading-[22px] tabular-nums text-ios-label">{priceLabel}</span>
         <span className="text-[15px] leading-5 text-ios-label-secondary">{stockLabel}</span>
       </span>
@@ -863,6 +878,9 @@ export function SelectionCheckbox({
     </label>
   );
 }
+
+/** Up to this many SKUs, the detail shows every option as a chip instead of a dropdown. */
+const VARIANT_CHIP_LIMIT = 12;
 
 /** NativeProductStockPresentation: tone of a product's stock on phones. */
 type NativeStockTone = "information" | "critical" | "warning" | "positive";
@@ -952,6 +970,9 @@ export function ProductDetailView({
   const needsVariant = Boolean(group && product.isVariantParent);
   const specs = specEntries(product.specs);
   const orderNote = orderNoteFromSpecs(product.specs);
+  const selectVariant = (id: string) => {
+    if (id !== product.id) router.replace(`${Routes.productDetail(id)}?detailTab=${tab}`, { scroll: false });
+  };
   const effectiveActive = product.isVariantParent
     ? product.children.some((child) => child.isActive)
     : product.isActive;
@@ -981,10 +1002,34 @@ export function ProductDetailView({
       </div>
       {group && <div className="mb-4 shrink-0 border-b border-border-soft pb-4 max-lg:px-3">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <label htmlFor={variantPickerId} className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("products.variants.version")}</label>
+          {group.count <= VARIANT_CHIP_LIMIT
+            ? <span id={variantPickerId} className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("products.variants.version")}</span>
+            : <label htmlFor={variantPickerId} className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("products.variants.version")}</label>}
           <span className="text-xs text-slate-500">{t("products.variants.count", { count: group.count })}</span>
         </div>
         <div className="flex flex-wrap items-center gap-3 lg:gap-6">
+          {group.count <= VARIANT_CHIP_LIMIT ? (
+            <div role="radiogroup" aria-labelledby={variantPickerId} className="flex w-full min-w-0 flex-wrap gap-2 lg:max-w-3xl lg:flex-1">
+              {group.members.map((member) => {
+                const active = !needsVariant && member.id === product.id;
+                return <button
+                  key={member.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  title={`${member.sku} · ${formatCurrency(Number(member.retailPrice))}`}
+                  onClick={() => selectVariant(member.id)}
+                  className={cn(
+                    "min-h-11 max-w-full break-words rounded-lg border px-3.5 py-2 text-left text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 lg:min-h-9",
+                    active
+                      ? "border-primary-600 bg-primary-600 text-white"
+                      : "border-border bg-surface text-slate-700 hover:border-primary-400 dark:text-slate-200",
+                    !member.isActive && !active && "text-slate-400 line-through decoration-slate-300 dark:text-slate-500",
+                  )}
+                >{productVariantLabel(member)}</button>;
+              })}
+            </div>
+          ) : (
           <Select
             id={variantPickerId}
             value={needsVariant ? "" : product.id}
@@ -1000,8 +1045,9 @@ export function ProductDetailView({
             rootClassName="w-full min-w-0 lg:max-w-3xl lg:flex-1"
             className="min-h-16 py-3 font-medium aria-expanded:border-primary-600 lg:min-h-16"
             optionClassName="min-h-16 py-3 lg:min-h-16"
-            onValueChange={(id) => { if (id !== product.id) router.replace(`${Routes.productDetail(id)}?detailTab=${tab}`, { scroll: false }); }}
+            onValueChange={selectVariant}
           />
+          )}
           <Link href={groupActionHref(group.id, "groupEdit", params.toString())} className="inline-flex min-h-11 shrink-0 items-center gap-2 text-sm font-semibold text-primary-600 hover:underline dark:text-primary-300"><Pencil className="h-4 w-4" />{t("products.variants.editGroup")}</Link>
         </div>
         {needsVariant && <p className="mt-2 text-xs text-slate-500">{t("products.variants.chooseHint")}</p>}

@@ -61,3 +61,32 @@ describe("variant presentation", () => {
     assert.deepEqual(selectableProductIds({ ...e, variantGroup: { members: [e, f] } }, false), ["e"]);
   });
 });
+
+describe("variant group summaries", () => {
+  test("orders option values naturally", async () => {
+    const { compareVariantValues, sortVariantMembers } = await import("./variant-presentation");
+    assert.deepEqual(["512GB", "64GB", "32GB"].sort(compareVariantValues), ["32GB", "64GB", "512GB"]);
+    const members = ["10", "2", "21"].map((value, index) => ({ id: `p${index}`, sku: `SP${9 - index}`, name: "Ống", specs: { SIZE: [value] } }));
+    assert.deepEqual(sortVariantMembers(members).map((member) => member.specs.SIZE[0]), ["2", "10", "21"]);
+  });
+
+  test("price range ignores unpriced SKUs unless all are unpriced", async () => {
+    const { variantPriceRange, formatVariantPriceRange } = await import("./variant-presentation");
+    assert.deepEqual(variantPriceRange(["0", "135000", "280000.00"]), { min: 135000, max: 280000 });
+    assert.deepEqual(variantPriceRange(["0", "0"]), { min: 0, max: 0 });
+    assert.match(formatVariantPriceRange(135000, 280000), /^135\.000 – 280\.000/);
+    assert.equal(formatVariantPriceRange(5000, 5000).includes("–"), false);
+  });
+
+  test("summarizes attribute values per axis", async () => {
+    const { variantOptionSummary, formatVariantOptionSummary } = await import("./variant-presentation");
+    const summary = variantOptionSummary([
+      { specs: { "Dung Lượng": ["64GB"] } }, { specs: { "Dung Lượng": ["512GB"] } },
+      { specs: { "Dung Lượng": ["32GB"] } }, { specs: { "Dung Lượng": ["128GB"] }, variantName: null },
+      { specs: { "Dung Lượng": ["256GB"], __orderNote: "x" } },
+    ]);
+    assert.deepEqual(summary, [{ name: "Dung Lượng", values: ["32GB", "64GB", "128GB", "256GB", "512GB"] }]);
+    assert.equal(formatVariantOptionSummary(summary, 3), "Dung Lượng: 32GB · 64GB · 128GB +2");
+    assert.equal(formatVariantOptionSummary(summary, 3, { compact: true }), "32GB · 64GB · 128GB +2");
+  });
+});

@@ -69,7 +69,7 @@ describe("variant group read model", () => {
       },
     });
     assert.equal(group.requiresReview, true);
-    assert.equal(group.members[1].combinationKey, undefined);
+    assert.equal(group.members.find((entry) => entry.id === "unknown")?.combinationKey, undefined);
     assert.deepEqual(group.excludedCombinationKeys, []);
   });
 
@@ -88,5 +88,15 @@ describe("variant group read model", () => {
     assert.equal(group.members.length, 241);
     assert.equal(group.requiresReview, false);
     assert.equal(group.excludedCombinationKeys.length, 0);
+  });
+
+  it("lists members by option value and ignores unpriced SKUs in the price range", () => {
+    const sized = (id: string, size: string, retailPrice: string) => ({ ...member(id, size), specs: { SIZE: [size] }, retailPrice });
+    const group = projectVariantGroup({ id: "a", name: "Ống", kind: "related", catalog: [],
+      members: [sized("a", "21", "12000"), sized("b", "114", "0"), sized("c", "34", "18000")] });
+    assert.deepEqual(group.members.map((entry) => entry.id), ["a", "c", "b"]);
+    assert.deepEqual(group.attributes[0].values, ["21", "34", "114"]);
+    assert.equal(group.minRetailPrice, "12000");
+    assert.equal(group.maxRetailPrice, "18000");
   });
 });

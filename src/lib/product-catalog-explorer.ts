@@ -4,6 +4,7 @@ import {
   type ProductCatalogWarehouse,
 } from "@/lib/product-catalog";
 import type { ProductListResult } from "@/lib/data/products";
+import { sortVariantMembers, variantPriceRange } from "@/lib/products/variant-presentation";
 import type { PriceComparison } from "@/lib/pricing/price-comparison";
 import { compareProductsBySort, DEFAULT_PRODUCT_SORT, sortProductsBySort, type ProductSort } from "@/lib/product-sort-policy";
 
@@ -125,7 +126,7 @@ function buildGroups(
     if (group.kind === "related" && !group.members.some((member) => member.id === group.root.id)) {
       group.members.push(group.root);
     }
-    group.members.sort((left, right) => left.sku.localeCompare(right.sku, "vi") || left.id.localeCompare(right.id));
+    group.members = sortVariantMembers(group.members);
   }
   return groups;
 }
@@ -326,8 +327,8 @@ export function exploreProductCatalog(
       .filter((member) => matched.has(member.id))
       .map((member) => makeProductRow(member, byId, warehouseById));
     const units = new Set(members.map((member) => member.baseUnit.trim().toLocaleLowerCase("vi")));
-    const costs = members.map((member) => Number(member.costPrice));
-    const retailPrices = members.map((member) => Number(member.retailPrice));
+    const cost = variantPriceRange(members.map((member) => member.costPrice));
+    const retail = variantPriceRange(members.map((member) => member.retailPrice));
     const totalStock = units.size <= 1 ? String(members.reduce((sum, member) => sum + Number(member.totalStock), 0)) : null;
     const projectedGroup = {
       id: group.id,
@@ -340,20 +341,20 @@ export function exploreProductCatalog(
       requiresReview: false,
       count: members.length,
       totalStock,
-      minCostPrice: String(Math.min(...costs)),
-      maxCostPrice: String(Math.max(...costs)),
-      minRetailPrice: String(Math.min(...retailPrices)),
-      maxRetailPrice: String(Math.max(...retailPrices)),
+      minCostPrice: String(cost.min),
+      maxCostPrice: String(cost.max),
+      minRetailPrice: String(retail.min),
+      maxRetailPrice: String(retail.max),
     };
     row.variantGroup = projectedGroup as ProductRow["variantGroup"];
     if (group.kind === "native") {
       row.children = members as unknown as ProductRow["children"];
       row.childCount = members.length;
       if (members.length) {
-        row.minCostPrice = String(Math.min(...costs));
-        row.maxCostPrice = String(Math.max(...costs));
-        row.minRetailPrice = String(Math.min(...retailPrices));
-        row.maxRetailPrice = String(Math.max(...retailPrices));
+        row.minCostPrice = String(cost.min);
+        row.maxCostPrice = String(cost.max);
+        row.minRetailPrice = String(retail.min);
+        row.maxRetailPrice = String(retail.max);
       }
     } else {
       row.relatedProducts = members as unknown as ProductRow["relatedProducts"];

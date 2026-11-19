@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { compareVariantValues, sortVariantMembers, variantPriceRange } from "./variant-presentation";
 import { buildVariantCombinations, normalizeVariantAttributes, variantCombinationBudget, variantCombinationKey, variantNameKey, type NormalizedVariantAttribute } from "./variant-model";
 
 export type VariantCatalogEntry = { id: string; name: string; aliases: string[] };
@@ -44,7 +45,7 @@ export function projectVariantGroup<T extends VariantReadMember>(input: {
     attributes = normalizeVariantAttributes(input.stored?.attributes.length ? input.stored.attributes.map((axis) => ({
       ...axis, name: input.catalog.find((entry) => entry.id === axis.attributeId)?.name ?? axis.name,
     })) : [...collected.values()].sort((a, b) => a.attributeId.localeCompare(b.attributeId)).map((axis) => {
-      const values = [...axis.values].sort();
+      const values = [...axis.values].sort(compareVariantValues);
       return { attributeId: axis.attributeId, name: axis.name, values, valueIds: values.map((value) => legacyValueId(axis.attributeId, value)), createsVariants: true };
     }));
   } catch { requiresReview = true; }
@@ -84,13 +85,14 @@ export function projectVariantGroup<T extends VariantReadMember>(input: {
     }
   } catch { requiresReview = true; }
   const sameUnit = new Set(members.map((member) => member.baseUnit.trim().toLowerCase())).size <= 1;
-  const prices = (key: "costPrice" | "retailPrice") => members.map((member) => Number(member[key]));
+  const cost = variantPriceRange(members.map((member) => member.costPrice));
+  const retail = variantPriceRange(members.map((member) => member.retailPrice));
   return {
-    id: input.id, name: input.name, kind: input.kind, attributes, members,
+    id: input.id, name: input.name, kind: input.kind, attributes, members: sortVariantMembers(members),
     excludedCombinationKeys, revision: input.stored?.revision ?? 0, requiresReview,
     count: members.length,
     totalStock: sameUnit ? String(members.reduce((sum, member) => sum + Number(member.totalStock), 0)) : null,
-    minCostPrice: String(Math.min(...prices("costPrice"))), maxCostPrice: String(Math.max(...prices("costPrice"))),
-    minRetailPrice: String(Math.min(...prices("retailPrice"))), maxRetailPrice: String(Math.max(...prices("retailPrice"))),
+    minCostPrice: String(cost.min), maxCostPrice: String(cost.max),
+    minRetailPrice: String(retail.min), maxRetailPrice: String(retail.max),
   };
 }
