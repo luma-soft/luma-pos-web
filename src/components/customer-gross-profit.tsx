@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
-import { ChevronDown, LoaderCircle } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { MobileDateRangeScreen } from "@/app/(app)/sales/tabs/filter-mobile-screens";
 import { useLocale, useTranslations } from "next-intl";
 import { DateInput } from "@/components/ui/date-input";
 import { ProfitVisibility } from "@/components/profit-visibility";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
+
+const formatMoney = (value: number) => formatCurrency(value);
 
 const PERIODS = ["all", "today", "yesterday", "7days", "30days", "thisWeek", "lastWeek", "thisMonth", "lastMonth", "thisYear", "lastYear", "custom"] as const;
 type Period = (typeof PERIODS)[number];
@@ -47,13 +50,18 @@ function rangeFor(period: Period, now = new Date()): DateRange {
   }
 }
 
-type CustomerGrossProfitProps =
+type CustomerGrossProfitProps = (
   | { customerId: string; walkIn?: false }
-  | { customerId?: never; walkIn: true };
+  | { customerId?: never; walkIn: true }
+) & {
+  /** "row": NativeGrossProfitRow inside an inset-grouped section on phones. */
+  variant?: "card" | "row";
+};
 
 export function CustomerGrossProfit({
   customerId,
   walkIn = false,
+  variant = "card",
 }: CustomerGrossProfitProps) {
   const t = useTranslations("customerProfit");
   const tDashboard = useTranslations("dashboard");
@@ -67,6 +75,8 @@ export function CustomerGrossProfit({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [open, setOpen] = useState(false);
+  const [periodScreenOpen, setPeriodScreenOpen] = useState(false);
+  const [amountVisible, setAmountVisible] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<CSSProperties>({});
@@ -172,6 +182,63 @@ export function CustomerGrossProfit({
     const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1
       : (current + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
     options[next]?.focus();
+  }
+
+  if (variant === "row") {
+    const tint = grossProfit === null ? "text-ios-label-secondary" : grossProfit > 0 ? "text-ios-green" : grossProfit < 0 ? "text-ios-red" : "text-ios-label-secondary";
+    return (
+      <div className="flex min-h-11 items-center gap-1 py-1.5 pl-4 pr-1">
+        <div className="min-w-0 flex-1">
+          <div className="text-[17px] leading-[22px]">{tDashboard("grossProfit")}</div>
+          <button
+            type="button"
+            onClick={() => setPeriodScreenOpen(true)}
+            className="inline-flex items-center gap-1 text-[12px] leading-4 text-ios-label-secondary"
+          >
+            {periodLabel}<ChevronDown className="size-[9px]" strokeWidth={3} aria-hidden="true" />
+          </button>
+        </div>
+        {loading ? (
+          <span className="block h-[15px] w-[82px] rounded-[5px] bg-black/[0.08] dark:bg-white/[0.08]" aria-label={tCommon("loading")} />
+        ) : (
+          <span className={cn("text-[15px] font-semibold tabular-nums", tint)} aria-live="polite">
+            {grossProfit === null || error ? "—" : amountVisible ? formatMoney(grossProfit) : "••••••"}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setAmountVisible((current) => !current)}
+          aria-label={amountVisible ? t("hide") : t("show")}
+          className="grid size-11 shrink-0 place-items-center text-ios-label-secondary"
+        >
+          {amountVisible ? <Eye className="size-[18px]" aria-hidden="true" /> : <EyeOff className="size-[18px]" aria-hidden="true" />}
+        </button>
+        {periodScreenOpen && (
+          <MobileDateRangeScreen
+            title={tDashboard("grossProfit")}
+            presets={PERIODS.map((value) => ({ value, label: t(`periods.${value}`) }))}
+            preset={period}
+            from={period === "custom" ? customFrom : range.from ?? ""}
+            to={period === "custom" ? customTo : range.to ?? ""}
+            resolvePreset={(preset) => {
+              const next = rangeFor(preset as Period);
+              return { from: next.from ?? "", to: next.to ?? "" };
+            }}
+            onApply={({ preset, from, to }) => {
+              setPeriod(preset as Period);
+              if (preset === "custom") {
+                setCustomFrom(from);
+                setCustomTo(to);
+                setRange({ from, to });
+              } else {
+                setRange(rangeFor(preset as Period));
+              }
+            }}
+            onClose={() => setPeriodScreenOpen(false)}
+          />
+        )}
+      </div>
+    );
   }
 
   return (

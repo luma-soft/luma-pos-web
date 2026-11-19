@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useImperativeHandle, useMemo, useState, useTransition, type Ref } from "react";
 import { useTranslations } from "next-intl";
 import { MoreHorizontal, Pencil, QrCode, WalletCards } from "lucide-react";
 import { collectCustomerReceivable, createCustomerReceivableEntry } from "@/lib/actions/receivables";
@@ -23,6 +23,8 @@ type Overview = {
   bankAccounts: Array<{ id: string; bankCode: string; accountNumber: string; accountName: string; isDefault: boolean }>;
 };
 type Mode = "collect" | "adjust" | "discount" | "qr";
+export type CustomerReceivableMode = Mode;
+export type CustomerReceivableActionsHandle = { open: (mode: Mode) => void };
 
 const requestId = (prefix: string) => `${prefix}:${crypto.randomUUID()}`;
 function localDateTimeValue(date: Date) {
@@ -33,9 +35,14 @@ function localDateTimeValue(date: Date) {
 export function CustomerReceivableActions({
   customerId,
   currentDebt,
+  hideTriggers = false,
+  handleRef,
 }: {
   customerId: string;
   currentDebt: number;
+  /** Phones open the dialogs from the detail screen's "…" menu instead of these buttons. */
+  hideTriggers?: boolean;
+  handleRef?: Ref<CustomerReceivableActionsHandle>;
 }) {
   const [mode, setMode] = useState<Mode | null>(null);
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -60,6 +67,8 @@ export function CustomerReceivableActions({
     }
   }
 
+  useImperativeHandle(handleRef, () => ({ open: (next: Mode) => void open(next) }));
+
   async function createQr(invoice: Invoice, amount: number) {
     setError("");
     setLoading(true);
@@ -80,6 +89,7 @@ export function CustomerReceivableActions({
 
   return (
     <>
+      {!hideTriggers && <>
       <button type="button" onClick={() => open("collect")} disabled={currentDebt <= 0} className="inline-flex h-10 min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-primary-600 bg-primary-600 px-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:pointer-events-none disabled:opacity-50 lg:min-h-0 lg:min-w-0">
         <WalletCards className="h-4 w-4" />Thanh toán
       </button>
@@ -96,6 +106,7 @@ export function CustomerReceivableActions({
           { key: "qr", label: "Tạo QR", icon: QrCode, disabled: currentDebt <= 0 || loading, onSelect: () => open("qr") },
         ]}
       />
+      </>}
       {mode === "collect" && loading && <PartnerDebtDialog title="Thanh toán công nợ" onClose={() => setMode(null)}><p className="text-sm text-slate-500">Đang tải hóa đơn...</p></PartnerDebtDialog>}
       {mode === "collect" && !loading && <CollectDialog customerId={customerId} overview={overview} error={error} onError={setError} onClose={() => setMode(null)} />}
       {mode === "qr" && loading && <PartnerDebtDialog title="Tạo QR thanh toán" onClose={() => setMode(null)}><p className="text-sm text-slate-500">Đang tải hóa đơn...</p></PartnerDebtDialog>}

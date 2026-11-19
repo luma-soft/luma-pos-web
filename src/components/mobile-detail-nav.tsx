@@ -62,7 +62,11 @@ export function MobileDetailNav({ title, actions }: { title: ReactNode; actions?
             role="dialog"
             aria-modal="true"
             aria-label={t("common.actions")}
-            onClick={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              // Like an iOS menu, choosing an action dismisses the sheet.
+              if ((event.target as HTMLElement).closest("[data-menu-action]")) setMenuOpen(false);
+            }}
             className="max-h-[80dvh] w-full overflow-y-auto rounded-t-[26px] bg-canvas px-ios-inset pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
           >
             <div className="mx-auto mb-3 h-[5px] w-9 rounded-full bg-ios-label-tertiary" aria-hidden="true" />

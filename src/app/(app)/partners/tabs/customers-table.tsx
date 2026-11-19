@@ -1,5 +1,9 @@
 "use client";
 
+import { usePhoneLayout } from "@/components/use-phone-layout";
+import { MobileBottomSearchBar } from "@/components/mobile-bottom-bar";
+import { MobilePushedScreen } from "@/components/mobile-pushed-screen";
+import { CustomerMobileRow, MobileCustomerDetail, MobileListTotalsCard, WalkInMobileRow } from "./customer-mobile";
 import { DesktopPagination, useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { MoneyInput } from "@/components/ui/money-input";
 import { DateInput } from "@/components/ui/date-input";
@@ -154,10 +158,12 @@ function CustomerSearch({
   filters,
   pageSize,
   onOpenFilters,
+  onCreate,
 }: {
   filters: CustomerFilters;
   pageSize: number;
   onOpenFilters: () => void;
+  onCreate?: () => void;
 }) {
   const t = useTranslations();
 
@@ -175,6 +181,7 @@ function CustomerSearch({
           />
         </InstantFilterForm>
       }
+      mobileAction={onCreate ? { label: t("mobile.customers.add"), onClick: onCreate } : undefined}
       filter={
         <FilterTriggerButton
           onClick={onOpenFilters}
@@ -209,6 +216,8 @@ function CustomerRows({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { rows: loadedRows, footer: loadMoreFooter } = useMobileLoadMore(data.rows, loadMore, (row) => row.id);
+  const phone = usePhoneLayout();
+  const activeFilterCount = FILTER_KEYS.filter((key) => Boolean(filters[key])).length;
   const [createOpen, setCreateOpen] = useState(aiPreview);
   const [walkInSelected, setWalkInSelected] = useState(false);
   const selectedCustomerId = searchParams.get("detailCustomerId")
@@ -344,6 +353,20 @@ function CustomerRows({
 
   return (
     <>
+      {/* Phones: LumaListTotalsCard and the active-filter row above the plain list. */}
+      <MobileListTotalsCard
+        metrics={[
+          { id: "debt", title: t("mobile.customers.totalDebt"), value: formatCurrency(data.totalDebt), tone: data.totalDebt > 0 ? "text-ios-red" : "text-ios-label-secondary" },
+          { id: "gross", title: t("mobile.customers.totalGrossSales"), value: formatCurrency(data.totalGrossSales), tone: "text-ios-accent" },
+          { id: "net", title: t("mobile.customers.totalNetSales"), value: formatCurrency(data.totalNetSales) },
+        ]}
+      />
+      {activeFilterCount > 0 && (
+        <div className="flex items-center gap-2 px-1 py-2 lg:hidden">
+          <span className="min-w-0 flex-1 text-[12px] font-medium text-ios-accent">{t("mobile.customers.filtersActive", { count: activeFilterCount })}</span>
+          <Link href={`${Routes.Partners}?tab=customers`} className="text-[12px] font-semibold text-ios-accent">{t("mobile.customers.clearFilters")}</Link>
+        </div>
+      )}
       <DataTableShell
         tableId="partners.customers"
         rows={tableRows}
@@ -364,7 +387,7 @@ function CustomerRows({
           { key: "netSales", content: formatCurrency(data.totalNetSales) },
         ]}
         toolbar={
-          <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex w-full flex-col gap-3 max-lg:hidden lg:flex-row lg:items-center lg:justify-between">
             <CustomerSearch
               filters={filters}
               pageSize={data.pageSize}
@@ -395,58 +418,42 @@ function CustomerRows({
             </div>
           </div>
         }
+        mobileListClassName="max-lg:-mx-ios-inset max-lg:space-y-0 max-lg:bg-surface"
+        mobileRowClassName="max-lg:rounded-none max-lg:border-0 max-lg:bg-[linear-gradient(var(--color-border),var(--color-border))] max-lg:bg-[length:calc(100%-70px)_1px] max-lg:bg-right-bottom max-lg:bg-no-repeat"
         renderMobileRow={({ row: customer }) => customer.id === WALK_IN_ROW_ID ? (
-          <article className="relative w-full min-h-[76px] p-3 text-left">
-            <button type="button" onClick={() => openCustomer(customer)} aria-label={t("orders.walkIn")} className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500" />
-            <div className="font-semibold">{t("orders.walkIn")}</div>
-            <div className="mt-1 text-xs text-slate-500">
-              {new Intl.NumberFormat(locale).format(data.walkInSummary?.orderCount ?? 0)} {t("customers.walkInCount")}
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <Metric label={t("customers.cols.totalGrossSales")} value={formatCurrency(Number(customer.grossSales))} tone="blue" />
-              <Metric label={t("customers.cols.totalSalesNet")} value={formatCurrency(Number(customer.totalSpent))} />
-            </div>
-          </article>
+          <WalkInMobileRow
+            orderCount={data.walkInSummary?.orderCount ?? 0}
+            netSales={Number(data.walkInSummary?.netSales ?? 0)}
+            onOpen={() => openCustomer(customer)}
+          />
         ) : (
-          <article className="relative w-full min-h-[76px] p-3 text-left">
-            <button type="button" onClick={() => openCustomer(customer)} aria-label={customer.name} className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500" />
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="min-w-0 whitespace-normal break-words font-semibold">
-                  <PartnerDetailLink
-                    kind="customer"
-                    partnerId={customer.id}
-                    name={customer.name}
-                    openInCurrentTab
-                    className="pointer-events-auto relative z-10 block w-full whitespace-normal break-words"
-                  />
-                </div>
-                <span className="mt-1 inline-flex items-center text-xs text-slate-400">
-                  {customer.code ?? t("customers.expand.profile")} ·{" "}
-                  {customer.phone ?? "—"}
-                </span>
-              </div>
-            </div>
-            <div className="pointer-events-none relative mt-3 grid grid-cols-3 gap-2 text-xs">
-              <Metric
-                label={t("customers.cols.debt")}
-                value={formatCurrency(Number(customer.currentDebt))}
-                tone={Number(customer.currentDebt) > 0 ? "danger" : "muted"}
-              />
-              <Metric
-                label={t("customers.cols.totalGrossSales")}
-                value={formatCurrency(Number(customer.grossSales))}
-                tone="blue"
-              />
-              <Metric
-                label={t("customers.cols.totalSalesNet")}
-                value={formatCurrency(Number(customer.totalSpent))}
-              />
-            </div>
-          </article>
+          <CustomerMobileRow customer={customer} onOpen={() => openCustomer(customer)} />
         )}
       />
       {loadMoreFooter}
+      <MobileBottomSearchBar>
+        <CustomerSearch
+          filters={filters}
+          pageSize={data.pageSize}
+          onOpenFilters={onOpenFilters}
+          onCreate={() => setCreateOpen(true)}
+        />
+      </MobileBottomSearchBar>
+      {phone && isWalkInSelected && data.walkInSummary && (
+        <MobilePushedScreen title={t("mobile.customers.walkInDetail")} onBack={closeCustomer}>
+          <div className="px-ios-inset pt-2">
+            <WalkInCustomerDetail summary={data.walkInSummary} />
+          </div>
+        </MobilePushedScreen>
+      )}
+      {phone && selectedCustomer && (
+        <MobileCustomerDetail
+          customer={selectedCustomer}
+          onBack={closeCustomer}
+          salesHistory={<CustomerSalesPanel customer={selectedCustomer} returnPrintTemplates={returnPrintTemplates} />}
+          debtLedger={<CustomerDebtPanel customer={selectedCustomer} />}
+        />
+      )}
       <CustomerCreateDialog
         open={createOpen}
         aiPreview={aiPreview}
@@ -457,7 +464,7 @@ function CustomerRows({
         }}
       />
       <RowPreviewModal
-        open={Boolean(selectedCustomerId)}
+        open={Boolean(selectedCustomerId) && !phone}
         onClose={closeCustomer}
         title={isWalkInSelected ? t("orders.walkIn") : selectedCustomer?.name ?? t("customers.expand.profile")}
         subtitle={

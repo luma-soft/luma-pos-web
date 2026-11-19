@@ -14,7 +14,7 @@ export function PartnerDebtDialog({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/40 p-3 sm:items-center" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[130] flex items-end justify-center bg-slate-950/40 p-3 sm:items-center" onMouseDown={onClose}>
       <section className="max-h-[92vh] w-full max-w-xl overflow-auto rounded-card bg-surface p-5 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold">{title}</h2>

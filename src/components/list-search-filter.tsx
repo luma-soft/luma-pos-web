@@ -121,11 +121,14 @@ export function ListSearchFilterBar({
   filter,
   search,
   searchClassName,
+  mobileAction,
 }: {
   className?: string;
   filter: ReactNode;
   search: ReactNode;
   searchClassName?: string;
+  /** Phones: a button-style "+" action (when it opens a sheet instead of a link). */
+  mobileAction?: { label: string; onClick: () => void };
 }) {
   const primaryAction = useContext(ListPrimaryActionContext);
   return (
@@ -141,6 +144,17 @@ export function ListSearchFilterBar({
         >
           <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
         </Link>
+      )}
+      {mobileAction && (
+        <button
+          type="button"
+          onClick={mobileAction.onClick}
+          aria-label={mobileAction.label}
+          data-button-radius="pill"
+          className="grid size-12 shrink-0 place-items-center rounded-[15px] border border-ios-stroke/60 bg-surface text-ios-accent transition-opacity active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ios-accent lg:hidden"
+        >
+          <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
+        </button>
       )}
     </div>
   );

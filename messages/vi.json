@@ -1819,6 +1819,47 @@
         "service_customer_request": "Yêu cầu dịch vụ",
         "service_attachment": "Tài liệu công trình"
       }
+    },
+    "customers": {
+      "title": "Khách hàng",
+      "searchPrompt": "Tìm tên hoặc số điện thoại",
+      "totalDebt": "Tổng công nợ",
+      "totalGrossSales": "Tổng bán",
+      "totalNetSales": "Tổng bán trừ trả hàng",
+      "walkInTitle": "Khách lẻ",
+      "walkInOrderCount": "{count} hóa đơn",
+      "debtBadge": "Nợ {amount}",
+      "tier": {
+        "retail": "Khách lẻ",
+        "wholesale": "Bán sỉ",
+        "contractor": "Nhà thầu",
+        "agent": "Đại lý"
+      },
+      "filtersActive": "Đang áp dụng {count} bộ lọc",
+      "clearFilters": "Xóa bộ lọc",
+      "noMatches": "Không tìm thấy khách hàng phù hợp",
+      "add": "Thêm khách hàng",
+      "filter": "Bộ lọc",
+      "transactionHistory": "Lịch sử giao dịch",
+      "transactionCount": "{count} giao dịch",
+      "currentDebt": "Công nợ",
+      "contact": "Thông tin liên hệ",
+      "phone": "Điện thoại",
+      "email": "Email",
+      "address": "Địa chỉ",
+      "zalo": "Zalo",
+      "call": "Gọi khách hàng",
+      "noContact": "Chưa có thông tin liên hệ.",
+      "edit": "Sửa hồ sơ khách hàng",
+      "collectDebt": "Thanh toán công nợ",
+      "adjustDebt": "Điều chỉnh công nợ",
+      "stop": "Ngừng hoạt động",
+      "grossProfit": "Lợi nhuận gộp",
+      "grossProfitPeriod": "Thời gian",
+      "walkInDetail": "Khách lẻ"
+    },
+    "suppliers": {
+      "title": "Nhà cung cấp"
     }
   },
   "toolsCenter": {

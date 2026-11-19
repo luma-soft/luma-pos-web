@@ -1819,6 +1819,47 @@
         "service_customer_request": "Service request",
         "service_attachment": "Project document"
       }
+    },
+    "customers": {
+      "title": "Customers",
+      "searchPrompt": "Search name or phone number",
+      "totalDebt": "Total debt",
+      "totalGrossSales": "Gross sales",
+      "totalNetSales": "Sales after returns",
+      "walkInTitle": "Walk-in sales",
+      "walkInOrderCount": "{count} invoices",
+      "debtBadge": "Debt {amount}",
+      "tier": {
+        "retail": "Retail",
+        "wholesale": "Wholesale",
+        "contractor": "Contractor",
+        "agent": "Agent"
+      },
+      "filtersActive": "{count} filters active",
+      "clearFilters": "Clear filters",
+      "noMatches": "No customers match the current filters",
+      "add": "Add customer",
+      "filter": "Filters",
+      "transactionHistory": "Transaction history",
+      "transactionCount": "{count} transactions",
+      "currentDebt": "Debt",
+      "contact": "Contact details",
+      "phone": "Phone",
+      "email": "Email",
+      "address": "Address",
+      "zalo": "Zalo",
+      "call": "Call customer",
+      "noContact": "No contact details yet.",
+      "edit": "Edit customer profile",
+      "collectDebt": "Collect debt",
+      "adjustDebt": "Adjust debt",
+      "stop": "Deactivate",
+      "grossProfit": "Gross profit",
+      "grossProfitPeriod": "Period",
+      "walkInDetail": "Walk-in sales"
+    },
+    "suppliers": {
+      "title": "Suppliers"
     }
   },
   "toolsCenter": {

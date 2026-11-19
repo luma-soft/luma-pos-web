@@ -11,7 +11,11 @@ import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fie
 
 type CustomerType = "retail" | "wholesale" | "contractor" | "agent";
 
-export function CustomerEdit({ customer }: {
+export function CustomerEdit({ customer, open: controlledOpen, onOpenChange, hideTrigger = false }: {
+  /** Controlled mode for the phone detail "…" menu. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
   customer: {
     id: string; name: string; phone: string | null; email: string | null;
     zaloUserId: string | null;
@@ -22,7 +26,12 @@ export function CustomerEdit({ customer }: {
 }) {
   const t = useTranslations();
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (next: boolean) => {
+    if (controlledOpen === undefined) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const [name, setName] = useState(customer.name);
   const [phone, setPhone] = useState(customer.phone ?? "");
   const [zaloUserId, setZaloUserId] = useState(customer.zaloUserId ?? "");
@@ -55,12 +64,14 @@ export function CustomerEdit({ customer }: {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center gap-2 px-4 rounded-lg border border-border text-sm font-medium hover:bg-surface-2 min-w-11">
-        <Pencil className="w-4 h-4" />{t("common.edit")}
-      </button>
+      {!hideTrigger && (
+        <button onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center gap-2 px-4 rounded-lg border border-border text-sm font-medium hover:bg-surface-2 min-w-11">
+          <Pencil className="w-4 h-4" />{t("common.edit")}
+        </button>
+      )}
 
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-[130] grid place-items-center bg-black/40 p-4" onClick={() => setOpen(false)}>
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg bg-surface rounded-2xl shadow-xl p-5 max-h-[90vh] overflow-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold">{t("customers.editTitle")}</h2>
