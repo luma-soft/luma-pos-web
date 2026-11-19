@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFieldArray, useFormContext, Controller, useWatch } from "react-hook-form";
 import { useTranslations } from "next-intl";
-import { ArrowDown, ArrowUp, Plus, Settings2, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Settings2, Tag, Trash2 } from "lucide-react";
 import { Button, Select } from "@/components/ui";
 import type { CreateProductInput } from "./schema";
 import { buildAttributeNameOptions } from "./attribute-name-options";
@@ -18,7 +18,7 @@ import { attributeValueChange } from "./attribute-value-change";
 
 const CREATE_ATTRIBUTE = "__create_attribute__";
 
-export function AttributesField({ locked = false, allowValueEdits = false }: { locked?: boolean; allowValueEdits?: boolean }) {
+export function AttributesField({ locked = false, allowValueEdits = false, layout = "default" }: { locked?: boolean; allowValueEdits?: boolean; layout?: "default" | "ios" }) {
   const t = useTranslations();
   const { control, getValues, setValue } = useFormContext<CreateProductInput>();
   const [catalog, setCatalog] = useState<ProductAttribute[]>([]);
@@ -89,61 +89,92 @@ export function AttributesField({ locked = false, allowValueEdits = false }: { l
         </p>
       )}
 
-      {fields.map((field, idx) => (
+      {fields.map((field, idx) => {
+        const nameControl = (
+              <Controller
+                control={control}
+                name={`attributes.${idx}.name`}
+                render={({ field: f }) => (
+                  <Select
+                    value={f.value}
+                    onValueChange={(value) => {
+                      if (value === CREATE_ATTRIBUTE) setDialog({ create: true, row: idx });
+                      else {
+                        f.onChange(value);
+                        const item = findCatalogAttribute(catalog, value);
+                        setValue(`attributes.${idx}.attributeId`, item?.id ?? crypto.randomUUID(), { shouldDirty: true });
+                        setValue(`attributes.${idx}.createsVariants`, true);
+                      }
+                    }}
+                    onBlur={f.onBlur}
+                    ref={f.ref}
+                    aria-label={t("products.attributes.nameLabel")}
+                    disabled={!loaded || locked || (currentAttributes[idx]?.valueIds ?? []).some((id) => protectedIds.has(id))}
+                    menuMinWidth={260}
+                    rootClassName={layout === "ios" ? "w-full" : undefined}
+                    className={layout === "ios" ? "min-h-12 text-base" : undefined}
+                    placeholderTx="products.attributes.namePlaceholder"
+                    options={[
+                      { value: CREATE_ATTRIBUTE, label: `+ ${t("products.attributes.create")}` },
+                      ...buildAttributeNameOptions(catalog, f.value).filter((option) =>
+                        option.value === f.value || !currentAttributes.some((attribute) => attribute.name === option.value)),
+                    ]}
+                  />
+                )}
+              />
+        );
+        const valuesControl = (
+              <Controller
+                control={control}
+                name={`attributes.${idx}.values`}
+                render={({ field: f }) => (
+                  <VariantValuesInput
+                    values={f.value || []}
+                    valueIds={currentAttributes[idx]?.valueIds ?? []}
+                    onChange={(values, ids) => {
+                      const attribute = getValues(`attributes.${idx}`);
+                      if (!attribute) return;
+                      const changed = attributeValueChange(attribute, values, ids, locked);
+                      setValue(`attributes.${idx}.valueIds`, changed.valueIds, { shouldDirty: true });
+                      setValue(`attributes.${idx}.createsVariants`, changed.createsVariants);
+                      f.onChange(changed.values);
+                    }}
+                    protectedIds={protectedIds}
+                    disabled={locked && !(allowValueEdits && (currentAttributes[idx]?.valueIds?.length ?? 0) > 0)}
+                    label={`${currentAttributes[idx]?.name || t("products.attributes.nameLabel")} — Giá trị`}
+                  />
+                )}
+              />
+        );
+        const removeDisabled = locked || (currentAttributes[idx]?.valueIds ?? []).some((id) => protectedIds.has(id));
+        if (layout === "ios") {
+          // Phone variants screen: iOS "Thuộc tính" picker with an inline remove button, values below.
+          return (
+            <div key={field.id} className="space-y-3 pb-2">
+              <div>
+                <p className="mb-2 text-[15px] text-slate-500">{t("mobile.products.variantAttribute")}</p>
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">{nameControl}</div>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(idx)} disabled={removeDisabled}
+                    aria-label={t("products.attributes.removeFromProduct")} className="h-12 w-11 shrink-0 text-red-600">
+                    <Trash2 className="h-[18px] w-[18px]" />
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 text-[15px] text-slate-500">{t("mobile.products.variantValues")}</p>
+                {valuesControl}
+              </div>
+            </div>
+          );
+        }
+        return (
         <div
           key={field.id}
           className="grid grid-cols-1 md:grid-cols-[180px_1fr_auto] gap-2 items-start"
         >
-          <Controller
-            control={control}
-            name={`attributes.${idx}.name`}
-            render={({ field: f }) => (
-              <Select
-                value={f.value}
-                onValueChange={(value) => {
-                  if (value === CREATE_ATTRIBUTE) setDialog({ create: true, row: idx });
-                  else {
-                    f.onChange(value);
-                    const item = findCatalogAttribute(catalog, value);
-                    setValue(`attributes.${idx}.attributeId`, item?.id ?? crypto.randomUUID(), { shouldDirty: true });
-                    setValue(`attributes.${idx}.createsVariants`, true);
-                  }
-                }}
-                onBlur={f.onBlur}
-                ref={f.ref}
-                aria-label={t("products.attributes.nameLabel")}
-                disabled={!loaded || locked || (currentAttributes[idx]?.valueIds ?? []).some((id) => protectedIds.has(id))}
-                menuMinWidth={260}
-                placeholderTx="products.attributes.namePlaceholder"
-                options={[
-                  { value: CREATE_ATTRIBUTE, label: `+ ${t("products.attributes.create")}` },
-                  ...buildAttributeNameOptions(catalog, f.value).filter((option) =>
-                    option.value === f.value || !currentAttributes.some((attribute) => attribute.name === option.value)),
-                ]}
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name={`attributes.${idx}.values`}
-            render={({ field: f }) => (
-              <VariantValuesInput
-                values={f.value || []}
-                valueIds={currentAttributes[idx]?.valueIds ?? []}
-                onChange={(values, ids) => {
-                  const attribute = getValues(`attributes.${idx}`);
-                  if (!attribute) return;
-                  const changed = attributeValueChange(attribute, values, ids, locked);
-                  setValue(`attributes.${idx}.valueIds`, changed.valueIds, { shouldDirty: true });
-                  setValue(`attributes.${idx}.createsVariants`, changed.createsVariants);
-                  f.onChange(changed.values);
-                }}
-                protectedIds={protectedIds}
-                disabled={locked && !(allowValueEdits && (currentAttributes[idx]?.valueIds?.length ?? 0) > 0)}
-                label={`${currentAttributes[idx]?.name || t("products.attributes.nameLabel")} — Giá trị`}
-              />
-            )}
-          />
+          {nameControl}
+          {valuesControl}
           <div className="flex items-center justify-end">
           <Button type="button" variant="ghost" size="icon" disabled={locked || idx === 0} onClick={() => move(idx, idx - 1)} aria-label="Đưa thuộc tính lên"><ArrowUp className="h-4 w-4" /></Button>
           <Button type="button" variant="ghost" size="icon" disabled={locked || idx === fields.length - 1} onClick={() => move(idx, idx + 1)} aria-label="Đưa thuộc tính xuống"><ArrowDown className="h-4 w-4" /></Button>
@@ -160,10 +191,24 @@ export function AttributesField({ locked = false, allowValueEdits = false }: { l
           </Button>
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {error && <div role="alert" className="flex items-center gap-2 text-sm text-red-600">{t(error)}<Button type="button" variant="ghost" onClick={() => void refresh()}>{t("products.attributes.retry")}</Button></div>}
-      <div className="flex flex-wrap gap-2">
+      {layout === "ios" ? <>
+        <div className="grid grid-cols-2 gap-2.5">
+          <Button type="button" variant="outline" className="min-h-12 whitespace-nowrap px-2 text-[14px] font-semibold text-primary-600 dark:text-primary-300"
+            disabled={locked || children.some((child) => child.productId && child.combinationKey)}
+            onClick={() => append({ attributeId: crypto.randomUUID(), name: "", values: [], valueIds: [], createsVariants: true })}>
+            <Plus className="h-4 w-4" />{t("mobile.products.addVariantAxis")}
+          </Button>
+          <Button type="button" variant="outline" className="min-h-12 whitespace-nowrap px-2 text-[14px] font-semibold text-primary-600 dark:text-primary-300"
+            disabled={!loaded} onClick={() => setDialog({ create: true })}>
+            <Tag className="h-4 w-4" />{t("mobile.products.createAttribute")}
+          </Button>
+        </div>
+        <p className="text-[13px] text-slate-500">{t("mobile.products.variantAttributesHint")}</p>
+      </> : <div className="flex flex-wrap gap-2">
       <Button
         type="button"
         variant="outline"
@@ -177,7 +222,7 @@ export function AttributesField({ locked = false, allowValueEdits = false }: { l
       <Button type="button" variant="ghost" size="sm" disabled={!loaded} onClick={() => setDialog({ create: false })}>
         <Settings2 className="h-4 w-4" />{t("products.attributes.manage")}
       </Button>
-      </div>
+      </div>}
       {dialog && <AttributeCatalogDialog attributes={catalog} create={dialog.create} draftAttributeIds={draftAttributeIds}
         onClose={() => setDialog(null)} onChanged={refresh}
         onCreated={(name, attributeId) => {

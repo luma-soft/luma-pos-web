@@ -729,7 +729,7 @@ export function NewProductForm({
             variantsOnly={variantsScreen}
           />
         )}
-        <VariantChildrenField key={`variant-children-${formGeneration}`} visible={tab === "variants"} enabled={variantEnabled && !groupAdding} />
+        <VariantChildrenField key={`variant-children-${formGeneration}`} visible={tab === "variants"} enabled={variantEnabled && !groupAdding} layout={variantsScreen ? "ios" : "default"} />
         {tab === "description" && <DescriptionTab />}
         {hasVariants && !groupEditing && tab === "info" && <p className="text-sm text-slate-500">Giá chung dùng cho SKU mới. Nhập giá và tồn từng biến thể tại tab Đơn vị & thuộc tính.</p>}
       </div>
@@ -1276,14 +1276,14 @@ function DescriptionTab() {
 function VariantGroupSummary({ name, skuCount }: { name: string; skuCount: number }) {
   const t = useTranslations();
   return (
-    <section className="rounded-xl border border-border bg-surface px-4 py-1">
-      <h2 className="pt-3 text-base font-semibold">{t("mobile.products.variantsGroup")}</h2>
+    <section>
+      <h2 className="text-base font-semibold">{t("mobile.products.variantsGroup")}</h2>
       <dl className="divide-y divide-border text-[15px]">
-        <div className="flex items-baseline justify-between gap-3 py-3">
+        <div className="flex items-baseline justify-between gap-3 py-2.5">
           <dt className="text-slate-500">{t("mobile.products.variantsRoot")}</dt>
           <dd className="min-w-0 text-right font-medium">{name}</dd>
         </div>
-        <div className="flex items-baseline justify-between gap-3 py-3">
+        <div className="flex items-baseline justify-between gap-3 py-2.5">
           <dt className="text-slate-500">{t("mobile.products.variantsSkuCount")}</dt>
           <dd className="font-medium tabular-nums">{skuCount}</dd>
         </div>
@@ -1326,7 +1326,11 @@ function VariantsTab({
       >
         <MultiUnitField />
       </Section>}
-      <Section
+      {variantsOnly && <section className="border-t border-border pt-5">
+        <h2 className="mb-3 text-base font-semibold">{t("mobile.products.variantAttributes")}</h2>
+        <AttributesField layout="ios" />
+      </section>}
+      {!variantsOnly && <Section
         title="Thuộc tính tạo biến thể"
         description={groupAdding ? "Cấu trúc thuộc tính của nhóm đã được khóa. Chỉ nhập giá trị thuộc tính của hàng hóa mới." : "Chọn đặc điểm phân biệt hàng bán như phiên bản, màu, dung tích. Mỗi tổ hợp tương ứng một SKU."}
         collapsible={false}
@@ -1347,7 +1351,7 @@ function VariantsTab({
             ) : t("products.variants.lockedStandaloneHint")}
           </div>
         )}
-      </Section>
+      </Section>}
       {isEdit && isVariantChild && !groupEditing && (
         <SiblingApplySection siblingCount={siblingCount} />
       )}

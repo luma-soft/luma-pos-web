@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Toggle } from "@/components/ui/toggle";
+import { CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button, Input, MoneyInput, QuantityInput, Select } from "@/components/ui";
 import { formatNumber } from "@/lib/utils";
 import { buildVariantCombinations } from "@/lib/products/variant-model";
@@ -47,7 +50,7 @@ const EMPTY_CHILDREN: Child[] = [];
 const EMPTY_KEYS: string[] = [];
 
 /** Stays mounted while switching tabs so hidden fields never submit stale rows. */
-export function VariantChildrenField({ visible, enabled }: { visible: boolean; enabled: boolean }) {
+export function VariantChildrenField({ visible, enabled, layout = "default" }: { visible: boolean; enabled: boolean; layout?: "default" | "ios" }) {
   const t = useTranslations();
   const { control, register, getValues, setValue, formState } = useFormContext<CreateProductInput>();
   const attributes = useWatch({ control, name: "attributes" }) ?? EMPTY_ATTRIBUTES;
@@ -117,6 +120,108 @@ export function VariantChildrenField({ visible, enabled }: { visible: boolean; e
 
   function toggle(key: string, checked: boolean) {
     setValue("excludedCombinationKeys", checked ? excluded.filter((item) => item !== key) : [...excluded, key], { shouldDirty: true });
+  }
+
+  if (layout === "ios") {
+    // Phone variants screen: mirrors NativeProductVariantsView (bulk price section, then SKU cards).
+    const label = "mb-2 block text-[15px] text-slate-500";
+    const assignSelect = (child: Child) => <Select value="" placeholder="Chọn tổ hợp của SKU này" aria-label={`Tổ hợp của ${child.sku}`} menuMinWidth={260}
+      options={generated.rows.filter((row) => !children.some((other) => other.productId && other.combinationKey === row.combinationKey)).map((row) => ({ value: row.combinationKey, label: row.variantName }))}
+      onValueChange={(key) => {
+        const row = generated.rows.find((candidate) => candidate.combinationKey === key);
+        if (!row) return;
+        setValue("variantChildren", children.filter((other) => other.productId || other.combinationKey !== key).map((other) => other.productId === child.productId ? { ...other, ...row } : other), { shouldDirty: true });
+        setValue("excludedCombinationKeys", excluded.filter((existing) => existing !== key), { shouldDirty: true });
+      }} />;
+    return <div>
+      {generated.rows.length > 1 && <section className="space-y-3.5 border-t border-border py-5" data-mobile-audit="product-variant-bulk">
+        <h2 className="text-base font-semibold">{t("mobile.products.bulkPriceTitle")}</h2>
+        <label className="block">
+          <span className={label}>Tìm dòng</span>
+          <Input className="min-h-12" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Biến thể hoặc SKU" type="search" />
+        </label>
+        <div role="radiogroup" aria-label="Lọc dòng" className="grid grid-cols-3 gap-1 rounded-full bg-primary-50 p-1 dark:bg-primary-950/30">
+          {STATUS_OPTIONS.map((option) => <button key={option.value} type="button" role="radio" aria-checked={statusFilter === option.value}
+            onClick={() => setStatusFilter(option.value)}
+            className={cn("min-h-10 rounded-full px-2 text-[15px] font-semibold transition-colors",
+              statusFilter === option.value ? "bg-primary-600 text-white" : "text-slate-800 dark:text-slate-200")}>
+            {option.value === "all" ? "Tất cả" : option.label}
+          </button>)}
+        </div>
+        <div className="grid grid-cols-2 gap-3.5">
+          <div><span className={label}>Giá</span><Select value={bulkField} options={FIELD_OPTIONS} aria-label="Giá cần sửa hàng loạt" onValueChange={(value) => { setBulkField(value as VariantBulkPriceField); setBulkNotice(""); }} /></div>
+          <div><span className={label}>Cách sửa</span><Select value={bulkMode} options={MODE_OPTIONS} aria-label="Cách sửa giá" onValueChange={(value) => { setBulkMode(value as VariantBulkPriceMode); setBulkNotice(""); }} /></div>
+        </div>
+        <div className="flex items-end gap-2.5">
+          <label className="min-w-0 flex-1">
+            <span className={label}>Giá trị</span>
+            <Input className="min-h-12" inputMode={bulkMode === "set" ? "numeric" : "decimal"} value={bulkText}
+              onChange={(event) => { setBulkText(event.target.value); setBulkNotice(""); }}
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); applyBulkPrice(); } }}
+              placeholder={bulkMode === "set" ? "Ví dụ 150.000" : bulkMode === "percent" ? "Ví dụ 10 hoặc -5" : "Ví dụ 10.000 hoặc -5.000"} />
+          </label>
+          <Button type="button" className="min-h-12 shrink-0 px-3.5 text-[15px]" disabled={!bulkReady} onClick={applyBulkPrice}>
+            Áp dụng cho {bulkTargets.length} SKU
+          </Button>
+        </div>
+        <p className="text-[13px] text-slate-500" aria-live="polite">
+          {bulkNotice || `Đang hiển thị ${visibleRows.length}/${generated.rows.length} tổ hợp. Giá áp dụng cho các dòng đang hiển thị và được chọn.`}
+        </p>
+      </section>}
+
+      <section className="border-t border-border pt-5" data-mobile-audit="product-variants">
+        <h2 className="text-base font-semibold">{t("mobile.products.generatedSkus")}</h2>
+        {generated.error && <p role="alert" className="mt-3 text-sm text-red-600">{t(generated.error)}</p>}
+        {issue && <p role="alert" className="mt-3 text-sm text-red-600">{t(issue)}</p>}
+        {unassigned.length > 0 && <div className="mt-3 space-y-3 rounded-lg border border-amber-300 bg-amber-50 p-3.5 dark:bg-amber-950/20">
+          <p className="text-sm text-amber-800 dark:text-amber-200">Chọn tổ hợp cho SKU đã có trước khi thêm biến thể. SKU và lịch sử kho được giữ nguyên.</p>
+          {unassigned.map((child) => <div key={child.productId} className="space-y-2">
+            <div className="text-sm"><strong>{child.sku}</strong><p>{child.variantName}</p></div>
+            {assignSelect(child)}
+          </div>)}
+        </div>}
+        {!generated.rows.length && !generated.error && <p className="mt-2 text-[13px] text-slate-500">{getValues("variantGroupId") ? "Thêm thuộc tính và các giá trị, rồi gán SKU đã có vào tổ hợp tương ứng để tiếp tục." : "Chọn thuộc tính và nhập các giá trị để tạo tổ hợp."}</p>}
+        {generated.rows.length > 0 && <>
+          <dl className="mt-1 divide-y divide-border text-[15px]">
+            <div className="flex justify-between py-2.5"><dt className="text-slate-500">{t("mobile.products.combinationCount")}</dt><dd className="font-medium tabular-nums">{generated.rows.length}</dd></div>
+            <div className="flex justify-between py-2.5"><dt className="text-slate-500">{t("mobile.products.newSkuCount")}</dt><dd className="font-medium tabular-nums">{newCount}</dd></div>
+          </dl>
+          <div className="mt-3.5 space-y-3">
+            {visibleRows.map((row) => {
+              const item = rowsByKey.get(row.combinationKey);
+              const child = item?.child;
+              const index = item?.index ?? -1;
+              const selected = !excluded.includes(row.combinationKey);
+              const persisted = Boolean(child?.productId);
+              const awaitingAssignment = unassigned.length > 0 && !child;
+              const editable = selected && child;
+              return <div key={row.combinationKey} className="space-y-3 rounded-lg border border-border bg-surface p-3.5">
+                <div className="flex min-h-11 items-center justify-between gap-2.5">
+                  <p className={cn("min-w-0 text-base font-semibold", !editable && "text-slate-400")}>{row.variantName}</p>
+                  {persisted
+                    ? <span className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium text-emerald-600"><CheckCircle2 className="h-4 w-4" />{t("mobile.products.existingSku")}</span>
+                    : <Toggle checked={selected && !awaitingAssignment} disabled={awaitingAssignment} onChange={(checked) => toggle(row.combinationKey, checked)} aria-label={`Chọn tổ hợp ${row.variantName}`} />}
+                </div>
+                {editable ? <>
+                  <div className="grid grid-cols-2 gap-3.5">
+                    <label><span className={label}>SKU</span><Input className="min-h-12" {...register(`variantChildren.${index}.sku`)} placeholder="Tự sinh" /></label>
+                    <label><span className={label}>Mã vạch</span><Input className="min-h-12" {...register(`variantChildren.${index}.barcode`)} inputMode="numeric" /></label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3.5">
+                    <label><span className={label}>Giá vốn</span><MoneyInput suffix="đ" min={0} value={child.costPrice} aria-label={`${row.variantName} — Giá vốn`} onChange={(value) => setValue(`variantChildren.${index}.costPrice`, value ?? 0, { shouldDirty: true })} className="w-full" /></label>
+                    <label><span className={label}>Giá bán lẻ</span><MoneyInput suffix="đ" min={0} value={child.retailPrice} aria-label={`${row.variantName} — Giá bán lẻ`} onChange={(value) => setValue(`variantChildren.${index}.retailPrice`, value ?? 0, { shouldDirty: true })} className="w-full" /></label>
+                  </div>
+                  {persisted
+                    ? <div className="flex items-baseline justify-between text-[15px]"><span className="text-slate-500">{t("mobile.products.currentStock")}</span><span className="font-semibold tabular-nums">{formatNumber(Number(child.currentStock ?? 0))} {child.baseUnit}</span></div>
+                    : <label className="block"><span className={label}>{t("mobile.products.openingStock")}</span><QuantityInput min={0} value={Number(child.initialStock ?? 0)} inputLabel={`${row.variantName} — ${t("mobile.products.openingStock")}`} onChange={(value) => setValue(`variantChildren.${index}.initialStock`, value, { shouldDirty: true })} className="w-full" touchTargets /></label>}
+                </> : <p className="text-[13px] text-slate-500">{awaitingAssignment ? "Gán SKU đã có vào một tổ hợp trước." : t("mobile.products.combinationExcluded")}</p>}
+              </div>;
+            })}
+            {visibleRows.length === 0 && <p className="py-2 text-[13px] text-slate-500">Không có tổ hợp phù hợp bộ lọc.</p>}
+          </div>
+        </>}
+      </section>
+    </div>;
   }
 
   return <div className="mt-4 overflow-hidden rounded-xl border border-border bg-surface">
