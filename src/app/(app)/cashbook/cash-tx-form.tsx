@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Plus, X } from "lucide-react";
@@ -10,6 +10,13 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 import { createCashTx } from "@/lib/actions/cashbook";
+import { createPortal } from "react-dom";
+import { usePhoneLayout } from "@/components/use-phone-layout";
+import { useHideMobileTabBar } from "@/components/mobile-tabbar-visibility";
+import { MobileFormHeader } from "@/components/mobile-form-header";
+import { MobileGroupedSection } from "@/components/mobile-pushed-screen";
+import { LumaWebPicker } from "@/app/(app)/sales/tabs/filter-drawer-shared";
+import { cn } from "@/lib/utils";
 
 export function CashTxForm() {
   const t = useTranslations();
@@ -23,6 +30,7 @@ export function CashTxForm() {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const phone = usePhoneLayout();
 
   async function submit() {
     if (amount <= 0 || !note.trim() || busy) return;
@@ -35,6 +43,57 @@ export function CashTxForm() {
       setAmount(0); setCounterparty(""); setNote("");
       router.refresh();
     } else setError(t(res.error as never));
+  }
+
+  if (phone) {
+    const segmented = <V extends string>(value: V, options: Array<[V, string]>, onChange: (v: V) => void) => (
+      <div className="grid grid-cols-2 rounded-full bg-ios-accent/10 p-1">
+        {options.map(([key, label]) => (
+          <button key={key} type="button" onClick={() => onChange(key)} data-button-radius="pill"
+            className={cn("min-h-9 rounded-full text-[15px]", value === key ? "bg-ios-accent font-semibold text-white" : "text-ios-label")}>{label}</button>
+        ))}
+      </div>
+    );
+    return (
+      <>
+        {/* Phones: the full-width "Tạo phiếu thu chi" button of CashbookView. */}
+        <button type="button" onClick={() => setOpen(true)} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-ios-accent text-[17px] font-medium text-white active:opacity-80">
+          <Plus className="size-5" aria-hidden="true" />{t("mobile.finance.createEntry")}
+        </button>
+        {open && createPortal(
+          <PhoneSheet>
+            <MobileFormHeader title={t("mobile.finance.createEntry")} onCancel={() => setOpen(false)} submitLabel={t("common.save")} onSubmit={() => void submit()} submitting={busy} />
+            <div className="space-y-ios-section px-ios-inset pb-10 pt-2">
+              <MobileGroupedSection>
+                <div className="space-y-3 px-4 py-3">
+                  {segmented(type, [["in", t("mobile.finance.in")], ["out", t("mobile.finance.out")]], setType)}
+                  {segmented(fund, [["cash", t("mobile.finance.cash")], ["bank", t("mobile.finance.bank")]], setFund)}
+                </div>
+                <LumaWebPicker name="category" ariaLabel={t("mobile.finance.category")} rowLabel={t("mobile.finance.category")} value={category}
+                  options={(["expense", "debt_collect", "supplier_payment", "other"] as const).map((key) => ({ value: key, label: t(`mobile.finance.cat.${key}`) }))}
+                  onChange={(value) => setCategory(value as typeof category)} />
+              </MobileGroupedSection>
+              <MobileGroupedSection title={t("mobile.finance.entryDetails")}>
+                <label className="flex min-h-11 items-center gap-3 px-4 py-1.5 text-[17px]">
+                  <span className="shrink-0">{t("mobile.finance.amount")}</span>
+                  <MoneyInput value={amount || ""} onChange={(v) => setAmount(v ?? 0)} placeholder="0" className="min-w-0 flex-1 border-0 bg-transparent px-0 text-right text-[17px] shadow-none focus:ring-0" />
+                </label>
+                <label className="block px-4 py-2">
+                  <span className="block text-[13px] text-ios-label-secondary">{type === "in" ? t("mobile.finance.payer") : t("mobile.finance.recipient")}</span>
+                  <input value={counterparty} onChange={(e) => setCounterparty(e.target.value)} className="mt-1 w-full bg-transparent text-[17px] outline-none" />
+                </label>
+                <label className="block px-4 py-2">
+                  <span className="block text-[13px] text-ios-label-secondary">{t("mobile.finance.note")}</span>
+                  <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} className="mt-1 w-full resize-none bg-transparent text-[17px] outline-none" />
+                </label>
+              </MobileGroupedSection>
+              {error && <p className="px-4 text-[13px] text-ios-red">{error}</p>}
+            </div>
+          </PhoneSheet>,
+          document.body,
+        )}
+      </>
+    );
   }
 
   if (!open) {
@@ -89,4 +148,10 @@ export function CashTxForm() {
       {error && <Text as="p" variant="destructive" size="xs" className="w-full" text={error} />}
     </div>
   );
+}
+
+/** Full-screen phone form that also hides the tab bar while open. */
+function PhoneSheet({ children }: { children: ReactNode }) {
+  useHideMobileTabBar();
+  return <div role="dialog" aria-modal="true" className="fixed inset-0 z-[110] overflow-y-auto bg-canvas lg:hidden">{children}</div>;
 }

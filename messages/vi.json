@@ -2201,7 +2201,19 @@
       "createEntry": "Tạo phiếu thu chi",
       "all": "Tất cả",
       "in": "Thu",
-      "out": "Chi"
+      "out": "Chi",
+      "entryDetails": "Thông tin phiếu",
+      "category": "Danh mục",
+      "amount": "Số tiền",
+      "payer": "Người nộp tiền",
+      "recipient": "Người nhận tiền",
+      "note": "Lý do / ghi chú",
+      "cat": {
+        "expense": "Chi phí",
+        "debt_collect": "Thu công nợ",
+        "supplier_payment": "Trả nhà cung cấp",
+        "other": "Khác"
+      }
     }
   },
   "toolsCenter": {

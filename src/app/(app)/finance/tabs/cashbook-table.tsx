@@ -53,47 +53,28 @@ export function CashbookTable({ rows: serverRows, loadMore }: {
       rows={rows}
       columns={columns}
       getRowId={(row) => row.id}
+      mobileListClassName="max-lg:-mx-4 max-lg:space-y-0 max-lg:bg-transparent"
+      mobileRowClassName="max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent max-lg:shadow-none"
+      // Phones: NativeCashbookRow — tinted circle, counterparty, signed amount, category · note, date · code · fund.
       renderMobileRow={({ row, toggle }) => (
-        <div className="relative flex min-h-[94px] items-start gap-3 p-3">
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label={row.code}
-            className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
-          />
-          <span className={cn(
-            "pointer-events-none relative grid h-10 w-10 shrink-0 place-items-center rounded-xl",
-            row.type === "in" ? "bg-ok-soft text-ok" : "bg-er-soft text-er",
-          )}>
-            {row.type === "in"
-              ? <ArrowDownLeft className="h-5 w-5" aria-hidden="true" />
-              : <ArrowUpRight className="h-5 w-5" aria-hidden="true" />}
+        <button type="button" onClick={toggle} aria-label={row.code} className="flex w-full items-start gap-3 pl-4 text-left active:bg-black/[0.04]">
+          <span className={cn("mt-3 grid size-6 shrink-0 place-items-center rounded-full text-white", row.type === "in" ? "bg-ios-green" : "bg-ios-red")}>
+            {row.type === "in" ? <ArrowDownLeft className="size-3.5" strokeWidth={3} aria-hidden="true" /> : <ArrowUpRight className="size-3.5" strokeWidth={3} aria-hidden="true" />}
           </span>
-          <div className="pointer-events-none relative min-w-0 flex-1">
-            <div className="flex min-w-0 items-start justify-between gap-3">
-              <div className="min-w-0 flex-1 truncate text-[15px] font-semibold">
-                {row.counterparty ?? row.code}
-                {row.status === "cancelled" && (
-                  <span className="ml-1 inline-flex rounded-full bg-warn-soft px-2 py-0.5 text-[10px] font-bold text-warn">
-                    {t("financialVoucherCancellation.cancelled")}
-                  </span>
-                )}
-              </div>
-              <span className={cn(
-                "max-w-[48%] shrink-0 text-right text-sm font-bold tabular-nums [overflow-wrap:anywhere]",
-                row.type === "in" ? "text-ok" : "text-er",
-              )}>
+          <span className="min-w-0 flex-1 border-b border-border py-3 pr-4">
+            <span className="flex items-baseline gap-2">
+              <span className="min-w-0 flex-1 truncate text-[17px] font-semibold">
+                {row.counterparty ?? "—"}
+                {row.status === "cancelled" && <span className="ml-1.5 rounded-full bg-ios-orange/12 px-2 py-0.5 text-[11px] font-bold text-ios-orange">{t("financialVoucherCancellation.cancelled")}</span>}
+              </span>
+              <span className={cn("shrink-0 text-[15px] font-bold tabular-nums", row.type === "in" ? "text-ios-green" : "text-ios-red")}>
                 {row.type === "in" ? "+" : "−"}{formatCurrency(Number(row.amount))}
               </span>
-            </div>
-            <div className="mt-1 line-clamp-2 text-xs text-slate-600 dark:text-slate-300">
-              {t(`cashbook.categories.${row.category}` as never)} · {row.note ?? "—"}
-            </div>
-            <div className="mt-1.5 truncate text-[11px] text-slate-500">
-              {formatDate(row.createdAt)} · {row.code} · {row.fund === "cash" ? t("cashbook.fundCash") : t("cashbook.fundBank")}
-            </div>
-          </div>
-        </div>
+            </span>
+            <span className="mt-1 line-clamp-2 block text-[15px] text-ios-label-secondary">{t(`cashbook.categories.${row.category}` as never)} · {row.note ?? "—"}</span>
+            <span className="mt-1 block truncate text-[12px] text-ios-label-tertiary">{formatDate(row.createdAt)} · {row.code} · {row.fund === "cash" ? t("cashbook.fundCash") : t("cashbook.fundBank")}</span>
+          </span>
+        </button>
       )}
       minWidth="940px"
       clientSideDetailNavigation

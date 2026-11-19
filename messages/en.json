@@ -2201,7 +2201,19 @@
       "createEntry": "Create cash voucher",
       "all": "All",
       "in": "In",
-      "out": "Out"
+      "out": "Out",
+      "entryDetails": "Entry details",
+      "category": "Category",
+      "amount": "Amount",
+      "payer": "Payer",
+      "recipient": "Recipient",
+      "note": "Reason / note",
+      "cat": {
+        "expense": "Expense",
+        "debt_collect": "Debt collection",
+        "supplier_payment": "Supplier payment",
+        "other": "Other"
+      }
     }
   },
   "toolsCenter": {
