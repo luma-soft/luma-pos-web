@@ -34,7 +34,7 @@ export async function CustomersTab({ searchParams }: { searchParams: SP }) {
     detailCustomerId && z.uuid().safeParse(detailCustomerId).success ? getCustomerPartnerDetail(context.storeId, detailCustomerId) : null,
   ]);
 
-  return <CustomersTable key={detailCustomerId ?? "customers"} data={data} filters={filters} returnPrintTemplates={returnPrintTemplates} aiPreview={params.source === "ai-preview"} initialDetailId={detailCustomerId} initialDetailCustomer={detailCustomer} loadMore={{ page: data.page, pageCount: data.pageCount, loadPage: loadCustomersPage.bind(null, params) }} />;
+  return <CustomersTable data={data} filters={filters} returnPrintTemplates={returnPrintTemplates} aiPreview={params.source === "ai-preview"} initialDetailId={detailCustomerId} initialDetailCustomer={detailCustomer} loadMore={{ page: data.page, pageCount: data.pageCount, loadPage: loadCustomersPage.bind(null, params) }} />;
 }
 
 /** Customer filters shared by the server page and the phone load-more action. */

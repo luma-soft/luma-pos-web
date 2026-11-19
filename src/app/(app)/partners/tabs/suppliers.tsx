@@ -34,7 +34,6 @@ export async function SuppliersTab({ searchParams }: { searchParams: SP }) {
   return (
     <>
       <SuppliersTable
-        key={detailSupplierId ?? "suppliers"}
         rows={rows}
         totalDebt={totalDebt}
         totalPurchase={totalPurchase}

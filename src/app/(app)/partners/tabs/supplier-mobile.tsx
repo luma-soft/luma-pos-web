@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Banknote, Pencil, SlidersHorizontal, Trash2, Truck } from "lucide-react";
+import { Banknote, Package, Pencil, SlidersHorizontal, Trash2, Truck, Undo2 } from "lucide-react";
 import { MobileGroupedSection, MobilePushedScreen } from "@/components/mobile-pushed-screen";
 import { SupplierCreateDialog } from "@/components/partners/supplier-create-dialog";
 import {
@@ -18,6 +18,14 @@ import { cn, formatCurrency } from "@/lib/utils";
 import { LumaWebPicker } from "@/app/(app)/sales/tabs/filter-drawer-shared";
 import { FilterDrawerFooter, FilterSection, MobileFilterHeader } from "@/app/(app)/sales/tabs/filter-drawer-sections";
 import { LabeledRow, MenuAction, RowChevron, compactMoney } from "./customer-mobile";
+import { CancelFinancialVoucherButton } from "@/components/partners/cancel-financial-voucher-button";
+import {
+  MobileHistoryContent,
+  MobileHistoryRow,
+  MobileLedgerContent,
+  mobileLedgerDateTime,
+} from "@/components/partners/partner-mobile-ledger";
+import { Routes } from "@/lib/routes";
 
 /**
  * Phone UI for the supplier list and profile, ported from SuppliersView.swift and
@@ -49,6 +57,30 @@ export type MobileSupplierProfile = {
 };
 
 export type SupplierDebtFilterValue = "" | "owing" | "clear";
+
+export type MobileSupplierActivity = {
+  id: string;
+  kind: "purchase" | "return";
+  code: string;
+  createdAt: string;
+  total: number;
+  status: string;
+};
+
+export type MobileSupplierLedgerRow = {
+  id: string;
+  kind: string;
+  code: string;
+  purchaseOrderId: string | null;
+  createdAt: string;
+  typeLabel: string;
+  value: number;
+  balance: number;
+  reason: string | null;
+  receiptId?: string | null;
+  receiptStatus?: string | null;
+  cancellationReason?: string | null;
+};
 
 /** NativeSupplierItemRow: truck tile, name, code · phone, compact purchases and debt. */
 export function SupplierMobileRow({ supplier, onOpen }: { supplier: MobileSupplierSummary; onOpen: () => void }) {
@@ -105,12 +137,14 @@ export function MobileSupplierDetail({
   error: string | null;
   onBack: () => void;
   onChanged: () => void | Promise<void>;
-  history: ReactNode;
-  debtLedger: ReactNode;
+  history: MobileSupplierActivity[] | null;
+  debtLedger: MobileSupplierLedgerRow[] | null;
 }) {
   const t = useTranslations();
   const ts = useTranslations("mobile.suppliers");
+  const tl = useTranslations("mobile.partnerLedger");
   const router = useRouter();
+  const openDetail = useOpenDetailParam();
   const dialog = useConfirmDialog();
   const [route, setRoute] = useState<"history" | "debt" | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -199,13 +233,52 @@ export function MobileSupplierDetail({
       </div>
 
       {route === "history" && (
-        <MobilePushedScreen title={ts("transactionHistory")} onBack={() => setRoute(null)} layer={1}>
-          <div className="px-ios-inset pt-2">{history}</div>
-        </MobilePushedScreen>
+        <SupplierHistoryScreen name={name} activities={history ?? []} onBack={() => setRoute(null)} />
       )}
       {route === "debt" && (
         <MobilePushedScreen title={ts("payables")} onBack={() => setRoute(null)} layer={1}>
-          <div className="px-ios-inset pt-2">{debtLedger}</div>
+          <MobileLedgerContent
+            partnerName={name}
+            balance={payables?.currentDebt ?? debt}
+            balanceLabel={tl("currentPayable")}
+            balanceHeader={tl("currentDebt")}
+            positiveTone="orange"
+            beforeLedger={(
+              <MobileGroupedSection title={tl("unpaidPurchases")}>
+                {payables && payables.invoices.length > 0 ? payables.invoices.map((invoice) => (
+                  <button key={invoice.id} type="button" onClick={() => openDetail("detailPurchaseId", invoice.id)} className="block w-full space-y-1 px-4 py-ios-row text-left active:bg-black/[0.04]">
+                    <span className="flex items-baseline gap-2">
+                      <span className="min-w-0 flex-1 text-[15px] font-semibold">{tl("purchase")}</span>
+                      <span className="text-[15px] tabular-nums">{formatCurrency(invoice.remaining)}</span>
+                    </span>
+                    <span className="block truncate text-[11px] text-ios-label-tertiary">{mobileLedgerDateTime(invoice.createdAt)} · {invoice.code}</span>
+                  </button>
+                )) : (
+                  <p className="px-4 py-[11px] text-[13px] text-ios-label-secondary">{tl("noOpenInvoices")}</p>
+                )}
+              </MobileGroupedSection>
+            )}
+            entries={(debtLedger ?? []).map((row) => ({
+              ...row,
+              label: row.typeLabel,
+              onOpen: row.purchaseOrderId ? () => openDetail("detailPurchaseId", row.purchaseOrderId!) : undefined,
+              extra: row.kind === "payment" && row.receiptId && row.receiptStatus === "confirmed" ? (
+                <CancelFinancialVoucherButton
+                  kind="supplier"
+                  receiptId={row.receiptId}
+                  partyId={summary.id}
+                  code={row.code}
+                  amount={Math.abs(row.value)}
+                  onCancelled={onChanged}
+                />
+              ) : undefined,
+            }))}
+            collectLabel={tl("collect")}
+            adjustLabel={tl("adjust")}
+            collectDisabled={debt <= 0 || !payables}
+            onCollect={() => payablesRef.current?.open("pay")}
+            onAdjust={() => payablesRef.current?.open("adjust")}
+          />
         </MobilePushedScreen>
       )}
 
@@ -232,8 +305,76 @@ export function MobileSupplierDetail({
         />
       )}
       {payables && (
-        <SupplierPayableActions hideTriggers handleRef={payablesRef} supplierId={summary.id} overview={payables} onChanged={onChanged} />
+        // Portalled so the dialogs also cover screens pushed above this one.
+        createPortal(<SupplierPayableActions hideTriggers handleRef={payablesRef} supplierId={summary.id} overview={payables} onChanged={onChanged} />, document.body)
       )}
+    </MobilePushedScreen>
+  );
+}
+
+/** Opens a URL-owned detail overlay (purchase) above the pushed screens. */
+function useOpenDetailParam() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  return (key: string, id: string) => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set(key, id);
+    router.push(`${pathname}?${next.toString()}`, { scroll: false });
+  };
+}
+
+/** SupplierHistoryView: search, net purchase summary and day sections. */
+function SupplierHistoryScreen({ name, activities, onBack }: { name: string; activities: MobileSupplierActivity[]; onBack: () => void }) {
+  const tl = useTranslations("mobile.partnerLedger");
+  const ts = useTranslations("mobile.suppliers");
+  const router = useRouter();
+  const openDetail = useOpenDetailParam();
+  const purchaseCount = activities.filter((activity) => activity.kind === "purchase" && activity.status !== "cancelled").length;
+  const items = activities.map((activity) => {
+    const isReturn = activity.kind === "return";
+    return {
+      id: `${activity.kind}-${activity.id}`,
+      createdAt: activity.createdAt,
+      net: isReturn ? -activity.total : activity.total,
+      searchText: activity.code,
+      row: (
+        <MobileHistoryRow
+          label={`${name} · ${activity.code}`}
+          onOpen={isReturn
+            ? () => router.push(`${Routes.PurchaseReturns}?q=${encodeURIComponent(activity.code)}`)
+            : () => openDetail("detailPurchaseId", activity.id)}
+        >
+          <span className={cn("flex w-[34px] shrink-0 justify-center", isReturn ? "text-ios-orange" : "text-ios-accent")}>
+            {isReturn ? <Undo2 className="size-5" aria-hidden="true" /> : <Package className="size-5" aria-hidden="true" />}
+          </span>
+          <span className="min-w-0 flex-1 space-y-1">
+            <span className="block text-[15px] font-semibold">{tl(isReturn ? "purchaseReturn" : "purchase")}</span>
+            <span className="block truncate text-[11px] text-ios-label-tertiary">{mobileLedgerDateTime(activity.createdAt)} · {activity.code}</span>
+          </span>
+          <span className={cn("shrink-0 text-[15px] tabular-nums", isReturn && "text-ios-orange")}>{formatCurrency(activity.total)}</span>
+        </MobileHistoryRow>
+      ),
+    };
+  });
+  return (
+    <MobilePushedScreen
+      title={(
+        <span className="block leading-tight">
+          <span className="block truncate text-[17px] font-semibold">{ts("transactionHistory")}</span>
+          <span className="block truncate text-[12px] font-normal text-ios-label-secondary">{tl("purchaseCount", { count: purchaseCount })}</span>
+        </span>
+      )}
+      onBack={onBack}
+      layer={1}
+      className="bg-surface"
+    >
+      <MobileHistoryContent
+        items={items}
+        icon={<Package className="size-5" strokeWidth={2.4} aria-hidden="true" />}
+        netLabel={tl("supplierNet")}
+        searchPlaceholder={tl("supplierSearch")}
+      />
     </MobilePushedScreen>
   );
 }

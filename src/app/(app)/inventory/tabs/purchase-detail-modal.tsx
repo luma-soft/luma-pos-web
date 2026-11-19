@@ -107,6 +107,8 @@ function PurchaseDetailModalContent({
         </span>
       )}
       bodyClassName="flex flex-col !overflow-hidden"
+      // Opened from supplier history/payables, it must sit above the pushed phone screens.
+      overlayClassName="z-[100]"
       footer={purchase && <PurchaseDetailFooter purchase={purchase} printTemplates={printTemplates} />}
     >
       {purchase && <PurchaseDetailContent purchase={purchase} />}

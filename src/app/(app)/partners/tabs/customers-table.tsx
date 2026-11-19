@@ -462,8 +462,6 @@ function CustomerRows({
         <MobileCustomerDetail
           customer={selectedCustomer}
           onBack={closeCustomer}
-          salesHistory={<CustomerSalesPanel customer={selectedCustomer} returnPrintTemplates={returnPrintTemplates} />}
-          debtLedger={<CustomerDebtPanel customer={selectedCustomer} />}
         />
       )}
       <CustomerCreateDialog

@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
-import { Banknote, Ban, ChevronRight, CircleX, Pencil, Phone, SlidersHorizontal, UserRound } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
+import { Banknote, Ban, ChevronRight, CircleX, Pencil, Phone, Receipt, SlidersHorizontal, Undo2, UserRound } from "lucide-react";
 import { MobileGroupedSection, MobilePushedScreen } from "@/components/mobile-pushed-screen";
 import { CustomerGrossProfit } from "@/components/customer-gross-profit";
 import { CustomerEdit } from "@/app/(app)/customers/[id]/customer-edit";
@@ -15,6 +15,15 @@ import {
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { setCustomerActive } from "@/lib/actions/partners";
 import { cn, formatCurrency } from "@/lib/utils";
+import type { CustomerDebtLedgerRow, CustomerSalesHistoryRow } from "@/lib/data/partners";
+import { CancelFinancialVoucherButton } from "@/components/partners/cancel-financial-voucher-button";
+import {
+  MobileHistoryContent,
+  MobileHistoryRow,
+  MobileLedgerContent,
+} from "@/components/partners/partner-mobile-ledger";
+import { mobileDocumentTimestamp } from "@/app/(app)/sales/tabs/mobile-document-day";
+import { orderMobileStatusKey } from "@/app/(app)/sales/tabs/orders-table";
 import { Routes } from "@/lib/routes";
 import { LumaWebPicker } from "@/app/(app)/sales/tabs/filter-drawer-shared";
 import {
@@ -51,7 +60,8 @@ export type MobileCustomer = {
   isActive: boolean;
   currentDebt: string | number;
   totalSpent: string | number;
-  salesHistory: Array<{ status?: string | null }>;
+  salesHistory: CustomerSalesHistoryRow[];
+  debtLedger: CustomerDebtLedgerRow[];
 };
 
 /** NativeCustomerListPresentation.compactMoney: 1.2Mđ, 350Kđ, 900đ. */
@@ -192,14 +202,9 @@ export function MenuAction({ icon: Icon, label, onSelect, disabled, destructive 
 export function MobileCustomerDetail({
   customer,
   onBack,
-  salesHistory,
-  debtLedger,
 }: {
   customer: MobileCustomer;
   onBack: () => void;
-  /** Existing history/debt panels shown in the pushed sub-screens. */
-  salesHistory: ReactNode;
-  debtLedger: ReactNode;
 }) {
   const t = useTranslations("mobile.customers");
   const router = useRouter();
@@ -278,14 +283,15 @@ export function MobileCustomerDetail({
       </div>
 
       {route === "history" && (
-        <MobilePushedScreen title={t("transactionHistory")} onBack={() => setRoute(null)} layer={1}>
-          <div className="px-ios-inset pt-2">{salesHistory}</div>
-        </MobilePushedScreen>
+        <CustomerHistoryScreen customer={customer} transactionCount={transactionCount} onBack={() => setRoute(null)} />
       )}
       {route === "debt" && (
-        <MobilePushedScreen title={t("currentDebt")} onBack={() => setRoute(null)} layer={1}>
-          <div className="px-ios-inset pt-2">{debtLedger}</div>
-        </MobilePushedScreen>
+        <CustomerLedgerScreen
+          customer={customer}
+          onBack={() => setRoute(null)}
+          onCollect={() => receivablesRef.current?.open("collect")}
+          onAdjust={() => receivablesRef.current?.open("adjust")}
+        />
       )}
 
       <CustomerEdit
@@ -308,7 +314,142 @@ export function MobileCustomerDetail({
           note: customer.note,
         }}
       />
-      <CustomerReceivableActions hideTriggers handleRef={receivablesRef} customerId={customer.id} currentDebt={debt} />
+      {/* Portalled so the dialogs also cover screens pushed above this one. */}
+      {createPortal(<CustomerReceivableActions hideTriggers handleRef={receivablesRef} customerId={customer.id} currentDebt={debt} />, document.body)}
+    </MobilePushedScreen>
+  );
+}
+
+/** Opens a URL-owned detail overlay (order) above the pushed screens. */
+function useOpenDetailParam() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  return (key: string, id: string) => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set(key, id);
+    router.push(`${pathname}?${next.toString()}`, { scroll: false });
+  };
+}
+
+/** Two-line principal title: screen title and a caption. */
+function PrincipalTitle({ title, caption }: { title: string; caption: string }) {
+  return (
+    <span className="block leading-tight">
+      <span className="block truncate text-[17px] font-semibold">{title}</span>
+      <span className="block truncate text-[12px] font-normal text-ios-label-secondary">{caption}</span>
+    </span>
+  );
+}
+
+/** CustomerSalesHistoryView. */
+function CustomerHistoryScreen({ customer, transactionCount, onBack }: { customer: MobileCustomer; transactionCount: number; onBack: () => void }) {
+  const t = useTranslations();
+  const tl = useTranslations("mobile.partnerLedger");
+  const locale = useLocale();
+  const openDetail = useOpenDetailParam();
+  const router = useRouter();
+  const items = customer.salesHistory.map((entry) => {
+    const total = Number(entry.total);
+    const isReturn = entry.kind === "return";
+    const names = entry.productNames?.replaceAll(" {DEL}", " (DEL)").trim();
+    const itemSummary = entry.itemCount > 0
+      ? names ? t("mobile.invoices.itemSummary", { count: entry.itemCount, names }) : t("mobile.invoices.itemCount", { count: entry.itemCount })
+      : names || null;
+    const onOpen = isReturn
+      ? () => router.push(`${Routes.Sales}?tab=returns&expandedReturn=${entry.id}`)
+      : entry.orderId ? () => openDetail("detailOrderId", entry.orderId!) : undefined;
+    return {
+      id: `${entry.kind}-${entry.id}`,
+      createdAt: entry.createdAt,
+      net: isReturn ? -total : total,
+      searchText: `${entry.code} ${entry.productNames ?? ""}`,
+      row: (
+        <MobileHistoryRow onOpen={onOpen} label={`${customer.name} · ${entry.code}`}>
+          {isReturn && (
+            <span className="grid size-[38px] shrink-0 place-items-center rounded-[12px] bg-ios-orange/10 text-ios-orange">
+              <Undo2 className="size-5" aria-hidden="true" />
+            </span>
+          )}
+          <span className="min-w-0 flex-1 space-y-1.5">
+            <span className="flex items-baseline gap-3">
+              <span className="min-w-0 flex-1 truncate text-[17px] font-semibold leading-[22px]">{customer.name}</span>
+              <span className={cn("shrink-0 text-[17px] font-semibold tabular-nums", isReturn && "text-[15px] text-ios-orange")}>{formatCurrency(total)}</span>
+            </span>
+            <span className="block text-[15px] leading-5 text-ios-label-secondary">
+              {isReturn
+                ? [tl("returned"), entry.itemCount > 0 ? tl("itemCount", { count: entry.itemCount }) : null].filter(Boolean).join(" · ")
+                : t(`mobile.invoices.status.${orderMobileStatusKey(entry.status, entry.paymentStatus)}`)}
+            </span>
+            {!isReturn && itemSummary && <span className="line-clamp-2 block text-[12px] leading-4 text-ios-label-secondary">{itemSummary}</span>}
+            <span className="block truncate text-[11px] leading-[13px] text-ios-label-tertiary">{mobileDocumentTimestamp(entry.createdAt, locale)} · {entry.code}</span>
+          </span>
+        </MobileHistoryRow>
+      ),
+    };
+  });
+  return (
+    <MobilePushedScreen
+      title={<PrincipalTitle title={tl("historyTitle")} caption={tl("orderCount", { count: transactionCount })} />}
+      onBack={onBack}
+      layer={1}
+      className="bg-surface"
+    >
+      <MobileHistoryContent
+        items={items}
+        icon={<Receipt className="size-5" strokeWidth={2.4} aria-hidden="true" />}
+        netLabel={tl("customerNet")}
+        searchPlaceholder={tl("customerSearch")}
+      />
+    </MobilePushedScreen>
+  );
+}
+
+/** CustomerReceivablesView. */
+function CustomerLedgerScreen({
+  customer,
+  onBack,
+  onCollect,
+  onAdjust,
+}: {
+  customer: MobileCustomer;
+  onBack: () => void;
+  onCollect: () => void;
+  onAdjust: () => void;
+}) {
+  const tl = useTranslations("mobile.partnerLedger");
+  const router = useRouter();
+  const openDetail = useOpenDetailParam();
+  const debt = Number(customer.currentDebt);
+  return (
+    <MobilePushedScreen title={tl("customerDebtTitle")} onBack={onBack} layer={1}>
+      <MobileLedgerContent
+        partnerName={customer.name}
+        balance={debt}
+        balanceLabel={tl("currentBalance")}
+        positiveTone="red"
+        reconciledAt={customer.debtLedger[0]?.createdAt ?? null}
+        entries={customer.debtLedger.map((row) => ({
+          ...row,
+          label: row.typeLabel,
+          onOpen: row.orderId ? () => openDetail("detailOrderId", row.orderId!) : undefined,
+          extra: row.kind === "payment" && row.receiptId && row.receiptStatus === "confirmed" ? (
+            <CancelFinancialVoucherButton
+              kind="customer"
+              receiptId={row.receiptId}
+              partyId={customer.id}
+              code={row.code}
+              amount={Math.abs(row.value)}
+              onCancelled={() => router.refresh()}
+            />
+          ) : undefined,
+        }))}
+        collectLabel={tl("collect")}
+        adjustLabel={tl("adjust")}
+        collectDisabled={debt <= 0}
+        onCollect={onCollect}
+        onAdjust={onAdjust}
+      />
     </MobilePushedScreen>
   );
 }

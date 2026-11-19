@@ -398,8 +398,8 @@ export function SuppliersTable({
           error={preview?.error ?? null}
           onBack={closeSupplier}
           onChanged={refreshSelectedSupplier}
-          history={activity && <SupplierHistoryPanel rows={activity.history} />}
-          debtLedger={activity && previewData && <SupplierDebtPanel rows={activity.debtRows} supplierId={previewData.supplier.id} onChanged={refreshSelectedSupplier} />}
+          history={activity?.history ?? null}
+          debtLedger={activity?.debtRows ?? null}
         />
       )}
 

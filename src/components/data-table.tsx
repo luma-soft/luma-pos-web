@@ -868,6 +868,7 @@ export function RowPreviewModal({
   closeLabel = "Đóng",
   bodyClassName,
   panelClassName,
+  overlayClassName,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -879,6 +880,8 @@ export function RowPreviewModal({
   closeLabel?: string;
   bodyClassName?: string;
   panelClassName?: string;
+  /** Raise the overlay, e.g. above phone screens pushed from a partner profile. */
+  overlayClassName?: string;
 }) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -930,7 +933,7 @@ export function RowPreviewModal({
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" onMouseDown={onClose}>
+    <div className={cn("fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-6", overlayClassName)} onMouseDown={onClose}>
       <div
         ref={dialogRef}
         tabIndex={-1}
