@@ -1856,7 +1856,34 @@
       "stop": "Deactivate",
       "grossProfit": "Gross profit",
       "grossProfitPeriod": "Period",
-      "walkInDetail": "Walk-in sales"
+      "walkInDetail": "Walk-in sales",
+      "filters": {
+        "title": "Customer filters",
+        "customerType": "Customer type",
+        "allTypes": "All types",
+        "owing": "Debt",
+        "owingOnly": "Only customers with debt",
+        "createdDate": "Customer created",
+        "lastTransaction": "Last transaction",
+        "totalSpent": "Total sales",
+        "currentDebt": "Current debt",
+        "from": "From",
+        "to": "To",
+        "clearDate": "Clear date",
+        "minimum": "Minimum",
+        "maximum": "Maximum",
+        "clear": "Clear filters",
+        "apply": "Apply"
+      },
+      "editor": {
+        "contact": "Contact information",
+        "relationship": "Customer type and credit",
+        "additional": "Additional information",
+        "createTitle": "Add customer",
+        "editTitle": "Edit customer profile",
+        "save": "Save",
+        "create": "Add"
+      }
     },
     "suppliers": {
       "title": "Suppliers"

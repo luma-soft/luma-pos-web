@@ -13,6 +13,7 @@ import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai
 import { useTenantClientScope } from "@/components/tenant-client-scope";
 import type { ActionResult } from "@/lib/actions/common";
 import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
+import { MobileFormHeader, mobileFormSectionTitle } from "@/components/mobile-form-header";
 
 type AiWorkflowDraft = {
   intent?: string;
@@ -79,7 +80,9 @@ export function CustomerCreateForm({
   onCreated,
   className,
   mobileDialogActions = false,
+  id,
 }: {
+  id?: string;
   aiPreview?: boolean;
   createAction?: CreateCustomerAction;
   onCancel: () => void;
@@ -120,18 +123,22 @@ export function CustomerCreateForm({
   }
 
   return (
-    <Form form={form} onSubmit={onSubmit} className={cn("space-y-4", className)}>
+    <Form id={id} form={form} onSubmit={onSubmit} className={cn("space-y-4", mobileDialogActions && "max-lg:flex max-lg:flex-col max-lg:gap-3 max-lg:space-y-0", className)}>
+      {mobileDialogActions && <h3 className={cn(mobileFormSectionTitle, "order-0")}>{t("mobile.customers.editor.contact")}</h3>}
       <FormField name="name" labelTx="customers.fields.name" required>
         {(field) => <Input {...field} placeholderTx="customers.fields.namePlaceholder" />}
       </FormField>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 max-lg:contents">
         <FormField name="phone" labelTx="customers.cols.phone">
           {(field) => <Input {...field} />}
         </FormField>
+        <div className="max-lg:order-6">
         <FormField name="type" labelTx="customers.cols.type">
           {(field) => (
             <Select
               {...field}
+              rootClassName="max-lg:block max-lg:w-full"
+              className="max-lg:w-full"
               options={(["retail", "wholesale", "contractor", "agent"] as const).map((v) => ({
                 value: v,
                 label: t(`customers.types.${v}`),
@@ -139,8 +146,9 @@ export function CustomerCreateForm({
             />
           )}
         </FormField>
+        </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 max-lg:contents">
         <FormField name="email" labelTx="customers.fields.email">
           {(field) => <Input {...field} type="email" />}
         </FormField>
@@ -162,19 +170,28 @@ export function CustomerCreateForm({
           form.setValue("addressWardCode", value.addressWardCode, { shouldDirty: true });
         }}
       />
-      <div className="grid gap-4 sm:grid-cols-2">
+      {mobileDialogActions && <h3 className={cn(mobileFormSectionTitle, "order-5 pt-2")}>{t("mobile.customers.editor.relationship")}</h3>}
+      {mobileDialogActions && <h3 className={cn(mobileFormSectionTitle, "order-8 pt-2")}>{t("mobile.customers.editor.additional")}</h3>}
+      <div className="grid gap-4 sm:grid-cols-2 max-lg:contents">
+        <div className="max-lg:order-9">
         <FormField name="taxCode" labelTx="customers.fields.taxCode">
           {(field) => <Input {...field} />}
         </FormField>
+        </div>
+        <div className="max-lg:order-7">
         <FormField name="debtLimit" labelTx="customers.fields.debtLimit" hintTx="customers.fields.debtLimitHint">
           {(field) => (
             <MoneyInput value={field.value ?? 0} onChange={(v) => field.onChange(v ?? 0)} suffix="đ" min={0} />
           )}
         </FormField>
+        </div>
       </div>
+      <div className="max-lg:order-10">
       <FormField name="note" labelTx="customers.fields.note">
         {(field) => <Textarea {...field} rows={2} />}
       </FormField>
+      </div>
+      <div className="max-lg:order-11">
       <FormField name="consentStatus" labelTx="customers.fields.consentStatus">
         {(field) => (
           <Select
@@ -186,14 +203,13 @@ export function CustomerCreateForm({
           />
         )}
       </FormField>
-
+      </div>
       {form.formState.errors.root && (
-        <p className="text-sm text-er">{t(form.formState.errors.root.message ?? "errors.serverError")}</p>
+        <p className="text-sm text-er max-lg:order-first">{t(form.formState.errors.root.message ?? "errors.serverError")}</p>
       )}
-
       <div className={cn(
         "flex justify-end gap-2 pt-2",
-        mobileDialogActions && "sticky bottom-0 z-10 -mx-4 border-t border-border-soft bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] lg:static lg:mx-0 lg:border-t-0 lg:bg-transparent lg:px-0 lg:pb-0",
+        mobileDialogActions && "max-lg:hidden",
       )}>
         <Button type="button" variant="outline" onClick={onCancel} tx="common.cancel" />
         <Button type="submit" loading={form.formState.isSubmitting} tx="common.save" />
@@ -217,16 +233,22 @@ export function CustomerCreateDialog({
 }) {
   const t = useTranslations();
   if (!open) return null;
-
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-0 lg:items-center lg:p-4" role="presentation">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="customer-create-dialog-title"
-        className="h-dvh w-full overflow-y-auto overscroll-contain border border-border bg-surface px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-[calc(1rem+env(safe-area-inset-top))] shadow-e2 lg:h-auto lg:max-h-[min(92dvh,760px)] lg:max-w-2xl lg:rounded-card lg:p-6"
+        className="h-dvh w-full overflow-y-auto overscroll-contain border border-border bg-surface px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-[calc(1rem+env(safe-area-inset-top))] shadow-e2 max-lg:border-0 max-lg:bg-canvas max-lg:px-0 max-lg:pt-0 lg:h-auto lg:max-h-[min(92dvh,760px)] lg:max-w-2xl lg:rounded-card lg:p-6"
       >
-        <div className="sticky top-0 z-10 mb-4 flex items-center justify-between gap-3 border-b border-border-soft bg-surface py-2 lg:static lg:border-b-0 lg:py-0">
+        {/* Phones: NativeCustomerEditorView presented full screen. */}
+        <MobileFormHeader
+          title={t("mobile.customers.editor.createTitle")}
+          onCancel={() => onOpenChange(false)}
+          submitLabel={t("mobile.customers.editor.create")}
+          formId="customer-create-form"
+        />
+        <div className="sticky top-0 z-10 mb-4 flex items-center justify-between gap-3 border-b border-border-soft bg-surface py-2 max-lg:hidden lg:static lg:border-b-0 lg:py-0">
           <Heading id="customer-create-dialog-title" as="h2" size="base" tx="customers.createNew" />
           <Button type="button" variant="ghost" size="iconSm" onClick={() => onOpenChange(false)} aria-label={t("common.close")}>
             <X className="h-4 w-4" />
@@ -238,6 +260,8 @@ export function CustomerCreateDialog({
           onCancel={() => onOpenChange(false)}
           onCreated={onCreated}
           mobileDialogActions
+          id="customer-create-form"
+          className="max-lg:px-ios-inset max-lg:pt-ios-section"
         />
       </div>
     </div>

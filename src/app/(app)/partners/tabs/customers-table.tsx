@@ -3,7 +3,7 @@
 import { usePhoneLayout } from "@/components/use-phone-layout";
 import { MobileBottomSearchBar } from "@/components/mobile-bottom-bar";
 import { MobilePushedScreen } from "@/components/mobile-pushed-screen";
-import { CustomerMobileRow, MobileCustomerDetail, MobileListTotalsCard, WalkInMobileRow } from "./customer-mobile";
+import { CustomerMobileRow, MobileCustomerDetail, MobileCustomerFilterScreen, MobileListTotalsCard, WalkInMobileRow } from "./customer-mobile";
 import { DesktopPagination, useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { MoneyInput } from "@/components/ui/money-input";
 import { DateInput } from "@/components/ui/date-input";
@@ -96,6 +96,7 @@ export function CustomersTable({
   initialDetailCustomer?: CustomerRow | null;
 }) {
   const t = useTranslations();
+  const phone = usePhoneLayout();
   const [filterOpen, setFilterOpen] = useState(false);
   return (
     <div className="min-w-0">
@@ -121,7 +122,10 @@ export function CustomersTable({
         </DesktopPagination>
       </section>
 
-      {filterOpen && (
+      {filterOpen && phone && (
+        <MobileCustomerFilterScreen filters={filters} pageSize={data.pageSize} onClose={() => setFilterOpen(false)} />
+      )}
+      {filterOpen && !phone && (
         <div
           className="fixed inset-0 z-[80] bg-slate-950/40"
           role="presentation"
@@ -186,7 +190,7 @@ function CustomerSearch({
         <FilterTriggerButton
           onClick={onOpenFilters}
           label={t("suppliers.filter.button")}
-          active={FILTER_KEYS.some((key) => Boolean(filters[key]))}
+          active={Boolean(filters.owing) || FILTER_KEYS.some((key) => Boolean(filters[key]))}
           hideLabelOnSmallScreens
         />
       }
@@ -217,7 +221,15 @@ function CustomerRows({
   const searchParams = useSearchParams();
   const { rows: loadedRows, footer: loadMoreFooter } = useMobileLoadMore(data.rows, loadMore, (row) => row.id);
   const phone = usePhoneLayout();
-  const activeFilterCount = FILTER_KEYS.filter((key) => Boolean(filters[key])).length;
+  // NativeCustomerFilterSelection.activeCount: date and amount ranges count once each.
+  const activeFilterCount = [
+    Boolean(filters.type),
+    Boolean(filters.owing),
+    Boolean(filters.createdFrom || filters.createdTo),
+    Boolean(filters.lastTxFrom || filters.lastTxTo),
+    Boolean(filters.totalFrom || filters.totalTo),
+    Boolean(filters.debtFrom || filters.debtTo),
+  ].filter(Boolean).length;
   const [createOpen, setCreateOpen] = useState(aiPreview);
   const [walkInSelected, setWalkInSelected] = useState(false);
   const selectedCustomerId = searchParams.get("detailCustomerId")
@@ -354,6 +366,12 @@ function CustomerRows({
   return (
     <>
       {/* Phones: LumaListTotalsCard and the active-filter row above the plain list. */}
+      {activeFilterCount > 0 && (
+        <div className="flex items-center gap-2 px-1 py-2 lg:hidden">
+          <span className="min-w-0 flex-1 text-[12px] font-medium text-ios-accent">{t("mobile.customers.filtersActive", { count: activeFilterCount })}</span>
+          <Link href={`${Routes.Partners}?tab=customers`} className="text-[12px] font-semibold text-ios-accent">{t("mobile.customers.clearFilters")}</Link>
+        </div>
+      )}
       <MobileListTotalsCard
         metrics={[
           { id: "debt", title: t("mobile.customers.totalDebt"), value: formatCurrency(data.totalDebt), tone: data.totalDebt > 0 ? "text-ios-red" : "text-ios-label-secondary" },
@@ -361,12 +379,6 @@ function CustomerRows({
           { id: "net", title: t("mobile.customers.totalNetSales"), value: formatCurrency(data.totalNetSales) },
         ]}
       />
-      {activeFilterCount > 0 && (
-        <div className="flex items-center gap-2 px-1 py-2 lg:hidden">
-          <span className="min-w-0 flex-1 text-[12px] font-medium text-ios-accent">{t("mobile.customers.filtersActive", { count: activeFilterCount })}</span>
-          <Link href={`${Routes.Partners}?tab=customers`} className="text-[12px] font-semibold text-ios-accent">{t("mobile.customers.clearFilters")}</Link>
-        </div>
-      )}
       <DataTableShell
         tableId="partners.customers"
         rows={tableRows}

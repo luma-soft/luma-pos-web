@@ -33,7 +33,7 @@ export function FilterSection({
   return (
     <section className="space-y-3 max-lg:space-y-2">
       <h3 className="text-sm font-extrabold max-lg:hidden">{title}</h3>
-      <h3 className="px-4 text-[15px] font-semibold leading-5 text-ios-label-secondary lg:hidden">{mobileTitle ?? title}</h3>
+      {mobileTitle !== "" && <h3 className="px-4 text-[15px] font-semibold leading-5 text-ios-label-secondary lg:hidden">{mobileTitle ?? title}</h3>}
       <div className={cn("space-y-3 max-lg:space-y-0 max-lg:overflow-hidden max-lg:rounded-[26px] max-lg:bg-surface", rowSeparators)}>
         {children}
       </div>
@@ -216,7 +216,9 @@ export function FilterDrawerFooter({
   pending,
   desktopApplyLabel,
   mobileApplyLabel,
+  mobileClearLabel,
 }: {
+  mobileClearLabel?: string;
   onClear: () => void;
   invalid: boolean;
   pending: boolean;
@@ -232,7 +234,7 @@ export function FilterDrawerFooter({
         className="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary-600 font-bold text-primary-700 min-w-11 max-lg:min-h-14 max-lg:min-w-[126px] max-lg:flex-1 max-lg:gap-2 max-lg:rounded-[18px] max-lg:border-0 max-lg:bg-ios-accent/10 max-lg:px-3 max-lg:text-[17px] max-lg:font-semibold max-lg:text-ios-accent lg:min-w-0"
       >
         <RotateCcw className="size-[18px] lg:hidden" strokeWidth={2.4} aria-hidden="true" />
-        <span className="lg:hidden">{t("mobile.invoices.filters.clear")}</span>
+        <span className="lg:hidden">{mobileClearLabel ?? t("mobile.invoices.filters.clear")}</span>
         <span className="max-lg:hidden">Xóa lọc</span>
       </button>
       <span className="h-[34px] w-px shrink-0 bg-border lg:hidden" aria-hidden="true" />

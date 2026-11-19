@@ -1,5 +1,7 @@
 "use client";
 
+import { MobileFormHeader, mobileFormSectionTitle } from "@/components/mobile-form-header";
+import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -71,14 +73,25 @@ export function CustomerEdit({ customer, open: controlledOpen, onOpenChange, hid
       )}
 
       {open && (
-        <div className="fixed inset-0 z-[130] grid place-items-center bg-black/40 p-4" onClick={() => setOpen(false)}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg bg-surface rounded-2xl shadow-xl p-5 max-h-[90vh] overflow-auto">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 z-[130] grid place-items-center bg-black/40 p-4 max-lg:block max-lg:bg-canvas max-lg:p-0" onClick={() => setOpen(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg bg-surface rounded-2xl shadow-xl p-5 max-h-[90vh] overflow-auto max-lg:h-dvh max-lg:max-h-none max-lg:max-w-none max-lg:rounded-none max-lg:bg-canvas max-lg:p-0 max-lg:pb-[max(1.5rem,env(safe-area-inset-bottom))] max-lg:shadow-none">
+            {/* Phones: NativeCustomerEditorView presented full screen. */}
+            <MobileFormHeader
+              title={t("mobile.customers.editor.editTitle")}
+              onCancel={() => setOpen(false)}
+              submitLabel={t("mobile.customers.editor.save")}
+              onSubmit={() => void save()}
+              submitting={saving}
+            />
+            <div className="flex items-center justify-between mb-4 max-lg:hidden">
               <h2 className="font-bold">{t("customers.editTitle")}</h2>
               <button onClick={() => setOpen(false)} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
             </div>
-            {error && <div className="mb-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2 text-sm text-red-700 dark:text-red-400">{error}</div>}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {error && <div className="mb-3 max-lg:mx-ios-inset max-lg:mt-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2 text-sm text-red-700 dark:text-red-400">{error}</div>}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-lg:flex max-lg:flex-col max-lg:px-ios-inset max-lg:pt-ios-section">
+              <h3 className={mobileFormSectionTitle}>{t("mobile.customers.editor.contact")}</h3>
+              <h3 className={cn(mobileFormSectionTitle, "order-5 pt-2")}>{t("mobile.customers.editor.relationship")}</h3>
+              <h3 className={cn(mobileFormSectionTitle, "order-8 pt-2")}>{t("mobile.customers.editor.additional")}</h3>
               <div className="sm:col-span-2"><label className={lbl}>{t("customers.fields.name")}</label><input className={input} value={name} onChange={(e) => setName(e.target.value)} /></div>
               <div><label className={lbl}>{t("customers.cols.phone")}</label><input className={input} value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
               <div><label className={lbl}>Email</label><input className={input} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
@@ -93,7 +106,7 @@ export function CustomerEdit({ customer, open: controlledOpen, onOpenChange, hid
                   setAddressWardCode(value.addressWardCode);
                 }}
               />
-              <div><label className={lbl}>{t("customers.cols.type")}</label>
+              <div className="max-lg:order-6"><label className={lbl}>{t("customers.cols.type")}</label>
                 <Select
                   className={input}
                   value={type}
@@ -101,11 +114,11 @@ export function CustomerEdit({ customer, open: controlledOpen, onOpenChange, hid
                   options={(["retail", "wholesale", "contractor", "agent"] as CustomerType[]).map((ty) => ({ value: ty, label: t(`customers.types.${ty}`) }))}
                 />
               </div>
-              <div><label className={lbl}>{t("customers.fields.taxCode")}</label><input className={input} value={taxCode} onChange={(e) => setTaxCode(e.target.value)} /></div>
-              <div><label className={lbl}>{t("customers.fields.debtLimit")}</label><MoneyInput className={`no-spinner text-right ${input}`} value={debtLimit} onChange={(v) => setDebtLimit(String(v ?? 0))} /></div>
-              <div className="sm:col-span-2"><label className={lbl}>{t("customers.fields.note")}</label><input className={input} value={note} onChange={(e) => setNote(e.target.value)} /></div>
+              <div className="max-lg:order-9"><label className={lbl}>{t("customers.fields.taxCode")}</label><input className={input} value={taxCode} onChange={(e) => setTaxCode(e.target.value)} /></div>
+              <div className="max-lg:order-7"><label className={lbl}>{t("customers.fields.debtLimit")}</label><MoneyInput className={`no-spinner text-right ${input}`} value={debtLimit} onChange={(v) => setDebtLimit(String(v ?? 0))} /></div>
+              <div className="sm:col-span-2 max-lg:order-10"><label className={lbl}>{t("customers.fields.note")}</label><input className={input} value={note} onChange={(e) => setNote(e.target.value)} /></div>
             </div>
-            <div className="flex justify-end gap-2 mt-5">
+            <div className="flex justify-end gap-2 mt-5 max-lg:hidden">
               <button onClick={() => setOpen(false)} className="min-h-11 px-4 rounded-lg border border-slate-200 dark:border-slate-700 text-sm min-w-11">{t("common.cancel")}</button>
               <button onClick={save} disabled={saving} className="inline-flex min-h-11 items-center gap-2 px-4 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium min-w-11">
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}{t("common.save")}

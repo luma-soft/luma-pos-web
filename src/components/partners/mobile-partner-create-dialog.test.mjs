@@ -27,7 +27,11 @@ test("creation actions, validation and cancellation remain connected",()=>{
 });
 
 test("mobile partner creation keeps submission controls visible on long forms",()=>{
-  for(const source of [customer,supplier]){
+  // Customers follow NativeCustomerEditorView: Save sits in the sticky iOS header.
+  expect(customer).toContain("mobileDialogActions = false");
+  expect(customer).toContain('formId="customer-create-form"');
+  expect(customer).toContain('type="submit" loading={form.formState.isSubmitting}');
+  for(const source of [supplier]){
     expect(source).toContain("mobileDialogActions = false");
     expect(source).toContain("sticky bottom-0 z-10");
     expect(source).toContain("lg:static lg:mx-0");

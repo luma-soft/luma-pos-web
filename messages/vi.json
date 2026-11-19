@@ -1856,7 +1856,34 @@
       "stop": "Ngừng hoạt động",
       "grossProfit": "Lợi nhuận gộp",
       "grossProfitPeriod": "Thời gian",
-      "walkInDetail": "Khách lẻ"
+      "walkInDetail": "Khách lẻ",
+      "filters": {
+        "title": "Bộ lọc khách hàng",
+        "customerType": "Loại khách hàng",
+        "allTypes": "Tất cả loại",
+        "owing": "Công nợ",
+        "owingOnly": "Chỉ khách đang nợ",
+        "createdDate": "Ngày tạo khách hàng",
+        "lastTransaction": "Giao dịch gần nhất",
+        "totalSpent": "Tổng doanh số",
+        "currentDebt": "Công nợ hiện tại",
+        "from": "Từ ngày",
+        "to": "Đến ngày",
+        "clearDate": "Xóa ngày",
+        "minimum": "Từ",
+        "maximum": "Đến",
+        "clear": "Xóa bộ lọc",
+        "apply": "Áp dụng"
+      },
+      "editor": {
+        "contact": "Thông tin liên hệ",
+        "relationship": "Phân loại và công nợ",
+        "additional": "Thông tin bổ sung",
+        "createTitle": "Thêm khách hàng",
+        "editTitle": "Sửa hồ sơ khách hàng",
+        "save": "Lưu",
+        "create": "Thêm"
+      }
     },
     "suppliers": {
       "title": "Nhà cung cấp"

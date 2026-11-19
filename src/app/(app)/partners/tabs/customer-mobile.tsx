@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Banknote, Ban, ChevronRight, Pencil, Phone, SlidersHorizontal, UserRound } from "lucide-react";
+import { Banknote, Ban, ChevronRight, CircleX, Pencil, Phone, SlidersHorizontal, UserRound } from "lucide-react";
 import { MobileGroupedSection, MobilePushedScreen } from "@/components/mobile-pushed-screen";
 import { CustomerGrossProfit } from "@/components/customer-gross-profit";
 import { CustomerEdit } from "@/app/(app)/customers/[id]/customer-edit";
@@ -14,6 +15,16 @@ import {
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { setCustomerActive } from "@/lib/actions/partners";
 import { cn, formatCurrency } from "@/lib/utils";
+import { Routes } from "@/lib/routes";
+import { LumaWebPicker } from "@/app/(app)/sales/tabs/filter-drawer-shared";
+import {
+  AmountRangeRows,
+  FilterDrawerFooter,
+  FilterSection,
+  LabeledInput,
+  MobileFilterHeader,
+  MobileSwitchRow,
+} from "@/app/(app)/sales/tabs/filter-drawer-sections";
 
 /**
  * Phone UI for the customer list and profile, ported from CustomersView.swift and
@@ -299,5 +310,165 @@ export function MobileCustomerDetail({
       />
       <CustomerReceivableActions hideTriggers handleRef={receivablesRef} customerId={customer.id} currentDebt={debt} />
     </MobilePushedScreen>
+  );
+}
+
+type CustomerFilterDraft = {
+  type: string;
+  owing: boolean;
+  createdFrom: string;
+  createdTo: string;
+  lastTxFrom: string;
+  lastTxTo: string;
+  totalFrom: string;
+  totalTo: string;
+  debtFrom: string;
+  debtTo: string;
+};
+
+function filterDraftCount(draft: CustomerFilterDraft) {
+  return [
+    Boolean(draft.type),
+    draft.owing,
+    Boolean(draft.createdFrom || draft.createdTo),
+    Boolean(draft.lastTxFrom || draft.lastTxTo),
+    Boolean(draft.totalFrom || draft.totalTo),
+    Boolean(draft.debtFrom || draft.debtTo),
+  ].filter(Boolean).length;
+}
+
+/** LumaOptionalDateTimePickerField row with the clear button. */
+function OptionalDateRow({ label, value, clearLabel, onChange }: { label: string; value: string; clearLabel: string; onChange: (value: string) => void }) {
+  return (
+    <label className="flex min-h-11 items-center gap-2 px-4 py-1.5 text-[17px]">
+      <span className="min-w-0 flex-1">{label}</span>
+      <input
+        type="date"
+        value={value}
+        max={new Date().toISOString().slice(0, 10)}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-[34px] rounded-[8px] bg-[rgb(118_118_128/0.12)] px-2.5 text-[17px] text-ios-label outline-none"
+      />
+      {value && (
+        <button type="button" onClick={() => onChange("")} aria-label={clearLabel} className="grid size-8 place-items-center text-ios-label-secondary">
+          <CircleX className="size-[18px] fill-current text-surface" aria-hidden="true" />
+        </button>
+      )}
+    </label>
+  );
+}
+
+/**
+ * NativeCustomerFilterSheet on phones: a full-screen draft with Cancel, title and
+ * condition count, inset-grouped sections and the Clear / Apply footer.
+ */
+export function MobileCustomerFilterScreen({
+  filters,
+  pageSize,
+  onClose,
+}: {
+  filters: {
+    q?: string;
+    type?: string;
+    owing?: boolean;
+    createdFrom?: string;
+    createdTo?: string;
+    lastTxFrom?: string;
+    lastTxTo?: string;
+    totalFrom?: string;
+    totalTo?: string;
+    debtFrom?: string;
+    debtTo?: string;
+  };
+  pageSize: number;
+  onClose: () => void;
+}) {
+  const t = useTranslations("mobile.customers");
+  const router = useRouter();
+  const [draft, setDraft] = useState<CustomerFilterDraft>(() => ({
+    type: filters.type ?? "",
+    owing: Boolean(filters.owing),
+    createdFrom: filters.createdFrom ?? "",
+    createdTo: filters.createdTo ?? "",
+    lastTxFrom: filters.lastTxFrom ?? "",
+    lastTxTo: filters.lastTxTo ?? "",
+    totalFrom: filters.totalFrom ?? "",
+    totalTo: filters.totalTo ?? "",
+    debtFrom: filters.debtFrom ?? "",
+    debtTo: filters.debtTo ?? "",
+  }));
+  const update = (patch: Partial<CustomerFilterDraft>) => setDraft((current) => ({ ...current, ...patch }));
+
+  function apply(event: FormEvent) {
+    event.preventDefault();
+    const query = new URLSearchParams({ tab: "customers", size: String(pageSize) });
+    if (filters.q) query.set("q", filters.q);
+    if (draft.type) query.set("type", draft.type);
+    if (draft.owing) query.set("owing", "1");
+    for (const key of ["createdFrom", "createdTo", "lastTxFrom", "lastTxTo", "totalFrom", "totalTo", "debtFrom", "debtTo"] as const) {
+      if (draft[key]) query.set(key, draft[key]);
+    }
+    router.push(`${Routes.Partners}?${query.toString()}`);
+    onClose();
+  }
+
+  const money = (value: number | null) => (value == null ? "" : String(value));
+
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label={t("filters.title")} className="fixed inset-0 z-[100] flex flex-col bg-canvas lg:hidden">
+      <MobileFilterHeader title={t("filters.title")} conditionCount={filterDraftCount(draft)} onCancel={onClose} />
+      <form onSubmit={apply} className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 space-y-ios-section overflow-y-auto overscroll-contain px-4 pb-6 pt-1">
+          <FilterSection title={t("filters.customerType")} mobileTitle="">
+            <LumaWebPicker
+              name="type"
+              ariaLabel={t("filters.customerType")}
+              rowLabel={t("filters.customerType")}
+              value={draft.type || "all"}
+              options={[
+                { value: "all", label: t("filters.allTypes") },
+                { value: "agent", label: t("tier.agent") },
+                { value: "wholesale", label: t("tier.wholesale") },
+                { value: "contractor", label: t("tier.contractor") },
+                { value: "retail", label: t("tier.retail") },
+              ]}
+              onChange={(value) => update({ type: value === "all" ? "" : value })}
+            />
+          </FilterSection>
+          <FilterSection title={t("filters.owing")}>
+            <MobileSwitchRow label={t("filters.owingOnly")} checked={draft.owing} onChange={(owing) => update({ owing })} />
+          </FilterSection>
+          <FilterSection title={t("filters.createdDate")}>
+            <OptionalDateRow label={t("filters.from")} value={draft.createdFrom} clearLabel={t("filters.clearDate")} onChange={(createdFrom) => update({ createdFrom })} />
+            <OptionalDateRow label={t("filters.to")} value={draft.createdTo} clearLabel={t("filters.clearDate")} onChange={(createdTo) => update({ createdTo })} />
+          </FilterSection>
+          <FilterSection title={t("filters.lastTransaction")}>
+            <OptionalDateRow label={t("filters.from")} value={draft.lastTxFrom} clearLabel={t("filters.clearDate")} onChange={(lastTxFrom) => update({ lastTxFrom })} />
+            <OptionalDateRow label={t("filters.to")} value={draft.lastTxTo} clearLabel={t("filters.clearDate")} onChange={(lastTxTo) => update({ lastTxTo })} />
+          </FilterSection>
+          <FilterSection title={t("filters.totalSpent")}>
+            <AmountRangeRows>
+              <LabeledInput label={t("filters.minimum")} mobileLabel={t("filters.minimum")} value={draft.totalFrom} placeholder="0" suffix="đ" onChange={(value) => update({ totalFrom: money(value) })} />
+              <LabeledInput label={t("filters.maximum")} mobileLabel={t("filters.maximum")} value={draft.totalTo} placeholder="0" suffix="đ" onChange={(value) => update({ totalTo: money(value) })} />
+            </AmountRangeRows>
+          </FilterSection>
+          <FilterSection title={t("filters.currentDebt")}>
+            <AmountRangeRows>
+              <LabeledInput label={t("filters.minimum")} mobileLabel={t("filters.minimum")} value={draft.debtFrom} placeholder="0" suffix="đ" onChange={(value) => update({ debtFrom: money(value) })} />
+              <LabeledInput label={t("filters.maximum")} mobileLabel={t("filters.maximum")} value={draft.debtTo} placeholder="0" suffix="đ" onChange={(value) => update({ debtTo: money(value) })} />
+            </AmountRangeRows>
+          </FilterSection>
+        </div>
+        <FilterDrawerFooter
+          onClear={() => setDraft({ type: "", owing: false, createdFrom: "", createdTo: "", lastTxFrom: "", lastTxTo: "", totalFrom: "", totalTo: "", debtFrom: "", debtTo: "" })}
+          invalid={false}
+          pending={false}
+          desktopApplyLabel={t("filters.apply")}
+          mobileApplyLabel={t("filters.apply")}
+          mobileClearLabel={t("filters.clear")}
+        />
+      </form>
+    </div>,
+    document.body,
   );
 }
