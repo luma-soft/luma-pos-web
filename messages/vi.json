@@ -1987,7 +1987,37 @@
       "itemCount": "{count} mặt hàng",
       "owed": "Còn nợ {amount}",
       "search": "Tìm mã phiếu, nhà cung cấp",
-      "create": "Tạo phiếu nhập"
+      "create": "Tạo phiếu nhập",
+      "detail": {
+        "info": "Thông tin phiếu",
+        "statusLabel": "Trạng thái phiếu",
+        "date": "Ngày tạo",
+        "supplier": "Nhà cung cấp",
+        "warehouse": "Kho",
+        "invoiceNumber": "Số hóa đơn",
+        "createdBy": "Người tạo",
+        "items": "Hàng hóa · {count}",
+        "noItems": "Phiếu chưa có hàng hóa",
+        "payment": "Thanh toán",
+        "subtotal": "Tạm tính",
+        "discount": "Chiết khấu",
+        "shipping": "Phí vận chuyển",
+        "tax": "Thuế",
+        "total": "Tổng cộng",
+        "paid": "Đã thanh toán",
+        "owedLabel": "Còn nợ",
+        "note": "Ghi chú",
+        "unitAfterDiscount": "Đơn giá sau giảm",
+        "print": "In / Chia sẻ",
+        "copy": "Sao chép phiếu",
+        "createReturn": "Trả hàng nhập",
+        "edit": "Sửa phiếu nhập",
+        "cancel": "Hủy phiếu nhập",
+        "cancelTitle": "Hủy phiếu {code}?",
+        "cancelHint": "Tồn kho và công nợ sẽ được cập nhật theo trạng thái phiếu.",
+        "editBlocked": "Phiếu nhập đã có phiếu trả hàng nhà cung cấp nên không thể sửa.",
+        "fullyReturned": "Phiếu nhập đã được trả hết, không còn số lượng có thể trả tiếp."
+      }
     }
   },
   "toolsCenter": {

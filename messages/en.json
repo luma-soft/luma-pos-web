@@ -1987,7 +1987,37 @@
       "itemCount": "{count} items",
       "owed": "Owed {amount}",
       "search": "Search code or supplier",
-      "create": "Create purchase receipt"
+      "create": "Create purchase receipt",
+      "detail": {
+        "info": "Receipt information",
+        "statusLabel": "Receipt status",
+        "date": "Created",
+        "supplier": "Supplier",
+        "warehouse": "Warehouse",
+        "invoiceNumber": "Invoice number",
+        "createdBy": "Created by",
+        "items": "Items · {count}",
+        "noItems": "This receipt has no items",
+        "payment": "Payment",
+        "subtotal": "Subtotal",
+        "discount": "Discount",
+        "shipping": "Shipping",
+        "tax": "Tax",
+        "total": "Total",
+        "paid": "Paid",
+        "owedLabel": "Owed",
+        "note": "Note",
+        "unitAfterDiscount": "Unit price after discount",
+        "print": "Print / Share",
+        "copy": "Copy receipt",
+        "createReturn": "Create supplier return",
+        "edit": "Edit receipt",
+        "cancel": "Cancel receipt",
+        "cancelTitle": "Cancel receipt {code}?",
+        "cancelHint": "Inventory and supplier balance will be updated for this receipt.",
+        "editBlocked": "This purchase receipt already has a supplier return and cannot be edited.",
+        "fullyReturned": "All quantities in this receipt have already been returned."
+      }
     }
   },
   "toolsCenter": {

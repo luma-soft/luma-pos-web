@@ -9,6 +9,8 @@ import { useTranslations } from "next-intl";
 import { Copy, FilePenLine, ReceiptText } from "lucide-react";
 import { PurchaseCancelButton } from "../../purchases/purchase-cancel-button";
 import { RowPreviewModal } from "@/components/data-table";
+import { usePhoneLayout } from "@/components/use-phone-layout";
+import { MobilePurchaseDetail } from "./purchase-detail-mobile";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { DisabledEditTooltip } from "@/components/disabled-edit-tooltip";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
@@ -95,6 +97,9 @@ function PurchaseDetailModalContent({
   printTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
   onClose: () => void;
 }) {
+  const phone = usePhoneLayout();
+  // Phones push PurchaseReceiptDetailView's grouped screen instead of the modal.
+  if (phone) return purchase ? <MobilePurchaseDetail purchase={purchase} onBack={onClose} /> : null;
   return (
     <RowPreviewModal
       open={Boolean(purchase)}
