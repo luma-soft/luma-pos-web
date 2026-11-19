@@ -970,9 +970,17 @@ export function ProductDetailView({
   const needsVariant = Boolean(group && product.isVariantParent);
   const specs = specEntries(product.specs);
   const orderNote = orderNoteFromSpecs(product.specs);
+  // Keep the current layout while the next SKU loads: the chip changes at once and the
+  // panels below dim in place instead of swapping to a different loading layout.
+  const [switchingVariant, startVariantSwitch] = useTransition();
+  const [pendingVariantId, setPendingVariantId] = useState<string | null>(null);
+  const activeVariantId = switchingVariant && pendingVariantId ? pendingVariantId : needsVariant ? null : product.id;
   const selectVariant = (id: string) => {
-    if (id !== product.id) router.replace(`${Routes.productDetail(id)}?detailTab=${tab}`, { scroll: false });
+    if (id === activeVariantId) return;
+    setPendingVariantId(id);
+    startVariantSwitch(() => router.replace(`${Routes.productDetail(id)}?detailTab=${tab}`, { scroll: false }));
   };
+  const variantBusyClass = switchingVariant && "pointer-events-none animate-pulse opacity-60 transition-opacity";
   const effectiveActive = product.isVariantParent
     ? product.children.some((child) => child.isActive)
     : product.isActive;
@@ -998,7 +1006,7 @@ export function ProductDetailView({
           title={t("mobile.products.title")}
           actions={<ProductActionBar product={product} variant="menu" />}
         />
-        <ProductMobileHero product={product} />
+        <div aria-busy={switchingVariant || undefined} className={cn(variantBusyClass)}><ProductMobileHero product={product} /></div>
       </div>
       {group && <div className="mb-4 shrink-0 border-b border-border-soft pb-4 max-lg:px-3">
         <div className="mb-2 flex items-center justify-between gap-3">
@@ -1011,7 +1019,7 @@ export function ProductDetailView({
           {group.count <= VARIANT_CHIP_LIMIT ? (
             <div role="radiogroup" aria-labelledby={variantPickerId} className="flex w-full min-w-0 flex-wrap gap-2 lg:max-w-3xl lg:flex-1">
               {group.members.map((member) => {
-                const active = !needsVariant && member.id === product.id;
+                const active = member.id === activeVariantId;
                 return <button
                   key={member.id}
                   type="button"
@@ -1032,7 +1040,7 @@ export function ProductDetailView({
           ) : (
           <Select
             id={variantPickerId}
-            value={needsVariant ? "" : product.id}
+            value={activeVariantId ?? ""}
             options={group.members.map((member) => ({
               value: member.id,
               label: `${productVariantLabel(member)} · ${member.sku}`,
@@ -1071,7 +1079,7 @@ export function ProductDetailView({
         ))}
       </div>
 
-      <div className={cn("pt-3 sm:pt-4 max-lg:px-3 max-lg:pt-0", surface === "modal" && "min-h-0 flex-1 overflow-y-auto")}>
+      <div aria-busy={switchingVariant || undefined} className={cn("pt-3 sm:pt-4 max-lg:px-3 max-lg:pt-0", surface === "modal" && "min-h-0 flex-1 overflow-y-auto", variantBusyClass)}>
         {tab === "info" && (
           <ProductInfoPanel
             key={product.id}
