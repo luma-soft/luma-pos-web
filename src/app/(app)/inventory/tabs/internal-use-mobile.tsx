@@ -15,6 +15,7 @@ import { productLineDisplayName } from "@/lib/products/variant-presentation";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import type { getInternalUseIssues } from "@/lib/data/internal-use";
+import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
 
 export type InternalUseRow = Awaited<ReturnType<typeof getInternalUseIssues>>[number];
 type Capabilities = { canEdit: boolean; canDelete: boolean; canApprovePending?: boolean };
@@ -93,7 +94,7 @@ export function MobileInternalUseDetail({ row, capabilities, onBack }: { row: In
       <div className="space-y-ios-section px-ios-inset pt-2">
         <MobileGroupedSection title={t("details")}>
           <LabeledRow label={t("statusLabel")} value={t(`status.${key}`)} />
-          <LabeledRow label={t("warehouse")} value={row.warehouseName ?? "—"} />
+          {SHOW_WAREHOUSE && <LabeledRow label={t("warehouse")} value={row.warehouseName ?? "—"} />}
           {row.department && <LabeledRow label={t("department")} value={row.department} />}
           {row.reason && <LabeledRow label={t("reason")} value={internalUseReasonLabel(row.reason, locale)} />}
           <LabeledRow label={t("createdAt")} value={mobileLedgerDateTime(row.createdAt)} />

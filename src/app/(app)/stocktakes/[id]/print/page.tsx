@@ -8,6 +8,7 @@ import { requireStockAccess } from "@/lib/actions/common";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
 
 export default async function PrintStocktakePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -88,7 +89,7 @@ export default async function PrintStocktakePage({ params }: { params: Promise<{
               <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold">{t(`stocktakes.status.${stocktake.status}` as never)}</span>
             </div>
             <dl className="mt-5 grid grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
-              <PrintMeta label={t("inventory.warehouseLabel")} value={stocktake.warehouseName} />
+              {SHOW_WAREHOUSE && <PrintMeta label={t("inventory.warehouseLabel")} value={stocktake.warehouseName} />}
               <PrintMeta label={t("internalUse.cols.by")} value={stocktake.byName ?? "—"} />
               <PrintMeta label={t("orders.cols.date")} value={formatDate(stocktake.createdAt)} />
               <PrintMeta label={t("stocktakes.cols.balancedAt")} value={stocktake.balancedAt ? formatDate(stocktake.balancedAt) : "—"} />

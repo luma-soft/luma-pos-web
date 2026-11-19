@@ -12,6 +12,7 @@ import { ReturnActions } from "./return-actions";
 import { ReturnMobileScreen } from "./return-mobile-screen";
 import { productDisplayName } from "@/lib/products/variant-presentation";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
+import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
 
 type ReturnDetail = NonNullable<Awaited<ReturnType<typeof getReturn>>>;
 
@@ -262,7 +263,7 @@ export async function ReturnDetailMobile({ ret }: { ret: ReturnDetail }) {
           {info(m("refundMethod"), t(`returns.refundMethods.${ret.refundMethod}`))}
           {info(m("createdBy"), ret.createdByName ?? "—")}
           {info(m("phone"), ret.customerPhone ?? "—")}
-          {info(m("warehouse"), ret.warehouseName ?? "—")}
+          {SHOW_WAREHOUSE && info(m("warehouse"), ret.warehouseName ?? "—")}
         </div>
         <div className={cn(card, "p-4")}>
           <h3 className="pb-2 text-[17px] font-semibold">{m("items")}</h3>

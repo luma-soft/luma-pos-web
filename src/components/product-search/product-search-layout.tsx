@@ -1,6 +1,7 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { ChevronRight, Plus } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
+import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
 
 export function ProductSearchStockLabel({
   quantity,
@@ -21,7 +22,7 @@ export function ProductSearchStockLabel({
   const multiplier = Number.isFinite(unitMultiplier) && unitMultiplier > 0 ? unitMultiplier : 1;
   return (
     <div className={cn("text-xs text-slate-400 tabular-nums max-lg:text-[13px] max-lg:leading-[18px] max-lg:text-ios-label-secondary", className)}>
-      {label}: {formatNumber(Number(quantity) / multiplier)} {unit}{location ? ` · ${location}` : ""}
+      {label}: {formatNumber(Number(quantity) / multiplier)} {unit}{SHOW_WAREHOUSE && location ? ` · ${location}` : ""}
     </div>
   );
 }

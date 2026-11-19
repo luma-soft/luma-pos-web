@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { LoaderCircle, RotateCw } from "lucide-react";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
 
 type StocktakeDetailData = {
   status: string;
@@ -122,7 +123,7 @@ export function StocktakeDetail({ stocktakeId, status }: { stocktakeId: string; 
             {t(`stocktakes.status.${status}` as never)}
           </span>
         </Meta>
-        <Meta label={t("inventory.warehouseLabel")} value={data.warehouseName} />
+        {SHOW_WAREHOUSE && <Meta label={t("inventory.warehouseLabel")} value={data.warehouseName} />}
         <Meta label={t("internalUse.cols.by")} value={data.byName ?? "—"} />
         <Meta label={t("orders.cols.date")} value={formatDate(data.createdAt)} />
         <Meta label={t("stocktakes.cols.balancedAt")} value={data.balancedAt ? formatDate(data.balancedAt) : "—"} />

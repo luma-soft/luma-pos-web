@@ -13,6 +13,7 @@ import { productLineDisplayName } from "@/lib/products/variant-presentation";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { purchaseOwed, type PurchaseRow } from "./purchase-detail-modal";
+import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
 
 /**
  * Purchase receipt pushed on phones (PurchaseReceiptDetailView): receipt info,
@@ -80,7 +81,7 @@ export function MobilePurchaseDetail({ purchase, onBack }: { purchase: PurchaseR
           <LabeledRow label={td("statusLabel")} value={t(`status.${purchase.status}` as never)} />
           <LabeledRow label={td("date")} value={mobileLedgerDateTime(purchase.createdAt)} />
           <LabeledRow label={td("supplier")} value={purchase.supplierName ?? "—"} />
-          {warehouseName && <LabeledRow label={td("warehouse")} value={warehouseName} />}
+          {SHOW_WAREHOUSE && warehouseName && <LabeledRow label={td("warehouse")} value={warehouseName} />}
           {purchase.invoiceNumber && <LabeledRow label={td("invoiceNumber")} value={purchase.invoiceNumber} />}
           {purchase.createdByName && <LabeledRow label={td("createdBy")} value={purchase.createdByName} />}
         </MobileGroupedSection>

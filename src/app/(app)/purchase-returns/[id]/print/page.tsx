@@ -4,6 +4,7 @@ import { getPurchaseReturn } from "@/lib/data/purchase-returns";
 import { getPrintTemplate } from "@/lib/print/template";
 import { PrintDoc } from "@/components/print/print-doc";
 import { PrintToolbar } from "@/components/print/print-toolbar";
+import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
 export default async function PrintInventoryDocument({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ size?: string }> }) {
   const { id } = await params;
   const requestedSize = (await searchParams).size;
@@ -21,7 +22,7 @@ export default async function PrintInventoryDocument({ params, searchParams }: {
         totals={[{ label: "Tổng tiền hàng", value: Number(doc.subtotal) }, { label: "Giảm giá", value: Number(doc.discount), negative: true }, { label: "Thuế", value: Number(doc.tax) }]}
         grandTotalLabel="Tổng tiền trả hàng" grandTotal={Number(doc.totalRefund)}
         afterTotals={[{ label: "Tiền hoàn", value: Number(doc.refundAmount) }, { label: "Cấn trừ công nợ", value: Number(doc.debtAmount) }]}
-        note={[`Kho: ${doc.warehouseName}`, doc.note].filter(Boolean).join(" · ")}
+        note={[SHOW_WAREHOUSE ? `Kho: ${doc.warehouseName}` : null, doc.note].filter(Boolean).join(" · ")}
         inWordsLabel="Bằng chữ" signatures={["Người lập phiếu", "Người giao", "Người nhận"]}
         cols={{ index: "STT", product: "Hàng hóa", unit: "ĐVT", qty: "Số lượng", unitPrice: "Đơn giá", lineTotal: "Thành tiền" }}
       />

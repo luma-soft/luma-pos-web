@@ -4,6 +4,7 @@ import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { getAccountingAuxiliaryBooks, getTaxActivityRevenue } from "@/lib/data/accounting";
 import type { RevenueBookRow } from "@/lib/data/accounting";
+import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
 
 type Books = Awaited<ReturnType<typeof getAccountingAuxiliaryBooks>>;
 type ActivityRows = Awaited<ReturnType<typeof getTaxActivityRevenue>>;
@@ -41,7 +42,7 @@ export function InventoryDetailBook({ rows }: { rows: Books["inventory"] }) {
   const columns: DataTableColumn<Books["inventory"][number]>[] = [
     { key: "date", label: "Ngày", required: true, width: "150px", render: (row) => formatDate(row.date) },
     { key: "product", label: "Hàng hóa", required: true, wrap: true, render: (row) => <div className="whitespace-normal break-words"><div className="font-bold">{row.productName}</div><div className="text-xs text-slate-400">{row.sku}</div></div> },
-    { key: "warehouse", label: "Kho", defaultVisible: true, width: "160px", render: (row) => row.warehouseName },
+    { key: "warehouse", label: "Kho", defaultVisible: SHOW_WAREHOUSE, width: "160px", render: (row) => row.warehouseName },
     { key: "type", label: "Nghiệp vụ", defaultVisible: true, width: "150px", render: (row) => row.type },
     { key: "quantity", label: "Số lượng", required: true, align: "right", width: "130px", render: (row) => `${row.quantity.toLocaleString("vi-VN")} ${row.unit}` },
     { key: "unitCost", label: "Đơn giá vốn", defaultVisible: true, align: "right", width: "160px", render: (row) => row.unitCost == null ? "—" : formatCurrency(row.unitCost) },

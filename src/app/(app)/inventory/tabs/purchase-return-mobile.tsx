@@ -14,6 +14,7 @@ import { productLineDisplayName } from "@/lib/products/variant-presentation";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import type { getPurchaseReturns } from "@/lib/data/purchase-returns";
+import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
 
 export type PurchaseReturnRow = Awaited<ReturnType<typeof getPurchaseReturns>>["rows"][number];
 
@@ -131,7 +132,7 @@ export function MobilePurchaseReturnDetail({
           <LabeledRow label={t("statusLabel")} value={t(`status.${row.status}` as never)} />
           <LabeledRow label={t("settlement")} value={t(`status.${row.settlementStatus}` as never)} />
           <LabeledRow label={t("supplier")} value={row.supplierName ?? "—"} />
-          <LabeledRow label={t("warehouse")} value={row.warehouseName ?? "—"} />
+          {SHOW_WAREHOUSE && <LabeledRow label={t("warehouse")} value={row.warehouseName ?? "—"} />}
           <LabeledRow label={t("createdAt")} value={mobileLedgerDateTime(row.createdAt)} />
         </MobileGroupedSection>
 

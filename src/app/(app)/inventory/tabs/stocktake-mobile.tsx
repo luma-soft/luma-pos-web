@@ -11,6 +11,7 @@ import { MenuAction } from "@/app/(app)/partners/tabs/customer-mobile";
 import { balanceStocktake, cancelStocktake } from "@/lib/actions/stocktakes";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
 
 type DetailData = {
   status: string;
@@ -163,7 +164,7 @@ export function MobileStocktakeDetail({
           <>
             <div className="grid grid-cols-2 gap-3">
               <Tile label={t("status")} className={statusTone(data.status)}>{tRoot(`stocktakes.status.${data.status}` as never)}</Tile>
-              <Tile label={t("warehouse")}>{data.warehouseName}</Tile>
+              {SHOW_WAREHOUSE && <Tile label={t("warehouse")}>{data.warehouseName}</Tile>}
               <Tile label={t("createdBy")}>{data.byName ?? "—"}</Tile>
               <Tile label={t("date")}>{shortDateTime(data.createdAt)}</Tile>
               {data.balancedAt && <Tile label={t("balancedAt")}>{shortDateTime(data.balancedAt)}</Tile>}

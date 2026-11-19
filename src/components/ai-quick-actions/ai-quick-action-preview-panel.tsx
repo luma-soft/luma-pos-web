@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { AiActionPreview } from "@/lib/ai/actions";
 import { fieldValue, previewMatchedCount, previewUnresolvedCount } from "./utils";
+import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
 
 function toneClass(tone?: string) {
   if (tone === "danger") return "text-er";
@@ -51,10 +52,10 @@ export function AiQuickActionPreviewPanel({
             <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t("aiQuick.preview.supplier")}</div>
             <div className="mt-1 truncate text-sm font-semibold text-slate-700 dark:text-slate-200">{fieldValue(preview.fields, "Nhà cung cấp")}</div>
           </div>
-          <div className="min-w-0">
+          {SHOW_WAREHOUSE && <div className="min-w-0">
             <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t("aiQuick.preview.warehouse")}</div>
             <div className="mt-1 truncate text-sm font-semibold text-slate-700 dark:text-slate-200">{fieldValue(preview.fields, "Kho")}</div>
-          </div>
+          </div>}
         </div>
       )}
 

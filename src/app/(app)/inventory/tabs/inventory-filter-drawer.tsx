@@ -22,6 +22,7 @@ import {
   resolveOrderTimePreset,
 } from "@/lib/orders/filter-date-range";
 import { Toggle } from "@/components/ui/toggle";
+import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
 
 type Option = { value: string; label: string };
 type Field =
@@ -473,7 +474,7 @@ export function InventoryFilterDrawer({
                   <h3 className="mb-3 font-bold">Tìm theo</h3>
                   <div className="space-y-3">
                     {fields.includes("supplier") && asyncPicker("supplier", "Nhà cung cấp", suppliers, "supplier")}
-                    {fields.includes("warehouse") && asyncPicker("warehouse", "Kho nhận", warehouses, "warehouse")}
+                    {SHOW_WAREHOUSE && fields.includes("warehouse") && asyncPicker("warehouse", "Kho nhận", warehouses, "warehouse")}
                   </div>
                 </section>
               )}
@@ -515,7 +516,7 @@ export function InventoryFilterDrawer({
               {!isPurchaseFilter && fields.includes("category") && <section><h3 className="mb-3 font-bold">Danh mục</h3>{asyncPicker("category", "Danh mục", categories, "category")}</section>}
               {!isPurchaseFilter && fields.includes("brand") && <section><h3 className="mb-3 font-bold">Thương hiệu</h3>{asyncPicker("brand", "Thương hiệu", brands, "brand")}</section>}
               {!isPurchaseFilter && fields.includes("supplier") && <section><h3 className="mb-3 font-bold">Nhà cung cấp</h3>{asyncPicker("supplier", "Nhà cung cấp", suppliers, "supplier")}</section>}
-              {!isPurchaseFilter && fields.includes("warehouse") && <section><h3 className="mb-3 font-bold">Kho</h3>{asyncPicker("warehouse", "Kho", warehouses, "warehouse")}</section>}
+              {SHOW_WAREHOUSE && !isPurchaseFilter && fields.includes("warehouse") && <section><h3 className="mb-3 font-bold">Kho</h3>{asyncPicker("warehouse", "Kho", warehouses, "warehouse")}</section>}
               {fields.includes("reason") && <section><h3 className="mb-3 font-bold">Loại xuất</h3>{picker("reason", "Loại xuất", [all, ...reasons])}</section>}
               {fields.includes("department") && <section><h3 className="mb-3 font-bold">Người nhận / bộ phận</h3>{picker("department", "Người nhận / bộ phận", [all, ...departments])}</section>}
 

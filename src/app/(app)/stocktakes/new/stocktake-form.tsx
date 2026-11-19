@@ -223,7 +223,7 @@ export function StocktakeForm({
         title={t("stocktakes.createNew")}
         subtitle={copyFromCode ? t("stocktakes.copyingFrom", { code: copyFromCode }) : t("stocktakes.balanceHint")}
         badge={<span className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-950 dark:text-primary-200">{t("stocktakes.status.draft")}</span>}
-        actions={<div className="hidden min-w-44 sm:block">
+        actions={warehouses.length > 1 && <div className="hidden min-w-44 sm:block">
           <Select
             value={warehouseId}
             onChange={(e) => router.push(`${Routes.StocktakeNew}?wh=${e.target.value}`)}
@@ -235,7 +235,7 @@ export function StocktakeForm({
           />
         </div>}
       />
-      <div className="mb-4 sm:hidden">
+      {warehouses.length > 1 && <div className="mb-4 sm:hidden">
         <Select
           value={warehouseId}
           onChange={(e) => router.push(`${Routes.StocktakeNew}?wh=${e.target.value}`)}
@@ -245,7 +245,7 @@ export function StocktakeForm({
           className="h-11 font-medium"
           title={lines.length > 0 ? t("stocktakes.warehouseLocked") : undefined}
         />
-      </div>
+      </div>}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="min-w-0 overflow-hidden rounded-card bg-surface shadow-e1">
@@ -448,7 +448,7 @@ export function StocktakeForm({
             </div>
             <div>
               <div className="text-sm font-bold">{t("stocktakes.balance")}</div>
-              <div className="text-xs text-slate-400">{warehouses.find((w) => w.id === warehouseId)?.name}</div>
+              {warehouses.length > 1 && <div className="text-xs text-slate-400">{warehouses.find((w) => w.id === warehouseId)?.name}</div>}
             </div>
           </div>
 

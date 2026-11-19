@@ -5,6 +5,7 @@ import { getInternalUseIssue } from "@/lib/data/internal-use";
 import { getPrintTemplate } from "@/lib/print/template";
 import { PrintDoc } from "@/components/print/print-doc";
 import { PrintToolbar } from "@/components/print/print-toolbar";
+import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
 export default async function PrintInventoryDocument({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ size?: string }> }) {
   const { id } = await params;
   const requestedSize = (await searchParams).size;
@@ -22,7 +23,7 @@ export default async function PrintInventoryDocument({ params, searchParams }: {
         totals={[]}
         grandTotalLabel="Tổng giá trị" grandTotal={Number(doc.totalCost)}
         afterTotals={[]}
-        note={[`Trạng thái: ${doc.status === "draft" ? "Nháp — chưa xuất kho" : doc.status === "pending" ? "Chờ duyệt — chưa xuất kho" : "Đã xuất kho"}`, `Kho: ${doc.warehouseName}`, `Lý do: ${internalUseReasonLabel(doc.reason, "vi")}`, doc.note].filter(Boolean).join(" · ")}
+        note={[`Trạng thái: ${doc.status === "draft" ? "Nháp — chưa xuất kho" : doc.status === "pending" ? "Chờ duyệt — chưa xuất kho" : "Đã xuất kho"}`, SHOW_WAREHOUSE ? `Kho: ${doc.warehouseName}` : null, `Lý do: ${internalUseReasonLabel(doc.reason, "vi")}`, doc.note].filter(Boolean).join(" · ")}
         inWordsLabel="Bằng chữ" signatures={["Người lập phiếu", "Người giao", "Người nhận"]}
         cols={{ index: "STT", product: "Hàng hóa", unit: "ĐVT", qty: "Số lượng", unitPrice: "Đơn giá", lineTotal: "Thành tiền" }}
       />
