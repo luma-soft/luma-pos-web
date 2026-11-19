@@ -11,11 +11,14 @@ export function PrintTemplateMenu({
   templates = [],
   label,
   className,
+  iconOnly = false,
 }: {
   baseHref: string;
   templates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
   label: string;
   className?: string;
+  /** Toolbar printer icon (iOS nav bar); the label becomes the accessible name. */
+  iconOnly?: boolean;
 }) {
   const menuId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -57,10 +60,14 @@ export function PrintTemplateMenu({
 
   return (
     <div className="relative">
-      <button ref={triggerRef} type="button" onClick={() => setOpen((value) => !value)} className={cn("inline-flex items-center gap-1.5 min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-0 lg:min-w-0", className)} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined}>
-        <Printer className="h-4 w-4" />
-        {label}
-        <ChevronDown className="h-3.5 w-3.5" />
+      <button ref={triggerRef} type="button" onClick={() => setOpen((value) => !value)} className={cn(!iconOnly && "inline-flex items-center gap-1.5 min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-0 lg:min-w-0", className)} aria-label={iconOnly ? label : undefined} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined}>
+        {iconOnly ? <Printer className="size-[22px]" aria-hidden="true" /> : (
+          <>
+            <Printer className="h-4 w-4" />
+            {label}
+            <ChevronDown className="h-3.5 w-3.5" />
+          </>
+        )}
       </button>
       <FloatingMenuPortal
         open={open}

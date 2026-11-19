@@ -38,11 +38,11 @@ export function MergeConfirm({ ids, disabled }: { ids: string[]; disabled: boole
   }
 
   return (
-    <div className="flex flex-col items-end gap-2">
+    <div className="flex flex-col items-end gap-2 max-lg:items-stretch">
       {error && <p className="text-sm text-er">{error}</p>}
       <button
         onClick={confirm} disabled={disabled || busy || confirming}
-        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-primary-700 disabled:opacity-50 sm:w-auto lg:min-h-0 lg:min-w-0"
+        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-primary-700 disabled:opacity-50 sm:w-auto lg:min-h-0 lg:min-w-0 max-lg:h-[50px] max-lg:rounded-[14px] max-lg:bg-ios-accent max-lg:text-[17px] max-lg:font-semibold"
       >
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitMerge className="w-4 h-4" />}
         {t("merge.confirm", { count: ids.length })}

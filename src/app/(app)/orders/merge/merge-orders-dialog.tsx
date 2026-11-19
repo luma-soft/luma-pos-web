@@ -6,10 +6,13 @@ import { X } from "lucide-react";
 
 export function MergeOrdersDialog({
   title,
+  phoneTitle,
   closeLabel,
   children,
 }: {
   title: string;
+  /** Phones: centered nav-bar title (NativeInvoiceMergePreviewView). */
+  phoneTitle?: string;
   closeLabel: string;
   children: ReactNode;
 }) {
@@ -44,7 +47,12 @@ export function MergeOrdersDialog({
         className="flex h-dvh w-full flex-col overflow-hidden bg-surface shadow-2xl sm:h-[calc(100dvh-2.5rem)] sm:w-[calc(100vw-2.5rem)] sm:max-w-none sm:rounded-2xl"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-6">
+        <div className="relative grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-black/10 bg-canvas/90 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-xl box-content lg:hidden dark:border-white/10">
+          <button type="button" onClick={close} className="min-h-11 justify-self-start px-2 text-[17px] text-ios-accent">{closeLabel}</button>
+          <h2 className="max-w-[60vw] truncate text-[17px] font-semibold">{phoneTitle ?? title}</h2>
+          <span aria-hidden="true" />
+        </div>
+        <div className="hidden shrink-0 items-center justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-6 lg:flex">
           <h2 id="merge-orders-dialog-title" className="min-w-0 truncate text-lg font-bold text-slate-900 dark:text-slate-100">{title}</h2>
           <button
             type="button"
@@ -55,7 +63,7 @@ export function MergeOrdersDialog({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain max-lg:bg-canvas">{children}</div>
       </div>
     </div>
   );

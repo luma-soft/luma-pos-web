@@ -67,18 +67,24 @@ export async function MergeOrderDetailPreview({
   if (!firstOrder) return null;
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
-      <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-4 dark:border-primary-900 dark:bg-primary-950/20">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+    <div className="space-y-4 p-4 sm:p-6 max-lg:bg-canvas">
+      <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-4 dark:border-primary-900 dark:bg-primary-950/20 max-lg:rounded-[16px] max-lg:border-0 max-lg:bg-ios-accent/[0.08]">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between max-lg:flex-row max-lg:items-start max-lg:gap-3">
           <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{t("merge.previewTitle")}</h3>
-            <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">{t("merge.previewNotice")}</p>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 max-lg:text-[17px] max-lg:font-semibold">{t("merge.previewTitle")}</h3>
+            <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300 max-lg:text-[13px] max-lg:leading-[18px] max-lg:text-ios-label-secondary">{t("merge.previewNotice")}</p>
           </div>
-          <span className="mt-2 inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-semibold text-primary-700 ring-1 ring-inset ring-primary-200 sm:mt-0 dark:bg-surface dark:text-primary-300 dark:ring-primary-900">
+          <span className="mt-2 inline-flex w-fit shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-primary-700 ring-1 ring-inset ring-primary-200 sm:mt-0 max-lg:mt-0 max-lg:bg-ios-accent/10 max-lg:px-2.5 max-lg:py-1.5 max-lg:text-ios-accent max-lg:ring-0 dark:bg-surface dark:text-primary-300 dark:ring-primary-900">
             {t("merge.previewCode")}
           </span>
         </div>
       </div>
+
+      {canMerge && (
+        <div className="fixed right-2 top-[calc(env(safe-area-inset-top)+0.375rem)] z-20 lg:hidden">
+          <PrintTemplateMenu baseHref={printHref} templates={printTemplates} label={t("merge.printSample")} iconOnly className="grid size-11 place-items-center text-ios-accent" />
+        </div>
+      )}
 
       {(selectedOrders.length === 0) ? (
         <div className="rounded-card border border-dashed border-border bg-surface p-10 text-center text-slate-400">
@@ -87,9 +93,9 @@ export async function MergeOrderDetailPreview({
       ) : (
         <>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="min-w-0 space-y-4">
-              <section className="overflow-hidden rounded-card border border-border bg-surface">
-                <div className="flex items-center justify-between gap-3 border-b border-border-soft px-4 py-3">
+            <div className="min-w-0 space-y-4 max-lg:contents max-lg:space-y-0">
+              <section className="max-lg:order-1 overflow-hidden rounded-card border border-border bg-surface max-lg:rounded-[16px] max-lg:border-0">
+                <div className="flex items-center justify-between gap-3 border-b border-border-soft px-4 py-3 max-lg:border-b-0 max-lg:pb-1 max-lg:pt-4">
                   <h4 className="font-semibold">{t("merge.sources")}</h4>
                   <span className="text-sm text-slate-500">{selectedOrders.length}</span>
                 </div>
@@ -98,7 +104,7 @@ export async function MergeOrderDetailPreview({
                     const invalid = order.status !== "completed" || !order.customerId;
                     return (
                       <div key={order.id} className={cn(
-                        "flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4",
+                        "flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 max-lg:flex-row max-lg:items-start max-lg:gap-3",
                         invalid && "bg-red-50 dark:bg-red-950/30",
                       )}>
                         <div className="min-w-0 flex-1">
@@ -122,8 +128,8 @@ export async function MergeOrderDetailPreview({
                 </div>
               </section>
 
-              <section className="overflow-hidden rounded-card border border-border bg-surface">
-                <div className="flex items-center justify-between gap-3 border-b border-border-soft px-4 py-3">
+              <section className="max-lg:order-2 overflow-hidden rounded-card border border-border bg-surface max-lg:rounded-[16px] max-lg:border-0">
+                <div className="flex items-center justify-between gap-3 border-b border-border-soft px-4 py-3 max-lg:border-b-0 max-lg:pb-1 max-lg:pt-4">
                   <h4 className="font-semibold">{t("merge.products")}</h4>
                   <span className="text-sm text-slate-500">{items.length}</span>
                 </div>
@@ -201,8 +207,8 @@ export async function MergeOrderDetailPreview({
                 )}
               </section>
 
-              <section className="overflow-hidden rounded-card border border-border bg-surface">
-                <div className="border-b border-border-soft px-4 py-3 font-semibold">{t("orders.detail.payments")}</div>
+              <section className="max-lg:order-5 overflow-hidden rounded-card border border-border bg-surface max-lg:rounded-[16px] max-lg:border-0">
+                <div className="border-b border-border-soft px-4 py-3 font-semibold max-lg:border-b-0 max-lg:pb-1 max-lg:pt-4">{t("orders.detail.payments")}</div>
                 {payments.length === 0 ? (
                   <p className="p-4 text-sm text-slate-500">{t("orders.detail.noPayments")}</p>
                 ) : (
@@ -227,7 +233,7 @@ export async function MergeOrderDetailPreview({
                 )}
               </section>
 
-              <section className="rounded-card border border-border bg-surface p-4">
+              <section className="max-lg:order-6 rounded-card border border-border bg-surface max-lg:rounded-[16px] max-lg:border-0 p-4">
                 <h4 className="mb-2 font-semibold">{t("orders.detail.info")}</h4>
                 <p className="text-sm text-slate-600 dark:text-slate-300">
                   {t("merge.sourceNote", { codes: selectedOrders.map((order) => order.code).join(", ") })}
@@ -235,8 +241,8 @@ export async function MergeOrderDetailPreview({
               </section>
             </div>
 
-            <aside className="space-y-4">
-              <section className="space-y-2 rounded-card border border-border bg-surface p-4 text-sm">
+            <aside className="space-y-4 max-lg:contents max-lg:space-y-0">
+              <section className="max-lg:order-3 space-y-2 rounded-card border border-border bg-surface max-lg:rounded-[16px] max-lg:border-0 p-4 text-sm">
                 <h4 className="font-semibold">{t("orders.detail.customer")}</h4>
                 <PreviewInfoRow label={t("orders.cols.customer")} value={firstOrder.customerName ?? t("orders.walkIn")} />
                 <PreviewInfoRow label={t("customers.cols.phone")} value={firstOrder.customerPhone ?? "—"} />
@@ -247,7 +253,7 @@ export async function MergeOrderDetailPreview({
                 />
               </section>
 
-              <section className="space-y-2 rounded-card border border-border bg-surface p-4 text-sm">
+              <section className="max-lg:order-4 space-y-2 rounded-card border border-border bg-surface max-lg:rounded-[16px] max-lg:border-0 p-4 text-sm">
                 <h4 className="font-semibold">{t("merge.paymentSummary")}</h4>
                 <PreviewInfoRow label={t("pos.subtotal")} value={formatCurrency(subtotal)} />
                 <PreviewInfoRow label={t("pos.discount")} value={formatCurrency(discount)} />
@@ -269,9 +275,11 @@ export async function MergeOrderDetailPreview({
             </div>
           )}
 
-          <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col gap-3 border-t border-border-soft bg-surface/95 px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur sm:-mx-6 sm:-mb-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
+          <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col gap-3 border-t border-border-soft bg-surface/95 max-lg:bg-canvas/90 max-lg:shadow-none max-lg:py-2.5 px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur sm:-mx-6 sm:-mb-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
             <p className="hidden min-w-0 flex-1 text-xs leading-5 text-slate-500 sm:block">{t("merge.hint")}</p>
             <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center">
+              {/* Phones print from the header (iOS toolbar printer). */}
+              <div className="contents max-lg:hidden">
               {canMerge ? (
                 <PrintTemplateMenu
                   baseHref={printHref}
@@ -285,6 +293,7 @@ export async function MergeOrderDetailPreview({
                   {t("merge.printSample")}
                 </button>
               )}
+              </div>
               <MergeConfirm ids={ids} disabled={!canMerge} />
             </div>
           </div>

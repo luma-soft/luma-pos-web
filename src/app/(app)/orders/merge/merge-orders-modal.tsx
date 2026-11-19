@@ -6,7 +6,7 @@ export async function MergeOrdersModal({ searchParams }: MergeOrdersPageProps) {
   const t = await getTranslations();
 
   return (
-    <MergeOrdersDialog title={t("merge.title")} closeLabel={t("common.close")}>
+    <MergeOrdersDialog title={t("merge.title")} phoneTitle={t("merge.previewTitle")} closeLabel={t("common.close")}>
       <MergeOrdersContent searchParams={searchParams} presentation="modal" />
     </MergeOrdersDialog>
   );
