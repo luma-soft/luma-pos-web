@@ -1313,7 +1313,14 @@
         "refundAmount": "Giá trị hoàn tiền",
         "resultCount": "{count} kết quả",
         "resultCountPending": "… kết quả"
-      }
+      },
+      "batchSelected": "Đã chọn {count}",
+      "batchSelectAll": "Chọn tất cả",
+      "batchCancel": "Hủy",
+      "batchActions": "Thao tác",
+      "batchPrint": "In / Chia sẻ",
+      "batchMerge": "Gộp đơn hàng",
+      "batchCancelOrders": "Hủy đơn đã chọn"
     },
     "dashboard": {
       "subtitle": "Nhịp vận hành hôm nay · POS-first",

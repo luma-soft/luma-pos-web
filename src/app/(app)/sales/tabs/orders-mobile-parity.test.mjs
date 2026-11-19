@@ -12,7 +12,10 @@ test("native-style order row enters selection by long press and keeps a full-row
   expect(row).toContain("onOpen={selecting ? onToggle : onOpen}");
   expect(row).toContain("disabled={!selectable}");
   expect(row).toContain("openInCurrentTab");
-  expect(orders).toContain('mobileSelecting ? "flex" : "hidden lg:flex"');
+  // Phones: iOS batch footer ("Đã chọn N" · select all, Cancel + Actions sheet) and "+" → "Xong".
+  expect(orders).toContain('"hidden w-full flex-wrap items-center justify-end gap-2 text-sm lg:flex"');
+  expect(orders).toContain("<OrderMobileBatchFooter");
+  expect(orders).toContain('useListPrimaryActionOverride(selecting ? t("mobile.invoices.selectDone") : null, exitSelection)');
 });
 
 test("mobile order rows show customer/amount, native status line, item summary and timestamp", () => {

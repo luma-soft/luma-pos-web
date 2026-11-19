@@ -17,7 +17,10 @@ import {
   OrderStatusBadge,
   PaymentStatusBadge,
 } from "../../orders/status-badges";
-import { ChevronDown, FileX2, Loader2, Printer, XCircle } from "lucide-react";
+import { ChevronDown, CircleCheck, FileX2, Files, Loader2, Printer, Trash2, XCircle } from "lucide-react";
+import { MobileActionSheet } from "@/components/mobile-detail-nav";
+import { useListPrimaryActionOverride } from "@/components/list-search-filter";
+import { MenuAction } from "@/app/(app)/partners/tabs/customer-mobile";
 import { MobileSelectionIndicator } from "@/components/mobile-ui";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import type { PrintTemplate } from "@/lib/print/template-shared";
@@ -109,8 +112,6 @@ export function OrderBatchToolbar({
   cancelling,
   onCancel,
   labels,
-  mobileSelecting = false,
-  onDone,
 }: {
   selectedCount: number;
   selectedIds: string[];
@@ -122,32 +123,19 @@ export function OrderBatchToolbar({
     print: string;
     cancel: string;
     selected?: string;
-    done?: string;
   };
-  /** Phones show batch actions only after a long press enters selection mode (iOS). */
-  mobileSelecting?: boolean;
-  onDone?: () => void;
 }) {
   const batchHref = `/orders/print-batch?${selectedIds.map((id) => `ids=${encodeURIComponent(id)}`).join("&")}`;
   const mergeHref = `/orders/merge?${selectedIds.map((id) => `ids=${encodeURIComponent(id)}`).join("&")}`;
   return (
-    <div className={cn("w-full flex-wrap items-center justify-end gap-2 text-sm", mobileSelecting ? "flex" : "hidden lg:flex")}>
+    <div className="hidden w-full flex-wrap items-center justify-end gap-2 text-sm lg:flex">
       <span
         className="px-2 py-1 text-xs font-semibold text-slate-600 max-lg:mr-auto"
         aria-live="polite"
       >
         {labels.selected ?? selectedCount}
       </span>
-      {onDone && labels.done && (
-        <button
-          type="button"
-          onClick={onDone}
-          className="min-h-11 px-2 text-[17px] font-semibold text-ios-accent lg:hidden"
-        >
-          {labels.done}
-        </button>
-      )}
-      <div className="grid w-full grid-cols-3 gap-2 lg:contents">
+      <div className="contents">
         {selectedCount < 2 ? (
           <button
             type="button"
@@ -331,6 +319,12 @@ export function OrdersTable({
     );
   }
 
+  function exitSelection() {
+    setSelecting(false);
+    setSelectedIds(new Set());
+  }
+  useListPrimaryActionOverride(selecting ? t("mobile.invoices.selectDone") : null, exitSelection);
+
   function toggleAll() {
     setSelectedIds(
       toggleAllOrderBatchSelection(normalizedSelection, selectableIds),
@@ -509,11 +503,6 @@ export function OrdersTable({
           <OrderBatchToolbar
             selectedCount={selectedVisibleIds.length}
             selectedIds={selectedVisibleIds}
-            mobileSelecting={selecting}
-            onDone={() => {
-              setSelecting(false);
-              setSelectedIds(new Set());
-            }}
             templates={printTemplates}
             cancelling={cancelling}
             onCancel={cancelSelectedOrders}
@@ -524,7 +513,6 @@ export function OrdersTable({
               selected: t("orders.selectedCount", {
                 count: selectedVisibleIds.length,
               }),
-              done: t("mobile.invoices.selectDone"),
             }}
           />
         }
@@ -560,6 +548,17 @@ export function OrdersTable({
         )}
       />
       {loadMoreFooter}
+      {selecting && (
+        <OrderMobileBatchFooter
+          selectedCount={selectedVisibleIds.length}
+          busy={cancelling}
+          onSelectAll={toggleAll}
+          onExit={exitSelection}
+          onPrint={() => router.push(`/orders/print-batch?${selectedVisibleIds.map((id) => `ids=${encodeURIComponent(id)}`).join("&")}`)}
+          onMerge={() => router.push(`/orders/merge?${selectedVisibleIds.map((id) => `ids=${encodeURIComponent(id)}`).join("&")}`)}
+          onCancelOrders={() => void cancelSelectedOrders()}
+        />
+      )}
     </form>
   );
 }
@@ -570,4 +569,63 @@ function orderItemSummary(order: OrderListRow, t: ReturnType<typeof useTranslati
   return names
     ? t("mobile.invoices.itemSummary", { count: order.itemCount, names })
     : t("mobile.invoices.itemCount", { count: order.itemCount });
+}
+
+/**
+ * NativeInvoiceBatchToolbar on phones: selection count with "select all", then
+ * Cancel and an "Actions" sheet (print / share, merge, cancel orders).
+ */
+function OrderMobileBatchFooter({
+  selectedCount,
+  busy,
+  onSelectAll,
+  onExit,
+  onPrint,
+  onMerge,
+  onCancelOrders,
+}: {
+  selectedCount: number;
+  busy: boolean;
+  onSelectAll: () => void;
+  onExit: () => void;
+  onPrint: () => void;
+  onMerge: () => void;
+  onCancelOrders: () => void;
+}) {
+  const t = useTranslations("mobile.invoices");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const choose = (action: () => void) => () => {
+    setMenuOpen(false);
+    action();
+  };
+  return (
+    <>
+      {/* Keeps the last rows reachable above the footer. */}
+      <div className="h-28 lg:hidden" aria-hidden="true" />
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-canvas/90 px-4 pb-[calc(var(--mobile-tabbar-space)+0.5rem)] pt-2.5 backdrop-blur-xl lg:hidden dark:border-white/10">
+        <div className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold" aria-live="polite">{t("batchSelected", { count: selectedCount })}</span>
+          <button type="button" onClick={onSelectAll} disabled={busy} className="inline-flex min-h-9 items-center gap-1.5 text-[15px] font-medium text-ios-label disabled:opacity-50">
+            <CircleCheck className="size-[18px]" aria-hidden="true" />
+            {t("batchSelectAll")}
+          </button>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-3">
+          <button type="button" onClick={onExit} disabled={busy} className="h-[50px] rounded-[14px] border-[1.5px] border-ios-stroke/60 bg-surface text-[17px] font-semibold text-ios-accent disabled:opacity-55">
+            {t("batchCancel")}
+          </button>
+          <button type="button" onClick={() => setMenuOpen(true)} disabled={busy || selectedCount === 0} className="grid h-[50px] place-items-center rounded-[14px] bg-ios-accent text-[17px] font-semibold text-white disabled:opacity-55">
+            {busy ? <Loader2 className="size-5 animate-spin" aria-hidden="true" /> : t("batchActions")}
+          </button>
+        </div>
+      </div>
+      <MobileActionSheet open={menuOpen} onClose={() => setMenuOpen(false)} title={t("batchActions")}>
+        <div className="space-y-2">
+          <MenuAction icon={Printer} label={t("batchPrint")} onSelect={choose(onPrint)} />
+          <MenuAction icon={Files} label={t("batchMerge")} disabled={selectedCount < 2} onSelect={choose(onMerge)} />
+          <MenuAction icon={Trash2} label={t("batchCancelOrders")} destructive onSelect={choose(onCancelOrders)} />
+        </div>
+      </MobileActionSheet>
+    </>
+  );
 }

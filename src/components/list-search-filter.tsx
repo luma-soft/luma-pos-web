@@ -4,6 +4,9 @@ import {
   createContext,
   forwardRef,
   useContext,
+  useEffect,
+  useRef,
+  useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -109,11 +112,40 @@ export const FilterTriggerButton = forwardRef<HTMLButtonElement, FilterTriggerBu
 
 type ListPrimaryAction = { href: string; label: string };
 
+type ListPrimaryActionOverride = { label: string; onClick: () => void };
+
 const ListPrimaryActionContext = createContext<ListPrimaryAction | null>(null);
+const ListPrimaryActionOverrideContext = createContext<{
+  override: ListPrimaryActionOverride | null;
+  setOverride: (value: ListPrimaryActionOverride | null) => void;
+} | null>(null);
 
 /** Lets a page put its create action beside the search/filter bar on phones (iOS "+" button). */
 export function ListPrimaryActionProvider({ action, children }: { action: ListPrimaryAction | null; children: ReactNode }) {
-  return <ListPrimaryActionContext.Provider value={action}>{children}</ListPrimaryActionContext.Provider>;
+  const [override, setOverride] = useState<ListPrimaryActionOverride | null>(null);
+  return (
+    <ListPrimaryActionContext.Provider value={action}>
+      <ListPrimaryActionOverrideContext.Provider value={{ override, setOverride }}>{children}</ListPrimaryActionOverrideContext.Provider>
+    </ListPrimaryActionContext.Provider>
+  );
+}
+
+/**
+ * Phones: while `label` is set, the "+" beside the search bar becomes a text
+ * button (e.g. iOS "Xong" while a list is in selection mode).
+ */
+export function useListPrimaryActionOverride(label: string | null, onClick: () => void) {
+  const context = useContext(ListPrimaryActionOverrideContext);
+  const handler = useRef(onClick);
+  useEffect(() => {
+    handler.current = onClick;
+  });
+  const setOverride = context?.setOverride;
+  useEffect(() => {
+    if (!setOverride || !label) return;
+    setOverride({ label, onClick: () => handler.current() });
+    return () => setOverride(null);
+  }, [setOverride, label]);
 }
 
 export function ListSearchFilterBar({
@@ -131,11 +163,21 @@ export function ListSearchFilterBar({
   mobileAction?: { label: string; onClick: () => void };
 }) {
   const primaryAction = useContext(ListPrimaryActionContext);
+  const override = useContext(ListPrimaryActionOverrideContext)?.override ?? null;
   return (
     <div className={cn("flex min-w-0 flex-1 items-center gap-2 max-lg:gap-ios-search", className)}>
       <div className={cn("min-w-0 flex-1 lg:max-w-xl", searchClassName)}>{search}</div>
       {filter}
-      {primaryAction && (
+      {override ? (
+        <button
+          type="button"
+          onClick={override.onClick}
+          data-button-radius="pill"
+          className="grid h-12 min-w-12 shrink-0 place-items-center rounded-[15px] border border-ios-stroke/60 bg-surface px-3 text-[17px] font-medium text-ios-accent transition-opacity active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ios-accent lg:hidden"
+        >
+          {override.label}
+        </button>
+      ) : primaryAction && (
         <Link
           href={primaryAction.href}
           aria-label={primaryAction.label}
@@ -145,7 +187,7 @@ export function ListSearchFilterBar({
           <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
         </Link>
       )}
-      {mobileAction && (
+      {!override && mobileAction && (
         <button
           type="button"
           onClick={mobileAction.onClick}

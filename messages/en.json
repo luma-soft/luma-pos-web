@@ -1313,7 +1313,14 @@
         "refundAmount": "Refund amount",
         "resultCount": "{count} results",
         "resultCountPending": "… results"
-      }
+      },
+      "batchSelected": "{count} selected",
+      "batchSelectAll": "Select all",
+      "batchCancel": "Cancel",
+      "batchActions": "Actions",
+      "batchPrint": "Print / Share",
+      "batchMerge": "Merge orders",
+      "batchCancelOrders": "Cancel selected orders"
     },
     "dashboard": {
       "subtitle": "Today's operations · POS-first",
