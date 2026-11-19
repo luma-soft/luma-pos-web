@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
+import { useHideMobileTabBar } from "@/components/mobile-tabbar-visibility";
 import { cn } from "@/lib/utils";
 
 export function InventoryDrawer({
@@ -16,6 +17,9 @@ export function InventoryDrawer({
   children,
   footer,
   bodyClassName,
+  mobileSubtitle,
+  mobileSubtitleClassName,
+  footerClassName,
 }: {
   title: string;
   subtitle?: string;
@@ -27,9 +31,14 @@ export function InventoryDrawer({
   children: ReactNode;
   footer?: ReactNode;
   bodyClassName?: string;
+  /** Phones: caption under the centred title (e.g. "1 SKU"), like a pushed iOS screen. */
+  mobileSubtitle?: string;
+  mobileSubtitleClassName?: string;
+  footerClassName?: string;
 }) {
   const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
+  useHideMobileTabBar();
   const closeRef = useRef<() => void>(() => {});
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isClosingRef = useRef(false);
@@ -87,7 +96,24 @@ export function InventoryDrawer({
         style={{ transform: isVisible ? "translateX(0)" : "translateX(100%)" }}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <header className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
+        {/* Phones: pushed-screen bar with the back circle and a centred title + caption. */}
+        <header className="grid shrink-0 grid-cols-[48px_minmax(0,1fr)_48px] items-center gap-2 px-ios-inset pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] lg:hidden">
+          <button
+            type="button"
+            onClick={close}
+            aria-label={closeLabel}
+            data-button-radius="pill"
+            className="grid size-12 place-items-center rounded-full border border-ios-stroke/40 bg-surface shadow-[0_2px_10px_rgb(0_0_0/0.08)] active:opacity-60"
+          >
+            <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden="true" />
+          </button>
+          <div className="min-w-0 text-center">
+            <h2 className="truncate text-[17px] font-semibold">{title}</h2>
+            {(mobileSubtitle ?? subtitle) && <p className={cn("truncate text-[12px] text-ios-label-secondary", mobileSubtitleClassName)}>{mobileSubtitle ?? subtitle}</p>}
+          </div>
+          <span aria-hidden="true" />
+        </header>
+        <header className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4 max-lg:hidden">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-50 text-primary-700 dark:bg-primary-950/40">
             {icon}
           </div>
@@ -105,7 +131,7 @@ export function InventoryDrawer({
           </button>
         </header>
         <div className={cn("min-h-0 flex-1 overflow-y-auto", bodyClassName)}>{children}</div>
-        {footer && <footer className="shrink-0 border-t border-border bg-surface px-5 py-3">{footer}</footer>}
+        {footer && <footer className={cn("shrink-0 border-t border-border bg-surface px-5 py-3", footerClassName)}>{footer}</footer>}
       </aside>
     </div>
   );

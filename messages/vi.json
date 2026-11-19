@@ -2111,7 +2111,8 @@
       "balance": "Cân bằng kho",
       "cancel": "Hủy phiếu",
       "loadError": "Không tải được phiếu kiểm kho.",
-      "retry": "Thử lại"
+      "retry": "Thử lại",
+      "minLevel": "Mức tồn tối thiểu: {value} {unit}"
     }
   },
   "toolsCenter": {

@@ -6,7 +6,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { PackagePlus } from "lucide-react";
+import { ChevronRight, Package, PackagePlus } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
@@ -39,7 +39,7 @@ export function stockSev(stock: number, min: number): Sev {
   return "ok";
 }
 
-export function StockTable({ rows: serverRows, loadMore }: {
+export function StockTable({ rows: serverRows, loadMore, stock }: {
   rows: StockRow[];
   stock?: StockFilter;
   /** Phones: append further pages automatically (desktop keeps pagination). */
@@ -67,37 +67,37 @@ export function StockTable({ rows: serverRows, loadMore }: {
       minWidth="980px"
       onRowClick={(row) => router.push(Routes.productDetail(row.id), { scroll: false })}
       rowClickColumnKey="product"
+      mobileListClassName="max-lg:space-y-0 max-lg:bg-surface"
+      mobileRowClassName="max-lg:rounded-none max-lg:border-0 max-lg:bg-[linear-gradient(var(--color-border),var(--color-border))] max-lg:bg-[length:100%_1px] max-lg:bg-left-bottom max-lg:bg-no-repeat"
       renderMobileRow={({ row }) => {
-        const stock = Number(row.totalStock);
+        const stockQty = Number(row.totalStock);
         const min = Number(row.minLevel);
-        const sev = stockSev(stock, min);
+        // The status list tints every row like its card (InventoryStockStatusList).
+        const tone = stock === "lowStock" ? "orange" : stock === "inStock" ? "green" : stock ? "red"
+          : ({ out: "red", crit: "red", warn: "orange", ok: "green" } as const)[stockSev(stockQty, min)];
+        const toneText = { red: "text-ios-red", orange: "text-ios-orange", green: "text-ios-green" }[tone];
+        const toneTile = { red: "bg-ios-red/10", orange: "bg-ios-orange/10", green: "bg-ios-green/10" }[tone];
         return (
-          <div className="relative min-h-[94px] p-3">
-            <button
-              type="button"
-              onClick={() => router.push(Routes.productDetail(row.id), { scroll: false })}
-              aria-label={productDisplayName(row)}
-              className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
-            />
-            <div className="pointer-events-none relative flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="line-clamp-2 text-sm font-semibold">{productDisplayName(row)}</div>
-                <div className="mt-1 truncate text-xs text-slate-500">{row.sku}</div>
-                <div className="mt-2"><StatusBadge sev={sev} /></div>
-              </div>
-              <div className="max-w-[47%] shrink-0 text-right">
-                <div className={cn("text-sm font-bold tabular-nums [overflow-wrap:anywhere]", (sev === "out" || sev === "crit") ? "text-er" : "")}>
-                  {formatNumber(stock)} {row.baseUnit}
-                </div>
-                <div className="mt-1 truncate text-xs text-slate-500">
-                  {t("inventory.cols.min")}: {min > 0 ? formatNumber(min) : "—"}
-                </div>
-                <div className="mt-1 text-xs font-medium tabular-nums text-slate-500">
-                  {formatCurrency(Number(row.stockValue))}
-                </div>
-              </div>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => router.push(Routes.productDetail(row.id), { scroll: false })}
+            aria-label={productDisplayName(row)}
+            className="flex w-full items-center gap-3 px-ios-inset py-3 text-left active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+          >
+            <span className={cn("grid size-[42px] shrink-0 place-items-center rounded-[12px]", toneTile, toneText)}>
+              <Package className="size-5" strokeWidth={2.2} aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1 space-y-1">
+              <span className="line-clamp-2 block text-[17px] font-semibold leading-[22px]">{productDisplayName(row)}</span>
+              <span className="block truncate text-[13px] text-ios-label-secondary">SKU: {row.sku}</span>
+              {min > 0 && <span className="block truncate text-[12px] text-ios-label-secondary">{t("mobile.stocktakes.minLevel", { value: formatNumber(min), unit: row.baseUnit })}</span>}
+            </span>
+            <span className="max-w-[40%] shrink-0 text-right">
+              <span className={cn("block text-[17px] font-bold tabular-nums", toneText)}>{formatNumber(stockQty)} {row.baseUnit}</span>
+              <span className="mt-1 block text-[13px] tabular-nums text-ios-label-secondary">{formatCurrency(Number(row.stockValue))}</span>
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-ios-label-tertiary" strokeWidth={2.4} aria-hidden="true" />
+          </button>
         );
       }}
       clientSideDetailNavigation

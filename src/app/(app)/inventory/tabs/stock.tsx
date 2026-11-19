@@ -111,6 +111,9 @@ async function StockStatusDetail({
       icon={<Warehouse className="h-5 w-5" />}
       closeLabel={t("common.close")}
       closeHref={`${Routes.Inventory}?tab=stock`}
+      mobileSubtitle={`${formatNumber(total)} SKU`}
+      footerClassName="max-lg:hidden"
+      mobileSubtitleClassName={status === "lowStock" ? "text-ios-orange" : status === "inStock" ? "text-ios-green" : "text-ios-red"}
       bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
       footer={(
         <div className="[&>div]:mt-0 max-lg:hidden">
@@ -125,7 +128,7 @@ async function StockStatusDetail({
       )}
     >
       <div className="flex min-h-0 flex-1 flex-col" data-layout="inventory-stock-status-detail">
-        <div className="shrink-0 border-b border-border bg-canvas/60 p-4">
+        <div className="shrink-0 border-b border-border bg-canvas/60 p-4 max-lg:bg-surface max-lg:px-ios-inset max-lg:pb-3 max-lg:pt-1">
           <ListSearchFilterBar
             className="w-full"
             searchClassName="min-w-0 flex-1"
@@ -140,7 +143,7 @@ async function StockStatusDetail({
           />
         </div>
 
-        <section className="min-h-0 flex-1 overflow-auto p-4" aria-label={t("inventory.productList")}>
+        <section className="min-h-0 flex-1 overflow-auto p-4 max-lg:p-0" aria-label={t("inventory.productList")}>
           {rows.length === 0 ? (
             <div className="rounded-card border border-border bg-surface p-12 text-center text-slate-400 shadow-e1">
               <Warehouse className="mx-auto mb-3 h-10 w-10 opacity-60" />

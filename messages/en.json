@@ -2111,7 +2111,8 @@
       "balance": "Balance stock",
       "cancel": "Cancel stocktake",
       "loadError": "Couldn't load the stocktake.",
-      "retry": "Retry"
+      "retry": "Retry",
+      "minLevel": "Minimum stock: {value} {unit}"
     }
   },
   "toolsCenter": {
