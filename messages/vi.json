@@ -2198,6 +2198,7 @@
       "printLabels": "In tem nhãn",
       "addSameType": "Thêm hàng cùng loại",
       "manageVariants": "Quản lý biến thể",
+      "chooseVariantHint": "Chọn một biến thể để xem tồn kho và lịch sử.",
       "variantsTitle": "Biến thể hàng hóa",
       "variantsGroup": "Nhóm hàng",
       "variantsRoot": "Sản phẩm gốc",

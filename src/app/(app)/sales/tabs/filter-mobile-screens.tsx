@@ -153,7 +153,7 @@ export function MobileEntityPickerScreen({
         <span className="grid w-10 place-items-center text-ios-accent"><ListFilter className="size-[22px]" strokeWidth={2.2} aria-hidden="true" /></span>
         <span className="min-w-0 flex-1 text-[17px] font-semibold">{t("mobile.invoices.filters.anyValue")}</span>
         {noneSelected && <CheckCircle2 className="size-[22px] fill-ios-accent text-surface" aria-hidden="true" />}
-        <span className="absolute bottom-0 left-[68px] right-0 h-px bg-border" aria-hidden="true" />
+        <span className="absolute bottom-0 inset-x-0 h-px bg-border" aria-hidden="true" />
       </button>
 
       {loading && options.length === 0 ? (
@@ -164,7 +164,7 @@ export function MobileEntityPickerScreen({
               <span className="block h-3.5 rounded-full bg-black/[0.08] dark:bg-white/[0.08]" style={{ width: index % 2 ? 150 : 190 }} />
               <span className="block h-2.5 w-24 rounded-full bg-black/[0.08] dark:bg-white/[0.08]" />
             </span>
-            <span className="absolute bottom-0 left-[68px] right-0 h-px bg-border" />
+            <span className="absolute bottom-0 inset-x-0 h-px bg-border" />
           </div>
         ))
       ) : error && options.length === 0 ? (
@@ -198,7 +198,7 @@ export function MobileEntityPickerScreen({
                 {selected
                   ? <CheckCircle2 className="size-[22px] shrink-0 fill-ios-accent text-surface" aria-hidden="true" />
                   : <ChevronRight className="size-[18px] shrink-0 text-ios-label-secondary" strokeWidth={2.6} aria-hidden="true" />}
-                <span className="absolute bottom-0 left-[68px] right-0 h-px bg-border" aria-hidden="true" />
+                <span className="absolute bottom-0 inset-x-0 h-px bg-border" aria-hidden="true" />
               </button>
             );
           })}

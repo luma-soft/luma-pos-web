@@ -59,9 +59,9 @@ export function MobileDocumentRow({
     <div>
       {dayGroup ? <MobileDocumentDayHeader title={dayGroup.title} summary={dayGroup.summary} />
         : dayHeading ? <MobileDocumentDayHeader title={dayHeading} /> : null}
-      <div className={cn("flex min-w-0 items-center gap-3 pl-ios-inset", selected && "bg-primary-600/[0.06]")}>
+      <div className={cn("flex min-w-0 items-center gap-3 border-b border-border pl-ios-inset", selected && "bg-primary-600/[0.06]")}>
         {leading}
-        <div className="relative min-w-0 flex-1 border-b border-border py-ios-row pr-ios-inset">
+        <div className="relative min-w-0 flex-1 py-ios-row pr-ios-inset">
           <button
             type="button"
             onClick={() => {

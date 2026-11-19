@@ -120,7 +120,7 @@ export function MobileHistoryContent({
             <span className="text-[15px] font-semibold">{group.title}</span>
             <span className="text-[12px] tabular-nums text-ios-label-secondary">{t("daySummary", { count: group.items.length, total: formatCurrency(group.total) })}</span>
           </div>
-          <div className="[&>*:last-child_[data-row-line]]:border-b-0">
+          <div className="[&>*:last-child]:border-b-0">
             {group.items.map((item) => <div key={item.id}>{item.row}</div>)}
           </div>
         </section>
@@ -138,9 +138,9 @@ export function MobileHistoryRow({ onOpen, children, label }: { onOpen?: () => v
       type={onOpen ? "button" : undefined}
       onClick={onOpen}
       aria-label={onOpen ? label : undefined}
-      className="block w-full pl-ios-inset text-left active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+      className="block w-full border-b border-border pl-ios-inset text-left active:bg-black/[0.04] dark:active:bg-white/[0.06]"
     >
-      <span data-row-line className="flex items-center gap-3 border-b border-border py-ios-row pr-ios-inset">{children}</span>
+      <span data-row-line className="flex items-center gap-3 py-ios-row pr-ios-inset">{children}</span>
     </Tag>
   );
 }

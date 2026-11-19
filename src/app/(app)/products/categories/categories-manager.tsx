@@ -350,7 +350,7 @@ function MobileCategoryRow({
       className={cn(
         "flex min-h-[62px] items-center gap-2 py-2 pl-ios-inset pr-2",
         // Child rows get the list hairline, inset to their indentation.
-        depth > 0 && "bg-[linear-gradient(var(--color-border),var(--color-border))] bg-[length:calc(100%-34px)_1px] bg-right-top bg-no-repeat",
+        depth > 0 && "bg-[linear-gradient(var(--color-border),var(--color-border))] bg-[length:100%_1px] bg-right-top bg-no-repeat",
       )}
       style={{ paddingLeft: 16 + depth * 18 }}
     >

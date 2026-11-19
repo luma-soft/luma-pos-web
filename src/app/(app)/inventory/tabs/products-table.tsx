@@ -560,7 +560,7 @@ export function ProductsTable({
           const expanded = isExpanded(product);
           return <div>
             {/* Native variant-group row: tinted, "N mã hàng ›", from-price and total stock. */}
-            <div className={cn("flex min-w-0 items-center gap-3 bg-primary-600/[0.08] pl-ios-inset", selected(product) && "bg-primary-600/[0.14]")}>
+            <div className={cn("flex min-w-0 items-center gap-3 border-b border-border bg-primary-600/[0.08] pl-ios-inset", selected(product) && "bg-primary-600/[0.14]")}>
               {mobileSelection && <MobileSelectionIndicator selected={selected(product)} label={t("products.bulk.selectProduct", { name: product.name })} onToggle={() => toggleProduct(product)} />}
               <ProductGroupMobileButton
                 product={product}
@@ -575,7 +575,7 @@ export function ProductsTable({
               />
             </div>
             {expanded && <>
-              <div className="pl-ios-inset">
+              <div>
                 {membersFor(product).members.map((member) => <ProductMobileRow key={member.id} product={{ ...member, variantGroup: undefined }} variantRow selectionEnabled={mobileSelection} selected={selectedIds.has(member.id)} selectLabel={t("products.bulk.selectProduct", { name: member.name })} stockNotTrackedLabel={t("products.stock.notTracked")} selectedUnitName={selectedUnitName(member)} onUnitChange={(unitName) => changeUnit(member.id, unitName)} onToggle={() => toggle(member.id)} onOpen={() => openProduct(member)} />)}
               </div>
               <div className="border-b border-border">{groupControls(product)}</div>
@@ -741,11 +741,12 @@ export function ProductMobileRow({
 
   // NativeProductRow: thumbnail, 17pt name, SKU and group, then price, unit and "On hand" on the right.
   return (
-    <div className={cn("flex min-w-0 items-center gap-3 pl-ios-inset", selected && "bg-primary-600/[0.06]")}>
+    // Full-bleed hairline on the row itself, like iOS list rows.
+    <div className={cn("flex min-w-0 items-center gap-3 border-b border-border", variantRow ? "pl-8" : "pl-ios-inset", selected && "bg-primary-600/[0.06]")}>
       {selectionEnabled && (
         <MobileSelectionIndicator selected={selected} label={selectLabel} onToggle={onToggle} />
       )}
-      <div className="relative min-h-[94px] min-w-0 flex-1 border-b border-border py-ios-row pr-ios-inset">
+      <div className="relative min-h-[94px] min-w-0 flex-1 py-ios-row pr-ios-inset">
         {/* One hit target for the row; the unit selector takes precedence. */}
         <button
           type="button"
@@ -832,7 +833,7 @@ function ProductGroupMobileButton({
       onClick={() => { if (!longPress.consumeClick()) onToggle(); }}
       {...longPress.handlers}
       aria-expanded={expanded}
-      className="flex min-h-[94px] min-w-0 flex-1 items-center gap-3 border-b border-border py-ios-row pr-ios-inset text-left [-webkit-touch-callout:none] active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+      className="flex min-h-[94px] min-w-0 flex-1 items-center gap-3 py-ios-row pr-ios-inset text-left [-webkit-touch-callout:none] active:bg-black/[0.04] dark:active:bg-white/[0.06]"
     >
       <ProductThumbnail product={product} largeOnMobile />
       <span className="min-w-0 flex-1">
@@ -878,6 +879,11 @@ export function SelectionCheckbox({
       />
     </label>
   );
+}
+
+/** iOS NativeInventoryFormatting.currency: "200.000đ". */
+function formatNativeCurrency(value: number) {
+  return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(value)}đ`;
 }
 
 /** Up to this many SKUs, the detail shows every option as a chip instead of a dropdown. */
@@ -982,42 +988,8 @@ export function ProductDetailView({
     startVariantSwitch(() => router.replace(`${Routes.productDetail(id)}?detailTab=${tab}`, { scroll: false }));
   };
   const variantBusyClass = switchingVariant && "pointer-events-none animate-pulse opacity-60 transition-opacity";
-  const effectiveActive = product.isVariantParent
-    ? product.children.some((child) => child.isActive)
-    : product.isActive;
-
-  if (cameraMaterials) {
-    return (
-      <div className={cn("bg-surface px-4 py-4", surface === "modal" && "flex h-full min-h-0 flex-col", surface === "page" && "rounded-card border border-border-soft")}>
-        <div className={cn("grid gap-4 sm:grid-cols-3", surface === "modal" && "min-h-0 flex-1 overflow-y-auto")}>
-          <InfoItem label={t("products.fields.sku")} value={product.sku} />
-          <InfoItem label={t("products.pricing.retailPrice")} value={formatCurrency(Number(product.retailPrice))} />
-          <InfoItem label={t("products.list.colUnits")} value={product.baseUnit} />
-        </div>
-        <ProductActionBar product={product} cameraMaterials />
-      </div>
-    );
-  }
-
-  return (
-    <div className={cn("bg-canvas px-3 py-3 sm:bg-surface sm:px-4 sm:py-4 max-lg:px-0 max-lg:pt-0", surface === "modal" && "flex h-full min-h-0 flex-col", surface === "page" && "sm:rounded-card sm:border sm:border-border-soft")}>
-      {/* Phones: ProductDetailView's navigation bar, with every action in the "…" sheet. */}
-      <div className="shrink-0 lg:hidden">
-        <MobileDetailNav
-          title={t("mobile.products.title")}
-          actions={<ProductActionBar product={product} variant="menu" />}
-        />
-        <div aria-busy={switchingVariant || undefined} className={cn(variantBusyClass)}><ProductMobileHero product={product} /></div>
-      </div>
-      {group && <div className="mb-4 shrink-0 border-b border-border-soft pb-4 max-lg:px-3">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          {group.count <= VARIANT_CHIP_LIMIT
-            ? <span id={variantPickerId} className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("products.variants.version")}</span>
-            : <label htmlFor={variantPickerId} className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("products.variants.version")}</label>}
-          <span className="text-xs text-slate-500">{t("products.variants.count", { count: group.count })}</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 lg:gap-6">
-          {group.count <= VARIANT_CHIP_LIMIT ? (
+  const variantPicker = group ? (
+    group.count <= VARIANT_CHIP_LIMIT ? (
             <div role="radiogroup" aria-labelledby={variantPickerId} className="flex w-full min-w-0 flex-wrap gap-2 lg:max-w-3xl lg:flex-1">
               {group.members.map((member) => {
                 const active = member.id === activeVariantId;
@@ -1056,12 +1028,48 @@ export function ProductDetailView({
             optionClassName="min-h-16 py-3 lg:min-h-16"
             onValueChange={selectVariant}
           />
-          )}
+          )
+  ) : null;
+  const effectiveActive = product.isVariantParent
+    ? product.children.some((child) => child.isActive)
+    : product.isActive;
+
+  if (cameraMaterials) {
+    return (
+      <div className={cn("bg-surface px-4 py-4", surface === "modal" && "flex h-full min-h-0 flex-col", surface === "page" && "rounded-card border border-border-soft")}>
+        <div className={cn("grid gap-4 sm:grid-cols-3", surface === "modal" && "min-h-0 flex-1 overflow-y-auto")}>
+          <InfoItem label={t("products.fields.sku")} value={product.sku} />
+          <InfoItem label={t("products.pricing.retailPrice")} value={formatCurrency(Number(product.retailPrice))} />
+          <InfoItem label={t("products.list.colUnits")} value={product.baseUnit} />
+        </div>
+        <ProductActionBar product={product} cameraMaterials />
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("bg-canvas px-3 py-3 sm:bg-surface sm:px-4 sm:py-4 max-lg:px-0 max-lg:pt-0", surface === "modal" && "flex h-full min-h-0 flex-col", surface === "page" && "sm:rounded-card sm:border sm:border-border-soft")}>
+      {/* Phones: ProductDetailView's navigation bar, with every action in the "…" sheet. */}
+      <div className="shrink-0 lg:hidden">
+        <MobileDetailNav
+          title={t("mobile.products.title")}
+          actions={<ProductActionBar product={product} variant="menu" />}
+        />
+      </div>
+      {group && <div className="mb-4 shrink-0 border-b border-border-soft pb-4 max-lg:hidden">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          {group.count <= VARIANT_CHIP_LIMIT
+            ? <span id={variantPickerId} className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("products.variants.version")}</span>
+            : <label htmlFor={variantPickerId} className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("products.variants.version")}</label>}
+          <span className="text-xs text-slate-500">{t("products.variants.count", { count: group.count })}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 lg:gap-6">
+          {variantPicker}
           <Link href={groupActionHref(group.id, "groupEdit", params.toString())} className="inline-flex min-h-11 shrink-0 items-center gap-2 text-sm font-semibold text-primary-600 hover:underline dark:text-primary-300"><Pencil className="h-4 w-4" />{t("products.variants.editGroup")}</Link>
         </div>
         {needsVariant && <p className="mt-2 text-xs text-slate-500">{t("products.variants.chooseHint")}</p>}
       </div>}
-      <div className="-mx-3 flex shrink-0 snap-x snap-mandatory items-center gap-[22px] max-lg:mx-0 max-lg:scroll-px-4 max-lg:px-ios-inset overflow-x-auto border-b border-border-soft bg-surface px-4 text-sm font-semibold text-slate-500 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-4 sm:px-4 lg:mx-0 lg:gap-6 lg:px-0">
+      <div className="-mx-3 flex shrink-0 snap-x snap-mandatory items-center gap-[22px] max-lg:sticky max-lg:top-0 max-lg:z-10 max-lg:mx-0 max-lg:scroll-px-4 max-lg:px-ios-inset overflow-x-auto border-b border-border-soft bg-surface px-4 text-sm font-semibold text-slate-500 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-4 sm:px-4 lg:mx-0 lg:gap-6 lg:px-0">
         {PRODUCT_EXPAND_TABS.map((key) => (
           <button
             key={key}
@@ -1080,7 +1088,17 @@ export function ProductDetailView({
         ))}
       </div>
 
-      <div aria-busy={switchingVariant || undefined} className={cn("pt-3 sm:pt-4 max-lg:px-3 max-lg:pt-0", surface === "modal" && "min-h-0 flex-1 overflow-y-auto", variantBusyClass)}>
+      <div className={cn("pt-3 sm:pt-4 max-lg:pt-0", surface === "modal" && "min-h-0 flex-1 overflow-y-auto")}>
+        {/* Phones: compact summary and variant chips scroll with the tab content, like iOS. */}
+        <div className="lg:hidden">
+          <div aria-busy={switchingVariant || undefined} className={cn(variantBusyClass)}><ProductMobileHero product={product} /></div>
+          {group && <div className="bg-surface px-ios-inset pb-3.5">
+            <p id={group.count <= VARIANT_CHIP_LIMIT ? undefined : `${variantPickerId}-hint`} className="mb-2 text-[12px] text-ios-label-secondary">{t("mobile.products.chooseVariantHint")}</p>
+            {variantPicker}
+          </div>}
+          <div className="h-px bg-border-soft" />
+        </div>
+        <div aria-busy={switchingVariant || undefined} className={cn("max-lg:px-3", variantBusyClass)}>
         {tab === "info" && (
           <ProductInfoPanel
             key={product.id}
@@ -1102,6 +1120,7 @@ export function ProductDetailView({
         )}
         {needsVariant && (tab === "stock" || tab === "stockCard") && <EmptyPanel message="Chọn một biến thể để xem tồn kho và lịch sử của SKU đó." />}
         {tab === "related" && <RelatedProductsPanel product={product} />}
+        </div>
       </div>
 
       <ProductActionBar product={product} />
@@ -1193,7 +1212,7 @@ function ProductInfoPanel({
         />
       )}
 
-      <div className="min-w-0 space-y-3 lg:space-y-4">
+      <div className="min-w-0 lg:space-y-4">
         <div className="flex items-start justify-between gap-3 max-lg:hidden">
           <div className="min-w-0 flex-1 text-center lg:text-left">
             <h3 className="text-balance break-words text-lg font-black leading-snug text-slate-900 lg:font-bold dark:text-slate-100">
@@ -1226,13 +1245,13 @@ function ProductInfoPanel({
 
         <div className="-mx-3 grid grid-cols-3 divide-x divide-border-soft border-b border-border-soft bg-surface py-1 lg:hidden">
           <ProductMetric
-            label={t("products.pricing.retailPrice")}
-            value={formatCurrency(Number(product.retailPrice))}
+            label={t("mobile.products.retailPrice")}
+            value={formatNativeCurrency(Number(product.retailPrice))}
             tone="primary"
           />
           <ProductMetric
             label={t("products.pricing.costPrice")}
-            value={formatCurrency(Number(product.costPrice))}
+            value={formatNativeCurrency(Number(product.costPrice))}
           />
           <ProductMetric
             label={t("products.stock.current")}
@@ -2606,28 +2625,27 @@ function specEntries(specs: unknown) {
 function ProductMobileHero({ product }: { product: ProductRow }) {
   const t = useTranslations();
   const image = product.imageUrls?.[0];
+  const imageCount = product.imageUrls?.length ?? 0;
   const tracked = isProductStockManaged(product.categoryName, product.productKind);
   const stock = Number(product.totalStock);
   const tone = NATIVE_STOCK_PILL[nativeStockTone(tracked, stock, Number(product.minLevel))];
+  // ProductDetailView.compactHero: 76pt image, name, "SKU · category", stock pill.
   return (
-    <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] items-center gap-3 border-b border-border-soft bg-canvas px-ios-inset pb-4 pt-2">
-      <div className="relative grid aspect-square place-items-center overflow-hidden rounded-[18px]">
+    <div className="flex items-start gap-3.5 bg-surface px-ios-inset py-3.5">
+      <div className="relative grid size-[76px] shrink-0 place-items-center overflow-hidden rounded-[12px] border border-border-soft bg-canvas">
         {image ? (
-          <Image src={image} alt={productDisplayName(product)} fill sizes="180px" className="object-contain" unoptimized />
+          <Image src={image} alt={productDisplayName(product)} fill sizes="76px" className="object-contain p-1" unoptimized />
         ) : (
-          <span className="flex flex-col items-center gap-2 text-ios-accent">
-            <Package className="size-10" strokeWidth={1.8} aria-hidden="true" />
-            <span className="text-[12px] text-ios-label-secondary">{t("mobile.products.noImage")}</span>
-          </span>
+          <Package className="size-[26px] text-ios-accent" strokeWidth={1.8} aria-label={t("mobile.products.noImage")} />
         )}
+        {imageCount > 1 && <span className="absolute bottom-1 right-1 rounded-full bg-black/60 px-1.5 py-px text-[11px] font-bold text-white">+{imageCount - 1}</span>}
       </div>
-      <div className="min-w-0 space-y-2">
-        <h2 className="text-[20px] font-bold leading-[25px] [overflow-wrap:anywhere]">{productDisplayName(product)}</h2>
-        <p className="text-[15px] text-ios-label-secondary">{product.sku}</p>
-        <span className={cn("inline-flex rounded-full px-2.5 py-1.5 text-[15px] font-medium leading-none", tone)}>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <h2 className="line-clamp-2 text-[17px] font-bold leading-[22px] [overflow-wrap:anywhere]">{productDisplayName(product)}</h2>
+        <p className="truncate text-[15px] text-ios-label-secondary">{[product.sku || "—", product.categoryName].filter(Boolean).join(" · ")}</p>
+        <span className={cn("inline-flex rounded-full px-2 py-[3px] text-[13px] font-semibold leading-[18px]", tone)}>
           {!tracked ? t("products.stock.notTracked") : stock === 0 ? t("mobile.products.stockOut") : t("mobile.products.stockLeft", { stock: productStockDisplay(product, t("products.stock.notTracked")) })}
         </span>
-        {product.categoryName && <p className="pt-2 text-[15px] text-ios-label-secondary">{product.categoryName}</p>}
       </div>
     </div>
   );
@@ -2638,14 +2656,14 @@ function ProductMobileInfo({ product }: { product: ProductRow }) {
   const t = useTranslations();
   const tracked = isProductStockManaged(product.categoryName, product.productKind);
   const row = (label: string, value: string | null | undefined, tone?: string) => (
-    <div key={label} className="flex min-h-11 items-center justify-between gap-4 border-b border-border-soft py-2.5 text-[17px]">
-      <span className="shrink-0 text-ios-label">{label}</span>
-      <span className={cn("min-w-0 text-right [overflow-wrap:anywhere]", tone ?? "text-ios-label-secondary")}>{value || "–"}</span>
+    <div key={label} className="flex min-h-[38px] items-center justify-between gap-4 border-b border-border-soft px-ios-inset py-2 text-[15px] font-medium">
+      <span className="shrink-0 text-[#596170] dark:text-ios-label-secondary">{label}</span>
+      <span className={cn("min-w-0 text-right [overflow-wrap:anywhere]", tone ?? "text-ios-label")}>{value || "–"}</span>
     </div>
   );
   return (
-    <div className="space-y-1 lg:hidden">
-      <h3 className="pb-1 pt-2 text-[20px] font-bold">{t("mobile.products.basicInfo")}</h3>
+    <div className="-mx-3 bg-surface lg:hidden">
+      <h3 className="flex min-h-[42px] items-center border-b border-border-soft px-ios-inset text-[17px] font-extrabold">{t("mobile.products.basicInfo")}</h3>
       {row(t("mobile.products.sku"), product.sku)}
       {row(t("mobile.products.barcode"), product.barcode)}
       {row(t("mobile.products.category"), product.categoryName)}
@@ -2654,16 +2672,16 @@ function ProductMobileInfo({ product }: { product: ProductRow }) {
       {tracked && Number(product.minLevel) > 0 && row(t("mobile.products.minStock"), formatNumber(Number(product.minLevel)))}
       {Number(product.weight) > 0 ? row(t("mobile.products.weight"), formatNumber(Number(product.weight))) : null}
       {product.dimensions ? row(t("mobile.products.dimensions"), product.dimensions) : null}
-      <h3 className="pb-1 pt-4 text-[20px] font-bold">{t("mobile.products.unitsAndPrices")}</h3>
-      <div className="flex items-center justify-between gap-3 rounded-[16px] bg-black/[0.04] px-4 py-3 dark:bg-white/[0.06]">
+      <h3 className="flex min-h-[42px] items-center border-b border-border-soft px-ios-inset text-[17px] font-extrabold">{t("mobile.products.unitsAndPrices")}</h3>
+      <div className="mx-ios-inset my-3 flex items-center justify-between gap-3 rounded-[16px] bg-black/[0.04] px-4 py-3 dark:bg-white/[0.06]">
         <span>
           <span className="block text-[17px] font-semibold">{t("mobile.products.baseUnit")}</span>
           <span className="block text-[13px] text-ios-label-secondary">{t("mobile.products.baseUnitHint")}</span>
         </span>
         <span className="text-[17px] text-ios-label-secondary">{product.baseUnit}</span>
       </div>
-      {row(t("mobile.products.costPrice"), formatCurrency(Number(product.costPrice)), "font-semibold text-ios-accent")}
-      {row(t("mobile.products.retailPrice"), formatCurrency(Number(product.retailPrice)), "font-semibold text-ios-accent")}
+      {row(t("mobile.products.costPrice"), formatNativeCurrency(Number(product.costPrice)), "font-extrabold text-ios-accent")}
+      {row(t("mobile.products.retailPrice"), formatNativeCurrency(Number(product.retailPrice)), "font-extrabold text-ios-accent")}
     </div>
   );
 }
