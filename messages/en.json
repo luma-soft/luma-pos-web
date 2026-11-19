@@ -2153,7 +2153,14 @@
       "stopSelling": "Stop selling",
       "resumeSelling": "Resume selling",
       "delete": "Delete product",
-      "moreTitle": "More actions"
+      "moreTitle": "More actions",
+      "editTitle": "Edit product",
+      "createTitle": "New product",
+      "tabs": {
+        "info": "Basics",
+        "variants": "Units & attributes",
+        "description": "Description"
+      }
     }
   },
   "toolsCenter": {

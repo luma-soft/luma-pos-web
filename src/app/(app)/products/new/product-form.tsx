@@ -1,5 +1,7 @@
 "use client";
 
+import { usePhoneLayout } from "@/components/use-phone-layout";
+
 import { isPriceBookReadOnly } from "@/lib/pricing/system-price-books";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -190,6 +192,7 @@ export function NewProductForm({
   const storageScope = useTenantClientScope();
   const scheduleAppDataRefreshOnReturn = useRefreshAppDataOnReturn();
   const t = useTranslations();
+  const isPhone = usePhoneLayout();
   const router = useRouter();
   const dismissProductModalAfterSave = useDismissProductModalAfterSave();
   const [tab, setTab] = useState<Tab>(initialValues?.variantOperation === "add" ? "variants" : "info");
@@ -598,11 +601,14 @@ export function NewProductForm({
     >
       <header className={cn(
         "z-10 flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 sm:px-6 lg:gap-3",
+        // Phones: ProductEditorView's bar — capsule Hủy / Lưu around a centred title.
+        "max-lg:border-0 max-lg:bg-canvas max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] dark:max-lg:bg-canvas",
         !isModal && "sticky top-0",
       )}>
         <div className="flex min-w-0 flex-1 items-center gap-2 lg:flex-none lg:gap-3">
           <Button type="button" variant="ghost" onClick={close} tx="common.cancel"
-            className="min-h-11 shrink-0 px-1.5 text-sm lg:hidden" />
+            data-button-radius="pill"
+            className="min-h-11 shrink-0 rounded-full border border-black/[0.06] bg-surface/90 px-4 text-[17px] text-ios-accent shadow-[0_2px_10px_rgb(0_0_0/0.08)] backdrop-blur-md hover:bg-surface dark:border-white/10 lg:hidden" />
           {!isModal && (
             <Button type="button" variant="ghost" size="iconSm" onClick={close}
               aria-label={t("common.back")} className="hidden h-9 w-9 shrink-0 rounded-xl lg:inline-flex">
@@ -612,10 +618,10 @@ export function NewProductForm({
           <Heading
             id={isModal ? "product-editor-title" : undefined}
             as="h1" size="lg"
-            className="min-w-0 flex-1 truncate text-center text-[15px] lg:text-left lg:text-lg"
-            text={groupEditing ? (groupAdding ? "Thêm hàng hóa cùng loại" : "Sửa nhóm biến thể") : t(
-              isEdit ? `products.kind.editTitles.${productKind}` : `products.kind.createTitles.${productKind}`,
-            )}
+            className="min-w-0 flex-1 truncate text-center text-[17px] font-semibold lg:text-left lg:text-lg"
+            text={groupEditing ? (groupAdding ? "Thêm hàng hóa cùng loại" : "Sửa nhóm biến thể") : isPhone && productKind === "product"
+              ? t(isEdit ? "mobile.products.editTitle" : "mobile.products.createTitle")
+              : t(isEdit ? `products.kind.editTitles.${productKind}` : `products.kind.createTitles.${productKind}`)}
           />
         </div>
         <Button type="submit"
@@ -623,7 +629,8 @@ export function NewProductForm({
           loadingMode="replace"
           disabled={form.formState.isSubmitting && submitIntent !== "save"}
           onClick={() => setSubmitIntent("save")} tx="common.save"
-          className="min-h-11 shrink-0 lg:hidden" />
+          variant="ghost" data-button-radius="pill"
+          className="min-h-11 shrink-0 rounded-full border border-black/[0.06] bg-surface/90 px-4 text-[17px] text-ios-accent shadow-[0_2px_10px_rgb(0_0_0/0.08)] backdrop-blur-md hover:bg-surface dark:border-white/10 font-semibold lg:hidden" />
         {isModal ? (
           <div className="hidden lg:block">
             <Button type="button" variant="ghost" size="iconSm"
@@ -655,13 +662,14 @@ export function NewProductForm({
               aria-current={tab === tk ? "step" : undefined}
               title={t(`products.tabs.${tk}`)}
               className={cn(
-                "min-h-12 min-w-0 flex-1 border-b-2 px-1 py-2 text-center text-[13px] font-semibold transition-colors min-[390px]:text-sm lg:min-h-11 lg:min-w-11 lg:flex-none lg:py-3 lg:text-sm lg:font-medium",
+                "min-h-12 min-w-0 flex-1 whitespace-nowrap border-b-2 px-1 py-2 text-center text-[13px] font-semibold transition-colors min-[390px]:text-sm max-lg:text-[13px] lg:min-h-11 lg:min-w-11 lg:flex-none lg:py-3 lg:text-sm lg:font-medium",
                 tab === tk
                   ? "border-primary-600 text-primary-600"
                   : "border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400",
               )}
             >
-              {t(`products.tabs.${tk}`)}
+              <span className="lg:hidden">{t(`mobile.products.tabs.${tk}`)}</span>
+              <span className="max-lg:hidden">{t(`products.tabs.${tk}`)}</span>
             </button>
           ))}
         </div>
@@ -1416,7 +1424,7 @@ function BasicInfoSection({
 
   return (
     <div className="space-y-4 px-1 sm:px-4">
-      {!groupEditing && <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {!groupEditing && <div className="grid grid-cols-1 gap-4 max-lg:grid-cols-2 max-lg:gap-3 sm:grid-cols-2">
         <Field labelTx="products.fields.sku">
           <Input
             {...register("sku")}
@@ -1440,7 +1448,7 @@ function BasicInfoSection({
         )}
       </FormField>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 max-lg:grid-cols-2 max-lg:gap-3 sm:grid-cols-2">
         <FormField
           name="categoryId"
           labelTx="products.fields.category"

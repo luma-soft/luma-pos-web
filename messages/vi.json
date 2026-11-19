@@ -2153,7 +2153,14 @@
       "stopSelling": "Ngừng bán",
       "resumeSelling": "Bán lại",
       "delete": "Xóa sản phẩm",
-      "moreTitle": "Thao tác khác"
+      "moreTitle": "Thao tác khác",
+      "editTitle": "Chỉnh sửa sản phẩm",
+      "createTitle": "Thêm sản phẩm",
+      "tabs": {
+        "info": "Cơ bản",
+        "variants": "Đơn vị & Thuộc tính",
+        "description": "Mô tả"
+      }
     }
   },
   "toolsCenter": {

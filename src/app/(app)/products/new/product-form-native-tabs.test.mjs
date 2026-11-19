@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 const src = readFileSync(new URL("./product-form.tsx", import.meta.url), "utf8");
 test("product wizard mobile tabs are equally sized and localized", () => {
   expect(src).toContain("flex items-end gap-0 lg:gap-6");
-  expect(src).toContain("min-h-12 min-w-0 flex-1 border-b-2");
+  expect(src).toContain("min-h-12 min-w-0 flex-1 whitespace-nowrap border-b-2");
+  // Phones show the native tab names (Cơ bản / Đơn vị & Thuộc tính / Mô tả).
+  expect(src).toContain("mobile.products.tabs.${tk}");
   expect(src).toContain('title={t(`products.tabs.${tk}`)}');
   expect(src).toContain("aria-current={tab === tk");
   expect(src).not.toContain('tk === "description" ? "Mô tả, ghi chú"');
