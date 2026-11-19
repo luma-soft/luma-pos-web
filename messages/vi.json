@@ -3910,46 +3910,6 @@
       "ready": "Phục vụ"
     }
   },
-  "import": {
-    "title": "Nhập dữ liệu",
-    "template": "Tải file mẫu",
-    "intro": "Nhập sản phẩm từ KiotViet, Sapo, POS365 hay bảng tính bất kỳ — CSV hoặc Excel (.xlsx). File xuất sản phẩm KiotViet dùng được ngay: tự ghép cột và bỏ qua dòng đơn vị quy đổi. Ghép cột, xem trước rồi xác nhận. Sản phẩm đã có được khớp theo mã hàng (SKU).",
-    "choose": "Chọn file CSV hoặc Excel",
-    "csvOnly": "CSV (.csv) hoặc Excel (.xlsx) — gồm cả file xuất SP KiotViet",
-    "mapTitle": "Ghép cột dữ liệu",
-    "rows": "dòng",
-    "ignore": "— bỏ qua —",
-    "preview": "Xem trước (5 dòng đầu)",
-    "dryRun": "Chạy thử",
-    "commit": "Nhập dữ liệu",
-    "fields": {
-      "name": "Tên hàng",
-      "sku": "Mã hàng (SKU)",
-      "barcode": "Mã vạch",
-      "category": "Nhóm hàng",
-      "unit": "Đơn vị",
-      "retailPrice": "Giá bán",
-      "costPrice": "Giá vốn",
-      "stock": "Tồn kho"
-    },
-    "previewTitle": "Kết quả chạy thử (chưa lưu)",
-    "doneTitle": "Nhập xong",
-    "total": "Số dòng",
-    "willCreate": "Sẽ tạo",
-    "created": "Đã tạo",
-    "willUpdate": "Sẽ cập nhật",
-    "updated": "Đã cập nhật",
-    "errCount": "Lỗi",
-    "newCats": "Sẽ tạo {count} nhóm hàng mới",
-    "rowN": "Dòng {n}",
-    "viewProducts": "Xem sản phẩm →",
-    "errors": {
-      "empty": "File không có dòng dữ liệu.",
-      "parse": "Không đọc được file. Dùng CSV hoặc .xlsx.",
-      "needName": "Hãy ghép cột Tên hàng trước.",
-      "noName": "thiếu tên hàng"
-    }
-  },
   "shifts": {
     "openTitle": "Mở ca",
     "openSub": "Bắt đầu ca với số tiền đầu ca.",
@@ -4227,12 +4187,9 @@
     "selectAll": "Chọn tất cả khách hàng",
     "emptyValue": "Chưa có",
     "actions": {
-      "importFile": "Import file",
       "more": "Thêm",
       "settings": "Cài đặt",
       "help": "Trợ giúp",
-      "exportFile": "Xuất file",
-      "exportDebtFile": "Xuất file công nợ",
       "payment": "Thanh toán",
       "adjust": "Điều chỉnh",
       "paymentDiscount": "Chiết khấu thanh toán",

@@ -12,7 +12,6 @@ import { getRawStorePrefs } from "@/lib/data/settings";
 import { parsePageSize } from "@/lib/pagination";
 import { Routes } from "@/lib/routes";
 import { formatCurrency } from "@/lib/utils";
-import { ReportExportButton } from "../reports/report-export-button";
 import { ReportPeriodFilter } from "../reports/report-period-filter";
 import { RevenueBookFilters } from "./revenue-book-filters";
 import { RevenueBookTable } from "./revenue-book-table";
@@ -91,7 +90,7 @@ async function AccountingDesktop({ searchParams }: { searchParams: Promise<Searc
     ? await getAccountingAuxiliaryBooks(context.storeId, dateRange.from, dateRange.toExclusive)
     : null;
   const classificationProducts = activeTab === "classification" ? await getTaxClassificationProducts(context.storeId) : null;
-  const exportData = data.total <= data.rows.length ? data : await getRevenueBook(context.storeId, prefs.tax, {
+  const periodRevenue = activeTab !== "income-expense" || data.total <= data.rows.length ? data : await getRevenueBook(context.storeId, prefs.tax, {
     from: dateRange.from,
     to: dateRange.toExclusive,
     q: params.q,
@@ -101,24 +100,14 @@ async function AccountingDesktop({ searchParams }: { searchParams: Promise<Searc
     pageSize: Math.min(data.total, 50_000),
   });
   const showActivity = book.code === "S2a-HKD";
-  const exportRows: (string | number | null)[][] = [[
-    "Ngày tháng", "Mã giao dịch", "Diễn giải",
-    ...(showActivity ? ["Nhóm ngành", "% GTGT", "% TNCN"] : []),
-    "Số tiền", "Kênh bán", "Số HĐĐT", "Ký hiệu HĐĐT", "Người tạo",
-  ], ...exportData.rows.map((row) => [
-    row.date.toISOString(), row.code, row.description,
-    ...(showActivity ? [row.activityName, row.vatRate, row.pitRate] : []),
-    row.amount, row.salesChannel, row.einvoiceNumber, row.einvoiceSerial, row.createdByName,
-  ])];
-  const exportButton = <ReportExportButton rows={exportRows} label="Tải sổ" filenamePrefix={`so-doanh-thu-${book.code.toLowerCase()}`} />;
 
   return (
     <div className="min-h-full bg-canvas">
-      <MobileTopBar title="Sổ kế toán" subtitle={`${book.title} (${book.code})`} trailing={<ReportExportButton rows={exportRows} iconOnly label="Tải sổ" filenamePrefix={`so-doanh-thu-${book.code.toLowerCase()}`} />} bottom={periodFilter} />
+      <MobileTopBar title="Sổ kế toán" subtitle={`${book.title} (${book.code})`} bottom={periodFilter} />
       <header className="sticky top-0 z-20 hidden border-b border-border bg-surface lg:block">
         <div className="flex min-h-[64px] items-center justify-between px-6">
           <div><Text as="h1" weight="bold" className="text-2xl" text="Sổ kế toán" /><p className="text-xs font-medium text-slate-500">{book.title} · {book.code}</p></div>
-          <div className="flex items-center gap-3">{periodFilter}{exportButton}</div>
+          <div className="flex items-center gap-3">{periodFilter}</div>
         </div>
       </header>
       <main className="space-y-4 p-3 sm:p-5 lg:p-6">
@@ -152,7 +141,7 @@ async function AccountingDesktop({ searchParams }: { searchParams: Promise<Searc
         <RevenueBookTable rows={data.rows} showActivity={showActivity} loadMore={{ page: data.page, pageCount: data.pageCount, loadPage: loadRevenueBookPage.bind(null, params) }} />
         <DesktopPagination><Pagination page={data.page} pageCount={data.pageCount} total={data.total} pageSize={data.pageSize} unitLabel="giao dịch" /></DesktopPagination>
         </>}
-        {activeTab === "income-expense" && auxiliary && <><BookHeading code="S2c-HKD" title="Sổ chi tiết doanh thu, chi phí" /><IncomeExpenseBook revenue={exportData.rows} purchases={auxiliary.purchases} expenses={auxiliary.expenses} /></>}
+        {activeTab === "income-expense" && auxiliary && <><BookHeading code="S2c-HKD" title="Sổ chi tiết doanh thu, chi phí" /><IncomeExpenseBook revenue={periodRevenue.rows} purchases={auxiliary.purchases} expenses={auxiliary.expenses} /></>}
         {activeTab === "inventory" && auxiliary && <><BookHeading code="S2d-HKD" title="Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa" /><InventoryDetailBook rows={auxiliary.inventory} /></>}
         {activeTab === "cash" && auxiliary && <><BookHeading code="S2e-HKD" title="Sổ chi tiết tiền" /><CashDetailBook rows={auxiliary.cash} /></>}
         {activeTab === "other-tax" && auxiliary && <><BookHeading code="S3a-HKD" title="Sổ theo dõi nghĩa vụ thuế khác" /><OtherTaxForm /><OtherTaxBook rows={auxiliary.taxes} /></>}

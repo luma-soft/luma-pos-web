@@ -9,7 +9,6 @@ import { getReportCustomers, getReportInvoices, getReportProducts, getReports } 
 import { parsePageSize } from "@/lib/pagination";
 import { Routes } from "@/lib/routes";
 import { CustomersReport, OrdersReport, OverviewReport, ProductsReport } from "./report-dashboard";
-import { ReportExportButton } from "./report-export-button";
 import { ReportPeriodFilter, type ReportPeriod } from "./report-period-filter";
 
 interface PageProps {
@@ -53,7 +52,6 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     activeTab === "products" ? getReportProducts(context.storeId, dateRange.rangeDays, filters, page, pageSize) : null,
     activeTab === "customers" ? getReportCustomers(context.storeId, dateRange.rangeDays, filters, page, pageSize) : null,
   ]);
-  const exportRows = makeExportRows(activeTab, data, invoices?.rows, products?.rows, reportCustomers?.rows);
   return (
     <div className="min-h-full bg-canvas">
       <header className="sticky top-0 z-20 border-b border-border bg-surface">
@@ -77,7 +75,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           </div>
           <div className="flex items-end justify-between px-6 pb-2">
             <div className="min-w-0 flex-1 pr-6"><GroupTabs base={Routes.Reports} items={REPORT_TABS} preserveParams={REPORT_FILTER_PARAMS} /></div>
-            <div className="flex shrink-0 items-center gap-3"><ReportPeriodFilter period={period} from={dateRange.fromValue} to={dateRange.toValue} /><ReportExportButton rows={exportRows} /></div>
+            <div className="flex shrink-0 items-center gap-3"><ReportPeriodFilter period={period} from={dateRange.fromValue} to={dateRange.toValue} /></div>
           </div>
         </div>
       </header>
@@ -92,13 +90,6 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   );
 }
 
-function makeExportRows(activeTab: string, data: Awaited<ReturnType<typeof getReports>>, invoices?: Awaited<ReturnType<typeof getReportInvoices>>["rows"], products?: Awaited<ReturnType<typeof getReportProducts>>["rows"], customers?: Awaited<ReturnType<typeof getReportCustomers>>["rows"]) {
-  const summary: (string | number | null)[][] = [["Chỉ số", "Giá trị"], ["Doanh thu thuần", data.summary.revenue], ["Giá vốn", data.summary.costOfGoods], ["Lãi gộp", data.summary.grossProfit], ["Biên lãi gộp", data.summary.grossMargin], ["Hoàn trả", data.summary.refundTotal]];
-  if (activeTab === "invoices" && invoices) return [["Mã đơn", "Ngày", "Khách hàng", "Trạng thái", "Doanh thu thuần", "Giá vốn", "Lãi gộp", "Biên lãi", "Hoàn trả"], ...invoices.map((row) => [row.code, row.createdAt.toISOString(), row.customerName, row.status, row.total, row.cost, row.profit, row.margin, row.refund])];
-  if (activeTab === "products" && products) return [["Sản phẩm", "SL bán", "Doanh thu thuần", "Giá vốn", "Lãi gộp", "Biên lãi", "Hoàn trả"], ...products.map((row) => [row.productName, row.qtySold, row.revenue, row.cost, row.profit, row.margin, row.returnCount])];
-  if (activeTab === "customers" && customers) return [["Khách hàng", "Loại khách", "Số đơn", "Doanh thu thuần", "Lãi gộp", "Biên lãi", "Giá trị TB"], ...customers.map((row) => [row.customerName, row.segment, row.orderCount, row.revenue, row.profit, row.margin, row.averageOrder])];
-  return summary;
-}
 
 function resolveDateRange(period: ReportPeriod, fromParam?: string, toParam?: string) {
   const today = startOfDay(new Date());

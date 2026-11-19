@@ -3910,46 +3910,6 @@
       "ready": "Serve"
     }
   },
-  "import": {
-    "title": "Import data",
-    "template": "Download template",
-    "intro": "Import products from KiotViet, Sapo, POS365 or any spreadsheet — CSV or Excel (.xlsx). KiotViet's product export works directly: headers are auto-mapped and conversion-unit rows are skipped. Map columns, preview, then confirm. Existing products are matched by code (SKU).",
-    "choose": "Choose a CSV or Excel file",
-    "csvOnly": "CSV (.csv) or Excel (.xlsx) — incl. KiotViet product export",
-    "mapTitle": "Map columns",
-    "rows": "rows",
-    "ignore": "— ignore —",
-    "preview": "Preview (first 5 rows)",
-    "dryRun": "Dry run",
-    "commit": "Import",
-    "fields": {
-      "name": "Product name",
-      "sku": "Code (SKU)",
-      "barcode": "Barcode",
-      "category": "Category",
-      "unit": "Unit",
-      "retailPrice": "Retail price",
-      "costPrice": "Cost price",
-      "stock": "Stock"
-    },
-    "previewTitle": "Dry-run result (nothing saved yet)",
-    "doneTitle": "Import complete",
-    "total": "Rows",
-    "willCreate": "To create",
-    "created": "Created",
-    "willUpdate": "To update",
-    "updated": "Updated",
-    "errCount": "Errors",
-    "newCats": "{count} new categories will be created",
-    "rowN": "Row {n}",
-    "viewProducts": "View products →",
-    "errors": {
-      "empty": "File has no data rows.",
-      "parse": "Couldn't read the file. Use CSV or .xlsx.",
-      "needName": "Map the Product name column first.",
-      "noName": "missing product name"
-    }
-  },
   "shifts": {
     "openTitle": "Open shift",
     "openSub": "Start your register with an opening float.",
@@ -4227,12 +4187,9 @@
     "selectAll": "Select all customers",
     "emptyValue": "Not set",
     "actions": {
-      "importFile": "Import file",
       "more": "More",
       "settings": "Settings",
       "help": "Help",
-      "exportFile": "Export file",
-      "exportDebtFile": "Export debt file",
       "payment": "Payment",
       "adjust": "Adjustment",
       "paymentDiscount": "Payment discount",

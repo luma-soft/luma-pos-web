@@ -17,9 +17,6 @@ import { useLocale, useTranslations } from "next-intl";
 import {
   Ban,
   CalendarDays,
-  Download,
-  FileDown,
-  FileInput,
   Pencil,
   Plus,
   Trash2,
@@ -417,16 +414,6 @@ function CustomerRows({
                 <Plus className="h-4 w-4" />
                 {t("customers.createNew")}
               </button>
-              <Link
-                href="/settings/import"
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "default" }),
-                  "shrink-0",
-                )}
-              >
-                <FileInput className="h-4 w-4" />
-                {t("customers.actions.importFile")}
-              </Link>
             </div>
           </div>
         }
@@ -1141,35 +1128,11 @@ function CustomerDetailFooter({
   customer: CustomerRow;
   tab: CustomerExpandTab;
 }) {
-  const t = useTranslations();
-
   if (tab === "info") return <CustomerActionBar customer={customer} />;
-  if (tab === "sales") {
-    return (
-      <div className="flex justify-start">
-        <ActionButton
-          icon={Download}
-          label={t("customers.actions.exportFile")}
-          disabled
-        />
-      </div>
-    );
-  }
+  if (tab === "sales") return null;
 
   return (
-    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-      <div className="flex flex-wrap gap-2">
-        <ActionButton
-          icon={FileDown}
-          label={t("customers.actions.exportDebtFile")}
-          onClick={() => exportCustomerDebtCsv(customer)}
-        />
-        <ActionButton
-          icon={Download}
-          label={t("customers.actions.exportFile")}
-          onClick={() => exportCustomerDebtCsv(customer)}
-        />
-      </div>
+    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-end">
       <div className="flex flex-wrap gap-2 xl:justify-end">
         <CustomerReceivableActions
           customerId={customer.id}
@@ -1178,31 +1141,6 @@ function CustomerDetailFooter({
       </div>
     </div>
   );
-}
-
-function exportCustomerDebtCsv(customer: CustomerRow) {
-  const quote = (value: unknown) =>
-    `"${String(value ?? "").replaceAll('"', '""')}"`;
-  const rows = [
-    ["Mã phiếu", "Thời gian", "Loại", "Giá trị", "Dư nợ khách hàng"],
-    ...customer.debtLedger.map((row) => [
-      row.code,
-      formatDate(row.createdAt),
-      row.typeLabel,
-      row.value,
-      row.balance,
-    ]),
-  ];
-  const blob = new Blob(
-    [`\ufeff${rows.map((row) => row.map(quote).join(",")).join("\n")}`],
-    { type: "text/csv;charset=utf-8" },
-  );
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `cong-no-${customer.code || customer.id}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 function CustomerActionBar({ customer }: { customer: CustomerRow }) {
