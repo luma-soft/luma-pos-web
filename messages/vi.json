@@ -2353,7 +2353,9 @@
     "breadcrumbs": {
       "calculation": "Công cụ · Tính toán",
       "printing": "Công cụ · In ấn"
-    }
+    },
+    "tileHint": "Tính sàn, tường, chân tường và hao hụt",
+    "labelsHint": "Thiết kế và in nhãn A4 theo module DIN"
   },
   "tileCalculator": {
     "title": "Tính gạch ốp lát",

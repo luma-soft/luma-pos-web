@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import type { ComponentType } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Calculator, Tags } from "lucide-react";
-import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/lib/routes";
 
@@ -75,33 +74,5 @@ export function ToolsNavigation() {
         </div>
       ))}
     </nav>
-  );
-}
-
-export function ToolsMobilePicker() {
-  const t = useTranslations("toolsCenter");
-  const router = useRouter();
-  const activeHref = useActiveTool();
-  const options = GROUPS.flatMap((group) => group.items.map((item) => ({
-    value: item.href,
-    label: `${t(`groups.${group.key}`)} · ${t(`items.${item.key}`)}`,
-  })));
-
-  return (
-    <div className="border-b border-border bg-surface px-4 py-3 md:hidden">
-      <div className="mb-2 flex items-baseline justify-between gap-3">
-        <span className="text-sm font-extrabold text-slate-900 dark:text-slate-100">{t("title")}</span>
-        <span className="text-[10px] italic text-slate-400">{t("subtitle")}</span>
-      </div>
-      <div className="[&>div]:w-full">
-        <Select
-          value={activeHref}
-          options={options}
-          onValueChange={(href) => router.push(href)}
-          aria-label={t("selectTool")}
-          className="w-full"
-        />
-      </div>
-    </div>
   );
 }

@@ -209,7 +209,7 @@ export function TileCalculator() {
           <p role="alert" className="mb-4 text-sm font-medium text-er">{t("copyFailed")}</p>
         )}
 
-        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[13rem_minmax(28rem,1fr)_20rem]">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[13rem_minmax(28rem,1fr)_20rem]">
           <RoomNavigator
             rooms={rooms}
             activeRoomId={activeRoom.id}

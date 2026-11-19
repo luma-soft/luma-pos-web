@@ -2353,7 +2353,9 @@
     "breadcrumbs": {
       "calculation": "Tools · Calculation",
       "printing": "Tools · Printing"
-    }
+    },
+    "tileHint": "Floors, walls, skirting and waste",
+    "labelsHint": "Design and print A4 labels by DIN module"
   },
   "tileCalculator": {
     "title": "Tile calculator",
