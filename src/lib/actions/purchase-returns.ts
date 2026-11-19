@@ -131,11 +131,6 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
         throw new Error("PRODUCT_NOT_FOUND");
       }
       const previous = id ? await reversePurchaseReturn(tx, gate.storeId, id, profileId, currentShift?.id ?? null) : null;
-      const originalItems = previous ? await tx.select().from(purchaseReturnItems).where(and(eq(purchaseReturnItems.storeId, gate.storeId), eq(purchaseReturnItems.purchaseReturnId, previous.id))) : [];
-      const originalStock = new Map<string, number>();
-      if (previous?.status === "completed" && previous.warehouseId === v.warehouseId) for (const item of originalItems) {
-        originalStock.set(item.productId, (originalStock.get(item.productId) ?? 0) + Number(item.quantity) * Number(item.unitMultiplier));
-      }
       const ids = v.items.map((item) => item.productId);
       const productRows = await tx
         .select({
@@ -149,22 +144,12 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
       if (productRows.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
       const productsById = new Map(productRows.map((product) => [product.id, product]));
 
-      const stockRows = await tx
-        .select({
-          productId: stockLevels.productId,
-          quantity: stockLevels.quantity,
-        })
+      // Lock the affected stock rows. Supplier returns may exceed current stock
+      // (e.g. stock not yet counted); the warehouse balance may go negative.
+      await tx
+        .select({ productId: stockLevels.productId })
         .from(stockLevels)
         .where(and(eq(stockLevels.storeId, gate.storeId), eq(stockLevels.warehouseId, v.warehouseId), inArray(stockLevels.productId, ids))).for("update");
-      const stockByProduct = new Map(stockRows.map((row) => [row.productId, Number(row.quantity)]));
-      // Existing historical deficits may remain, but an edit must not increase them.
-      for (const [productId, quantity] of originalStock) stockByProduct.set(productId, Math.max(stockByProduct.get(productId) ?? 0, quantity));
-      for (const item of v.items) {
-        const available = stockByProduct.get(item.productId) ?? 0;
-        const baseQuantity = item.quantity * (item.unitMultiplier ?? 1);
-        if (baseQuantity > available + 1e-9) throw new Error("INSUFFICIENT_STOCK");
-        stockByProduct.set(item.productId, available - baseQuantity);
-      }
 
       const values = {
         storeId: gate.storeId,
@@ -220,10 +205,15 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
           refId: ret.id,
           createdBy: profileId,
         });
-        await tx.update(stockLevels).set({
-          quantity: sql`${stockLevels.quantity} - ${toQty(baseQuantity)}`,
-          updatedAt: sql`now()`,
-        }).where(and(eq(stockLevels.storeId, gate.storeId), eq(stockLevels.productId, item.productId), eq(stockLevels.warehouseId, v.warehouseId)));
+        await tx.insert(stockLevels).values({
+          storeId: gate.storeId,
+          productId: item.productId,
+          warehouseId: v.warehouseId,
+          quantity: toQty(-baseQuantity),
+        }).onConflictDoUpdate({
+          target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
+          set: { quantity: sql`${stockLevels.quantity} - ${toQty(baseQuantity)}`, updatedAt: sql`now()` },
+        });
 
         await tx.insert(stockMovements).values({
           storeId: gate.storeId,

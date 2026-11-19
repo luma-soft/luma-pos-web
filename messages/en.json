@@ -4460,6 +4460,7 @@
     "emptyLinesTitle": "Add returned products",
     "emptyLinesHint": "Search by product code or name to add items.",
     "availableStock": "Current stock {stock} {unit}",
+    "purchasedQuantity": "Purchased quantity {qty} {unit}",
     "remainingToReturn": "Remaining to return: {stock} {unit}",
     "fullyReturned": "This product has been fully returned.",
     "fullyReturnedHint": "All quantities in this receipt have already been returned.",

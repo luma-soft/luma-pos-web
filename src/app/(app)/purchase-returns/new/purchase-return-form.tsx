@@ -114,6 +114,11 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
       [item.id, Number(item.remainingReturnBaseQuantity)] as const) ?? []),
     [initialPurchase],
   );
+  const sourceBaseQuantityByLine = useMemo(
+    () => new Map(initialPurchase?.items.map((item) =>
+      [item.id, Number(item.quantity) * (Number(item.unitMultiplier) || 1)] as const) ?? []),
+    [initialPurchase],
+  );
   const browseProducts = useMemo(
     () => catalog.products.filter((product) =>
       product.isStockManaged && (!linkedProductIds || linkedProductIds.has(product.id))),
@@ -218,30 +223,40 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
     return Math.max(0, (remainingBySourceLine.get(line.purchaseOrderItemId) ?? 0) / line.unitMultiplier);
   }
 
-  function totalStock(line: Line) {
+  /** Quantity received on the source purchase line, in the line's selected unit. */
+  function purchasedFromSource(line: Line) {
+    if (!initialPurchase || !line.purchaseOrderItemId) return null;
+    const baseQuantity = sourceBaseQuantityByLine.get(line.purchaseOrderItemId);
+    return baseQuantity == null ? null : baseQuantity / (line.unitMultiplier || 1);
+  }
+
+  /** Informational warehouse stock; supplier returns may exceed it (stock goes negative). */
+  function availableStock(line: Line) {
     // Return quantities are recorded in their selected unit; inventory is in base units.
     const restored = initial?.status === "completed" ? initial.items.reduce((sum, item) =>
       item.productId === line.productId ? sum + Number(item.quantity) * (Number(item.unitMultiplier) || 1) : sum, 0) : 0;
     const otherLines = lines.reduce((sum, item) => item.productId === line.productId && item.key !== line.key
       ? sum + item.quantity * item.unitMultiplier : sum, 0);
-    const currentStock = restored > 0 ? Math.max(0, line.stock) : line.stock;
-    const stockLimit = Math.max(0, (currentStock + restored - otherLines) / line.unitMultiplier);
-    if (!initialPurchase) return stockLimit;
-    // Even when the warehouse contains stock from other receipts, a linked
-    // supplier return cannot exceed this receipt's unreturned source quantity.
-    return Math.max(0, Math.min(stockLimit, remainingFromSource(line)));
+    const currentStock = Number.isFinite(line.stock) ? line.stock : 0;
+    return (currentStock + restored - otherLines) / line.unitMultiplier;
+  }
+
+  /** A linked supplier return cannot exceed the receipt's unreturned quantity; unlinked returns are unbounded. */
+  function returnLimit(line: Line) {
+    return initialPurchase ? remainingFromSource(line) : undefined;
+  }
+
+  function exceedsLimit(line: Line) {
+    const limit = returnLimit(line);
+    return limit != null && line.quantity > limit + 1e-9;
   }
 
   async function submit() {
     if (busy || submitInFlightRef.current || !supplierId || !warehouseId || selectedLines.length === 0) return;
     const invalid = lines.some((line) => !Number.isFinite(line.quantity) || line.quantity < 0)
-      || selectedLines.some((line) => line.returnUnitCost < 0 || line.quantity > totalStock(line) + 1e-9);
+      || selectedLines.some((line) => line.returnUnitCost < 0 || exceedsLimit(line));
     if (invalid) {
-      const sourceExceeded = initialPurchase && lines.some((line) =>
-        line.quantity > remainingFromSource(line) + 1e-9);
-      setError(t(sourceExceeded
-        ? "purchaseReturns.errors.qtyExceedsSource"
-        : "purchaseReturns.errors.insufficientStock"));
+      setError(t(lines.some(exceedsLimit) ? "purchaseReturns.errors.qtyExceedsSource" : "errors.invalidData"));
       return;
     }
     submitInFlightRef.current = true;
@@ -362,7 +377,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                             size="sm"
                             className="w-[8.25rem] max-lg:w-[124px]"
                             min={0}
-                            max={totalStock(line)}
+                            max={returnLimit(line)}
                             value={line.quantity}
                             onChange={(quantity) => patch(line.key, { quantity })}
                             inputLabel={t("common.productQuantity", { product: product.name })}
@@ -389,7 +404,8 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
               ) : (
                 <div className="space-y-2 p-3">
                   {lines.map((line) => {
-                    const overStock = line.quantity > totalStock(line) + 1e-9;
+                    const overStock = exceedsLimit(line);
+                    const purchased = purchasedFromSource(line);
                     return (
                       <MobileFormLineCard
                         key={line.key}
@@ -410,14 +426,14 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                       >
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
-                            <div className="text-xs font-semibold text-slate-500">{t(initialPurchase ? "purchaseReturns.remainingToReturn" : "purchaseReturns.availableStock", { stock: formatNumber(totalStock(line)), unit: line.unitName })}</div>
+                            <div className="text-xs font-semibold text-slate-500">{t(initialPurchase ? "purchaseReturns.remainingToReturn" : "purchaseReturns.availableStock", { stock: formatNumber(initialPurchase ? remainingFromSource(line) : availableStock(line)), unit: line.unitName })}</div>
                             <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{line.unitName}</div>
                           </div>
                           <div className="col-span-2 space-y-1 text-xs font-semibold text-slate-500">
                             <span>{t("purchaseReturns.cols.qty")}</span>
                             <QuantityInput
                               min={0}
-                              max={totalStock(line)}
+                              max={returnLimit(line)}
                               value={line.quantity}
                               onChange={(quantity) => patch(line.key, { quantity })}
                               touchTargets
@@ -427,7 +443,8 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                               className={cn("min-h-11", overStock && "border-er text-er")}
                               inputClassName={cn(overStock && "border-er text-er")}
                             />
-                            {overStock && <span className="block text-er">{t(initialPurchase && line.quantity > remainingFromSource(line) + 1e-9 ? "purchaseReturns.errors.qtyExceedsSource" : "purchaseReturns.errors.insufficientStock")}</span>}
+                            {purchased != null && <span className="block text-right tabular-nums text-slate-500" title={t("purchaseReturns.purchasedQuantity", { qty: formatNumber(purchased), unit: line.unitName })}>/{formatNumber(purchased)}</span>}
+                            {overStock && <span className="block text-er">{t("purchaseReturns.errors.qtyExceedsSource")}</span>}
                           </div>
                           <div className="space-y-1">
                             <div className="text-xs font-semibold text-slate-500">{t("purchaseReturns.cols.unitCost")}</div>
@@ -477,27 +494,33 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                     </td>
                   </tr>
                 ) : lines.map((line, index) => {
-                  const overStock = line.quantity > totalStock(line) + 1e-9;
+                  const overStock = exceedsLimit(line);
+                    const purchased = purchasedFromSource(line);
                   return (
                     <tr key={line.key}>
                       <td className="px-3 py-2 text-center text-slate-500">{index + 1}</td>
                                             <td className="px-3 py-2">
                         <div className="truncate font-medium">{line.name}</div>
                         <div className={cn("text-xs", overStock ? "text-er" : "text-slate-400")}>
-                          {t(initialPurchase ? "purchaseReturns.remainingToReturn" : "purchaseReturns.availableStock", { stock: formatNumber(totalStock(line)), unit: line.unitName })}
+                          {t(initialPurchase ? "purchaseReturns.remainingToReturn" : "purchaseReturns.availableStock", { stock: formatNumber(initialPurchase ? remainingFromSource(line) : availableStock(line)), unit: line.unitName })}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-slate-500">{line.unitName}</td>
                       <td className="px-3 py-2">
                         <QuantityInput
                           min={0}
-                          max={totalStock(line)}
+                          max={returnLimit(line)}
                           value={line.quantity}
                           onChange={(quantity) => patch(line.key, { quantity })}
                           size="sm"
                           className={cn("w-28", overStock && "border-er text-er")}
                           inputClassName={cn(overStock && "border-er text-er")}
                         />
+                        {purchased != null && (
+                          <div className="mt-1 w-28 text-right text-xs tabular-nums text-slate-500" title={t("purchaseReturns.purchasedQuantity", { qty: formatNumber(purchased), unit: line.unitName })}>
+                            /{formatNumber(purchased)}
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-slate-500">{formatCurrency(line.unitCost)}</td>
                       <td className="px-3 py-2">

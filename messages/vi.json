@@ -4460,6 +4460,7 @@
     "emptyLinesTitle": "Thêm sản phẩm trả hàng",
     "emptyLinesHint": "Tìm theo mã hoặc tên sản phẩm để thêm vào phiếu.",
     "availableStock": "Tồn hiện tại {stock} {unit}",
+    "purchasedQuantity": "Số lượng đã nhập {qty} {unit}",
     "remainingToReturn": "Còn được trả {stock} {unit}",
     "fullyReturned": "Sản phẩm đã được trả hết.",
     "fullyReturnedHint": "Phiếu nhập này đã được trả hết, không còn số lượng có thể trả tiếp.",
