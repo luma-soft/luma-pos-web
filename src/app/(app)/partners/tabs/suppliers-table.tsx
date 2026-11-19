@@ -4,7 +4,7 @@ import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load
 import { usePhoneLayout } from "@/components/use-phone-layout";
 import { MobileBottomSearchBar } from "@/components/mobile-bottom-bar";
 import { SupplierCreateDialog, type SupplierCreateResult } from "@/components/partners/supplier-create-dialog";
-import { MobileListTotalsCard } from "./customer-mobile";
+import { MobileListTotalsCard, nativeCurrency } from "./customer-mobile";
 import { MobileSupplierDetail, MobileSupplierFilterScreen, SupplierMobileRow } from "./supplier-mobile";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -337,9 +337,10 @@ export function SuppliersTable({
     <>
       {/* Phones: LumaListTotalsCard above the plain list (SuppliersView). */}
       <MobileListTotalsCard
+        large
         metrics={[
-          { id: "purchase", title: t("mobile.suppliers.totalPurchase"), value: formatCurrency(totalPurchase), tone: "text-ios-accent" },
-          { id: "debt", title: t("mobile.suppliers.totalDebt"), value: formatCurrency(totalDebt), tone: totalDebt > 0 ? "text-ios-red" : "text-ios-label-secondary" },
+          { id: "purchase", title: t("mobile.suppliers.totalPurchase"), value: nativeCurrency(totalPurchase), tone: "text-ios-accent" },
+          { id: "debt", title: t("mobile.suppliers.totalDebt"), value: nativeCurrency(totalDebt), tone: totalDebt > 0 ? "text-ios-red" : "text-ios-label-secondary" },
         ]}
       />
       <DataTableShell

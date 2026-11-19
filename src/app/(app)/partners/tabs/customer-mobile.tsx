@@ -89,16 +89,43 @@ function initials(name: string) {
   return name.trim().split(/\s+/).slice(-2).map((part) => part[0] ?? "").join("").toLocaleUpperCase("vi");
 }
 
-/** LumaListTotalsCard with centred metrics separated by hairlines. */
-export function MobileListTotalsCard({ metrics }: { metrics: Array<{ id: string; title: string; value: string; tone?: string }> }) {
+/** NativeInventoryFormatting.currency: 4.514.112.891đ (no space, plain "đ"). */
+export function nativeCurrency(value: number) {
+  return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(Math.round(value))}đ`;
+}
+
+/**
+ * LumaListTotalsCard with centred metrics separated by hairlines. `large` is the
+ * SuppliersView variant (subheadline titles, headline values, 22pt title row).
+ */
+export function MobileListTotalsCard({ metrics, large = false }: { metrics: Array<{ id: string; title: string; value: string; tone?: string }>; large?: boolean }) {
   return (
     <div className="mx-ios-inset mb-1.5 flex items-start rounded-[8px] bg-surface px-3.5 py-3 lg:hidden">
       {metrics.map((metric, index) => (
         <div key={metric.id} className="contents">
-          {index > 0 && <span className="mx-2.5 mt-2 h-[38px] w-px shrink-0 bg-black/[0.08] dark:bg-white/[0.08]" aria-hidden="true" />}
+          {index > 0 && (
+            <span className="mx-2.5 flex h-[54px] w-px shrink-0 items-center" aria-hidden="true">
+              <span className="h-[38px] w-px bg-black/[0.08] dark:bg-white/[0.08]" />
+            </span>
+          )}
           <div className="min-w-0 flex-1 text-center">
-            <div className="flex h-[34px] items-start justify-center text-[12px] leading-4 text-ios-label-secondary">{metric.title}</div>
-            <div className={cn("mt-[5px] whitespace-nowrap text-[clamp(10px,3vw,13px)] font-semibold tabular-nums", metric.tone)}>{metric.value}</div>
+            <div
+              className={cn(
+                "flex items-start justify-center text-ios-label-secondary",
+                large ? "h-[22px] text-[15px] leading-5" : "h-[34px] text-[12px] leading-4",
+              )}
+            >
+              {metric.title}
+            </div>
+            <div
+              className={cn(
+                "whitespace-nowrap font-semibold tabular-nums",
+                large ? "mt-0.5 text-[clamp(13px,4.4vw,17px)] leading-[22px]" : "mt-[5px] text-[clamp(10px,3vw,13px)] leading-[18px]",
+                metric.tone,
+              )}
+            >
+              {metric.value}
+            </div>
           </div>
         </div>
       ))}

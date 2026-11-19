@@ -3,7 +3,7 @@
 import { usePhoneLayout } from "@/components/use-phone-layout";
 import { MobileBottomSearchBar } from "@/components/mobile-bottom-bar";
 import { MobilePushedScreen } from "@/components/mobile-pushed-screen";
-import { CustomerMobileRow, MobileCustomerDetail, MobileCustomerFilterScreen, MobileListTotalsCard, WalkInMobileRow } from "./customer-mobile";
+import { nativeCurrency, CustomerMobileRow, MobileCustomerDetail, MobileCustomerFilterScreen, MobileListTotalsCard, WalkInMobileRow } from "./customer-mobile";
 import { DesktopPagination, useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { MoneyInput } from "@/components/ui/money-input";
 import { DateInput } from "@/components/ui/date-input";
@@ -371,9 +371,9 @@ function CustomerRows({
       )}
       <MobileListTotalsCard
         metrics={[
-          { id: "debt", title: t("mobile.customers.totalDebt"), value: formatCurrency(data.totalDebt), tone: data.totalDebt > 0 ? "text-ios-red" : "text-ios-label-secondary" },
-          { id: "gross", title: t("mobile.customers.totalGrossSales"), value: formatCurrency(data.totalGrossSales), tone: "text-ios-accent" },
-          { id: "net", title: t("mobile.customers.totalNetSales"), value: formatCurrency(data.totalNetSales) },
+          { id: "debt", title: t("mobile.customers.totalDebt"), value: nativeCurrency(data.totalDebt), tone: data.totalDebt > 0 ? "text-ios-red" : "text-ios-label-secondary" },
+          { id: "gross", title: t("mobile.customers.totalGrossSales"), value: nativeCurrency(data.totalGrossSales), tone: "text-ios-accent" },
+          { id: "net", title: t("mobile.customers.totalNetSales"), value: nativeCurrency(data.totalNetSales) },
         ]}
       />
       <DataTableShell
