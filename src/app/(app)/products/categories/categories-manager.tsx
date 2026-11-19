@@ -346,7 +346,14 @@ function MobileCategoryRow({
 }) {
   const t = useTranslations("mobile.categories");
   return (
-    <div className="flex min-h-[62px] items-center gap-2 py-2 pl-ios-inset pr-2" style={{ paddingLeft: 16 + depth * 18 }}>
+    <div
+      className={cn(
+        "flex min-h-[62px] items-center gap-2 py-2 pl-ios-inset pr-2",
+        // Child rows get the list hairline, inset to their indentation.
+        depth > 0 && "bg-[linear-gradient(var(--color-border),var(--color-border))] bg-[length:calc(100%-34px)_1px] bg-right-top bg-no-repeat",
+      )}
+      style={{ paddingLeft: 16 + depth * 18 }}
+    >
       {hasChildren ? (
         <button type="button" onClick={onToggle} aria-label={t(expanded ? "collapse" : "expand")} aria-expanded={expanded} className="grid h-9 w-[30px] shrink-0 place-items-center text-ios-label-secondary">
           <ChevronRight className={cn("size-[14px] transition-transform", expanded && "rotate-90")} strokeWidth={2.8} aria-hidden="true" />

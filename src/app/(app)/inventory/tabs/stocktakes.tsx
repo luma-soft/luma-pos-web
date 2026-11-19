@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { and, count, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
-import { ClipboardCheck, Plus, Search } from "lucide-react";
+import { ClipboardCheck, Plus } from "lucide-react";
+import { ListSearchInput } from "@/components/list-search-filter";
 import { db } from "@/db";
 import { profiles, stocktakeItems, stocktakes, warehouses } from "@/db/schema";
 import { Routes } from "@/lib/routes";
@@ -85,15 +86,8 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
         action={Routes.Inventory}
       >
         <input type="hidden" name="tab" value="stock" />
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            name="stocktakeQ"
-            defaultValue={searchParams.stocktakeQ ?? ""}
-            placeholder="Theo mã phiếu kiểm"
-            className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm min-h-11 lg:min-h-0"
-          />
+        <div className="relative w-full max-w-sm max-lg:max-w-none">
+          <ListSearchInput name="stocktakeQ" defaultValue={searchParams.stocktakeQ ?? ""} placeholder="Theo mã phiếu kiểm" />
         </div>
         <Link href={Routes.StocktakeNew} className="ml-auto max-lg:hidden inline-flex h-11 shrink-0 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98]">
           <Plus className="h-4 w-4" />
@@ -102,7 +96,7 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
       </InstantFilterForm>
 
       {rows.length === 0 ? (
-        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
+        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400 max-lg:border-0 max-lg:py-24 max-lg:text-ios-label-secondary">
           <ClipboardCheck className="w-10 h-10 mx-auto mb-3 opacity-60" />
           <p className="font-medium">{t("stocktakes.empty")}</p>
           <p className="text-sm mt-1">{t("stocktakes.emptyHint")}</p>

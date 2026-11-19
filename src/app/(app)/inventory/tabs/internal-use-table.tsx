@@ -76,7 +76,7 @@ export function InternalUseTable({ rows, capabilities }: { rows: InternalUseRow[
         getRowId={(row) => row.id}
         minWidth="1120px"
         empty={(
-          <div className="rounded-card border border-dashed border-border bg-surface px-4 py-14 text-center text-slate-400">
+          <div className="rounded-card border border-dashed border-border bg-surface px-4 py-14 text-center text-slate-400 max-lg:border-0 max-lg:py-24 max-lg:text-ios-label-secondary">
             <LayoutList className="mx-auto mb-3 h-10 w-10 opacity-60" />
             <p className="font-medium">{t("internalUse.empty")}</p>
           </div>

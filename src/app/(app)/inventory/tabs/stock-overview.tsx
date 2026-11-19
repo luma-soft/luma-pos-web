@@ -161,12 +161,12 @@ function StatusCard({
       )}
     >
       {/* Phones: header row with icon, title and chevron; big count below (2-column grid). */}
-      <div className="flex w-full items-center gap-2.5 lg:hidden">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full border border-current/20 bg-surface/80">
-          <Icon className="size-[18px]" strokeWidth={2.4} />
+      <div className="flex w-full items-center gap-2 lg:hidden">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full border border-current/20 bg-surface/80">
+          <Icon className="size-[17px]" strokeWidth={2.4} />
         </span>
-        <span className="min-w-0 flex-1 truncate text-[17px] font-bold text-ios-label">{t(`inventory.statusCards.${status}.label`)}</span>
-        <ChevronRight className="size-4 shrink-0 text-ios-label-secondary" strokeWidth={2.4} />
+        <span className="min-w-0 flex-1 truncate text-[16px] font-bold tracking-[-0.01em] text-ios-label">{t(`inventory.statusCards.${status}.label`)}</span>
+        <ChevronRight className="-mr-1 size-4 shrink-0 text-ios-label-secondary" strokeWidth={2.4} />
       </div>
       <div className="mt-3 text-[26px] font-extrabold leading-none tabular-nums lg:hidden">
         {formatNumber(count)} <span className="text-[13px] font-semibold">SKU</span>

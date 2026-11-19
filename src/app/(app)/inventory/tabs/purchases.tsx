@@ -69,7 +69,7 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
       </div>
 
       {rows.length === 0 && !detailPurchase ? (
-        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
+        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400 max-lg:border-0 max-lg:py-24 max-lg:text-ios-label-secondary">
           <Truck className="w-10 h-10 mx-auto mb-3 opacity-60" />
           <p className="font-medium">{t("purchases.empty")}</p>
           <p className="text-sm mt-1">{t("purchases.emptyHint")}</p>

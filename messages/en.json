@@ -2160,7 +2160,10 @@
         "info": "Basics",
         "variants": "Units & attributes",
         "description": "Description"
-      }
+      },
+      "stockOut": "Out of stock",
+      "currentStock": "Current stock",
+      "stockAfter": "Stock"
     }
   },
   "toolsCenter": {

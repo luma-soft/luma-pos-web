@@ -724,6 +724,7 @@ export function ProductMobileRow({
         stockNotTrackedLabel,
       );
   const tracked = stockDisplay !== stockNotTrackedLabel;
+  const stockTone = nativeStockTone(tracked, Number(projected.totalStock), Number(projected.minLevel));
 
   // NativeProductRow: thumbnail, 17pt name, SKU and group, then price, unit and "On hand" on the right.
   return (
@@ -745,7 +746,7 @@ export function ProductMobileRow({
           className="absolute inset-0 -left-ios-inset [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ios-accent active:bg-black/[0.04] dark:active:bg-white/[0.06]"
         />
         <div className="pointer-events-none relative flex min-w-0 items-center gap-3">
-          <ProductThumbnail product={product} largeOnMobile />
+          <ProductThumbnail product={product} largeOnMobile tone={stockTone} />
           <div className="min-w-0 flex-1">
             <div className="line-clamp-2 break-words text-[17px] font-semibold leading-[22px] text-ios-label">
               {displayName}
@@ -779,9 +780,9 @@ export function ProductMobileRow({
             )}
             <span className={cn(
               "mt-auto max-w-full break-words text-[17px] leading-[22px]",
-              !tracked ? "text-ios-label-secondary" : projected.totalStock <= 0 ? "text-ios-orange" : "text-ios-green",
+              tracked ? NATIVE_STOCK_TEXT[stockTone] : "text-ios-label-secondary",
             )}>
-              {tracked ? t("mobile.inventory.onHand", { stock: stockDisplay }) : stockDisplay}
+              {!tracked ? stockDisplay : projected.totalStock === 0 ? t("mobile.products.stockOut") : t("mobile.inventory.onHand", { stock: stockDisplay })}
             </span>
           </div>
         </div>
@@ -863,7 +864,30 @@ export function SelectionCheckbox({
   );
 }
 
-function ProductThumbnail({ product, largeOnMobile = false }: { product: ProductRow; largeOnMobile?: boolean }) {
+/** NativeProductStockPresentation: tone of a product's stock on phones. */
+type NativeStockTone = "information" | "critical" | "warning" | "positive";
+function nativeStockTone(tracked: boolean, stock: number, minimum: number): NativeStockTone {
+  if (!tracked) return "information";
+  if (stock <= 0) return "critical";
+  if (minimum === 0) return "positive";
+  if (minimum < 0 || stock * 2 <= minimum) return "critical";
+  if (stock <= minimum) return "warning";
+  return "positive";
+}
+const NATIVE_STOCK_TEXT: Record<NativeStockTone, string> = {
+  information: "text-ios-accent",
+  critical: "text-ios-red",
+  warning: "text-ios-orange",
+  positive: "text-ios-green",
+};
+const NATIVE_STOCK_PILL: Record<NativeStockTone, string> = {
+  information: "bg-ios-accent/12 text-ios-accent",
+  critical: "bg-ios-red/12 text-ios-red",
+  warning: "bg-ios-orange/12 text-ios-orange",
+  positive: "bg-ios-green/12 text-ios-green",
+};
+
+function ProductThumbnail({ product, largeOnMobile = false, tone }: { product: ProductRow; largeOnMobile?: boolean; tone?: NativeStockTone }) {
   const image = Array.isArray(product.imageUrls) && typeof product.imageUrls[0] === "string"
     ? product.imageUrls[0]
     : null;
@@ -884,7 +908,7 @@ function ProductThumbnail({ product, largeOnMobile = false }: { product: Product
       ) : (
         <div className="grid h-full place-items-center text-slate-300 dark:text-slate-600">
           <ImageIcon className={cn("h-5 w-5", largeOnMobile && "max-lg:hidden")} />
-          {largeOnMobile && <Tag className="size-6 -rotate-45 text-primary-600/50 lg:hidden" strokeWidth={1.8} aria-hidden="true" />}
+          {largeOnMobile && <Tag className={cn("size-6 -rotate-45 lg:hidden", tone ? NATIVE_STOCK_TEXT[tone] : "text-primary-600/50")} strokeWidth={1.8} aria-hidden="true" />}
         </div>
       )}
     </div>
@@ -1541,24 +1565,34 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
 
   return (
     <>
-    <div className="divide-y divide-border-soft lg:hidden" data-mobile-audit="product-stock-card">
-      {movements.map((movement) => (
-        <article key={movement.id} className="space-y-3 border border-border-soft p-3 first:rounded-t-card last:rounded-b-card">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 font-semibold"><DocumentValue movement={movement} /></div>
-            <div className={cn("shrink-0 text-sm font-semibold tabular-nums", Number(movement.quantity) < 0 ? "text-er" : "text-ok")}>
-              {formatSignedNumber(movement.quantity)}
-            </div>
-          </div>
-          <div className="text-xs text-slate-500">{formatDate(movement.createdAt)} · {t(movementTypeKey(movement.type) as never)}</div>
-          <dl className="grid grid-cols-2 gap-2 text-xs">
-            <div><dt className="text-slate-500">{t("products.expand.cols.partner")}</dt><dd className="mt-0.5 break-words"><PartnerDetailLink kind={movement.refType === "purchase" ? "supplier" : "customer"} partnerId={movement.partnerId} name={movement.partnerName || "—"} openInCurrentTab /></dd></div>
-            <div><dt className="text-right text-slate-500">{t("products.expand.cols.stockAfter")}</dt><dd className="mt-0.5 text-right font-semibold tabular-nums">{formatNumber(Number(movement.stockAfter))}</dd></div>
-            <div><dt className="text-slate-500">{t("products.expand.cols.transactionPrice")}</dt><dd className="mt-0.5 tabular-nums">{moneyOrDash(movement.transactionPrice)}</dd></div>
-            <div><dt className="text-right text-slate-500">{t("products.expand.cols.costPrice")}</dt><dd className="mt-0.5 text-right tabular-nums">{moneyOrDash(movement.unitCost)}</dd></div>
-          </dl>
-        </article>
-      ))}
+    {/* Phones: NativeProductStockCardTab — current stock heading and plain movement rows. */}
+    <div className="lg:hidden" data-mobile-audit="product-stock-card">
+      <p className="pb-3 pt-2 text-[17px] font-semibold">
+        {product.sku} · {t("mobile.products.currentStock")}: {formatNumber(Number(product.totalStock))}
+      </p>
+      <div className="divide-y divide-border-soft">
+        {movements.map((movement) => {
+          const quantity = Number(movement.quantity);
+          return (
+            <article key={movement.id} className="flex items-center gap-3 py-3">
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="text-[15px] font-semibold">{t(movementTypeKey(movement.type) as never)}</div>
+                <div className="line-clamp-2 text-[15px] text-ios-label-secondary">
+                  {formatDate(movement.createdAt)} · <DocumentValue movement={movement} />
+                </div>
+              </div>
+              <div className="shrink-0 space-y-1 text-right">
+                <div className={cn("text-[15px] font-bold tabular-nums", quantity < 0 ? "text-ios-orange" : "text-ios-green")}>
+                  {formatSignedNumber(movement.quantity)}
+                </div>
+                {movement.stockAfter != null && (
+                  <div className="text-[15px] tabular-nums text-ios-label-secondary">{t("mobile.products.stockAfter")}: {formatNumber(Number(movement.stockAfter))}</div>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </div>
     </div>
     <div className="hidden overflow-x-auto lg:block">
       <table className="w-full min-w-[980px] text-sm">
@@ -2529,8 +2563,7 @@ function ProductMobileHero({ product }: { product: ProductRow }) {
   const image = product.imageUrls?.[0];
   const tracked = isProductStockManaged(product.categoryName, product.productKind);
   const stock = Number(product.totalStock);
-  const low = tracked && Number(product.minLevel) > 0 && stock <= Number(product.minLevel);
-  const tone = !tracked ? "bg-black/[0.06] text-ios-label-secondary" : stock <= 0 ? "bg-ios-red/12 text-ios-red" : low ? "bg-ios-orange/12 text-ios-orange" : "bg-ios-green/12 text-ios-green";
+  const tone = NATIVE_STOCK_PILL[nativeStockTone(tracked, stock, Number(product.minLevel))];
   return (
     <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] items-center gap-3 border-b border-border-soft bg-canvas px-ios-inset pb-4 pt-2">
       <div className="relative grid aspect-square place-items-center overflow-hidden rounded-[18px]">
@@ -2547,7 +2580,7 @@ function ProductMobileHero({ product }: { product: ProductRow }) {
         <h2 className="text-[20px] font-bold leading-[25px] [overflow-wrap:anywhere]">{productDisplayName(product)}</h2>
         <p className="text-[15px] text-ios-label-secondary">{product.sku}</p>
         <span className={cn("inline-flex rounded-full px-2.5 py-1.5 text-[15px] font-medium leading-none", tone)}>
-          {tracked ? t("mobile.products.stockLeft", { stock: productStockDisplay(product, t("products.stock.notTracked")) }) : t("products.stock.notTracked")}
+          {!tracked ? t("products.stock.notTracked") : stock === 0 ? t("mobile.products.stockOut") : t("mobile.products.stockLeft", { stock: productStockDisplay(product, t("products.stock.notTracked")) })}
         </span>
         {product.categoryName && <p className="pt-2 text-[15px] text-ios-label-secondary">{product.categoryName}</p>}
       </div>
@@ -2561,7 +2594,7 @@ function ProductMobileInfo({ product }: { product: ProductRow }) {
   const tracked = isProductStockManaged(product.categoryName, product.productKind);
   const row = (label: string, value: string | null | undefined, tone?: string) => (
     <div key={label} className="flex min-h-11 items-center justify-between gap-4 border-b border-border-soft py-2.5 text-[17px]">
-      <span className="shrink-0 text-ios-label-secondary">{label}</span>
+      <span className="shrink-0 text-ios-label">{label}</span>
       <span className={cn("min-w-0 text-right [overflow-wrap:anywhere]", tone ?? "text-ios-label-secondary")}>{value || "–"}</span>
     </div>
   );

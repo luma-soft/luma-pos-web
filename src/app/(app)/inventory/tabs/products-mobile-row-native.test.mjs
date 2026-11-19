@@ -5,7 +5,9 @@ const source = readFileSync(new URL("./products-table.tsx", import.meta.url), "u
 const row = source.slice(source.indexOf("export function ProductMobileRow("), source.indexOf("function ProductGroupMobileButton("));
 
 test("native mobile product rows keep image, product, price, stock and unit actions together", () => {
-  expect(row).toContain("<ProductThumbnail product={product} largeOnMobile />");
+  // The tag is tinted by the native stock tone (NativeProductStockPresentation).
+  expect(row).toContain("<ProductThumbnail product={product} largeOnMobile tone={stockTone} />");
+  expect(row).toContain("mobile.products.stockOut");
   expect(row).toContain("productDisplayName(product");
   expect(row).toContain("retailDisplay");
   expect(row).toContain("stockDisplay");

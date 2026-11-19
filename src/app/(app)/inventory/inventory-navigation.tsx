@@ -2,6 +2,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { ScrollActiveTabIntoView } from "@/components/scroll-active-tab-into-view";
 
 const TABS = [
   { tab: "products", labelKey: "nav.products" },
@@ -38,6 +39,7 @@ export function InventoryNavigation({ activeTab }: { activeTab: string }) {
           {t(item.labelKey)}
         </Link>
       ))}
+      <ScrollActiveTabIntoView activeKey={activeTab} />
     </nav>
   );
 }

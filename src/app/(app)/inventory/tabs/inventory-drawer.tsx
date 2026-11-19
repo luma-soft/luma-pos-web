@@ -80,7 +80,8 @@ export function InventoryDrawer({
   return (
     <div
       className={cn(
-        "fixed inset-0 z-[80] transition-opacity duration-300 ease-out motion-reduce:duration-0",
+        // Phones: a full-screen pushed screen, so no dimming shows around browser chrome.
+        "fixed inset-0 z-[80] transition-opacity duration-300 ease-out motion-reduce:duration-0 max-lg:!bg-transparent",
         isVisible ? "bg-slate-950/30 opacity-100" : "bg-slate-950/0 opacity-0",
       )}
       role="presentation"

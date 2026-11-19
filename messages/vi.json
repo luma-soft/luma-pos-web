@@ -2160,7 +2160,10 @@
         "info": "Cơ bản",
         "variants": "Đơn vị & Thuộc tính",
         "description": "Mô tả"
-      }
+      },
+      "stockOut": "Hết hàng",
+      "currentStock": "Tồn hiện tại",
+      "stockAfter": "Tồn"
     }
   },
   "toolsCenter": {

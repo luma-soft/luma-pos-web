@@ -175,6 +175,8 @@ export function InventoryFilterDrawer({
     key !== "to" &&
     Boolean(value) &&
     !(key === "status" && value === "all") &&
+    // The default status (active products) is not a filter the user chose.
+    !(key === "status" && value === defaultStatus) &&
     !(key === "time" && value === "all") &&
     !(key === "sort" && value === defaultSort),
   ).length + (showPriceComparison && draft.priceCondition && draft.priceAgainst ? 1 : 0);
