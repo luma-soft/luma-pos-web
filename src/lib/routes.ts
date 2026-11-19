@@ -26,6 +26,7 @@ export const Routes = {
   Delivery: "/delivery",
   Projects: "/projects",
   Services: "/services",
+  ServiceJobs: "/services/jobs",
   // Legacy promotion actions still use this path for cache invalidation.
   Promotions: "/promotions",
   EInvoices: "/einvoices",

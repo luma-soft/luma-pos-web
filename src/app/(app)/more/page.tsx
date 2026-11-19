@@ -65,7 +65,7 @@ export default async function MorePage() {
       { href: Routes.Finance, label: t("nav.groups.finance"), subtitle: t("mobile.more.financeHint") },
       { href: Routes.Accounting, label: t("mobile.more.accountingTax") },
     ] : []),
-    ...(sales && context.features.field_services ? [{ href: Routes.Services, label: t("mobile.more.serviceJobs") }] : []),
+    ...(sales && context.features.field_services ? [{ href: Routes.ServiceJobs, label: t("mobile.more.serviceJobs") }] : []),
     ...(sales ? [{ href: `${Routes.Sales}?tab=returns`, label: t("nav.returns"), subtitle: t("mobile.more.returnsHint") }] : []),
     ...(sales && SHIFT_MANAGEMENT_UI_ENABLED ? [{ href: `${Routes.Finance}?tab=shifts`, label: t("nav.shifts"), subtitle: t("mobile.more.shiftHint") }] : []),
     ...(context.features.ai_assistant && store.prefs.ai.openaiApiKeySet ? [{ href: "/ai", label: t("nav.ai"), subtitle: t("mobile.more.aiHint") }] : []),
@@ -109,7 +109,7 @@ export default async function MorePage() {
 
           {sales && (
             <MobileListSection>
-              {services && <MobileListRow href={Routes.Services} icon={Wrench} title={t("mobile.more.serviceJobs")} />}
+              {services && <MobileListRow href={Routes.ServiceJobs} icon={Wrench} title={t("mobile.more.serviceJobs")} />}
               <MobileListRow href={Routes.Projects} icon={Building2} title={t("nav.projects")} />
             </MobileListSection>
           )}

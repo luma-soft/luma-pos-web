@@ -2336,6 +2336,25 @@
       "zalo": "Zalo OA",
       "shopee": "Shopee",
       "ai": "Trợ lý AI"
+    },
+    "serviceJobs": {
+      "title": "Lệnh việc",
+      "scopeLabel": "Lịch",
+      "today": "Hôm nay",
+      "week": "7 ngày",
+      "emptyTitle": "Không có công việc theo lịch",
+      "emptyMessage": "Không có công việc hiện trường được phân công trong khoảng thời gian này.",
+      "checklistProgress": "{done}/{total} hạng mục",
+      "status": {
+        "new": "Mới",
+        "scheduled": "Đã lên lịch",
+        "in_progress": "Đang thực hiện",
+        "waiting_materials": "Chờ vật tư",
+        "waiting_customer": "Chờ khách hàng",
+        "warranty": "Bảo hành",
+        "completed": "Hoàn thành",
+        "cancelled": "Đã hủy"
+      }
     }
   },
   "toolsCenter": {

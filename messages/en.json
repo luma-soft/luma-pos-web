@@ -2336,6 +2336,25 @@
       "zalo": "Zalo OA",
       "shopee": "Shopee",
       "ai": "AI assistant"
+    },
+    "serviceJobs": {
+      "title": "Work orders",
+      "scopeLabel": "Schedule",
+      "today": "Today",
+      "week": "7 days",
+      "emptyTitle": "No scheduled work",
+      "emptyMessage": "No field work is assigned in this period.",
+      "checklistProgress": "{done} of {total} checklist items",
+      "status": {
+        "new": "New",
+        "scheduled": "Scheduled",
+        "in_progress": "In progress",
+        "waiting_materials": "Waiting for materials",
+        "waiting_customer": "Waiting for customer",
+        "warranty": "Warranty",
+        "completed": "Completed",
+        "cancelled": "Cancelled"
+      }
     }
   },
   "toolsCenter": {
