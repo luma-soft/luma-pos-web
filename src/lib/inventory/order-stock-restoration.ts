@@ -11,6 +11,17 @@ export type OrderStockRestoration = {
 
 type OrderItemStockSnapshot = { productId: string; quantity: string; unitMultiplier: string };
 
+/** KiotViet-imported orders may have no warehouse; their stock was counted
+ * in the store's default warehouse. */
+export async function resolveOrderWarehouseId(
+  tx: InventoryTransaction, storeId: string, warehouseId: string | null,
+): Promise<string | null> {
+  if (warehouseId) return warehouseId;
+  const [row] = await tx.select({ id: warehouses.id }).from(warehouses)
+    .where(and(eq(warehouses.storeId, storeId), eq(warehouses.isDefault, true))).limit(1);
+  return row?.id ?? null;
+}
+
 /** Resolve the physical stock actually sold, including earlier same-ID edits. */
 export async function getOrderStockRestorations(
   tx: InventoryTransaction, storeId: string, order: { id: string; warehouseId: string | null }, items: readonly OrderItemStockSnapshot[],
@@ -39,8 +50,7 @@ export async function getOrderStockRestorations(
     // stock remains authoritative; resolve only physical items for restoration.
     // KiotViet imports may also lack a warehouse: their sale was counted in the
     // store's default warehouse, so restore there.
-    const warehouseId = order.warehouseId ?? (await tx.select({ id: warehouses.id }).from(warehouses)
-      .where(and(eq(warehouses.storeId, storeId), eq(warehouses.isDefault, true))).limit(1))[0]?.id;
+    const warehouseId = await resolveOrderWarehouseId(tx, storeId, order.warehouseId);
     if (!warehouseId) return [];
     const ids = [...new Set(items.map((item) => item.productId))];
     const productRows = await tx.select({ id: products.id, kind: products.productKind }).from(products)

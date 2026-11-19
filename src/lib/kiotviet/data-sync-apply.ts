@@ -274,12 +274,13 @@ async function writeOrderPayment(input: ApplyInput & {
 }
 
 async function applyBookings(input: ApplyInput & { plan: Extract<KiotVietTypedPhasePlan, { phase: "bookings" }> }) {
+  const defaultWarehouseId = input.plan.typedPlan.writes.length > 0 ? await requireDefaultWarehouse(input.transaction, input.storeId) : null;
   for (const write of input.plan.typedPlan.writes) {
     const localId = write.localId ?? randomUUID();
     const parentWasCreated = write.action === "create";
     const values = bookingOrderValues(write.booking);
     if (parentWasCreated) await input.transaction.insert(orders).values({
-      id: localId, storeId: input.storeId, ...values,
+      id: localId, storeId: input.storeId, warehouseId: defaultWarehouseId!, ...values,
       code: await allocatePosCode(input, "booking", write.externalId, write.booking.createdAt),
     });
     else await requireUpdated(await input.transaction.update(orders).set(withoutCode(values)).where(and(
@@ -299,6 +300,7 @@ async function applyBookings(input: ApplyInput & { plan: Extract<KiotVietTypedPh
 }
 
 async function applySales(input: ApplyInput & { plan: Extract<KiotVietTypedPhasePlan, { phase: "sales" }> }) {
+  const defaultWarehouseId = input.plan.typedPlan.writes.length > 0 ? await requireDefaultWarehouse(input.transaction, input.storeId) : null;
   for (const write of input.plan.typedPlan.writes) {
     const localId = write.localId ?? randomUUID();
     const parentWasCreated = write.action === "create";
@@ -311,7 +313,7 @@ async function applySales(input: ApplyInput & { plan: Extract<KiotVietTypedPhase
     const status = currentStatus?.[0]?.status === "returned" ? "returned" : "completed";
     const values = saleOrderValues(write.sale, status);
     if (parentWasCreated) await input.transaction.insert(orders).values({
-      id: localId, storeId: input.storeId, ...values,
+      id: localId, storeId: input.storeId, warehouseId: defaultWarehouseId!, ...values,
       code: await allocatePosCode(input, "sale", write.externalId, write.sale.createdAt),
     });
     else await requireUpdated(await input.transaction.update(orders).set(withoutCode(values)).where(and(
@@ -363,6 +365,7 @@ async function applyPurchases(input: ApplyInput & { plan: Extract<KiotVietTypedP
 }
 
 async function applyReturns(input: ApplyInput & { plan: Extract<KiotVietTypedPhasePlan, { phase: "returns" }> }) {
+  const defaultWarehouseId = input.plan.typedPlan.writes.length > 0 ? await requireDefaultWarehouse(input.transaction, input.storeId) : null;
   for (const write of input.plan.typedPlan.writes) {
     const localId = write.localId ?? randomUUID();
     const value = write.return;
@@ -376,7 +379,7 @@ async function applyReturns(input: ApplyInput & { plan: Extract<KiotVietTypedPha
       sourcePaymentSnapshots: value.paymentSnapshots, note: value.note, createdAt: value.createdAt, updatedAt: new Date(),
     };
     if (write.action === "create") await input.transaction.insert(returns).values({
-      id: localId, storeId: input.storeId, ...parent,
+      id: localId, storeId: input.storeId, warehouseId: defaultWarehouseId!, ...parent,
       code: await allocatePosCode(input, "customer_return", write.externalId, value.createdAt),
     });
     else await requireUpdated(await input.transaction.update(returns).set(withoutCode(parent)).where(and(
