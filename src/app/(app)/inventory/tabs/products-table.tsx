@@ -31,6 +31,7 @@ import { selectAllInputOnClick } from "@/lib/input-selection";
 import {
   Ban,
   Barcode,
+  Package,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -77,6 +78,8 @@ import { useProductSelection } from "./product-selection";
 import { MobileSelectionIndicator } from "@/components/mobile-ui";
 import { useLongPress } from "@/components/use-long-press";
 import { useProductCatalog } from "@/components/product-catalog-provider";
+import { MobileDetailNav } from "@/components/mobile-detail-nav";
+import { MenuAction as MobileMenuAction } from "@/app/(app)/partners/tabs/customer-mobile";
 import {
   checkStockHistoryVersionOnce,
   fetchStockHistoryOnce,
@@ -943,8 +946,16 @@ export function ProductDetailView({
   }
 
   return (
-    <div className={cn("bg-canvas px-3 py-3 sm:bg-surface sm:px-4 sm:py-4", surface === "modal" && "flex h-full min-h-0 flex-col", surface === "page" && "sm:rounded-card sm:border sm:border-border-soft")}>
-      {group && <div className="mb-4 shrink-0 border-b border-border-soft pb-4">
+    <div className={cn("bg-canvas px-3 py-3 sm:bg-surface sm:px-4 sm:py-4 max-lg:px-0 max-lg:pt-0", surface === "modal" && "flex h-full min-h-0 flex-col", surface === "page" && "sm:rounded-card sm:border sm:border-border-soft")}>
+      {/* Phones: ProductDetailView's navigation bar, with every action in the "…" sheet. */}
+      <div className="shrink-0 lg:hidden">
+        <MobileDetailNav
+          title={t("mobile.products.title")}
+          actions={<ProductActionBar product={product} variant="menu" />}
+        />
+        <ProductMobileHero product={product} />
+      </div>
+      {group && <div className="mb-4 shrink-0 border-b border-border-soft pb-4 max-lg:px-3">
         <div className="mb-2 flex items-center justify-between gap-3">
           <label htmlFor={variantPickerId} className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("products.variants.version")}</label>
           <span className="text-xs text-slate-500">{t("products.variants.count", { count: group.count })}</span>
@@ -971,7 +982,7 @@ export function ProductDetailView({
         </div>
         {needsVariant && <p className="mt-2 text-xs text-slate-500">{t("products.variants.chooseHint")}</p>}
       </div>}
-      <div className="-mx-3 flex shrink-0 snap-x snap-mandatory items-center gap-[22px] overflow-x-auto border-b border-border-soft bg-surface px-4 text-sm font-semibold text-slate-500 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-4 sm:px-4 lg:mx-0 lg:gap-6 lg:px-0">
+      <div className="-mx-3 flex shrink-0 snap-x snap-mandatory items-center gap-[22px] max-lg:mx-0 max-lg:scroll-px-4 max-lg:px-ios-inset overflow-x-auto border-b border-border-soft bg-surface px-4 text-sm font-semibold text-slate-500 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-4 sm:px-4 lg:mx-0 lg:gap-6 lg:px-0">
         {PRODUCT_EXPAND_TABS.map((key) => (
           <button
             key={key}
@@ -990,7 +1001,7 @@ export function ProductDetailView({
         ))}
       </div>
 
-      <div className={cn("pt-3 sm:pt-4", surface === "modal" && "min-h-0 flex-1 overflow-y-auto")}>
+      <div className={cn("pt-3 sm:pt-4 max-lg:px-3 max-lg:pt-0", surface === "modal" && "min-h-0 flex-1 overflow-y-auto")}>
         {tab === "info" && (
           <ProductInfoPanel
             key={product.id}
@@ -1037,7 +1048,7 @@ function ProductInfoPanel({
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[160px_1fr] lg:gap-5">
-      <div className="flex flex-col items-center lg:block">
+      <div className="flex flex-col items-center max-lg:hidden lg:block">
         <button
           type="button"
           onClick={() => image && setImagePreviewOpen(true)}
@@ -1104,7 +1115,7 @@ function ProductInfoPanel({
       )}
 
       <div className="min-w-0 space-y-3 lg:space-y-4">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3 max-lg:hidden">
           <div className="min-w-0 flex-1 text-center lg:text-left">
             <h3 className="text-balance break-words text-lg font-black leading-snug text-slate-900 lg:font-bold dark:text-slate-100">
               {productDisplayName(product)}
@@ -1134,7 +1145,7 @@ function ProductInfoPanel({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 divide-x divide-border-soft overflow-hidden rounded-xl border border-border-soft bg-surface lg:hidden">
+        <div className="-mx-3 grid grid-cols-3 divide-x divide-border-soft border-b border-border-soft bg-surface py-1 lg:hidden">
           <ProductMetric
             label={t("products.pricing.retailPrice")}
             value={formatCurrency(Number(product.retailPrice))}
@@ -1157,7 +1168,8 @@ function ProductInfoPanel({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-x-8 lg:gap-y-3">
+        <ProductMobileInfo product={product} />
+        <div className="grid grid-cols-2 gap-2 max-lg:hidden lg:grid-cols-4 lg:gap-x-8 lg:gap-y-3">
           <InfoItem label={t("products.fields.sku")} value={product.sku} />
           <InfoItem className="lg:hidden"
             label={t("products.stock.min")}
@@ -1914,7 +1926,7 @@ function DocumentValue({ movement }: { movement: StockMovementRow }) {
   return <span className="text-primary-600">{label}</span>;
 }
 
-function ProductActionBar({ product, cameraMaterials = false }: { product: ProductRow; cameraMaterials?: boolean }) {
+function ProductActionBar({ product, cameraMaterials = false, variant = "bar" }: { product: ProductRow; cameraMaterials?: boolean; variant?: "bar" | "menu" }) {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
@@ -2092,8 +2104,29 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
     return `${Routes.Inventory}?${sp.toString()}`;
   }
 
+  if (variant === "menu") {
+    // Phones: the native "Thao tác khác" sheet (edit, purchase, copy, labels, same type, stop, delete).
+    const go = (href: string) => router.push(href);
+    return (
+      <div className="space-y-2">
+        <MobileMenuAction icon={Pencil} label={t("mobile.products.edit")} onSelect={() => go(
+          pathname.startsWith("/products/")
+            ? `${Routes.productDetail(product.id)}?edit=1`
+            : productModalHref({ productModal: product.isVariantParent ? "groupEdit" : "edit", productId: product.id }),
+        )} />
+        {!product.isVariantParent && <MobileMenuAction icon={PackagePlus} label={t("mobile.products.purchase")} onSelect={() => go(Routes.purchaseNewForProduct(product.id))} />}
+        <MobileMenuAction icon={Copy} label={t("mobile.products.copy")} onSelect={() => go(productModalHref({ productModal: "copy", copyFrom: product.id }))} />
+        {!product.isVariantParent && <MobileMenuAction icon={Barcode} label={t("mobile.products.printLabels")} onSelect={() => go(Routes.productLabels(product.id))} />}
+        <MobileMenuAction icon={Plus} label={t("mobile.products.addSameType")} onSelect={() => go(productModalHref({ productModal: product.variantGroup ? "groupAdd" : "sameType", sameTypeAs: sameTypeSourceId }))} />
+        <MobileMenuAction icon={Ban} label={t(nextActive ? "mobile.products.resumeSelling" : "mobile.products.stopSelling")} disabled={pending} onSelect={() => void toggleActive()} />
+        <MobileMenuAction icon={Trash2} label={t("mobile.products.delete")} destructive disabled={pending} onSelect={() => void removeProduct()} />
+        {error && <p className="text-sm font-medium text-er">{error}</p>}
+      </div>
+    );
+  }
+
   return (
-    <div className="border-t border-border-soft pt-4">
+    <div className="border-t border-border-soft pt-4 max-lg:hidden">
       <div className={cn(
         cameraMaterials
           ? "flex"
@@ -2386,16 +2419,17 @@ function ProductMetric({
   tone?: "neutral" | "primary" | "success" | "warning";
 }) {
   return (
-    <div className="min-w-0 bg-surface px-2 py-3 text-center">
-      <div className="text-[10px] font-semibold leading-4 text-slate-500">
+    // Phone-only metric row (ProductDetailView): large value above a secondary label.
+    <div className="flex min-w-0 flex-col-reverse bg-surface px-2 py-3 text-center">
+      <div className="mt-1 text-[15px] leading-5 text-ios-label-secondary">
         {label}
       </div>
       <div
         className={cn(
-          "mt-1 break-words text-[12px] font-extrabold leading-5 tabular-nums text-slate-800 dark:text-slate-100 [overflow-wrap:anywhere] min-[390px]:text-[13px]",
-          tone === "primary" && "text-primary-700 dark:text-primary-300",
-          tone === "success" && "text-ok",
-          tone === "warning" && "text-warn",
+          "break-words text-[19px] font-bold leading-6 tabular-nums text-ios-label [overflow-wrap:anywhere]",
+          tone === "primary" && "text-ios-accent",
+          tone === "success" && "text-ios-green",
+          tone === "warning" && "text-ios-orange",
         )}
       >
         {value}
@@ -2487,4 +2521,71 @@ function specEntries(specs: unknown) {
       ([key, value]) =>
         [key, Array.isArray(value) ? value.join(", ") : String(value)] as const,
     );
+}
+
+/** ProductDetailView header on phones: image (or placeholder) beside name, SKU, stock pill, category. */
+function ProductMobileHero({ product }: { product: ProductRow }) {
+  const t = useTranslations();
+  const image = product.imageUrls?.[0];
+  const tracked = isProductStockManaged(product.categoryName, product.productKind);
+  const stock = Number(product.totalStock);
+  const low = tracked && Number(product.minLevel) > 0 && stock <= Number(product.minLevel);
+  const tone = !tracked ? "bg-black/[0.06] text-ios-label-secondary" : stock <= 0 ? "bg-ios-red/12 text-ios-red" : low ? "bg-ios-orange/12 text-ios-orange" : "bg-ios-green/12 text-ios-green";
+  return (
+    <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] items-center gap-3 border-b border-border-soft bg-canvas px-ios-inset pb-4 pt-2">
+      <div className="relative grid aspect-square place-items-center overflow-hidden rounded-[18px]">
+        {image ? (
+          <Image src={image} alt={productDisplayName(product)} fill sizes="180px" className="object-contain" unoptimized />
+        ) : (
+          <span className="flex flex-col items-center gap-2 text-ios-accent">
+            <Package className="size-10" strokeWidth={1.8} aria-hidden="true" />
+            <span className="text-[12px] text-ios-label-secondary">{t("mobile.products.noImage")}</span>
+          </span>
+        )}
+      </div>
+      <div className="min-w-0 space-y-2">
+        <h2 className="text-[20px] font-bold leading-[25px] [overflow-wrap:anywhere]">{productDisplayName(product)}</h2>
+        <p className="text-[15px] text-ios-label-secondary">{product.sku}</p>
+        <span className={cn("inline-flex rounded-full px-2.5 py-1.5 text-[15px] font-medium leading-none", tone)}>
+          {tracked ? t("mobile.products.stockLeft", { stock: productStockDisplay(product, t("products.stock.notTracked")) }) : t("products.stock.notTracked")}
+        </span>
+        {product.categoryName && <p className="pt-2 text-[15px] text-ios-label-secondary">{product.categoryName}</p>}
+      </div>
+    </div>
+  );
+}
+
+/** Phone sections of the info tab: "Thông tin cơ bản" and "Đơn vị & bảng giá" as plain labelled rows. */
+function ProductMobileInfo({ product }: { product: ProductRow }) {
+  const t = useTranslations();
+  const tracked = isProductStockManaged(product.categoryName, product.productKind);
+  const row = (label: string, value: string | null | undefined, tone?: string) => (
+    <div key={label} className="flex min-h-11 items-center justify-between gap-4 border-b border-border-soft py-2.5 text-[17px]">
+      <span className="shrink-0 text-ios-label-secondary">{label}</span>
+      <span className={cn("min-w-0 text-right [overflow-wrap:anywhere]", tone ?? "text-ios-label-secondary")}>{value || "–"}</span>
+    </div>
+  );
+  return (
+    <div className="space-y-1 lg:hidden">
+      <h3 className="pb-1 pt-2 text-[20px] font-bold">{t("mobile.products.basicInfo")}</h3>
+      {row(t("mobile.products.sku"), product.sku)}
+      {row(t("mobile.products.barcode"), product.barcode)}
+      {row(t("mobile.products.category"), product.categoryName)}
+      {row(t("mobile.products.brand"), product.brandName)}
+      {row(t("mobile.products.location"), product.location)}
+      {tracked && Number(product.minLevel) > 0 && row(t("mobile.products.minStock"), formatNumber(Number(product.minLevel)))}
+      {Number(product.weight) > 0 ? row(t("mobile.products.weight"), formatNumber(Number(product.weight))) : null}
+      {product.dimensions ? row(t("mobile.products.dimensions"), product.dimensions) : null}
+      <h3 className="pb-1 pt-4 text-[20px] font-bold">{t("mobile.products.unitsAndPrices")}</h3>
+      <div className="flex items-center justify-between gap-3 rounded-[16px] bg-black/[0.04] px-4 py-3 dark:bg-white/[0.06]">
+        <span>
+          <span className="block text-[17px] font-semibold">{t("mobile.products.baseUnit")}</span>
+          <span className="block text-[13px] text-ios-label-secondary">{t("mobile.products.baseUnitHint")}</span>
+        </span>
+        <span className="text-[17px] text-ios-label-secondary">{product.baseUnit}</span>
+      </div>
+      {row(t("mobile.products.costPrice"), formatCurrency(Number(product.costPrice)), "font-semibold text-ios-accent")}
+      {row(t("mobile.products.retailPrice"), formatCurrency(Number(product.retailPrice)), "font-semibold text-ios-accent")}
+    </div>
+  );
 }

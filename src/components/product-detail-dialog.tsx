@@ -16,7 +16,8 @@ export function ProductDetailDialog({
 }) {
   return (
     <ProductModalFrame labelledBy="product-detail-title" closeHref={closeHref} closeOnBackdrop>
-      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-6">
+      {/* Phones: ProductDetailView draws its own iOS navigation bar. */}
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border-soft px-4 py-3 max-lg:hidden sm:px-6">
         <div className="min-w-0">
           <h2 id="product-detail-title" className="truncate text-lg font-bold text-slate-900 dark:text-slate-100">
             {title}
