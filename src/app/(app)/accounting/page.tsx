@@ -1,3 +1,4 @@
+import { AccountingMobile } from "./accounting-mobile";
 import Link from "next/link";
 import { AlertTriangle, BookOpen } from "lucide-react";
 import { MobileTopBar } from "@/components/mobile-ui";
@@ -37,7 +38,17 @@ type SearchParams = {
 };
 
 
+/** Phones show NativeAccountingView; desktop keeps the full revenue book. */
 export default async function AccountingPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  return (
+    <>
+      <AccountingMobile />
+      <div className="max-lg:hidden">{await AccountingDesktop({ searchParams })}</div>
+    </>
+  );
+}
+
+async function AccountingDesktop({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const context = await requireStoreRole(["owner", "manager"]);
   const params = await searchParams;
   const prefs = await getRawStorePrefs(context.storeId);

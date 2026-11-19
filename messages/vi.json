@@ -2214,6 +2214,30 @@
         "supplier_payment": "Trả nhà cung cấp",
         "other": "Khác"
       }
+    },
+    "accounting": {
+      "title": "Sổ kế toán & thuế",
+      "year": "Năm {year}",
+      "tabRevenue": "Doanh thu",
+      "tabBooks": "Sổ chi tiết",
+      "tabTax": "Kê khai",
+      "loadError": "Không tải được dữ liệu kế toán",
+      "retry": "Thử lại",
+      "revenueTitle": "Sổ doanh thu",
+      "revenueTotal": "Tổng doanh thu trong năm",
+      "revenueEmpty": "Chưa có doanh thu trong năm.",
+      "entries": "Giao dịch",
+      "unconfiguredTitle": "Chưa cấu hình phương pháp thuế",
+      "unconfiguredSubtitle": "Chọn đúng mẫu sổ trong cài đặt thuế trên web.",
+      "cashCount": "Sổ chi tiết tiền (S2e-HKD)",
+      "inventoryCount": "Sổ chi tiết hàng hóa (S2d-HKD)",
+      "taxesCount": "Nghĩa vụ thuế khác (S3a-HKD)",
+      "recentCash": "Giao dịch tiền gần nhất",
+      "cashEmpty": "Chưa có giao dịch tiền.",
+      "declarationsCount": "Tờ khai đã chuẩn bị",
+      "bankAccountsCount": "Tài khoản trong bảng kê 01/BK-STK",
+      "declarations": "Tờ khai",
+      "taxEmpty": "Chưa có tờ khai. Hãy chuẩn bị và cập nhật trạng thái trên web."
     }
   },
   "toolsCenter": {

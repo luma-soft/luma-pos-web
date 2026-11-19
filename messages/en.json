@@ -2214,6 +2214,30 @@
         "supplier_payment": "Supplier payment",
         "other": "Other"
       }
+    },
+    "accounting": {
+      "title": "Accounting & tax",
+      "year": "Year {year}",
+      "tabRevenue": "Revenue",
+      "tabBooks": "Ledgers",
+      "tabTax": "Filings",
+      "loadError": "Could not load accounting data",
+      "retry": "Retry",
+      "revenueTitle": "Revenue book",
+      "revenueTotal": "Total revenue this year",
+      "revenueEmpty": "No revenue this year.",
+      "entries": "Entries",
+      "unconfiguredTitle": "Tax method not configured",
+      "unconfiguredSubtitle": "Choose the book template in the web tax settings.",
+      "cashCount": "Cash ledger (S2e-HKD)",
+      "inventoryCount": "Inventory ledger (S2d-HKD)",
+      "taxesCount": "Other tax obligations (S3a-HKD)",
+      "recentCash": "Recent cash entries",
+      "cashEmpty": "No cash entries yet.",
+      "declarationsCount": "Prepared filings",
+      "bankAccountsCount": "Accounts in 01/BK-STK",
+      "declarations": "Filings",
+      "taxEmpty": "No filings yet. Prepare and update them on the web."
     }
   },
   "toolsCenter": {
