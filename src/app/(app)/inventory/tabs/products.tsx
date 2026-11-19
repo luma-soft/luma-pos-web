@@ -97,9 +97,11 @@ export async function ProductEditorModal({
   const publicMedia = getPublicMediaConfig();
   const modal = searchParams.productModal;
   if (!modal) return null;
-  if (!["create", "edit", "copy", "sameType", "groupEdit", "groupAdd"].includes(modal)) return null;
+  if (!["create", "edit", "copy", "sameType", "groupEdit", "groupAdd", "variants"].includes(modal)) return null;
 
-  const editId = modal === "edit" || modal === "groupEdit" ? searchParams.productId : undefined;
+  // "variants" is the iOS "Biến thể hàng hóa" screen: the group editor limited to its variant sections.
+  const managesVariants = modal === "groupEdit" || modal === "variants";
+  const editId = modal === "edit" || managesVariants ? searchParams.productId : undefined;
   const copyFrom = modal === "copy" ? searchParams.copyFrom : undefined;
   const sameTypeAs = modal === "sameType" || modal === "groupAdd" ? searchParams.sameTypeAs : undefined;
   const seedId = editId ?? copyFrom ?? sameTypeAs;
@@ -111,7 +113,7 @@ export async function ProductEditorModal({
     seedId ? getProduct(context.storeId, seedId) : Promise.resolve(null),
   ]);
   if (seedId && !requestedProduct) notFound();
-  const seedMode = modal === "copy" ? (searchParams.copyGroup === "1" ? "groupCopy" : "copy") : modal === "sameType" || modal === "groupAdd" ? "groupAdd" : modal === "groupEdit" ? "groupEdit" : "edit";
+  const seedMode = modal === "copy" ? (searchParams.copyGroup === "1" ? "groupCopy" : "copy") : modal === "sameType" || modal === "groupAdd" ? "groupAdd" : managesVariants ? "groupEdit" : "edit";
   const seedProduct = requestedProduct ? await resolveProductFormSeed(requestedProduct, seedMode, (productId) => getProduct(context.storeId, productId)) : null;
   if (seedId && !seedProduct) notFound();
 
@@ -125,7 +127,7 @@ export async function ProductEditorModal({
   const returnTo = safeReturnHref(searchParams.returnTo);
   const closeHref = returnTo ?? closeHrefOverride ?? productModalHref(searchParams, {});
   const effectiveCancelNavigation = cancelNavigation ?? closeNavigation ?? "replace";
-  const mode = modal === "edit" || modal === "groupEdit" ? "edit" : "create";
+  const mode = modal === "edit" || managesVariants ? "edit" : "create";
   const requestedKind = ["product", "service", "combo"].includes(searchParams.productKind ?? "")
     ? searchParams.productKind as "product" | "service" | "combo"
     : "product";
@@ -161,6 +163,7 @@ export async function ProductEditorModal({
           cancelNavigation={effectiveCancelNavigation}
           createdProductReturnTo={mode === "create" ? returnTo ?? undefined : undefined}
           creationKind={seedProduct?.productKind ?? requestedKind}
+          variantsOnly={modal === "variants"}
         />
     </ProductModalFrame>
   );

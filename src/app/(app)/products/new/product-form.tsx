@@ -166,6 +166,8 @@ export interface NewProductFormProps {
   createdProductReturnTo?: string;
   aiPreview?: boolean;
   creationKind?: "product" | "service" | "combo";
+  /** iOS "Biến thể hàng hóa": group editor showing only the variant sections, without tabs. */
+  variantsOnly?: boolean;
 }
 
 export function NewProductForm({
@@ -189,6 +191,7 @@ export function NewProductForm({
   createdProductReturnTo,
   aiPreview = false,
   creationKind = "product",
+  variantsOnly = false,
 }: NewProductFormProps) {
   const storageScope = useTenantClientScope();
   const scheduleAppDataRefreshOnReturn = useRefreshAppDataOnReturn();
@@ -196,7 +199,9 @@ export function NewProductForm({
   const isPhone = usePhoneLayout();
   const router = useRouter();
   const dismissProductModalAfterSave = useDismissProductModalAfterSave();
-  const [tab, setTab] = useState<Tab>(initialValues?.variantOperation === "add" ? "variants" : "info");
+  const [tab, setTab] = useState<Tab>(variantsOnly || initialValues?.variantOperation === "add" ? "variants" : "info");
+  // The iOS-style variants screen is phone-only; desktop keeps the tabbed group editor.
+  const variantsScreen = variantsOnly && isPhone;
   const [submitIntent, setSubmitIntent] = useState<"save" | "sameType">("save");
   const [formGeneration, setFormGeneration] = useState(0);
   const isEdit = mode === "edit";
@@ -620,7 +625,7 @@ export function NewProductForm({
             id={isModal ? "product-editor-title" : undefined}
             as="h1" size="lg"
             className="min-w-0 flex-1 truncate text-center text-[17px] font-semibold lg:text-left lg:text-lg"
-            text={groupEditing ? (groupAdding ? "Thêm hàng hóa cùng loại" : "Sửa nhóm biến thể") : isPhone && productKind === "product"
+            text={variantsScreen ? t("mobile.products.variantsTitle") : groupEditing ? (groupAdding ? "Thêm hàng hóa cùng loại" : "Sửa nhóm biến thể") : isPhone && productKind === "product"
               ? t(isEdit ? "mobile.products.editTitle" : "mobile.products.createTitle")
               : t(isEdit ? `products.kind.editTitles.${productKind}` : `products.kind.createTitles.${productKind}`)}
           />
@@ -653,7 +658,7 @@ export function NewProductForm({
         )}
       </header>
 
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6">
+      {!variantsScreen && <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6">
         <div className="flex items-end gap-0 lg:gap-6 overflow-x-auto">
           {(["info", ...(productKind === "product" ? ["variants" as const] : []), "description"] as Tab[]).map((tk) => (
             <button
@@ -674,7 +679,7 @@ export function NewProductForm({
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
       {rawError && (
         <div className="bg-red-50 dark:bg-red-950/40 border-b border-red-200 dark:border-red-900 px-4 sm:px-6 py-2 text-sm text-red-700 dark:text-red-400">
@@ -688,7 +693,8 @@ export function NewProductForm({
           isModal ? "mx-auto max-w-none" : "mx-auto max-w-5xl",
         )}
       >
-        {groupEditing && <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-800">
+        {variantsScreen && <VariantGroupSummary name={variantGroup?.name ?? form.watch("name")} skuCount={variantGroup?.count ?? variantGroup?.members.length ?? 0} />}
+        {groupEditing && !variantsScreen && <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-800">
           <p className="font-semibold">{groupAdding ? "Thêm hàng hóa cùng loại" : "Sửa nhóm biến thể"}: {groupAdding ? variantTemplateName ?? form.watch("name") : variantGroup?.name ?? form.watch("name")}</p>
           <p className="mt-1">{groupAdding ? "Thông tin đang được sao chép từ biến thể mới nhất. Bạn có thể sửa cho hàng mới; cấu trúc thuộc tính của nhóm được giữ nguyên." : "Nội dung riêng của từng SKU được giữ nguyên khi chỉnh cấu trúc nhóm."}</p>
         </div>}
@@ -720,6 +726,7 @@ export function NewProductForm({
             siblingCount={siblingCount}
             groupEditing={groupEditing}
             groupId={variantGroup?.id}
+            variantsOnly={variantsScreen}
           />
         )}
         <VariantChildrenField key={`variant-children-${formGeneration}`} visible={tab === "variants"} enabled={variantEnabled && !groupAdding} />
@@ -730,6 +737,8 @@ export function NewProductForm({
       <footer className={cn(
         "shrink-0 border-t border-border bg-surface px-4 py-2 pb-[calc(.5rem+env(safe-area-inset-bottom))] sm:px-6",
         !isModal && "lg:hidden",
+        // Like iOS, the variants screen saves from the header button only on phones.
+        variantsScreen && "max-lg:hidden",
         isModal && "lg:py-3 lg:pb-3",
       )}>
         <MobileProductSaveOptions
@@ -1263,25 +1272,47 @@ function DescriptionTab() {
   );
 }
 
+/** "Nhóm hàng" block of the iOS variants screen. */
+function VariantGroupSummary({ name, skuCount }: { name: string; skuCount: number }) {
+  const t = useTranslations();
+  return (
+    <section className="rounded-xl border border-border bg-surface px-4 py-1">
+      <h2 className="pt-3 text-base font-semibold">{t("mobile.products.variantsGroup")}</h2>
+      <dl className="divide-y divide-border text-[15px]">
+        <div className="flex items-baseline justify-between gap-3 py-3">
+          <dt className="text-slate-500">{t("mobile.products.variantsRoot")}</dt>
+          <dd className="min-w-0 text-right font-medium">{name}</dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-3 py-3">
+          <dt className="text-slate-500">{t("mobile.products.variantsSkuCount")}</dt>
+          <dd className="font-medium tabular-nums">{skuCount}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
 function VariantsTab({
   isEdit,
   isVariantChild,
   siblingCount,
   groupEditing,
   groupId,
+  variantsOnly = false,
 }: {
   groupEditing: boolean;
   groupId?: string;
   isEdit: boolean;
   isVariantChild: boolean;
   siblingCount: number;
+  variantsOnly?: boolean;
 }) {
   const t = useTranslations();
   const { watch } = useFormCtx();
   const groupAdding = groupEditing && watch("variantOperation") === "add";
   return (
     <div className="space-y-4">
-      <Section
+      {!variantsOnly && <Section
         {...(groupEditing
           ? {
               title: "Đơn vị mặc định cho SKU mới",
@@ -1294,7 +1325,7 @@ function VariantsTab({
         collapsible={false}
       >
         <MultiUnitField />
-      </Section>
+      </Section>}
       <Section
         title="Thuộc tính tạo biến thể"
         description={groupAdding ? "Cấu trúc thuộc tính của nhóm đã được khóa. Chỉ nhập giá trị thuộc tính của hàng hóa mới." : "Chọn đặc điểm phân biệt hàng bán như phiên bản, màu, dung tích. Mỗi tổ hợp tương ứng một SKU."}
