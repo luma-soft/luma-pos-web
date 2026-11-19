@@ -1472,13 +1472,53 @@
       }
     },
     "notifications": {
+      "title": "Thông báo",
+      "modeAll": "Tất cả · {count}",
+      "modeAction": "Cần xử lý · {count}",
+      "modeActivity": "Hoạt động",
+      "modeLabel": "Loại thông báo",
+      "inbox": "Hộp thư thông báo",
+      "priorityFocus": "Ưu tiên xử lý",
+      "moreActionable": "Việc cần xử lý khác",
+      "unread": "{count, number} chưa đọc",
+      "loading": "Đang tải thông báo",
+      "emptyTitle": "Chưa có thông báo",
+      "emptyMessage": "Thông báo mới sẽ xuất hiện ở đây.",
+      "emptyActionTitle": "Không có việc cần xử lý",
+      "emptyActionMessage": "Các thông báo cần xử lý sẽ xuất hiện ở đây.",
+      "filters": "Bộ lọc thông báo",
+      "moreActions": "Thao tác thông báo",
+      "markAllRead": "Đánh dấu tất cả đã đọc",
+      "settings": "Cài đặt thông báo",
+      "retry": "Thử lại",
+      "loadError": "Không thể tải thông báo lúc này.",
       "category": {
         "inventory": "Kho hàng",
-        "einvoice": "HĐ điện tử",
+        "einvoice": "Hóa đơn điện tử",
+        "sales": "Bán hàng",
         "debt": "Công nợ",
-        "sales": "Báo cáo",
         "system": "Hệ thống"
-      }
+      },
+      "action": {
+        "inventory": "Mở kho",
+        "invoices": "Xem hóa đơn",
+        "purchases": "Xem phiếu nhập",
+        "customers": "Xem khách hàng",
+        "reports": "Xem báo cáo",
+        "shift": "Mở ca",
+        "detail": "Xem chi tiết"
+      },
+      "detailTitle": "Chi tiết thông báo",
+      "detailCategory": "Danh mục",
+      "detailPriority": "Mức độ",
+      "detailTime": "Thời gian",
+      "priority": {
+        "high": "Cao",
+        "medium": "Trung bình",
+        "low": "Thông tin"
+      },
+      "activityTitle": "Nhật ký hoạt động",
+      "activityCount": "{count, number} hoạt động"
     },
     "activity": {
       "fallback": {

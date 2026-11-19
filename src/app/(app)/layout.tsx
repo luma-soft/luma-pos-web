@@ -88,7 +88,7 @@ export default async function AppLayout({
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 overflow-x-hidden">
+      <main className="min-w-0 flex-1 overflow-x-hidden max-lg:overflow-x-clip">
         <div className="pb-(--mobile-tabbar-space) lg:pb-0">{children}</div>
         <MobileTabBar role={role} />
         {context.features.ai_assistant && store.prefs.ai.openaiApiKeySet && store.prefs.ai.showFloatingLauncher && <AiAssistantLauncher />}

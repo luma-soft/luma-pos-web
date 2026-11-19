@@ -1472,13 +1472,53 @@
       }
     },
     "notifications": {
+      "title": "Notifications",
+      "modeAll": "All · {count}",
+      "modeAction": "Action · {count}",
+      "modeActivity": "Activity",
+      "modeLabel": "Notification type",
+      "inbox": "Inbox",
+      "priorityFocus": "Priority",
+      "moreActionable": "Other actions",
+      "unread": "{count, number} unread",
+      "loading": "Loading notifications",
+      "emptyTitle": "No notifications",
+      "emptyMessage": "New notifications will appear here.",
+      "emptyActionTitle": "Nothing to handle",
+      "emptyActionMessage": "Notifications that need action will appear here.",
+      "filters": "Notification filters",
+      "moreActions": "Notification actions",
+      "markAllRead": "Mark all as read",
+      "settings": "Notification settings",
+      "retry": "Retry",
+      "loadError": "Couldn't load notifications right now.",
       "category": {
         "inventory": "Inventory",
         "einvoice": "E-invoice",
-        "debt": "Receivables",
-        "sales": "Reports",
+        "sales": "Sales",
+        "debt": "Debt",
         "system": "System"
-      }
+      },
+      "action": {
+        "inventory": "Open inventory",
+        "invoices": "View invoice",
+        "purchases": "View receipt",
+        "customers": "View customer",
+        "reports": "View report",
+        "shift": "Open shift",
+        "detail": "View details"
+      },
+      "detailTitle": "Notification details",
+      "detailCategory": "Category",
+      "detailPriority": "Priority",
+      "detailTime": "Time",
+      "priority": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Info"
+      },
+      "activityTitle": "Activity log",
+      "activityCount": "{count, number} activities"
     },
     "activity": {
       "fallback": {

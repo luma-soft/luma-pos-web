@@ -4,7 +4,7 @@ import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { BarChart3, Bot, Box, CheckCircle2, ChevronRight, Clock, ExternalLink, FileWarning, PackageCheck, RefreshCw, ShieldAlert, UserRound, XCircle } from "lucide-react";
+import { BarChart3, Bot, Box, CheckCircle2, ChevronRight, CircleAlert, Clock, ExternalLink, FileWarning, History, PackageCheck, RefreshCw, ShieldAlert, Smartphone, Sparkles, UserRound, Waypoints, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn, formatDate } from "@/lib/utils";
@@ -222,6 +222,8 @@ export function NotificationsTable({ rows: serverRows, loadMore }: {
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="1080px"
+      mobileListClassName="space-y-0 border-t border-border bg-surface"
+      mobileRowClassName="!rounded-none !border-0"
       renderMobileRow={({ row, expanded, toggle }) => <NotificationMobileRow row={row} expanded={expanded} toggle={toggle} />}
       clientSideDetailNavigation
       renderDetail={(row) => <ExpandedAudit row={row} />}
@@ -358,23 +360,43 @@ export function InboxNotificationsTable({
   );
 }
 
+/** NativeActivityRowView: tinted circle, action title, "entity · actor", source + status and time. */
 export function NotificationMobileRow({ row, expanded, toggle }: { row: AuditRow; expanded: boolean; toggle: () => void }) {
   const t = useTranslations();
+  const locale = useLocale();
+  const failed = row.status === "failed" || row.status === "unauthorized";
+  const tint = failed ? "text-ios-red bg-ios-red/12" : row.status === "cancelled" ? "text-ios-orange bg-ios-orange/12" : row.status === "succeeded" ? "text-ios-green bg-ios-green/12" : "text-ios-accent bg-ios-accent/12";
+  const Icon = failed ? CircleAlert : row.source === "ai" ? Sparkles : row.source === "pos" ? Waypoints : row.source === "mobile" ? Smartphone : History;
+  const entity = t.has(`mobile.activity.entities.${row.entityType}` as never) ? t(`mobile.activity.entities.${row.entityType}` as never) : t("mobile.activity.fallback.entity");
+  const actorName = actorFor(row, t);
+  const actorKey = actorName.trim().toLowerCase();
+  const actor = t.has(`mobile.activity.actors.${actorKey}` as never) ? t(`mobile.activity.actors.${actorKey}` as never) : actorName;
+  const source = t.has(`mobile.activity.sources.${row.source}` as never) ? t(`mobile.activity.sources.${row.source}` as never) : t("mobile.activity.fallback.source");
+  const status = t.has(`mobile.activity.statuses.${row.status}` as never) ? t(`mobile.activity.statuses.${row.status}` as never) : t("mobile.activity.fallback.status");
+  const date = new Date(row.createdAt);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const time = Number.isNaN(date.getTime()) ? "—" : locale === "vi"
+    ? `${pad(date.getHours())}:${pad(date.getMinutes())} ${date.getDate()} thg ${date.getMonth() + 1}`
+    : date.toLocaleString("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
   return (
     <button
       type="button"
       aria-expanded={expanded}
       onClick={toggle}
-      className="min-h-11 w-full p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+      className="flex w-full items-start gap-3 border-b border-border px-ios-inset py-3 text-left active:bg-black/[0.04] dark:active:bg-white/[0.06]"
     >
-      <ActivityCell row={row} t={t} />
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <span className={cn("rounded-full px-2 py-1 text-xs font-bold", sourceTone(row.source))}>{sourceText(row.source, t)}</span>
-        <span className={cn("rounded-full px-2 py-1 text-xs font-bold", toneFor(row.status))}>{statusText(row.status, t)}</span>
-      </div>
-      <div className="mt-2 text-xs text-slate-400">
-        {actorFor(row, t)} · {formatDate(row.createdAt)}
-      </div>
+      <span className={cn("grid size-9 shrink-0 place-items-center rounded-full", tint.split(" ").slice(1).join(" "))}>
+        <Icon className={cn("size-[17px]", tint.split(" ")[0])} strokeWidth={2.4} aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1 space-y-[5px]">
+        <span className="block text-[15px] font-semibold leading-5">{titleFor(row, t)}</span>
+        <span className="block text-[13px] text-ios-label-secondary">{entity} · {actor}</span>
+        <span className="flex items-center gap-2 text-[11px]">
+          <span className="text-ios-label-secondary">{source}</span>
+          <span className={cn("font-semibold", tint.split(" ")[0])}>{status}</span>
+          <span className="ml-auto text-ios-label-tertiary">{time}</span>
+        </span>
+      </span>
     </button>
   );
 }

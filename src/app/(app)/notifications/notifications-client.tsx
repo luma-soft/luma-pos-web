@@ -23,6 +23,7 @@ import {
   type AuditRow,
 } from "./notifications-table";
 import { NotificationsFilterDrawer } from "./notifications-filter-drawer";
+import { NotificationsMobile } from "./notifications-mobile";
 import { Pagination } from "@/components/pagination";
 import {
   applyNotificationFilters,
@@ -283,8 +284,66 @@ export function NotificationsClient({
     });
   }
 
+  const activityContent = activityLoading ? (
+    <LoadingState label={t("loading")} />
+  ) : activityError ? (
+    <ErrorState
+      label={t("loadError")}
+      retry={t("retry")}
+      onRetry={() =>
+        void loadActivityPage(pages.activity, pageSizes.activity)
+      }
+    />
+  ) : (
+    <>
+      <NotificationsTable
+        rows={activities.rows}
+        loadMore={{
+          page: activities.page,
+          pageCount: activities.pageCount,
+          loadPage: (page) => fetchActivityRows(page, activities.pageSize),
+        }}
+      />
+      <DesktopPagination>
+      <Pagination
+        page={activities.page}
+        pageCount={activities.pageCount}
+        total={activities.total}
+        pageSize={activities.pageSize}
+        unitLabel={activityT("unitLabel")}
+        onPageChange={(page) =>
+          void loadActivityPage(page, activities.pageSize)
+        }
+        onPageSizeChange={(pageSize) =>
+          void loadActivityPage(1, pageSize)
+        }
+      />
+      </DesktopPagination>
+    </>
+  );
+
   return (
-    <div className="min-h-full bg-canvas p-4 sm:p-6">
+    <>
+    <NotificationsMobile
+      tab={tab}
+      onTabChange={setTab}
+      allCount={rows.length}
+      visibleRows={visibleRows}
+      actionableRows={actionableRows}
+      unreadCount={unreadCount}
+      loading={loading}
+      error={error}
+      pending={pendingId !== null}
+      activeFilterCount={activeFilterCount}
+      onRetry={() => void load()}
+      onOpenFilter={() => setFilterOpen(true)}
+      onMarkAllRead={() => void markAllNotificationsRead()}
+      onAction={runAction}
+      onRead={(row) => void updateNotification(row)}
+      activity={activityContent}
+      activityTotal={activities.total}
+    />
+    <div className="min-h-full bg-canvas p-4 sm:p-6 max-lg:hidden">
       <header className="sticky top-0 z-20 -mx-4 -mt-4 mb-4 border-b border-border bg-surface sm:-mx-6 sm:-mt-6 lg:mb-5">
         <div className="flex min-h-[68px] items-center gap-3 px-4 pt-2 sm:px-6 lg:min-h-13 lg:pt-2.5">
           <div className="min-w-0 flex-1">
@@ -382,43 +441,7 @@ export function NotificationsClient({
           </p>
         )}
         {tab === "activity" ? (
-          activityLoading ? (
-            <LoadingState label={t("loading")} />
-          ) : activityError ? (
-            <ErrorState
-              label={t("loadError")}
-              retry={t("retry")}
-              onRetry={() =>
-                void loadActivityPage(pages.activity, pageSizes.activity)
-              }
-            />
-          ) : (
-            <>
-              <NotificationsTable
-                rows={activities.rows}
-                loadMore={{
-                  page: activities.page,
-                  pageCount: activities.pageCount,
-                  loadPage: (page) => fetchActivityRows(page, activities.pageSize),
-                }}
-              />
-              <DesktopPagination>
-              <Pagination
-                page={activities.page}
-                pageCount={activities.pageCount}
-                total={activities.total}
-                pageSize={activities.pageSize}
-                unitLabel={activityT("unitLabel")}
-                onPageChange={(page) =>
-                  void loadActivityPage(page, activities.pageSize)
-                }
-                onPageSizeChange={(pageSize) =>
-                  void loadActivityPage(1, pageSize)
-                }
-              />
-              </DesktopPagination>
-            </>
-          )
+          activityContent
         ) : loading ? (
           <LoadingState label={t("loading")} />
         ) : error ? (
@@ -458,6 +481,7 @@ export function NotificationsClient({
         )}
       </main>
 
+    </div>
       <NotificationsFilterDrawer
         open={filterOpen}
         rows={rows}
@@ -469,7 +493,7 @@ export function NotificationsClient({
           setPages((current) => ({ ...current, action: 1, all: 1 }));
         }}
       />
-    </div>
+    </>
   );
 }
 
