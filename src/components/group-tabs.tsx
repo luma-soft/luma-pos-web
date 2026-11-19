@@ -62,6 +62,7 @@ export function GroupTabs({
               key={it.tab}
               href={tabHref(it.tab)}
               aria-current={on ? "page" : undefined}
+              data-button-radius={mobileSegmented ? "pill" : undefined}
               className={cn(
                 "shrink-0 snap-start items-center gap-2 border-b-2 px-0.5 text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:text-xs lg:h-9 lg:min-w-0 lg:rounded-[10px] lg:border-b-0 lg:px-3.5 lg:font-semibold",
                 nativeMobileStyle && "border-b-[3px] text-[15px] font-semibold sm:text-[15px] lg:border-b-0 lg:text-xs",

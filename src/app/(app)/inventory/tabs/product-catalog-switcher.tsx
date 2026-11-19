@@ -35,18 +35,20 @@ export function ProductCatalogSwitcher({
   return (
     <nav
       aria-label={t("nav.products")}
-      className="mb-4 grid grid-cols-2 gap-1 overflow-hidden rounded-full bg-primary-50/75 p-[3px] dark:bg-primary-950/30 lg:gap-0 lg:rounded-xl lg:border lg:border-border lg:bg-surface lg:p-0"
+      className="mb-4 grid grid-cols-2 gap-1 overflow-hidden rounded-full bg-primary-50/75 p-[3px] dark:bg-primary-950/30 max-lg:gap-0 max-lg:bg-ios-accent/10 max-lg:p-1 lg:gap-0 lg:rounded-xl lg:border lg:border-border lg:bg-surface lg:p-0"
     >
       {options.map((option) => (
         <Link
           key={option.id}
           href={`${Routes.Inventory}?tab=products&catalog=${option.id}`}
           aria-current={activeView === option.id ? "page" : undefined}
+          // Phones: LumaSegmentedControl's fully rounded pill (not the 8px control radius).
+          data-button-radius="pill"
           className={cn(
-            "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-2 text-sm font-semibold transition-colors lg:gap-2 lg:rounded-none lg:px-4",
+            "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-2 text-sm font-semibold transition-colors max-lg:min-h-10 max-lg:text-[17px] lg:gap-2 lg:rounded-none lg:px-4",
             activeView === option.id
-              ? "bg-primary-600 text-white shadow-sm lg:bg-primary-50 lg:text-primary-700 lg:shadow-none lg:dark:bg-primary-950/40 lg:dark:text-primary-300"
-              : "text-slate-500 hover:bg-surface-2 hover:text-slate-900",
+              ? "bg-primary-600 text-white shadow-sm max-lg:bg-ios-accent lg:bg-primary-50 lg:text-primary-700 lg:shadow-none lg:dark:bg-primary-950/40 lg:dark:text-primary-300"
+              : "text-slate-500 hover:bg-surface-2 hover:text-slate-900 max-lg:font-normal max-lg:text-ios-label max-lg:hover:bg-transparent",
             "min-w-11 lg:min-w-0",
           )}
         >
