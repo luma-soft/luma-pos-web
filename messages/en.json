@@ -2018,6 +2018,42 @@
         "editBlocked": "This purchase receipt already has a supplier return and cannot be edited.",
         "fullyReturned": "All quantities in this receipt have already been returned."
       }
+    },
+    "purchaseReturns": {
+      "status": {
+        "completed": "Completed",
+        "draft": "Draft",
+        "cancelled": "Cancelled",
+        "unsettled": "Unpaid",
+        "partial": "Partially paid",
+        "settled": "Paid"
+      },
+      "itemCount": "{count} items",
+      "debtAmount": "Supplier debt",
+      "create": "Create supplier return",
+      "info": "Return information",
+      "statusLabel": "Return status",
+      "settlement": "Settlement",
+      "supplier": "Supplier",
+      "warehouse": "Warehouse",
+      "createdAt": "Created",
+      "items": "Returned items · {count}",
+      "payment": "Payment and tax",
+      "subtotal": "Subtotal",
+      "discount": "Discount",
+      "vatRate": "VAT",
+      "tax": "Tax",
+      "totalRefund": "Total return",
+      "refundAmount": "Refund",
+      "refundMethod": "Refund method",
+      "note": "Note",
+      "returnUnitCost": "Return price",
+      "unitAfterDiscount": "Unit price after discount",
+      "print": "Print / Share",
+      "edit": "Edit return",
+      "delete": "Delete return",
+      "deleteTitle": "Delete return {code}?",
+      "deleteMessage": "Related stock, refund and supplier balance will be updated."
     }
   },
   "toolsCenter": {

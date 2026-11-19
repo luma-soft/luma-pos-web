@@ -4,7 +4,9 @@ import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load
 import { productLineDisplayName } from "@/lib/products/variant-presentation";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { usePhoneLayout } from "@/components/use-phone-layout";
+import { MobilePurchaseReturnDetail, PurchaseReturnMobileRow } from "./purchase-return-mobile";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
@@ -19,12 +21,6 @@ type PurchaseReturnRow = Awaited<ReturnType<typeof getPurchaseReturns>>["rows"][
 function statusClass(status: string) {
   if (status === "draft") return "bg-warn-soft text-warn";
   return "bg-ok-soft text-ok";
-}
-
-function settlementClass(status: string) {
-  if (status === "settled") return "text-ok";
-  if (status === "partial") return "text-warn";
-  return "text-slate-400";
 }
 
 function purchaseReturnLinePricing(item: PurchaseReturnRow["items"][number]) {
@@ -52,6 +48,9 @@ export function PurchaseReturnsTable({ rows: serverRows, loadMore, capabilities 
   loadMore?: LoadMoreSource<PurchaseReturnRow>; capabilities?: { canEdit: boolean; canDelete: boolean } }) {
   const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
+  const phone = usePhoneLayout();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const openRow = phone ? rows.find((row) => row.id === openId) ?? null : null;
   const columns: DataTableColumn<PurchaseReturnRow>[] = [
     { key: "code", label: t("purchaseReturns.cols.code"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "time", label: t("purchaseReturns.cols.time"), defaultVisible: true, render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
@@ -82,43 +81,13 @@ export function PurchaseReturnsTable({ rows: serverRows, loadMore, capabilities 
           <InventoryDocumentActions kind="purchase-returns" id={row.id} code={row.code} capabilities={capabilities} inFooter />
         </div>
       )}
-      renderMobileRow={({ row, toggle }) => (
-        <div className="relative min-h-[120px] p-3">
-          <button type="button" onClick={toggle} aria-label={row.code}
-            className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500" />
-          <div className="pointer-events-none relative flex items-start justify-between gap-3">
-            <PartnerDetailLink
-              kind="supplier"
-              partnerId={row.supplierId}
-              name={row.supplierName}
-              openInCurrentTab
-              className="pointer-events-auto relative z-10 min-w-0 flex-1 truncate text-[15px] font-semibold"
-            />
-            <span className="max-w-[48%] shrink-0 text-right text-sm font-bold tabular-nums text-er [overflow-wrap:anywhere]">
-              {formatCurrency(Number(row.totalRefund))}
-            </span>
-          </div>
-          <div className="pointer-events-none relative mt-1.5 truncate text-[11px] text-slate-500">
-            {formatDate(row.createdAt)} · {row.code}
-          </div>
-          <div className="pointer-events-none relative mt-2 text-xs text-slate-500">
-            {t("purchaseReturns.cols.productName")}: {row.items.length}
-          </div>
-          <div className="pointer-events-none relative mt-1.5 flex flex-wrap items-center justify-between gap-2">
-            <StatusBadge status={row.status} />
-            <span className={cn("text-xs font-semibold", settlementClass(row.settlementStatus))}>
-              {t(`purchaseReturns.settlement.${row.settlementStatus}` as never)}
-            </span>
-          </div>
-          {Number(row.debtAmount) > 0 && (
-            <div className="pointer-events-none relative mt-1.5 text-right text-xs font-semibold tabular-nums text-slate-500">
-              {t("purchaseReturns.debtAmount")}: {formatCurrency(Number(row.debtAmount))}
-            </div>
-          )}
-        </div>
-      )}
+      mobileListClassName="max-lg:-mx-4 max-lg:space-y-0 max-lg:bg-surface"
+      mobileRowClassName="max-lg:rounded-none max-lg:border-0 max-lg:bg-[linear-gradient(var(--color-border),var(--color-border))] max-lg:bg-[length:calc(100%-70px)_1px] max-lg:bg-right-bottom max-lg:bg-no-repeat"
+      // Phones push PurchaseReturnDetailView instead of expanding the row.
+      renderMobileRow={({ row }) => <PurchaseReturnMobileRow row={row} onOpen={() => setOpenId(row.id)} />}
     />
     {loadMoreFooter}
+    {openRow && <MobilePurchaseReturnDetail row={openRow} capabilities={capabilities} onBack={() => setOpenId(null)} />}
     </>
   );
 }

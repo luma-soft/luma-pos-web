@@ -13,7 +13,7 @@ import { TableSkeleton } from "@/components/table-skeleton";
 import { PurchaseReturnsTable } from "./purchase-returns-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { PurchaseReturnsFilter } from "./purchase-returns-filter";
-import { ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
+import { ListPrimaryActionProvider, ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
@@ -48,11 +48,14 @@ async function PurchaseReturnsContent({ searchParams }: { searchParams: SP }) {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <InstantFilterForm className="flex min-w-0 flex-1 flex-wrap items-center gap-3" action={Routes.Inventory}>
           <input type="hidden" name="tab" value="purchase-returns" />
-          <ListSearchFilterBar
-            search={<ListSearchInput name="q" defaultValue={searchParams.q ?? ""} placeholder={t("purchaseReturns.searchPlaceholder")} />}
-            filter={<PurchaseReturnsFilter suppliers={options.suppliers} values={searchParams} resultCount={total} />}
-          />
-          <Link href={Routes.PurchaseReturnNew} className="ml-auto inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border border-primary-600 bg-surface px-4 text-sm font-semibold text-primary-600 transition hover:bg-primary-50 active:scale-[0.98]">
+          {/* Phones: PurchaseReturnsView's search bar with the "+" create button. */}
+          <ListPrimaryActionProvider action={{ href: Routes.PurchaseReturnNew, label: t("mobile.purchaseReturns.create") }}>
+            <ListSearchFilterBar
+              search={<ListSearchInput name="q" defaultValue={searchParams.q ?? ""} placeholder={t("purchaseReturns.searchPlaceholder")} />}
+              filter={<PurchaseReturnsFilter suppliers={options.suppliers} values={searchParams} resultCount={total} />}
+            />
+          </ListPrimaryActionProvider>
+          <Link href={Routes.PurchaseReturnNew} className="ml-auto max-lg:hidden inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border border-primary-600 bg-surface px-4 text-sm font-semibold text-primary-600 transition hover:bg-primary-50 active:scale-[0.98]">
             <Plus className="w-4 h-4" />
             {t("purchaseReturns.createNew")}
           </Link>
