@@ -1,9 +1,11 @@
 "use client";
 
 import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { usePhoneLayout } from "@/components/use-phone-layout";
+import { MobileStocktakeDetail } from "./stocktake-mobile";
 import { useTranslations } from "next-intl";
-import { ChevronRight } from "lucide-react";
+import { ListChecks } from "lucide-react";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { StocktakeRowActions } from "../../stocktakes/stocktake-actions";
@@ -31,6 +33,7 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled: "bg-surface-2 text-slate-500",
 };
 
+/** NativeStocktakeListItem: checklist tile, product summary, SKU count, date · code, status, differences. */
 export function StocktakeMobileRow({
   row,
   renderActions,
@@ -41,43 +44,40 @@ export function StocktakeMobileRow({
   onOpen: () => void;
 }) {
   const t = useTranslations();
+  const totalDiff = Number(row.totalDiff);
+  const netValue = row.netValue === null ? null : Number(row.netValue);
+  const tone = row.status === "draft" ? "text-ios-orange bg-ios-orange/12" : row.status === "balanced" ? "text-ios-green bg-ios-green/12" : "text-ios-label-secondary bg-black/[0.06]";
+  const valueTone = (value: number) => value === 0 ? "text-ios-label-secondary" : value > 0 ? "text-ios-green" : "text-ios-red";
+  const actions = renderActions(row);
   return (
-    <article className={cn("min-w-0 p-4", row.status === "cancelled" && "opacity-60")}>
-      <div className="flex min-w-0 items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3>
-            <button
-              type="button"
-              onClick={onOpen}
-              aria-label={t("stocktakes.viewDetails")}
-              className="inline-flex min-h-11 max-w-full items-center gap-1 break-words text-left text-sm font-semibold text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-              <span className="break-all">{row.code}</span>
-              <ChevronRight className="h-4 w-4 shrink-0" />
-            </button>
-          </h3>
-          <p className="mt-1 break-words text-xs text-slate-500">
-            {formatDate(row.createdAt)}
-          </p>
-        </div>
-        <Status row={row} />
-      </div>
-      <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4">
-        <Info label={t("stocktakes.cols.items")} value={String(row.itemCount)} />
-        <Info label={t("stocktakes.cols.productSummary")} value={row.productSummary || "—"} />
-        <Info label={t("stocktakes.cols.totalDiff")} value={diffText(Number(row.totalDiff))} tone={diffTone(Number(row.totalDiff))} />
-        {row.netValue !== null && <Info label={t("stocktakes.summary.netValue")} value={formatCurrency(Number(row.netValue))} tone={diffTone(Number(row.netValue))} />}
-        <Info label={t("stocktakes.cols.balancedAt")} value={row.balancedAt ? formatDate(row.balancedAt) : "—"} />
-        <Info label={t("internalUse.cols.by")} value={row.byName ?? "—"} />
-      </dl>
-      <div className="mt-4 grid gap-3">
-        <Info label={t("customers.fields.note")} value={row.note ?? "—"} />
-      </div>
-      <div className="mt-4 flex min-h-11 flex-wrap items-center justify-end gap-2 border-t border-border-soft pt-3">
-        {renderActions(row)}
-      </div>
+    <article className={cn("min-w-0 space-y-3 rounded-[18px] border border-border bg-surface p-4", row.status === "cancelled" && "opacity-60")}>
+      <button type="button" onClick={onOpen} aria-label={`${t("stocktakes.viewDetails")} ${row.code}`} className="block w-full space-y-2.5 text-left">
+        <span className="flex items-center gap-3">
+          <span className={cn("grid size-11 shrink-0 place-items-center rounded-[12px]", tone)}>
+            <ListChecks className="size-[18px]" strokeWidth={2.4} aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1 space-y-1">
+            <span className="block truncate text-[17px] font-semibold leading-[22px]">{row.productSummary?.trim() || t("mobile.stocktakes.defaultTitle")}</span>
+            <span className="block text-[12px] text-ios-label-secondary">{formatNumber(row.itemCount)} SKU</span>
+            <span className="block truncate text-[11px] text-ios-label-tertiary">{shortDateTime(row.createdAt)} · {row.code}</span>
+          </span>
+          <span className={cn("shrink-0 rounded-full px-2.5 py-1.5 text-[12px] font-semibold leading-none", tone)}>{t(`stocktakes.status.${row.status}` as never)}</span>
+        </span>
+        <span className="flex items-baseline gap-2 text-[12px] tabular-nums">
+          <span className={cn("min-w-0 flex-1 font-medium", valueTone(totalDiff))}>{t("mobile.stocktakes.totalDiff")}: {diffText(totalDiff)}</span>
+          {netValue !== null && <span className={cn("shrink-0 font-semibold", valueTone(netValue))}>{t("mobile.stocktakes.valueDiff")}: {formatCurrency(netValue)}</span>}
+        </span>
+      </button>
+      {actions && <div className="flex flex-wrap items-center justify-end gap-2">{actions}</div>}
     </article>
   );
+}
+
+function shortDateTime(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return "—";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 export function StocktakesTable({
@@ -96,6 +96,9 @@ export function StocktakesTable({
 }) {
   const { rows, footer: loadMoreFooter } = useMobileLoadMore(serverRows, loadMore, (row) => row.id);
   const t = useTranslations();
+  const phone = usePhoneLayout();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const openRow = phone ? rows.find((row) => row.id === openId) ?? null : null;
   const columns: DataTableColumn<StocktakeRow>[] = [
     { key: "code", label: t("stocktakes.cols.code"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
@@ -119,13 +122,17 @@ export function StocktakesTable({
       maxHeight={fillHeight ? undefined : "none"}
       minHeight={fillHeight ? 280 : 0}
       rowClassName={(row) => cn(row.status === "cancelled" && "opacity-60")}
-      renderMobileRow={({ row, toggle }) => (
+      mobileListClassName="max-lg:space-y-ios-section"
+      mobileRowClassName="max-lg:border-0 max-lg:bg-transparent max-lg:shadow-none"
+      renderMobileRow={({ row }) => (
         <StocktakeMobileRow
           row={row}
-          onOpen={toggle}
-          renderActions={(actionRow) => (
-            <StocktakeRowActions id={actionRow.id} status={actionRow.status} />
-          )}
+          // Phones push the native-style detail instead of the modal.
+          onOpen={() => setOpenId(row.id)}
+          // Only drafts have row actions (balance / cancel) on phones.
+          renderActions={(actionRow) => actionRow.status === "draft"
+            ? <StocktakeRowActions id={actionRow.id} status={actionRow.status} />
+            : null}
         />
       )}
       clientSideDetailNavigation
@@ -138,6 +145,9 @@ export function StocktakesTable({
       detailPanelClassName="h-[min(88dvh,780px)] w-[min(96vw,1200px)] sm:max-w-none"
     />
     {loadMoreFooter}
+    {openRow && (
+      <MobileStocktakeDetail id={openRow.id} code={openRow.code} status={openRow.status} canCancelBalanced={canCancelBalanced} onBack={() => setOpenId(null)} />
+    )}
     </>
   );
 }
@@ -160,13 +170,4 @@ function diffClass(value: number) {
 function Status({ row }: { row: StocktakeRow }) {
   const t = useTranslations();
   return <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", STATUS_STYLES[row.status])}>{t(`stocktakes.status.${row.status}` as never)}</span>;
-}
-
-function Info({ label, value, tone }: { label: string; value: string; tone?: "ok" | "er" }) {
-  return (
-    <div className="border-b border-border-soft pb-2">
-      <div className="text-xs font-semibold text-slate-500">{label}</div>
-      <div className={cn("mt-1 text-sm font-medium", tone === "ok" && "text-ok", tone === "er" && "text-er")}>{value}</div>
-    </div>
-  );
 }

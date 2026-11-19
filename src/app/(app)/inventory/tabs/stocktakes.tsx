@@ -95,7 +95,7 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
             className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm min-h-11 lg:min-h-0"
           />
         </div>
-        <Link href={Routes.StocktakeNew} className="ml-auto inline-flex h-11 shrink-0 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98]">
+        <Link href={Routes.StocktakeNew} className="ml-auto max-lg:hidden inline-flex h-11 shrink-0 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98]">
           <Plus className="h-4 w-4" />
           {t("stocktakes.createNew")}
         </Link>
@@ -125,7 +125,7 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
           unitLabel={t("stocktakes.unitLabel")}
         />
       </DesktopPagination>
-      <p className="text-xs text-slate-400">{t("stocktakes.balanceHint")}</p>
+      <p className="text-xs text-slate-400 max-lg:hidden">{t("stocktakes.balanceHint")}</p>
     </section>
   );
 }

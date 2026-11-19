@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import {
   Check,
   ChevronRight,
+  ListChecks,
   CircleAlert,
   Minus,
   PackageX,
@@ -73,7 +74,7 @@ export function StockOverview({
           </h2>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 max-lg:grid-cols-2 sm:grid-cols-2 xl:grid-cols-4">
           {STATUS_CARDS.map((item) => (
             <StatusCard
               key={item.status}
@@ -85,6 +86,15 @@ export function StockOverview({
           ))}
         </div>
       </section>
+
+      {/* Phones: InventoryStockOverviewView's prominent stocktake button. */}
+      <Link
+        href={Routes.StocktakeNew}
+        className="flex min-h-[52px] items-center justify-center gap-2 rounded-[16px] bg-ios-accent text-[17px] font-semibold text-white active:opacity-80 lg:hidden"
+      >
+        <ListChecks className="size-5" strokeWidth={2.4} aria-hidden="true" />
+        {t("mobile.stocktakes.start")}
+      </Link>
 
       {children}
 
@@ -145,12 +155,23 @@ function StatusCard({
     <Link
       href={href}
       className={cn(
-        "group min-h-[116px] rounded-card border p-4 transition duration-150 hover:-translate-y-0.5 hover:shadow-e2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+        "group min-h-[116px] rounded-card border p-4 max-lg:rounded-[18px] max-lg:p-3.5 transition duration-150 hover:-translate-y-0.5 hover:shadow-e2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
         toneClass,
         "inline-flex min-h-11 min-w-11 flex-col sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-[116px] lg:min-w-0",
       )}
     >
-      <div className="flex w-full items-center gap-3">
+      {/* Phones: header row with icon, title and chevron; big count below (2-column grid). */}
+      <div className="flex w-full items-center gap-2.5 lg:hidden">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full border border-current/20 bg-surface/80">
+          <Icon className="size-[18px]" strokeWidth={2.4} />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[17px] font-bold text-ios-label">{t(`inventory.statusCards.${status}.label`)}</span>
+        <ChevronRight className="size-4 shrink-0 text-ios-label-secondary" strokeWidth={2.4} />
+      </div>
+      <div className="mt-3 text-[26px] font-extrabold leading-none tabular-nums lg:hidden">
+        {formatNumber(count)} <span className="text-[13px] font-semibold">SKU</span>
+      </div>
+      <div className="flex w-full items-center gap-3 max-lg:hidden">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-current/20 bg-surface/65">
           <Icon className="h-5 w-5" strokeWidth={2} />
         </span>
@@ -165,7 +186,7 @@ function StatusCard({
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-hover:translate-x-0.5" />
       </div>
-      <p className="mt-2 text-xs font-medium text-slate-500">
+      <p className="mt-2 text-xs font-medium text-slate-500 max-lg:mt-2.5 max-lg:text-[13px] max-lg:text-ios-label-secondary">
         {t(`inventory.statusCards.${status}.description`)}
       </p>
     </Link>

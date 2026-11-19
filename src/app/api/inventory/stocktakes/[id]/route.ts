@@ -53,6 +53,7 @@ export async function GET(_request: Request, { params }: Context) {
   const items = await db
     .select({
       id: stocktakeItems.id,
+      productId: stocktakeItems.productId,
       productName: sql<string>`case when ${products.lifecycleStatus} = 'deleted' then ${products.name} || ' {DEL}' else ${products.name} end`,
       sku: products.sku,
       baseUnit: products.baseUnit,
