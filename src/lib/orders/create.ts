@@ -265,7 +265,7 @@ export async function createOrderForUser(
         const [hasEInvoice] = await tx.select({ id: einvoices.id }).from(einvoices).where(eq(einvoices.orderId, sourceOrder.id)).limit(1);
         if (hasEInvoice) throw new Error("SOURCE_HAS_EINVOICE");
 
-        if (sourceIsSale && sourceOrder.warehouseId) {
+        if (sourceIsSale) {
           const sourceItems = await tx.select().from(orderItems)
             .where(and(eq(orderItems.storeId, storeId), eq(orderItems.orderId, sourceOrder.id)));
           const targets = await getOrderStockRestorations(tx, storeId, sourceOrder, sourceItems);

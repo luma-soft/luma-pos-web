@@ -367,7 +367,7 @@ export async function OrderDetailPanel({
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                     <span>{formatNumber(Number(item.quantity))} {item.unitName}</span>
                     <span>× {formatCurrency(pricing.unitPrice)}</span>
-                    {pricing.discount > 0 && <span>{t("orders.cols.discount")}: {pricing.lineDiscountMode === "pct" && `${formatNumber(pricing.lineDiscountValue)}% · `}{formatCurrency(pricing.discount)}</span>}
+                    {pricing.discount > 0 && <span>{t("orders.cols.discount")}: {pricing.lineDiscountMode === "pct" && `${formatNumber(pricing.lineDiscountValue)}% · `}{formatCurrency(pricing.lineDiscount)}</span>}
                     <span>{t("orders.cols.unitPriceAfterDiscount")}: {formatCurrency(pricing.netUnitPrice)}</span>
                   </div>
                 </div>
@@ -404,7 +404,7 @@ export async function OrderDetailPanel({
                       <td className="px-3 py-3 text-slate-500">{item.unitName}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(pricing.unitPrice)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums text-slate-500">{pricing.discount > 0 ? <>{pricing.lineDiscountMode === "pct" && <div>{formatNumber(pricing.lineDiscountValue)}%</div>}{formatCurrency(pricing.discount)}</> : "—"}</td>
+                      <td className="px-3 py-3 text-right tabular-nums text-slate-500">{pricing.discount > 0 ? <>{pricing.lineDiscountMode === "pct" && <div>{formatNumber(pricing.lineDiscountValue)}%</div>}{formatCurrency(pricing.lineDiscount)}</> : "—"}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(pricing.netUnitPrice)}</td>
                       <td className="px-3 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(item.total))}</td>
                     </tr>

@@ -156,7 +156,7 @@ export async function MergeOrderDetailPreview({
                             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                               <span>{formatNumber(Number(item.quantity))} {item.unitName}</span>
                               <span>× {formatCurrency(pricing.unitPrice)}</span>
-                              {pricing.discount > 0 && <span>{t("orders.cols.discount")}: {formatCurrency(pricing.discount)}</span>}
+                              {pricing.discount > 0 && <span>{t("orders.cols.discount")}: {formatCurrency(pricing.lineDiscount)}</span>}
                               <span>{t("orders.cols.unitPriceAfterDiscount")}: {formatCurrency(pricing.netUnitPrice)}</span>
                             </div>
                           </div>
@@ -193,7 +193,7 @@ export async function MergeOrderDetailPreview({
                                 <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
                                 <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(pricing.unitPrice)}</td>
                                 <td className="px-3 py-3 text-right tabular-nums text-slate-500">
-                                  {pricing.discount > 0 ? formatCurrency(pricing.discount) : "—"}
+                                  {pricing.discount > 0 ? formatCurrency(pricing.lineDiscount) : "—"}
                                 </td>
                                 <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(pricing.netUnitPrice)}</td>
                                 <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatCurrency(Number(item.total))}</td>

@@ -272,6 +272,7 @@ export async function getPurchases(storeId: string, filters: { q?: string; statu
           productId: purchaseOrderItems.productId,
           quantity: purchaseOrderItems.quantity,
           unitMultiplier: purchaseOrderItems.unitMultiplier,
+          unitName: purchaseOrderItems.unitName,
           unitCost: purchaseOrderItems.unitCost,
           discount: purchaseOrderItems.discount,
           total: purchaseOrderItems.total,

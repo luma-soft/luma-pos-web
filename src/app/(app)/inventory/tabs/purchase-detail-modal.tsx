@@ -163,7 +163,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
                   </Link>
                   <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.total))}</div>
                 </div>
-                <div className="text-xs text-slate-500">{item.sku} · {formatNumber(Number(item.quantity))} {item.baseUnit}</div>
+                <div className="text-xs text-slate-500">{item.sku} · {formatNumber(Number(item.quantity))} {item.unitName || item.baseUnit}</div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <span>{t("purchases.cols.unitCost")}: <b className="tabular-nums">{formatCurrency(Number(item.unitCost))}</b></span>
                   <span className="text-right">{t("orders.cols.discount")}: <b className="tabular-nums">{discount > 0 ? <>{discountDetails.mode === "pct" && discountDetails.input != null && `${formatNumber(Number(discountDetails.input))}% · `}{formatCurrency(discount)}</> : "—"}</b></span>
@@ -199,7 +199,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
                     </td>
                     <td className="px-3 py-3">
                       <div className="font-medium">{productLineDisplayName(item)}</div>
-                      <div className="text-xs text-slate-400">{item.baseUnit}</div>
+                      <div className="text-xs text-slate-400">{item.unitName || item.baseUnit}</div>
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.unitCost))}</td>
