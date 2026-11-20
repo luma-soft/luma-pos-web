@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { getTheme, getMode } from "@/lib/theme/cookie";
 import { ServiceWorkerRegister } from "@/components/sw-register";
+import { SafariChromeColorSync } from "@/components/safari-chrome-color-sync";
 import { ConfirmDialogProvider } from "@/components/confirm-dialog-provider";
 import { DismissKeyboardOnOutsidePress } from "@/components/dismiss-keyboard-on-outside-press";
 import { DATA_TABLE_FILL_INIT } from "@/lib/data-table-fill";
@@ -18,8 +19,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  // Matches the native app's grouped background (systemGroupedBackground) so the
-  // status-bar area and launch screen blend with the mobile UI in light and dark.
+  // Initial value (grouped background) for the launch screen; SafariChromeColorSync
+  // then follows the visible top surface of each page at runtime.
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#F2F2F7" },
     { media: "(prefers-color-scheme: dark)", color: "#000000" },
@@ -53,6 +54,7 @@ export default async function RootLayout({
         <Script id="mode-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: MODE_INIT }} />
         <Script id="data-table-fill-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: DATA_TABLE_FILL_INIT }} />
         <ServiceWorkerRegister />
+        <SafariChromeColorSync />
         <NextIntlClientProvider messages={messages}>
           <DismissKeyboardOnOutsidePress />
           <ConfirmDialogProvider>{children}</ConfirmDialogProvider>
