@@ -2204,6 +2204,7 @@
       "variantsRoot": "Root product",
       "variantsSkuCount": "SKUs",
       "variantAttributes": "Variant attributes",
+      "attributes": "Attributes",
       "variantAttribute": "Attribute",
       "variantValues": "Values",
       "addVariantAxis": "Add variant axis",

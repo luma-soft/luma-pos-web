@@ -1266,7 +1266,7 @@ function ProductInfoPanel({
           />
         </div>
 
-        <ProductMobileInfo product={product} />
+        <ProductMobileInfo product={product} specs={specs} />
         <div className="grid grid-cols-2 gap-2 max-lg:hidden lg:grid-cols-4 lg:gap-x-8 lg:gap-y-3">
           <InfoItem label={t("products.fields.sku")} value={product.sku} />
           <InfoItem className="lg:hidden"
@@ -1347,7 +1347,7 @@ function ProductInfoPanel({
         )}
 
         {specs.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-x-8 lg:gap-y-3">
+          <div className="grid grid-cols-2 gap-2 max-lg:hidden lg:grid-cols-4 lg:gap-x-8 lg:gap-y-3">
             {specs.map(([key, value]) => (
               <InfoItem key={key} label={key} value={value} />
             ))}
@@ -2652,7 +2652,7 @@ function ProductMobileHero({ product }: { product: ProductRow }) {
 }
 
 /** Phone sections of the info tab: "Thông tin cơ bản" and "Đơn vị & bảng giá" as plain labelled rows. */
-function ProductMobileInfo({ product }: { product: ProductRow }) {
+function ProductMobileInfo({ product, specs }: { product: ProductRow; specs: ReadonlyArray<readonly [string, string]> }) {
   const t = useTranslations();
   const tracked = isProductStockManaged(product.categoryName, product.productKind);
   const row = (label: string, value: string | null | undefined, tone?: string) => (
@@ -2682,6 +2682,12 @@ function ProductMobileInfo({ product }: { product: ProductRow }) {
       </div>
       {row(t("mobile.products.costPrice"), formatNativeCurrency(Number(product.costPrice)), "font-extrabold text-ios-accent")}
       {row(t("mobile.products.retailPrice"), formatNativeCurrency(Number(product.retailPrice)), "font-extrabold text-ios-accent")}
+      {specs.length > 0 && (
+        <>
+          <h3 className="flex min-h-[42px] items-center border-b border-border-soft px-ios-inset text-[17px] font-extrabold">{t("mobile.products.attributes")}</h3>
+          {specs.map(([key, value]) => row(key.toLocaleUpperCase("vi"), value))}
+        </>
+      )}
     </div>
   );
 }
