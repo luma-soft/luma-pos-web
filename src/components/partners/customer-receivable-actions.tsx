@@ -15,6 +15,19 @@ import {
 } from "@/components/partners/partner-debt-dialog";
 import { cn, formatCurrency } from "@/lib/utils";
 import { autoAllocatePayment } from "@/lib/payments/auto-allocation";
+import { usePhoneLayout } from "@/components/use-phone-layout";
+import {
+  DebtSheet,
+  DebtSheetAllocationRow,
+  DebtSheetAmount,
+  DebtSheetBalance,
+  DebtSheetMethod,
+  DebtSheetNote,
+  DebtSheetReason,
+  DebtSheetRow,
+  DebtSheetSection,
+  DebtSheetTime,
+} from "@/components/partners/partner-debt-sheet";
 
 type Invoice = { id: string; code: string; createdAt: string; remaining: number };
 type Overview = {
@@ -49,6 +62,7 @@ export function CustomerReceivableActions({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [qr, setQr] = useState<{ imageUrl: string; reference: string; amount: number } | null>(null);
+  const phone = usePhoneLayout();
 
   async function open(next: Mode) {
     setMode(next);
@@ -107,7 +121,9 @@ export function CustomerReceivableActions({
         ]}
       />
       </>}
-      {mode === "collect" && loading && <PartnerDebtDialog title="Thanh toán công nợ" onClose={() => setMode(null)}><p className="text-sm text-slate-500">Đang tải hóa đơn...</p></PartnerDebtDialog>}
+      {mode === "collect" && loading && (phone
+        ? <DebtSheet title="Thanh toán công nợ" confirmLabel="Xác nhận" confirmDisabled pending={false} onConfirm={() => undefined} onClose={() => setMode(null)}><DebtSheetNote>Đang tải hóa đơn...</DebtSheetNote></DebtSheet>
+        : <PartnerDebtDialog title="Thanh toán công nợ" onClose={() => setMode(null)}><p className="text-sm text-slate-500">Đang tải hóa đơn...</p></PartnerDebtDialog>)}
       {mode === "collect" && !loading && <CollectDialog customerId={customerId} overview={overview} error={error} onError={setError} onClose={() => setMode(null)} />}
       {mode === "qr" && loading && <PartnerDebtDialog title="Tạo QR thanh toán" onClose={() => setMode(null)}><p className="text-sm text-slate-500">Đang tải hóa đơn...</p></PartnerDebtDialog>}
       {mode === "qr" && !loading && <QrCreateDialog invoices={overview?.invoices ?? []} error={error} onCreate={createQr} onClose={() => setMode(null)} />}
@@ -142,6 +158,7 @@ function QrCreateDialog({ invoices, error, onCreate, onClose }: { invoices: Invo
 
 function CollectDialog({ customerId, overview, error, onError, onClose }: { customerId: string; overview: Overview | null; error: string; onError: (value: string) => void; onClose: () => void }) {
   const t = useTranslations();
+  const phone = usePhoneLayout();
   const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState<"cash" | "bank_transfer">("cash");
   const [occurredAt, setOccurredAt] = useState(() => localDateTimeValue(new Date()));
@@ -164,6 +181,32 @@ function CollectDialog({ customerId, overview, error, onError, onClose }: { cust
       onClose();
     });
   }
+  if (phone) {
+    const prepayment = Math.max(0, amount - allocationTotal);
+    return <DebtSheet title="Thanh toán công nợ" confirmLabel="Xác nhận" confirmDisabled={!valid} pending={pending} onConfirm={submit} onClose={onClose}>
+      {!overview ? <DebtSheetNote tone="error">{error || "Không có dữ liệu công nợ."}</DebtSheetNote> : <>
+        <DebtSheetSection title="Thanh toán công nợ">
+          <DebtSheetBalance value={overview.currentDebt} />
+          <DebtSheetTime value={occurredAt} onChange={setOccurredAt} />
+          <DebtSheetAmount label="Số tiền thanh toán" value={amount} onChange={(value) => setPaymentAmount(value ?? 0)} helper="Có thể thanh toán vượt dư nợ để ghi nhận khách trả trước." />
+          <DebtSheetMethod value={method} onChange={setMethod} />
+          {method === "bank_transfer" && (overview.bankAccounts.length > 0
+            ? <Select aria-label="Số tài khoản" value={bankAccountId} onValueChange={setBankAccountId} options={overview.bankAccounts.map((account) => ({ value: account.id, label: `${account.bankCode} · ${account.accountNumber}`, description: account.accountName }))} rootClassName="w-full" />
+            : <DebtSheetNote>Chưa có tài khoản đang hoạt động. Hãy thêm tài khoản trong Cài đặt trước khi ghi nhận chuyển khoản.</DebtSheetNote>)}
+          {error && <DebtSheetNote tone="error">{error}</DebtSheetNote>}
+        </DebtSheetSection>
+        <DebtSheetSection title="Phân bổ hóa đơn">
+          {overview.invoices.length === 0 && <DebtSheetNote>Không có hóa đơn còn nợ; khoản thu sẽ được ghi nhận là tiền khách trả trước.</DebtSheetNote>}
+          {overview.invoices.map((invoice, index) => (
+            <DebtSheetAllocationRow key={invoice.id} code={invoice.code} remaining={invoice.remaining} value={allocations[index]?.amount ?? 0} disabled={pending} onChange={(value) => setAllocations((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, amount: value } : row))} />
+          ))}
+          <DebtSheetRow label="Tổng đã phân bổ" value={allocationTotal} />
+          <DebtSheetRow label="Khách trả trước" value={prepayment} />
+          {allocationTotal > amount + 0.01 && <DebtSheetNote tone="error">Số tiền phân bổ phải nằm trong dư nợ từng hóa đơn và không vượt số tiền thu.</DebtSheetNote>}
+        </DebtSheetSection>
+      </>}
+    </DebtSheet>;
+  }
   return <PartnerDebtDialog title="Thanh toán công nợ" onClose={onClose}>
     {!overview ? <p className="text-sm text-er">{error || "Không có dữ liệu công nợ."}</p> : <div className="space-y-4">
       <DebtBalanceSummary value={overview.currentDebt} />
@@ -181,6 +224,7 @@ function CollectDialog({ customerId, overview, error, onError, onClose }: { cust
 
 function EntryDialog({ customerId, currentDebt, mode, error, onError, onClose }: { customerId: string; currentDebt: number; mode: "adjust" | "discount"; error: string; onError: (value: string) => void; onClose: () => void }) {
   const t = useTranslations();
+  const phone = usePhoneLayout();
   const [amount, setAmount] = useState<number | null>(null); const [reason, setReason] = useState(""); const [pending, startTransition] = useTransition();
   const [occurredAt, setOccurredAt] = useState(() => localDateTimeValue(new Date()));
   const [clientRequestId] = useState(() => requestId("web-receivable-entry"));
@@ -190,5 +234,18 @@ function EntryDialog({ customerId, currentDebt, mode, error, onError, onClose }:
   const reasonMissing = reasonRequired && !reason.trim();
   const valid = Boolean(occurredAt) && amount != null && !(mode === "adjust" ? amount === currentDebt : signedAmount === 0) && !reasonMissing && !pending;
   function submit() { if (!valid || amount == null || !occurredAt) return; startTransition(async () => { const result = await createCustomerReceivableEntry({ customerId, ...(mode === "adjust" ? { targetDebt: amount } : { amount: signedAmount }), type, reason: reason.trim(), occurredAt: new Date(occurredAt).toISOString(), clientRequestId }); if (!result.ok) return onError(t.has(result.error) ? t(result.error as never) : "Không thể tạo chứng từ."); onClose(); }); }
+  if (phone) {
+    const title = mode === "discount" ? "Chiết khấu thanh toán" : "Điều chỉnh công nợ";
+    return <DebtSheet title={title} confirmLabel={mode === "discount" ? "Xác nhận" : "Lưu"} confirmDisabled={!valid} pending={pending} onConfirm={submit} onClose={onClose}>
+      <DebtSheetSection title={title}>
+        <DebtSheetBalance value={currentDebt} />
+        <DebtSheetTime value={occurredAt} onChange={setOccurredAt} />
+        <DebtSheetAmount label={mode === "adjust" ? "Công nợ mới" : "Số tiền"} value={amount} min={mode === "adjust" ? -Number.MAX_SAFE_INTEGER : 0} onChange={setAmount} helper={mode === "adjust" ? "Nhập số âm nếu khách hàng đang có số dư/trả trước." : undefined} />
+        <DebtSheetReason placeholder={reasonRequired ? "Lý do" : "Lý do (không bắt buộc)"} value={reason} onChange={setReason} />
+        {error && <DebtSheetNote tone="error">{error}</DebtSheetNote>}
+        <DebtSheetNote>Điều chỉnh sẽ ghi một giao dịch vào sổ công nợ và cần quyền quản lý.</DebtSheetNote>
+      </DebtSheetSection>
+    </DebtSheet>;
+  }
   return <PartnerDebtDialog title={mode === "discount" ? "Chiết khấu thanh toán" : "Điều chỉnh công nợ"} onClose={onClose}><div className="space-y-4"><DebtBalanceSummary value={currentDebt} /><label className="block text-sm font-medium">Thời gian<Input type="datetime-local" value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} required className="mt-1 w-full" /></label><label className="block text-sm font-medium">{mode === "adjust" ? "Công nợ mới" : "Số tiền"}<MoneyInput value={amount} min={mode === "adjust" ? -Number.MAX_SAFE_INTEGER : 0} onChange={setAmount} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-right" /></label>{mode === "adjust" && <p className="text-xs text-slate-500">Nhập số âm nếu khách hàng có số dư/trả trước.</p>}<label className="block text-sm font-medium">{reasonRequired ? "Lý do" : "Lý do (không bắt buộc)"}<textarea value={reason} maxLength={200} onChange={(event) => setReason(event.target.value)} className="mt-1 min-h-24 w-full rounded-lg border border-border p-2" /><span className="mt-1 block text-right text-xs text-slate-400">{reason.length}/200</span></label>{error && <p className="text-sm text-er">{error}</p>}<DebtDialogFooter onCancel={onClose} onConfirm={submit} confirmLabel={pending ? "Đang lưu..." : "Xác nhận"} disabled={!valid} /></div></PartnerDebtDialog>;
 }

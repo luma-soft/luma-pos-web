@@ -13,6 +13,19 @@ import {
 } from "@/components/partners/partner-debt-dialog";
 import { cn, formatCurrency } from "@/lib/utils";
 import { autoAllocatePayment } from "@/lib/payments/auto-allocation";
+import { usePhoneLayout } from "@/components/use-phone-layout";
+import {
+  DebtSheet,
+  DebtSheetAllocationRow,
+  DebtSheetAmount,
+  DebtSheetBalance,
+  DebtSheetMethod,
+  DebtSheetNote,
+  DebtSheetReason,
+  DebtSheetRow,
+  DebtSheetSection,
+  DebtSheetTime,
+} from "@/components/partners/partner-debt-sheet";
 
 type Invoice = { id: string; code: string; createdAt: string; remaining: number };
 export type SupplierPayableOverview = {
@@ -93,6 +106,7 @@ function SupplierPaymentDialog({
   onClose: () => void;
   onChanged: () => void | Promise<void>;
 }) {
+  const phone = usePhoneLayout();
   const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState<"cash" | "bank_transfer">("cash");
   const [occurredAt, setOccurredAt] = useState(() => localDateTimeValue(new Date()));
@@ -138,6 +152,32 @@ function SupplierPaymentDialog({
       onClose();
       void onChanged();
     });
+  }
+
+  if (phone) {
+    return (
+      <DebtSheet title="Thanh toán nhà cung cấp" confirmLabel="Xác nhận" confirmDisabled={!valid} pending={pending} onConfirm={submit} onClose={onClose}>
+        {error && <div className="rounded-[14px] bg-surface p-3"><DebtSheetNote tone="error">{error}</DebtSheetNote></div>}
+        <DebtSheetSection title="Ghi nhận thanh toán">
+          <DebtSheetBalance value={overview.currentDebt} tone="warning" />
+          <DebtSheetTime value={occurredAt} onChange={setOccurredAt} />
+          <DebtSheetAmount label="Số tiền thanh toán" value={amount} max={overview.currentDebt} onChange={(value) => setPaymentAmount(value ?? 0)} helper={`Số tiền tối đa ${formatCurrency(overview.currentDebt)}`} />
+          <DebtSheetMethod value={method} onChange={setMethod} />
+          {method === "bank_transfer" && (overview.bankAccounts.length > 0
+            ? <Select aria-label="Số tài khoản" value={bankAccountId} onValueChange={setBankAccountId} options={overview.bankAccounts.map((account) => ({ value: account.id, label: `${account.bankCode} · ${account.accountNumber}`, description: account.accountName }))} rootClassName="w-full" />
+            : <DebtSheetNote>Chưa có tài khoản đang hoạt động. Hãy thêm tài khoản trong Cài đặt trước khi ghi nhận chuyển khoản.</DebtSheetNote>)}
+        </DebtSheetSection>
+        <DebtSheetSection title="Phân bổ phiếu nhập">
+          {overview.invoices.length === 0 && <DebtSheetNote>Không có phiếu nhập còn nợ; khoản thanh toán mới sẽ chưa phân bổ.</DebtSheetNote>}
+          {overview.invoices.map((invoice, index) => (
+            <DebtSheetAllocationRow key={invoice.id} code={invoice.code} remaining={invoice.remaining} value={allocations[index]?.amount ?? 0} disabled={pending} onChange={(value) => setAllocations((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, amount: value } : row))} />
+          ))}
+          <DebtSheetRow label="Đã phân bổ" value={allocationTotal} />
+          <DebtSheetRow label="Chưa phân bổ" value={Math.max(0, amount - allocationTotal)} />
+          {allocationTotal > amount + 0.01 && <DebtSheetNote tone="error">Tổng phân bổ không được vượt số tiền thanh toán.</DebtSheetNote>}
+        </DebtSheetSection>
+      </DebtSheet>
+    );
   }
 
   return (
@@ -224,6 +264,7 @@ function SupplierAdjustmentDialog({
   onClose: () => void;
   onChanged: () => void | Promise<void>;
 }) {
+  const phone = usePhoneLayout();
   const [amount, setAmount] = useState<number | null>(null);
   const [reason, setReason] = useState("");
   const [occurredAt, setOccurredAt] = useState(() => localDateTimeValue(new Date()));
@@ -251,6 +292,21 @@ function SupplierAdjustmentDialog({
       onClose();
       void onChanged();
     });
+  }
+
+  if (phone) {
+    return (
+      <DebtSheet title="Điều chỉnh công nợ" confirmLabel="Xác nhận" confirmDisabled={!valid} pending={pending} onConfirm={submit} onClose={onClose}>
+        {error && <div className="rounded-[14px] bg-surface p-3"><DebtSheetNote tone="error">{error}</DebtSheetNote></div>}
+        <DebtSheetSection title="Điều chỉnh công nợ">
+          <DebtSheetBalance value={currentDebt} tone="warning" />
+          <DebtSheetTime value={occurredAt} onChange={setOccurredAt} />
+          <DebtSheetAmount label="Dư nợ sau điều chỉnh" value={amount} min={-Number.MAX_SAFE_INTEGER} onChange={setAmount} helper="Nhập số âm nếu nhà cung cấp đang có số dư/trả trước." />
+          <DebtSheetReason placeholder="Lý do điều chỉnh (không bắt buộc)" value={reason} onChange={setReason} showCount />
+          <DebtSheetNote>Việc điều chỉnh sẽ ghi sổ công nợ của nhà cung cấp.</DebtSheetNote>
+        </DebtSheetSection>
+      </DebtSheet>
+    );
   }
 
   return (
