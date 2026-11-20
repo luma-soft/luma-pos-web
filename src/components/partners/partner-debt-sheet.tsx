@@ -93,12 +93,23 @@ export function DebtSheetBalance({ value, tone = "danger" }: { value: number; to
 /** LumaDateTimePickerField: label with time and date capsules ("YYYY-MM-DDTHH:mm"). */
 export function DebtSheetTime({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [date = "", time = ""] = value.split("T");
-  const pill = "h-11 appearance-none rounded-full bg-black/[0.06] px-4 text-[17px] tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ios-accent dark:bg-white/10";
+  const [year, month, day] = date.split("-").map(Number);
+  // iOS shows "Ngày 20 thg 11, 2026"; Safari would format the native input in the device locale,
+  // so the label is drawn here and the transparent native input on top still opens the picker.
+  const dateLabel = year && month && day ? `Ngày ${day} thg ${month}, ${year}` : "—";
+  const pill = "relative inline-flex h-11 shrink-0 items-center rounded-full bg-black/[0.06] px-3 text-[16px] tabular-nums focus-within:ring-2 focus-within:ring-ios-accent dark:bg-white/10";
+  const overlay = "absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0";
   return (
     <div className="flex items-center gap-2">
-      <span className="min-w-0 flex-1 whitespace-nowrap text-[17px]">Thời gian</span>
-      <input type="time" aria-label="Giờ" value={time} onChange={(event) => onChange(`${date}T${event.target.value}`)} required className={cn(pill, "w-[108px] shrink-0 px-3")} />
-      <input type="date" aria-label="Ngày" value={date} onChange={(event) => onChange(`${event.target.value}T${time}`)} required className={cn(pill, "min-w-0 max-w-[180px] px-3")} />
+      <span className="mr-auto shrink-0 whitespace-nowrap text-[17px]">Thời gian</span>
+      <label className={pill}>
+        <span aria-hidden="true">{time || "--:--"}</span>
+        <input type="time" aria-label="Giờ" value={time} onChange={(event) => onChange(`${date}T${event.target.value}`)} required className={overlay} />
+      </label>
+      <label className={cn(pill, "min-w-0 shrink")}>
+        <span className="truncate" aria-hidden="true">{dateLabel}</span>
+        <input type="date" aria-label="Ngày" value={date} onChange={(event) => onChange(`${event.target.value}T${time}`)} required className={overlay} />
+      </label>
     </div>
   );
 }
