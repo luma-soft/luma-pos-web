@@ -457,7 +457,8 @@
     "uploading": "Uploading {current}/{total}: {name}",
     "uploaded": "Uploaded {count} files.",
     "partialUpload": "Uploaded {success} files; {failed} failed. You can retry the remaining files.",
-    "invalidFile": "{name}: unsupported format or file exceeds its size limit.",
+    "unsupportedFileType": "Unsupported file format.",
+    "fileTooLarge": "File is {size}, over the {max} limit for this type.",
     "removeSelection": "Remove {name}",
     "errors": {
       "load": "Could not refresh the library.",

@@ -178,6 +178,7 @@ export function LibraryUploadDialog({
   return (
     <LibraryDialog
       wide
+      fixedHeight
       title={t("uploadTitle")}
       description={t("uploadHint")}
       busy={busy}
@@ -213,8 +214,9 @@ export function LibraryUploadDialog({
         </div>
       }
     >
-      <div className="grid sm:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-        <section className="p-4 sm:p-6" aria-label={t("chooseFiles")}>
+      <div className="flex min-h-full flex-col sm:h-full">
+      <div className="grid flex-1 sm:min-h-0 sm:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+        <section className="p-4 sm:min-h-0 sm:overflow-y-auto sm:overscroll-contain sm:p-6" aria-label={t("chooseFiles")}>
           <button
             type="button"
             disabled={busy}
@@ -296,7 +298,7 @@ export function LibraryUploadDialog({
             </div>
           )}
         </section>
-        <section className="space-y-4 border-t border-border bg-surface-2/50 p-4 sm:border-l sm:border-t-0 sm:p-6">
+        <section className="space-y-4 border-t border-border bg-surface-2/50 p-4 sm:min-h-0 sm:overflow-y-auto sm:overscroll-contain sm:border-l sm:border-t-0 sm:p-6">
           <Field label={t("album")}>
             <Input
               aria-label={t("album")}
@@ -373,7 +375,7 @@ export function LibraryUploadDialog({
         <div
           role={error || !validMetadata ? "alert" : "status"}
           className={cn(
-            "mx-4 mb-4 rounded-lg px-3 py-3 text-sm sm:mx-6",
+            "mx-4 mb-4 shrink-0 rounded-lg px-3 py-3 text-sm sm:mx-6 sm:mt-4",
             error || !validMetadata
               ? "bg-er-soft text-er"
               : "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200",
@@ -396,6 +398,7 @@ export function LibraryUploadDialog({
           )}
         </div>
       )}
+      </div>
     </LibraryDialog>
   );
 }
@@ -427,6 +430,7 @@ function UploadFileRow({
     return () => URL.revokeObjectURL(preview);
   }, [file]);
   const invalid = !validFile(file);
+  const fileLimit = mediaLibraryMaxBytesForMime(file.type);
   return (
     <li className="flex items-center gap-3 py-2">
       <div className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2 text-slate-400">
@@ -455,7 +459,12 @@ function UploadFileRow({
           )}
         >
           {invalid
-            ? t("invalidFile", { name: file.name })
+            ? fileLimit === null
+              ? t("unsupportedFileType")
+              : t("fileTooLarge", {
+                  size: formatLibraryBytes(file.size, locale),
+                  max: formatLibraryBytes(fileLimit, locale),
+                })
             : failed
               ? t("fileRetryHint")
               : formatLibraryBytes(file.size, locale)}

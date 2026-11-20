@@ -457,7 +457,8 @@
     "uploading": "Đang tải {current}/{total}: {name}",
     "uploaded": "Đã tải lên {count} tệp.",
     "partialUpload": "Đã tải {success} tệp; {failed} tệp bị lỗi. Có thể thử lại các tệp còn lại.",
-    "invalidFile": "{name}: định dạng không được hỗ trợ hoặc vượt giới hạn dung lượng.",
+    "unsupportedFileType": "Định dạng tệp không được hỗ trợ.",
+    "fileTooLarge": "Tệp {size} vượt giới hạn {max} cho loại này.",
     "removeSelection": "Bỏ tệp {name}",
     "errors": {
       "load": "Không thể tải lại thư viện.",
