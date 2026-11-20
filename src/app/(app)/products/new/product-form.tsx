@@ -2037,7 +2037,8 @@ function StockFields() {
   const hasVariants = (groupEditing && !groupAdding) || (!groupAdding && !editingStock && (watch("attributes") ?? []).some((attribute) => attribute.createsVariants !== false));
   if (hasVariants) return <p className="text-sm text-slate-500">Tồn được quản lý trên từng SKU trong tab Đơn vị & thuộc tính. Nhóm không có tồn riêng.</p>;
   return (
-    <div className="grid grid-cols-1 max-lg:grid-cols-[10fr_14fr_14fr] max-lg:items-end max-lg:gap-2.5 md:grid-cols-3 gap-4">
+    // No maximum level: nothing stores it, so the field is not offered.
+    <div className="grid grid-cols-1 max-lg:grid-cols-2 max-lg:items-end max-lg:gap-2.5 md:grid-cols-2 gap-4">
       <Field labelTx="products.stock.current">
         <NumberInput
           value={editingStock ? currentStock : watch("initialStock")}
@@ -2051,14 +2052,6 @@ function StockFields() {
           decimals={4}
           value={watch("minLevel")}
           onChange={(v) => setValue("minLevel", v ?? 0)}
-          min={0}
-        />
-      </Field>
-      <Field labelTx="products.stock.max">
-        <NumberInput
-          decimals={4}
-          value={watch("maxLevel")}
-          onChange={(v) => setValue("maxLevel", v ?? 999_999_999)}
           min={0}
         />
       </Field>
