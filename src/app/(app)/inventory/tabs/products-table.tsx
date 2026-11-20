@@ -90,6 +90,7 @@ import {
   readCachedStockHistory,
 } from "@/lib/offline/product-stock-history-store";
 import { resolveProductStockHistoryPanelState } from "@/lib/product-stock-history-state";
+import { loadProductPriceBookRows, type ProductPriceBookRow } from "./product-price-actions";
 
 type ProductRow = ProductListResult["rows"][number];
 type StockMovementRow = ProductRow["stockMovements"][number];
@@ -2655,6 +2656,15 @@ function ProductMobileHero({ product }: { product: ProductRow }) {
 function ProductMobileInfo({ product, specs }: { product: ProductRow; specs: ReadonlyArray<readonly [string, string]> }) {
   const t = useTranslations();
   const tracked = isProductStockManaged(product.categoryName, product.productKind);
+  const [priceBooks, setPriceBooks] = useState<{ productId: string; rows: ProductPriceBookRow[] } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    loadProductPriceBookRows(product.id, product.sku)
+      .then((rows) => { if (!cancelled) setPriceBooks(rows ? { productId: product.id, rows } : null); })
+      .catch(() => { if (!cancelled) setPriceBooks(null); });
+    return () => { cancelled = true; };
+  }, [product.id, product.sku]);
+  const bookRows = priceBooks?.productId === product.id ? priceBooks.rows : null;
   const row = (label: string, value: string | null | undefined, tone?: string) => (
     <div key={label} className="flex min-h-[38px] items-center justify-between gap-4 border-b border-border-soft px-ios-inset py-2 text-[15px] font-medium">
       <span className="shrink-0 text-[#596170] dark:text-ios-label-secondary">{label}</span>
@@ -2680,8 +2690,14 @@ function ProductMobileInfo({ product, specs }: { product: ProductRow; specs: Rea
         </span>
         <span className="text-[17px] text-ios-label-secondary">{product.baseUnit}</span>
       </div>
-      {row(t("mobile.products.costPrice"), formatNativeCurrency(Number(product.costPrice)), "font-extrabold text-ios-accent")}
-      {row(t("mobile.products.retailPrice"), formatNativeCurrency(Number(product.retailPrice)), "font-extrabold text-ios-accent")}
+      {bookRows
+        ? bookRows.map((book) => row(book.name, book.price == null ? t("mobile.products.noPriceData") : formatNativeCurrency(book.price), "font-extrabold text-ios-accent"))
+        : (
+          <>
+            {row(t("mobile.products.costPrice"), formatNativeCurrency(Number(product.costPrice)), "font-extrabold text-ios-accent")}
+            {row(t("mobile.products.retailPrice"), formatNativeCurrency(Number(product.retailPrice)), "font-extrabold text-ios-accent")}
+          </>
+        )}
       {specs.length > 0 && (
         <>
           <h3 className="flex min-h-[42px] items-center border-b border-border-soft px-ios-inset text-[17px] font-extrabold">{t("mobile.products.attributes")}</h3>

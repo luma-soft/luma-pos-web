@@ -2205,6 +2205,7 @@
       "variantsSkuCount": "SKUs",
       "variantAttributes": "Variant attributes",
       "attributes": "Attributes",
+      "noPriceData": "No data yet",
       "variantAttribute": "Attribute",
       "variantValues": "Values",
       "addVariantAxis": "Add variant axis",

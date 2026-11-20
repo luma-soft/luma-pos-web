@@ -2205,6 +2205,7 @@
       "variantsSkuCount": "Số SKU",
       "variantAttributes": "Thuộc tính biến thể",
       "attributes": "Thuộc tính",
+      "noPriceData": "Chưa có dữ liệu",
       "variantAttribute": "Thuộc tính",
       "variantValues": "Giá trị",
       "addVariantAxis": "Thêm trục biến thể",
