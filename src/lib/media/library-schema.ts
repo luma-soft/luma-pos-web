@@ -4,7 +4,7 @@ import { canonicalUuidCoordinateSchema } from "@/lib/media/uuid-coordinate";
 
 export const MEDIA_LIBRARY_UNCLASSIFIED_ALBUM = "Chưa phân loại";
 export const LIBRARY_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
-export const LIBRARY_DOCUMENT_MAX_BYTES = 100 * 1024 * 1024;
+export const LIBRARY_DOCUMENT_MAX_BYTES = 256 * 1024 * 1024;
 export const LIBRARY_VIDEO_MAX_BYTES = 512 * 1024 * 1024;
 
 export const MEDIA_LIBRARY_IMAGE_MIME_TYPES = [

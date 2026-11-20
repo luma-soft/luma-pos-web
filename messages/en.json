@@ -421,7 +421,7 @@
     "zoomOut": "Zoom out",
     "documentPreviewHint": "Open or download this document to view its contents.",
     "uploadTitle": "Add to library",
-    "uploadHint": "Up to 25 MB per image, 100 MB per document, and 512 MB per video.",
+    "uploadHint": "Up to 25 MB per image, 256 MB per document, and 512 MB per video.",
     "chooseFiles": "Choose photos, videos, or documents",
     "chooseFilesHint": "You can select multiple files at once",
     "selectedFiles": "{count} files selected",
