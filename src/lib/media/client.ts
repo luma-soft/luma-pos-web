@@ -478,7 +478,7 @@ export async function uploadManagedMedia(
   const validatedMediaId = intent.media.id;
   const uploadResponse = await fetchStage(
     fetcher,
-    intent.uploadUrl,
+    sameOriginLocalUploadUrl(intent.uploadUrl),
     {
       method: "PUT",
       credentials: "omit",
@@ -507,4 +507,22 @@ export async function uploadManagedMedia(
   await discardResponseBody(uploadResponse);
 
   return completeManagedMedia(intent.media, fetcher, signal);
+}
+
+/**
+ * Local-disk storage signs upload URLs against the public address
+ * (LUMAPOS_PUBLIC_URL). A page opened on another address of the same server
+ * (e.g. http://127.0.0.1:3000 on the store Mac) would PUT cross-origin, which
+ * the browser blocks without CORS, so every upload failed. The signed token
+ * does not depend on the host, so send it to the page's own origin instead.
+ */
+export function sameOriginLocalUploadUrl(uploadUrl: string): string {
+  if (typeof window === "undefined") return uploadUrl;
+  try {
+    const url = new URL(uploadUrl);
+    if (url.pathname !== "/api/media/local/upload" || url.origin === window.location.origin) return uploadUrl;
+    return `${window.location.origin}${url.pathname}${url.search}`;
+  } catch {
+    return uploadUrl;
+  }
 }
