@@ -232,14 +232,19 @@ export function NewProductForm({
       return attributes;
     }
   }, [initialValues, isEdit]);
+  const formDefaults: Partial<CreateProductInput> = {
+    ...blankProductValues(creationKind, requestId),
+    ...initialValues,
+    priceBookPrices: Object.fromEntries(Object.entries(initialValues?.priceBookPrices ?? {}).filter(([id]) => priceBooks.some((book) => book.id === id && !book.isDefault && !isPriceBookReadOnly(book)))),
+    attributes: preparedAttributes,
+  };
+  // Baseline for the edit save. `form.formState.defaultValues` is a lazily
+  // subscribed proxy that can read back empty in production builds, which
+  // silently dropped stock edits ("Tồn kho" saved but never changed).
+  const savedDefaults = useRef(formDefaults);
   const form = useForm<CreateProductInput, unknown, CreateProductOutput>({
     resolver: zodResolver(createProductSchema),
-    defaultValues: {
-      ...blankProductValues(creationKind, requestId),
-      ...initialValues,
-      priceBookPrices: Object.fromEntries(Object.entries(initialValues?.priceBookPrices ?? {}).filter(([id]) => priceBooks.some((book) => book.id === id && !book.isDefault && !isPriceBookReadOnly(book)))),
-      attributes: preparedAttributes,
-    },
+    defaultValues: formDefaults,
   });
   const initialPricing = useRef<UnitPricingSnapshot>({
     baseUnit: form.getValues("baseUnit") ?? "cái",
@@ -296,6 +301,15 @@ export function NewProductForm({
       const categoryId = typeof payload.categoryId === "string" && categories.some((category) => category.id === payload.categoryId)
         ? payload.categoryId
         : form.getValues("categoryId");
+      savedDefaults.current = {
+        ...form.getValues(),
+        name: typeof payload.name === "string" ? payload.name : form.getValues("name"),
+        sku: typeof payload.sku === "string" ? payload.sku : form.getValues("sku"),
+        categoryId,
+        costPrice: typeof payload.costPrice === "number" ? payload.costPrice : form.getValues("costPrice"),
+        retailPrice: typeof payload.retailPrice === "number" ? payload.retailPrice : form.getValues("retailPrice"),
+        baseUnit: typeof payload.baseUnit === "string" ? payload.baseUnit : form.getValues("baseUnit"),
+      };
       form.reset({
         ...form.getValues(),
         name: typeof payload.name === "string" ? payload.name : form.getValues("name"),
@@ -402,9 +416,9 @@ export function NewProductForm({
       return;
     }
     if (isEdit && productId) {
-      const defaults = createProductSchema.safeParse(form.formState.defaultValues);
+      const defaults = createProductSchema.safeParse(savedDefaults.current);
       const stockAdjustment = changedProductStock(
-        values.currentStock, form.formState.defaultValues?.currentStock,
+        values.currentStock, savedDefaults.current.currentStock,
       );
       // `dimUnit` has a form default even when no dimensions are set. Do not
       // let that default turn an unrelated product edit into a partial
@@ -519,6 +533,7 @@ export function NewProductForm({
   function resetForNextProduct() {
     const nextValues = blankProductValues(creationKind, crypto.randomUUID());
     form.reset(nextValues);
+    savedDefaults.current = nextValues;
     setImageUrlDraft("");
     setImageUrlDraftError(null);
     initialPricing.current = {
