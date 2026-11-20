@@ -114,3 +114,40 @@ export async function applyProductStockAdjustment(
     metadata: { productName: product.name, productSku: product.sku, warehouseId, quantityDelta: quantity - current },
   });
 }
+
+/**
+ * Saves the low-stock threshold edited on the product form. Every warehouse
+ * row gets the same minimum (the product form shows one value, the max of the
+ * rows); a product without stock rows gets one in the default warehouse.
+ */
+export async function applyProductMinLevel(
+  tx: InventoryTransaction,
+  storeId: string,
+  productId: string,
+  minLevel: number,
+) {
+  const value = minLevel.toFixed(4);
+  const levels = await tx.select({ minLevel: stockLevels.minLevel }).from(stockLevels)
+    .where(and(eq(stockLevels.storeId, storeId), eq(stockLevels.productId, productId)));
+  if (levels.length) {
+    // Skip the write (and the catalog revision bump) when nothing changed.
+    if (levels.every((level) => Number(level.minLevel ?? 0) === minLevel)) return;
+    await tx.update(stockLevels)
+      .set({ minLevel: value, updatedAt: new Date() })
+      .where(and(eq(stockLevels.storeId, storeId), eq(stockLevels.productId, productId)));
+    return;
+  }
+  if (minLevel === 0) return;
+  const [warehouse] = await tx.select({ id: warehouses.id }).from(warehouses)
+    .where(eq(warehouses.storeId, storeId))
+    .orderBy(desc(warehouses.isDefault), asc(warehouses.id))
+    .limit(1);
+  if (!warehouse) return;
+  await tx.insert(stockLevels).values({
+    storeId,
+    productId,
+    warehouseId: warehouse.id,
+    quantity: "0",
+    minLevel: value,
+  }).onConflictDoNothing();
+}

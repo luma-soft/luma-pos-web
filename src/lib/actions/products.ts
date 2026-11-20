@@ -42,7 +42,7 @@ import {
   getProfileId,
 } from "./common";
 import { productStockAdjustmentSchema } from "@/lib/products/stock-adjustment";
-import { applyProductStockAdjustment } from "@/lib/products/product-stock-adjustment";
+import { applyProductMinLevel, applyProductStockAdjustment } from "@/lib/products/product-stock-adjustment";
 import { syncProductUnits } from "@/lib/products/product-unit-sync";
 import {
   buildProductDimensions,
@@ -381,6 +381,8 @@ export async function updateProductPrices(
 const updateProductSchema = z.object({
   id: z.uuid(),
   stockAdjustment: productStockAdjustmentSchema.optional(),
+  /** Low-stock threshold (stock_levels.min_level); omitted keeps the saved value. */
+  minLevel: z.number().min(0).max(9_999_999_999.9999).optional(),
   productKind: z.enum(["product", "service", "combo"]).optional(),
   sku: z.string().trim().min(1),
   barcode: z.string().trim().optional(),
@@ -969,6 +971,10 @@ export async function updateProduct(
         nextTrackBatches: v.trackBatches,
         nextCategoryId: v.categoryId,
       });
+
+      if (v.minLevel !== undefined && !current.isVariantParent) {
+        await applyProductMinLevel(tx, gate.storeId, v.id, v.minLevel);
+      }
 
       if (v.imageMediaIds !== undefined || v.imageUrls !== undefined) {
         const imageMediaIds = await resolveProductImageMediaIdsInTransaction(tx, {

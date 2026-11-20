@@ -935,6 +935,10 @@ async function getBaseProduct(storeId: string, id: string) {
       ) else (
         select coalesce(sum(${stockLevels.quantity}),0) from ${stockLevels} where ${stockLevels.productId} = ${products.id}
       ) end`,
+      minLevel: sql<string>`(
+        select coalesce(max(${stockLevels.minLevel}),0) from ${stockLevels}
+        where ${stockLevels.storeId} = ${storeId} and ${stockLevels.productId} = ${products.id}
+      )`,
     })
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))

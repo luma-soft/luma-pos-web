@@ -240,5 +240,7 @@ export function productToFormInitialValues(
     directSale: product.isActive,
     initialStock: 0,
     ...(mode === "edit" ? { currentStock: Number(product.totalStock ?? 0) } : {}),
+    // Edit keeps the saved threshold; copy/create start from the store default.
+    ...(mode === "edit" && "minLevel" in product ? { minLevel: Number(product.minLevel ?? 0) } : {}),
   };
 }

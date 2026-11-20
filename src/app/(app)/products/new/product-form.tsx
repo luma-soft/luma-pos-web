@@ -364,6 +364,11 @@ export function NewProductForm({
       }
       if (pendingImageUrl) setImageUrlDraft("");
       await saveValues(values);
+    } catch (error) {
+      // A dropped connection or server crash rejects the action call; say so
+      // instead of leaving the form as if nothing happened.
+      console.error("product save failed", error);
+      form.setError("root", { message: "errors.serverError" });
     } finally {
       submitting.current = false;
     }
@@ -473,6 +478,7 @@ export function NewProductForm({
           length: dimensionsEdited ? values.length : undefined,
           thickness: dimensionsEdited ? values.thickness : undefined,
           dimUnit: dimensionsEdited ? values.dimUnit : undefined,
+          minLevel: values.minLevel,
           stockAdjustment,
         }, refreshOptions);
       if (res.ok) {
