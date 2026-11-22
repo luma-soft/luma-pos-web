@@ -2232,7 +2232,6 @@
         "description": "Description"
       },
       "stockOut": "Out of stock",
-      "currentStock": "Current stock",
       "stockAfter": "Stock",
       "onHand": "On hand",
       "minimum": "Minimum",
@@ -2396,6 +2395,30 @@
       "done": "Completed",
       "inProgress": "In progress",
       "empty": "No projects yet"
+    },
+    "checkout": {
+      "title": "Checkout",
+      "quoteTitle": "Confirm quotation",
+      "total": "Total",
+      "refundTotal": "Total refund",
+      "subtotal": "Subtotal",
+      "discountType": "Discount type",
+      "discountValue": "Discount",
+      "vatRate": "VAT",
+      "shippingFee": "Shipping fee",
+      "discount": "Discount",
+      "vat": "VAT {rate}%",
+      "vatMixed": "VAT · several rates",
+      "shipping": "Delivery fee",
+      "method": "Method",
+      "cash": "Cash",
+      "bank_transfer": "Transfer",
+      "credit": "On credit",
+      "received": "Customer pays",
+      "change": "Change",
+      "remaining": "Remaining",
+      "fullDebtNotice": "The full order will be recorded as customer debt.",
+      "confirm": "Confirm"
     }
   },
   "toolsCenter": {

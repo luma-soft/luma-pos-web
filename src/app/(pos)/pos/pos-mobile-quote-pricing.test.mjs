@@ -5,7 +5,9 @@ const vi=JSON.parse(readFileSync(new URL("../../../../messages/vi.json",import.m
 const en=JSON.parse(readFileSync(new URL("../../../../messages/en.json",import.meta.url),"utf8"));
 test("quotation confirmation has a native-specific heading only on mobile",()=>{
   expect(source).toContain('t(isQuoteDraft ? "pos.quotePricingDetails" : "pos.paymentDetails")');
-  expect(source).toContain('uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400 lg:hidden');
+  const checkout=source.slice(source.indexOf("<PosMobileCheckout"));
+  expect(checkout).toContain('heading: t(isQuoteDraft ? "pos.quotePricingDetails" : "pos.paymentDetails")');
+  expect(readFileSync(new URL("../../../components/pos/pos-mobile-checkout.tsx",import.meta.url),"utf8")).toContain('lg:hidden print:hidden');
   expect(source).toContain('onValueChange={setDiscountInput}');
   expect(source).toContain('onValueChange={setTaxRate}');
   expect(source).toContain('onValueChange={setShippingFee}');

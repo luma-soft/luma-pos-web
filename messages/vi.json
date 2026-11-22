@@ -2232,7 +2232,6 @@
         "description": "Mô tả"
       },
       "stockOut": "Hết hàng",
-      "currentStock": "Tồn hiện tại",
       "stockAfter": "Tồn",
       "onHand": "Tồn thực tế",
       "minimum": "Tối thiểu",
@@ -2396,6 +2395,30 @@
       "done": "Hoàn thành",
       "inProgress": "Đang thực hiện",
       "empty": "Chưa có công trình"
+    },
+    "checkout": {
+      "title": "Thanh toán",
+      "quoteTitle": "Xác nhận báo giá",
+      "total": "Tổng cộng",
+      "refundTotal": "Tổng hoàn tiền",
+      "subtotal": "Tạm tính",
+      "discountType": "Kiểu giảm giá",
+      "discountValue": "Giá trị giảm",
+      "vatRate": "Thuế VAT",
+      "shippingFee": "Phí vận chuyển",
+      "discount": "Giảm giá",
+      "vat": "VAT {rate}%",
+      "vatMixed": "VAT · nhiều mức",
+      "shipping": "Phí giao hàng",
+      "method": "Phương thức",
+      "cash": "Tiền mặt",
+      "bank_transfer": "Chuyển khoản",
+      "credit": "Công nợ",
+      "received": "Khách thanh toán",
+      "change": "Tiền thừa",
+      "remaining": "Còn phải thu",
+      "fullDebtNotice": "Toàn bộ đơn sẽ ghi công nợ cho khách.",
+      "confirm": "Xác nhận"
     }
   },
   "toolsCenter": {

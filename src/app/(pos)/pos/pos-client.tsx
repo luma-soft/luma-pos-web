@@ -106,6 +106,8 @@ import {
   type SwitchablePosDraftKind,
 } from "@/lib/pos/draft-kind-switch";
 import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
+import { PosMobileCheckout } from "@/components/pos/pos-mobile-checkout";
+import { usePhoneLayout } from "@/components/use-phone-layout";
 import { buildExpectedPosPricing, countPosPricingConflicts, requestPosOrder } from "@/lib/pos/checkout-pricing";
 import { defaultPosSellableUnitName, isPosUnitSellable, resolvePosCartUnit } from "@/lib/pos/cart-unit";
 import { upsertPosCartLine } from "@/lib/pos/cart-line-order";
@@ -695,6 +697,7 @@ export function PosClient({
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
   const [dropHover, setDropHover] = useState(false);
+  const phone = usePhoneLayout();
   const [mobileView, setMobileView] = useState<"catalog" | "cart">("catalog"); // chuyển đổi trên mobile
   const [mobileInvoicePickerOpen, setMobileInvoicePickerOpen] = useState(false);
   const [keyboardInset, setKeyboardInset] = useState(0);
@@ -3301,6 +3304,69 @@ export function PosClient({
     ? null
     : invoices.find((inv) => inv.id === draftKindPickerId) ?? null;
 
+  const checkoutExtras = (
+    <>
+          {!isReturnDraft && cart.some(usesCompanyPrice) && (
+            <CompanyLineDiscount count={cart.filter((line) => usesCompanyPrice(line) && line.unitPrice > 0).length} onApply={applyCompanyDiscount} />
+          )}
+          {customer && Number(customer.currentDebt) > 0 && (
+            <p className="text-xs text-warn">
+              {t("pos.customerDebt", { debt: formatCurrency(Number(customer.currentDebt)) })}
+            </p>
+          )}
+          {isReturnInvoiceDraft && (
+            <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+              <div className="text-sm font-semibold">
+                {t("pos.returns.invoiceSource", { code: returnOrderCode ?? "—" })}
+              </div>
+            </div>
+          )}
+          {posPrefs.showProjectFields && !isReturnDraft && (
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Combobox
+                  value={projectId}
+                  onChange={(id) => { setProjectId(id); const pj = data.projects.find((p) => p.id === id); if (pj) setProjectName(pj.name); }}
+                  placeholder={t("pos.noProject")}
+                  options={data.projects.filter((p) => !customerId || !p.customerId || p.customerId === customerId).map((p) => ({ value: p.id, label: p.name }))}
+                />
+              </div>
+              <input
+                value={projectName}
+                onChange={(e) => { setProjectName(e.target.value); setProjectId(""); }}
+                placeholder={t("pos.projectPlaceholder")}
+                className="min-h-11 min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-base lg:text-sm"
+              />
+            </div>
+          )}
+          {isBookingDraft && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">{t("pos.deliveryTime")}</label>
+              <DateInput
+                type="datetime-local"
+                value={deliveryDate ?? ""}
+                onChange={(e) => setDeliveryDate(e.target.value)}
+                className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+              />
+            </div>
+          )}
+    </>
+  );
+  const pricingConflictAction = pricingConflictId === activeId ? (
+    <button
+      type="button"
+      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full whitespace-normal")}
+      disabled={refreshingPricing || pricingRoutePending || submitting || !online}
+      onClick={() => void refreshCheckoutPricing()}
+    >
+      <RefreshCw className={cn("h-4 w-4 shrink-0", (refreshingPricing || pricingRoutePending) && "animate-spin")} />
+      {t("pos.pricingConflict.refresh")}
+    </button>
+  ) : null;
+  // Leaving an empty cart (order completed or parked) returns to the catalog, like iOS dismissing CheckoutSheet.
+  if (mobileView === "cart" && cart.length === 0) setMobileView("catalog");
+  const showMobileCheckout = phone && mobileView === "cart" && cart.length > 0;
+
   return (
     <div
       className="relative flex h-full min-h-0 overflow-hidden"
@@ -3749,14 +3815,10 @@ export function PosClient({
           if (p) selectProduct(p);
         }}
         className={cn(
-          mobileView === "catalog" && "hidden lg:flex",
+          "max-lg:hidden",
           dropHover && "bg-primary-50/60 dark:bg-primary-950/30 border-l-primary-400"
         )}
       >
-        {/* nút quay lại danh sách SP — chỉ mobile */}
-        <button onClick={() => setMobileView("catalog")} className="flex min-h-11 items-center gap-1.5 border-b border-border px-3 py-2 text-sm text-primary-600 lg:hidden">
-          <X className="w-4 h-4" /> {t("pos.searchPlaceholder")}
-        </button>
         {/* customer + bảng giá */}
         <div className="p-3 border-b border-border space-y-2">
           <div className="flex gap-2">
@@ -3786,57 +3848,10 @@ export function PosClient({
               options={data.priceBooks.map((pb) => ({ value: pb.id, label: pb.name }))}
             />
           </div>
-          {!isReturnDraft && cart.some(usesCompanyPrice) && (
-            <CompanyLineDiscount count={cart.filter((line) => usesCompanyPrice(line) && line.unitPrice > 0).length} onApply={applyCompanyDiscount} />
-          )}
-          {customer && Number(customer.currentDebt) > 0 && (
-            <p className="text-xs text-warn">
-              {t("pos.customerDebt", { debt: formatCurrency(Number(customer.currentDebt)) })}
-            </p>
-          )}
-          {isReturnInvoiceDraft && (
-            <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
-              <div className="text-sm font-semibold">
-                {t("pos.returns.invoiceSource", { code: returnOrderCode ?? "—" })}
-              </div>
-            </div>
-          )}
-          {posPrefs.showProjectFields && !isReturnDraft && (
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Combobox
-                  value={projectId}
-                  onChange={(id) => { setProjectId(id); const pj = data.projects.find((p) => p.id === id); if (pj) setProjectName(pj.name); }}
-                  placeholder={t("pos.noProject")}
-                  options={data.projects.filter((p) => !customerId || !p.customerId || p.customerId === customerId).map((p) => ({ value: p.id, label: p.name }))}
-                />
-              </div>
-              <input
-                value={projectName}
-                onChange={(e) => { setProjectName(e.target.value); setProjectId(""); }}
-                placeholder={t("pos.projectPlaceholder")}
-                className="min-h-11 min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-base lg:text-sm"
-              />
-            </div>
-          )}
-          {isBookingDraft && (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">{t("pos.deliveryTime")}</label>
-              <DateInput
-                type="datetime-local"
-                value={deliveryDate ?? ""}
-                onChange={(e) => setDeliveryDate(e.target.value)}
-                className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-              />
-            </div>
-          )}
+          {checkoutExtras}
         </div>
 
-        {/* Pricing follows the native confirmation sheet; mobile heading differs for quotes. */}
         <div className="p-3 border-t border-border space-y-2 text-sm">
-          <h2 className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400 lg:hidden">
-            {t(isQuoteDraft ? "pos.quotePricingDetails" : "pos.paymentDetails")}
-          </h2>
           <div className="flex justify-between items-center">
             <span className="text-slate-500">{t("pos.subtotal")}</span>
             <span className="tabular-nums">{formatCurrency(subtotal)}</span>
@@ -3980,17 +3995,7 @@ export function PosClient({
             />
           </div>
           {error && <p className="text-xs text-red-600">{error}</p>}
-          {pricingConflictId === activeId && (
-            <button
-              type="button"
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full whitespace-normal")}
-              disabled={refreshingPricing || pricingRoutePending || submitting || !online}
-              onClick={() => void refreshCheckoutPricing()}
-            >
-              <RefreshCw className={cn("h-4 w-4 shrink-0", (refreshingPricing || pricingRoutePending) && "animate-spin")} />
-              {t("pos.pricingConflict.refresh")}
-            </button>
-          )}
+          {pricingConflictAction}
 
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 lg:flex">
             {!initialSourceInvoice && !initialContext && (
@@ -4057,6 +4062,68 @@ export function PosClient({
         onCreated={applyCreatedCustomer}
         createAction={createPosCustomer}
       />
+      {showMobileCheckout && (
+        <PosMobileCheckout
+          title={t(isQuoteDraft ? "mobile.checkout.quoteTitle" : "mobile.checkout.title")}
+          subtitle={[draftDisplayLabel(active, Math.max(0, invoices.findIndex((inv) => inv.id === activeId))), customer?.name].filter(Boolean).join(" · ")}
+          onBack={() => setMobileView("catalog")}
+          pricing={{
+            heading: t(isQuoteDraft ? "pos.quotePricingDetails" : "pos.paymentDetails"),
+            subtotal,
+            total,
+            adjustments: isReturnDraft ? null : {
+              discountInput,
+              discountMode,
+              discountAmount: discountVnd,
+              onDiscountInput: setDiscountInput,
+              onDiscountMode: setDiscountMode,
+              tax: taxPrefs.vatTreatment === "taxable" ? {
+                rate: taxRate,
+                amount: taxAmount,
+                label: mixedTaxRates ? t("mobile.checkout.vatMixed") : t("mobile.checkout.vat", { rate: taxRate }),
+                onRate: setTaxRate,
+              } : null,
+              shippingFee,
+              onShippingFee: setShippingFee,
+            },
+          }}
+          payment={isDraftEditMode || !(isReturnDraft || isInvoiceDraft) ? null : {
+            methods: (["cash", "bank_transfer", "credit"] as const).map((key) => ({
+              key,
+              label: isReturnDraft && key === "credit" ? t("returns.refundMethods.debt_deduct") : t(`mobile.checkout.${key}`),
+            })),
+            selected: payMethod,
+            onSelect: (method) => void selectPayMethod(method),
+            paid: isReturnDraft ? null : {
+              value: paidInput ?? total,
+              onChange: setPaidInput,
+              isCredit: payMethod === "credit",
+              owedNotice: payMethod !== "credit" && remaining > 0 ? t("pos.willOweAmount", { amount: formatCurrency(remaining) }) : null,
+            },
+          }}
+          notice={isDraftEditMode ? t("pos.invoiceEdit.draftPaymentHint") : isEditMode ? t("pos.invoiceEdit.editFootnote") : undefined}
+          extras={(
+            <>
+              {checkoutExtras}
+              {!initialSourceInvoice && !initialContext && (
+                <button type="button" disabled={submitting} onClick={parkActiveDraft} className="flex min-h-11 w-full items-center text-left text-[17px] text-ios-accent disabled:opacity-50">
+                  {t("pos.held.hold")}
+                </button>
+              )}
+            </>
+          )}
+          printTemplates={activePrintTemplates}
+          printTemplateId={activePrintTemplate.id}
+          onPrintTemplate={changePrintTemplate}
+          error={error || pricingConflictId === activeId ? <>{error}{pricingConflictAction}</> : null}
+          onPrint={() => doPrint()}
+          printDisabled={(isReturnDraft && !hasReturnQuantity) || submitting}
+          confirmLabel={sourcePrimaryLabel ?? (isInvoiceDraft || isReturnDraft ? t("mobile.checkout.confirm") : primaryActionLabel)}
+          confirmDisabled={(isReturnDraft && !hasReturnQuantity) || submitting || refreshingPricing || pricingRoutePending || !data.warehouse || !!sepayCheckout || sepayCheckoutLoading}
+          submitting={submittingMode !== null}
+          onConfirm={submitActiveDraft}
+        />
+      )}
       {(sepayCheckout || sepayCheckoutLoading) && (
         <SepayCheckoutModal
           checkout={sepayCheckout}
