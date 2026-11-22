@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { flushSync } from "react-dom";
 import { ChevronLeft, CircleX, Loader2, Search, X } from "lucide-react";
 import { selectAllInputOnClick } from "@/lib/input-selection";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,18 @@ function useVisualViewportFrame(active: boolean): ViewportFrame | null {
     };
   }, [active]);
   return active ? frame : null;
+}
+
+/** Scrolls only the result list (never the page) until the row being edited is fully visible. */
+function revealFocusedRow(list: HTMLElement | null) {
+  const field = document.activeElement;
+  if (!list || !field || !list.contains(field) || !field.matches("input,textarea")) return;
+  const row = field.closest<HTMLElement>("[role=option]");
+  if (!row) return;
+  const listRect = list.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  if (rowRect.top < listRect.top || rowRect.height > listRect.height) list.scrollTop += rowRect.top - listRect.top;
+  else if (rowRect.bottom > listRect.bottom) list.scrollTop += rowRect.bottom - listRect.bottom;
 }
 
 export type ProductSearchPickerStatus = "ready" | "loading" | "unavailable";
@@ -146,6 +159,7 @@ export function ProductSearchPicker<T>({
   const [pagination, setPagination] = useState({ key: paginationKey, count: pageSize });
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const requestGateRef = useRef(new ProductSearchRequestGate());
   const listboxId = useId();
 
@@ -221,12 +235,21 @@ export function ProductSearchPicker<T>({
     return fullScreen && window.matchMedia("(max-width: 1023px)").matches;
   }
 
-  /** Keeps the software keyboard up: refocus inside the same tap gesture (iOS allows it there). */
   function keepSearchFocus() {
     if (document.activeElement !== inputRef.current) inputRef.current?.focus({ preventScroll: true });
   }
 
-  function select(item: T, { fromNestedField = false }: { fromNestedField?: boolean } = {}) {
+  // The keyboard resizes the phone overlay after a quantity field takes focus,
+  // so bring the edited row back into the space that is left.
+  const frameTop = viewportFrame?.top;
+  const frameHeight = viewportFrame?.height;
+  useEffect(() => {
+    if (frameHeight == null) return;
+    const animationFrame = window.requestAnimationFrame(() => revealFocusedRow(listRef.current));
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [frameTop, frameHeight]);
+
+  function select(item: T) {
     if (!shouldSelectProductSearchItem({
       selected: isItemSelected?.(item) ?? false,
       disabled: isItemDisabled?.(item) ?? false,
@@ -238,8 +261,6 @@ export function ProductSearchPicker<T>({
     else {
       setOpen(true);
       setActiveIndex(-1);
-      // Native POS search keeps the keyboard while picking several products.
-      if (isPhoneFullScreen() && !fromNestedField) keepSearchFocus();
     }
   }
 
@@ -369,9 +390,15 @@ export function ProductSearchPicker<T>({
 
       {open && (
         <div
+          ref={listRef}
           id={listboxId}
           role="listbox"
           aria-busy={showLoading}
+          onFocus={() => {
+            if (!isPhoneFullScreen()) return;
+            // Keyboard already up (no resize follows): reveal the row right away.
+            window.requestAnimationFrame(() => revealFocusedRow(listRef.current));
+          }}
           onScroll={(event) => {
             const target = event.currentTarget;
             if (canLoadMore && target.scrollHeight - target.scrollTop - target.clientHeight < 120) {
@@ -418,12 +445,15 @@ export function ProductSearchPicker<T>({
                       if ((event.target as HTMLElement).closest("input,textarea,select")) return;
                       event.preventDefault();
                     }}
-                    onClick={(event) => {
-                      const fromNestedField = Boolean((event.target as HTMLElement).closest("input,textarea,select"));
-                      select(item, { fromNestedField });
-                      // Steppers and already-picked rows must not drop the keyboard either.
-                      if (!fromNestedField && isPhoneFullScreen()) keepSearchFocus();
+                    onClickCapture={(event) => {
+                      // Phones: only quantity fields bring up the keyboard. Rows and steppers
+                      // close it, committing a quantity still being typed before they act on it.
+                      // Not on mousedown: the keyboard resize would make Safari drop the click.
+                      if (!isPhoneFullScreen() || (event.target as HTMLElement).closest("input,textarea,select")) return;
+                      const field = document.activeElement;
+                      if (field instanceof HTMLElement) flushSync(() => field.blur());
                     }}
+                    onClick={() => select(item)}
                     className={cn(active && "bg-surface-2", fullScreen && "max-lg:border-b max-lg:border-border max-lg:bg-transparent")}
                   >
                     {renderItem(item, { active, selected })}
