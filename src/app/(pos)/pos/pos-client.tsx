@@ -670,6 +670,8 @@ export function PosClient({
   const [sepayCheckoutLoading, setSepayCheckoutLoading] = useState(false);
   const [sepayCheckoutAmount, setSepayCheckoutAmount] = useState(0);
   const [sepayFinalizing, setSepayFinalizing] = useState(false);
+  const sepayActive = sepayCheckout !== null || sepayCheckoutLoading;
+  const sepayReceived = sepayCheckout !== null && ["confirmed", "reconciled", "manual_confirmed"].includes(sepayCheckout.status);
   const sepaySetupAttemptRef = useRef(0);
   const sepayFinalizingRef = useRef<string | null>(null);
   const submitOrderRef = useRef<(
@@ -1857,6 +1859,12 @@ export function PosClient({
   const paid = payMethod === "credit" ? 0 : (paidInput ?? total);
   const payableAmount = Math.min(Math.max(0, paid), total);
   const remaining = Math.max(0, total - paid);
+  // The unpaid part becomes debt, so it needs a saved customer. Existing invoices being edited keep theirs.
+  const partialNeedsCustomer = isInvoiceDraft && payMethod !== "credit" && remaining > 0 && !customerId
+    && sourceInvoice?.mode !== "edit" && sourceInvoice?.mode !== "draft_edit";
+  const owedNotice = payMethod === "credit" || remaining <= 0
+    ? null
+    : partialNeedsCustomer ? t("pos.errors.partialNeedsCustomer") : t("pos.willOweAmount", { amount: formatCurrency(remaining) });
 
   function persistPosPrintSettings(templates: PosPrintTemplateSelections) {
     try {
@@ -2400,8 +2408,17 @@ export function PosClient({
       setError(t("pos.quickLine.cannotSubmit"));
       return;
     }
-    const attempt = ++sepaySetupAttemptRef.current;
     const amount = Math.min(Math.max(0, paidInput ?? total), total);
+    // Checked before the customer transfers anything, never after.
+    if (amount <= 0) {
+      setError(t("pos.sepay.invalidAmount"));
+      return;
+    }
+    if (amount < total && !customerId && sourceInvoice?.mode !== "edit" && sourceInvoice?.mode !== "draft_edit") {
+      setError(t("pos.errors.partialNeedsCustomer"));
+      return;
+    }
+    const attempt = ++sepaySetupAttemptRef.current;
     setSepayCheckout(null);
     setSepayCheckoutAmount(amount);
     setSepayCheckoutLoading(true);
@@ -2416,7 +2433,8 @@ export function PosClient({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           amount,
-          clientRequestId: `web-pos:${activeId}:${attempt}`,
+          // Draft ids repeat across reloads and devices, so each QR gets its own id.
+          clientRequestId: `web-pos:${makeClientId()}`,
           note: `POS ${activeId}`,
         }),
       });
@@ -2470,6 +2488,10 @@ export function PosClient({
     const selectedPayableAmount = Math.min(Math.max(0, selectedPaid), total);
     if (submitMode === "sale" && selectedPayMethod === "credit" && !customerId) {
       setError(t("pos.errors.creditNeedsCustomer"));
+      return;
+    }
+    if (submitMode === "sale" && !paymentSessionId && partialNeedsCustomer) {
+      setError(t("pos.errors.partialNeedsCustomer"));
       return;
     }
     if (submitMode === "sale" && selectedPayMethod === "bank_transfer" && selectedPayableAmount <= 0) {
@@ -2672,8 +2694,22 @@ export function PosClient({
     submitOrderRef.current = submitOrder;
   });
 
+  /** Stops watching the QR. The order stays an unpaid draft. */
+  function closeSepayCheckout() {
+    if (sepayFinalizing) return;
+    if (sepayCheckoutLoading) sepaySetupAttemptRef.current += 1;
+    setSepayCheckoutLoading(false);
+    setSepayCheckout(null);
+  }
+
   async function selectPayMethod(method: PayMethod) {
-    if (submitting || sepayCheckout || sepayCheckoutLoading) return;
+    if (submitting) return;
+    if (sepayCheckout || sepayCheckoutLoading) {
+      // Phones show the QR in the page, so another method can be picked while it waits.
+      if (!phone || method === "bank_transfer" || sepayReceived) return;
+      closeSepayCheckout();
+    }
+    setError("");
     setPayMethod(method);
     if (method === "bank_transfer" && isInvoiceDraft) {
       await startSepayCheckout();
@@ -3959,11 +3995,7 @@ export function PosClient({
                   </span>
                 )}
               </div>
-              {payMethod !== "credit" && remaining > 0 && (
-                <p className="text-xs text-warn text-right">
-                  {t("pos.willOweAmount", { amount: formatCurrency(remaining) })}
-                </p>
-              )}
+              {owedNotice && <p className="text-xs text-warn text-right">{owedNotice}</p>}
             </>
           ) : (
             <div className="flex justify-between rounded-lg border border-border bg-surface-2 px-3 py-2">
@@ -4066,7 +4098,15 @@ export function PosClient({
         <PosMobileCheckout
           title={t(isQuoteDraft ? "mobile.checkout.quoteTitle" : "mobile.checkout.title")}
           subtitle={[draftDisplayLabel(active, Math.max(0, invoices.findIndex((inv) => inv.id === activeId))), customer?.name].filter(Boolean).join(" · ")}
-          onBack={() => setMobileView("catalog")}
+          locked={sepayActive}
+          onBack={async () => {
+            if (sepayFinalizing) return;
+            if (sepayActive) {
+              if (!await confirm({ title: t("mobile.checkout.pendingCloseTitle"), description: t("mobile.checkout.pendingCloseMessage"), confirmLabel: t("mobile.checkout.pendingCloseConfirm"), variant: "warning" })) return;
+              closeSepayCheckout();
+            }
+            setMobileView("catalog");
+          }}
           pricing={{
             heading: t(isQuoteDraft ? "pos.quotePricingDetails" : "pos.paymentDetails"),
             subtotal,
@@ -4096,10 +4136,22 @@ export function PosClient({
             onSelect: (method) => void selectPayMethod(method),
             paid: isReturnDraft ? null : {
               value: paidInput ?? total,
-              onChange: setPaidInput,
+              // Typing the full amount makes the field follow the total again.
+              onChange: (value) => setPaidInput(value === total ? null : value),
               isCredit: payMethod === "credit",
-              owedNotice: payMethod !== "credit" && remaining > 0 ? t("pos.willOweAmount", { amount: formatCurrency(remaining) }) : null,
+              owedNotice,
             },
+            qr: sepayActive ? {
+              amount: sepayCheckout?.amount ?? sepayCheckoutAmount,
+              imageUrl: sepayCheckout?.qrImageUrl ?? null,
+              bankName: sepayCheckout ? sepayCheckout.bankAccount.gateway ?? sepayCheckout.bankAccount.bankCode : "",
+              accountName: sepayCheckout?.bankAccount.accountName ?? "",
+              accountNumber: sepayCheckout?.bankAccount.accountNumber ?? "",
+              reference: sepayCheckout?.reference ?? "",
+              received: sepayReceived,
+              owedNotice,
+              onManualConfirm: confirmSepayPaymentManually,
+            } : null,
           }}
           notice={isDraftEditMode ? t("pos.invoiceEdit.draftPaymentHint") : isEditMode ? t("pos.invoiceEdit.editFootnote") : undefined}
           extras={(
@@ -4118,24 +4170,29 @@ export function PosClient({
           error={error || pricingConflictId === activeId ? <>{error}{pricingConflictAction}</> : null}
           onPrint={() => doPrint()}
           printDisabled={(isReturnDraft && !hasReturnQuantity) || submitting}
-          confirmLabel={sourcePrimaryLabel ?? (isInvoiceDraft || isReturnDraft ? t("mobile.checkout.confirm") : primaryActionLabel)}
-          confirmDisabled={(isReturnDraft && !hasReturnQuantity) || submitting || refreshingPricing || pricingRoutePending || !data.warehouse || !!sepayCheckout || sepayCheckoutLoading}
-          submitting={submittingMode !== null}
-          onConfirm={submitActiveDraft}
+          confirmLabel={sepayActive
+            ? t(sepayReceived ? "mobile.checkout.confirm" : "mobile.checkout.closePending")
+            : sourcePrimaryLabel ?? (isInvoiceDraft && payMethod === "bank_transfer"
+              ? t("mobile.checkout.createQr")
+              : isInvoiceDraft || isReturnDraft ? t("mobile.checkout.confirm") : primaryActionLabel)}
+          confirmTone={sepayActive && !sepayReceived ? "tinted" : "primary"}
+          confirmDisabled={(isReturnDraft && !hasReturnQuantity) || submitting || sepayFinalizing || refreshingPricing || pricingRoutePending || !data.warehouse || partialNeedsCustomer}
+          submitting={submittingMode !== null || sepayFinalizing}
+          onConfirm={() => {
+            if (!sepayActive) return void submitActiveDraft();
+            // Money already arrived but saving the order failed: save again with the same session.
+            if (sepayReceived && sepayCheckout) return void finalizeSepayCheckout(sepayCheckout);
+            closeSepayCheckout();
+          }}
         />
       )}
-      {(sepayCheckout || sepayCheckoutLoading) && (
+      {sepayActive && !showMobileCheckout && (
         <SepayCheckoutModal
           checkout={sepayCheckout}
           amount={sepayCheckout?.amount ?? sepayCheckoutAmount}
           loading={sepayCheckoutLoading}
           onManualConfirm={confirmSepayPaymentManually}
-          onClose={() => {
-            if (sepayFinalizing) return;
-            if (sepayCheckoutLoading) sepaySetupAttemptRef.current += 1;
-            setSepayCheckoutLoading(false);
-            setSepayCheckout(null);
-          }}
+          onClose={closeSepayCheckout}
         />
       )}
 

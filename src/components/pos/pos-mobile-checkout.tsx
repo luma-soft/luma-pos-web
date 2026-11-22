@@ -2,7 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { Banknote, Check, ChevronLeft, ChevronRight, FileSearch, Loader2, QrCode, UserRound, type LucideIcon } from "lucide-react";
+import { Banknote, Check, CheckCircle2, ChevronLeft, ChevronRight, FileSearch, Loader2, QrCode, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
+import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { MobileActionSheet } from "@/components/mobile-detail-nav";
 import { useHideMobileTabBar } from "@/components/mobile-tabbar-visibility";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -35,6 +36,22 @@ type Payment = {
   onSelect: (method: PosCheckoutMethod) => void;
   /** Sale drafts: what the customer pays now. Null for returns. */
   paid: { value: number; onChange: (value: number) => void; isCredit: boolean; owedNotice: string | null } | null;
+  /** VietQR session being paid; replaces the amount section while it is open. */
+  qr: Qr | null;
+};
+
+type Qr = {
+  amount: number;
+  /** Null while the QR is being created. */
+  imageUrl: string | null;
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
+  reference: string;
+  received: boolean;
+  owedNotice: string | null;
+  /** Resolves to an error message, or null when confirmed. */
+  onManualConfirm: () => Promise<string | null>;
 };
 
 const METHOD_ICON: Record<PosCheckoutMethod, LucideIcon> = { cash: Banknote, bank_transfer: QrCode, credit: UserRound };
@@ -50,6 +67,7 @@ export function PosMobileCheckout({
   title,
   subtitle,
   onBack,
+  locked,
   pricing,
   payment,
   notice,
@@ -61,6 +79,7 @@ export function PosMobileCheckout({
   onPrint,
   printDisabled,
   confirmLabel,
+  confirmTone = "primary",
   confirmDisabled,
   submitting,
   onConfirm,
@@ -68,6 +87,8 @@ export function PosMobileCheckout({
   title: string;
   subtitle: string;
   onBack: () => void;
+  /** A QR is waiting: the amount must not change under it. */
+  locked: boolean;
   pricing: Pricing;
   payment: Payment | null;
   notice?: ReactNode;
@@ -80,6 +101,7 @@ export function PosMobileCheckout({
   onPrint: () => void;
   printDisabled: boolean;
   confirmLabel: string;
+  confirmTone?: "primary" | "tinted";
   confirmDisabled: boolean;
   submitting: boolean;
   onConfirm: () => void;
@@ -116,7 +138,7 @@ export function PosMobileCheckout({
           <div className="mt-1 text-[30px] font-black leading-9 tabular-nums">{formatCurrency(total)}</div>
         </section>
 
-        <section className={card}>
+        <fieldset disabled={locked} className={cn("min-w-0", card)}>
           <h2 className="text-[13px] font-extrabold uppercase text-ios-label-tertiary">{pricing.heading}</h2>
           <SummaryRow className="mt-2.5" label={t("subtotal")} value={formatCurrency(pricing.subtotal)} />
           {adjustments && (
@@ -159,7 +181,7 @@ export function PosMobileCheckout({
             <span>{t(adjustments ? "total" : "refundTotal")}</span>
             <span className="tabular-nums">{formatCurrency(total)}</span>
           </div>
-        </section>
+        </fieldset>
 
         {notice && <div className={cn(card, "text-[15px] text-ios-label-secondary")}>{notice}</div>}
 
@@ -191,16 +213,16 @@ export function PosMobileCheckout({
           </section>
         )}
 
-        {payment?.paid && <PaidSection total={total} paid={payment.paid} />}
+        {payment?.qr ? <QrSection qr={payment.qr} /> : payment?.paid && <PaidSection total={total} paid={payment.paid} />}
 
-        <section className={cn(card, "space-y-3")}>
+        <fieldset disabled={locked} className={cn("min-w-0", card, "space-y-3")}>
           {extras}
           <button type="button" onClick={() => setTemplatesOpen(true)} className="flex min-h-11 w-full items-center gap-2 text-left text-[17px]">
             <span className="min-w-0 flex-1 truncate">{tc("pos.printTemplate")}</span>
             <span className="max-w-[50%] truncate text-ios-label-secondary">{template?.name}</span>
             <ChevronRight className="size-[17px] shrink-0 text-ios-label-tertiary" strokeWidth={2.5} aria-hidden="true" />
           </button>
-        </section>
+        </fieldset>
       </div>
 
       <footer className="shrink-0 border-t border-border bg-surface px-ios-inset pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5">
@@ -219,7 +241,10 @@ export function PosMobileCheckout({
             type="button"
             onClick={onConfirm}
             disabled={confirmDisabled}
-            className="flex h-[54px] min-w-0 flex-1 items-center justify-center gap-2 !rounded-[14px] bg-ios-accent px-3 text-[17px] font-semibold text-white disabled:bg-black/[0.06] disabled:text-ios-label-secondary dark:disabled:bg-white/10"
+            className={cn(
+              "flex h-[54px] min-w-0 flex-1 items-center justify-center gap-2 !rounded-[14px] px-3 text-[17px] font-semibold disabled:bg-black/[0.06] disabled:text-ios-label-secondary dark:disabled:bg-white/10",
+              confirmTone === "tinted" ? "bg-ios-accent/15 text-ios-accent" : "bg-ios-accent text-white",
+            )}
           >
             {submitting && <Loader2 className="size-5 animate-spin" aria-hidden="true" />}
             <span className="truncate">{confirmLabel}</span>
@@ -268,6 +293,65 @@ function PaidSection({ total, paid }: { total: number; paid: NonNullable<Payment
         <span className={cn("text-[18px] font-black tabular-nums", !settled && "text-ios-label")}>{formatCurrency(Math.abs(total - amount))}</span>
       </div>
       {paid.owedNotice && <p className="text-[13px] text-ios-orange">{paid.owedNotice}</p>}
+    </section>
+  );
+}
+
+/** CheckoutSheet.qrPaymentView: the VietQR code, its amount and the manual confirmation. */
+function QrSection({ qr }: { qr: Qr }) {
+  const t = useTranslations("mobile.checkout");
+  const tc = useTranslations();
+  const { confirm } = useConfirmDialog();
+  const [confirming, setConfirming] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+
+  async function confirmManually() {
+    if (!await confirm({ title: t("manualConfirmTitle"), description: tc("pos.sepay.manualConfirmHint"), confirmLabel: t("manualConfirm") })) return;
+    setConfirming(true);
+    setManualError(await qr.onManualConfirm());
+    setConfirming(false);
+  }
+
+  if (!qr.imageUrl) {
+    return (
+      <section className={cn(card, "flex min-h-[72px] items-center justify-center gap-2.5 text-[15px] font-medium text-ios-label-secondary")}>
+        <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+        {t("creatingQr")}
+      </section>
+    );
+  }
+  return (
+    <section className={cn(card, "flex flex-col items-center gap-3 text-center")}>
+      <div className="w-full max-w-[240px] rounded-[12px] bg-white">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={qr.imageUrl} alt={tc("pos.sepay.qrAlt")} className="aspect-square w-full object-contain" />
+      </div>
+      <h2 className="text-[17px] font-semibold">{t("scanQr")}</h2>
+      <div className="text-[22px] font-bold tabular-nums text-ios-accent">{formatCurrency(qr.amount)}</div>
+      <div className="text-[15px]">
+        {qr.accountName}
+        <div className="text-[12px] text-ios-label-secondary">{[qr.bankName, qr.accountNumber].filter(Boolean).join(" · ")}</div>
+        <div className="text-[12px] text-ios-label-secondary">{tc("pos.sepay.reference")}: {qr.reference}</div>
+      </div>
+      {qr.owedNotice && <p className="text-[13px] text-ios-orange">{qr.owedNotice}</p>}
+      {qr.received ? (
+        <p className="flex items-center gap-2 text-[17px] text-ios-green"><CheckCircle2 className="size-5" aria-hidden="true" />{tc("pos.sepay.confirmed")}</p>
+      ) : (
+        <>
+          <p className="flex items-center gap-2 text-[15px] text-ios-label-secondary"><Loader2 className="size-4 animate-spin" aria-hidden="true" />{t("waitingForPayment")}</p>
+          <button
+            type="button"
+            onClick={() => void confirmManually()}
+            disabled={confirming}
+            data-button-radius="pill"
+            className="flex min-h-11 items-center gap-2 rounded-full bg-ios-accent px-4 text-[17px] font-medium text-white disabled:opacity-50"
+          >
+            {confirming ? <Loader2 className="size-5 animate-spin" aria-hidden="true" /> : <ShieldCheck className="size-5" aria-hidden="true" />}
+            {t("manualConfirm")}
+          </button>
+          {manualError && <p role="alert" className="text-[13px] text-ios-red">{manualError}</p>}
+        </>
+      )}
     </section>
   );
 }

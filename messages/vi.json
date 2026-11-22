@@ -2418,7 +2418,17 @@
       "change": "Tiền thừa",
       "remaining": "Còn phải thu",
       "fullDebtNotice": "Toàn bộ đơn sẽ ghi công nợ cho khách.",
-      "confirm": "Xác nhận"
+      "confirm": "Xác nhận",
+      "createQr": "Tạo mã QR",
+      "creatingQr": "Đang tạo mã QR…",
+      "scanQr": "Khách quét mã để thanh toán",
+      "waitingForPayment": "Đang kiểm tra giao dịch…",
+      "manualConfirm": "Xác nhận thủ công",
+      "manualConfirmTitle": "Xác nhận đã nhận tiền?",
+      "closePending": "Đóng mã QR",
+      "pendingCloseTitle": "Thanh toán đang chờ",
+      "pendingCloseMessage": "Mã QR đang chờ vẫn có thể nhận được tiền. Nếu đóng, hệ thống sẽ ngừng theo dõi mã này.",
+      "pendingCloseConfirm": "Đóng mã QR"
     }
   },
   "toolsCenter": {
@@ -2714,7 +2724,8 @@
       "onlineRequired": "Loại giao dịch này cần có mạng. Giỏ hàng vẫn được giữ trên màn hình.",
       "emptyCart": "Giỏ hàng trống.",
       "draftAlreadyFinalized": "Đơn tạm này đã được thanh toán hoặc xóa. Hãy làm mới danh sách đơn trước khi tiếp tục.",
-      "offlineSyncDisabled": "Không kết nối được máy chủ và đồng bộ offline đang tắt trên trình duyệt này. Giỏ hàng vẫn được giữ; hãy thử lại khi có mạng hoặc bật đồng bộ offline trong Cài đặt › Đồng bộ offline."
+      "offlineSyncDisabled": "Không kết nối được máy chủ và đồng bộ offline đang tắt trên trình duyệt này. Giỏ hàng vẫn được giữ; hãy thử lại khi có mạng hoặc bật đồng bộ offline trong Cài đặt › Đồng bộ offline.",
+      "partialNeedsCustomer": "Khách trả thiếu: chọn khách hàng để ghi nợ phần còn lại."
     },
     "pricingConflict": {
       "refresh": "Làm mới giá để chọn lại",

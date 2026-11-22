@@ -2418,7 +2418,17 @@
       "change": "Change",
       "remaining": "Remaining",
       "fullDebtNotice": "The full order will be recorded as customer debt.",
-      "confirm": "Confirm"
+      "confirm": "Confirm",
+      "createQr": "Create QR code",
+      "creatingQr": "Creating QR code…",
+      "scanQr": "Scan to pay",
+      "waitingForPayment": "Checking for the payment…",
+      "manualConfirm": "Confirm manually",
+      "manualConfirmTitle": "Confirm payment received?",
+      "closePending": "Close QR code",
+      "pendingCloseTitle": "Payment pending",
+      "pendingCloseMessage": "The QR code can still receive money. If you close it, this payment is no longer tracked.",
+      "pendingCloseConfirm": "Close QR code"
     }
   },
   "toolsCenter": {
@@ -2714,7 +2724,8 @@
       "onlineRequired": "This transaction requires an Internet connection. Your cart is still on screen.",
       "emptyCart": "Cart is empty.",
       "draftAlreadyFinalized": "This saved order has already been checked out or deleted. Refresh the order list before continuing.",
-      "offlineSyncDisabled": "Can't reach the server and offline sync is off in this browser. The cart is kept; retry when online or turn on offline sync in Settings › Offline sync."
+      "offlineSyncDisabled": "Can't reach the server and offline sync is off in this browser. The cart is kept; retry when online or turn on offline sync in Settings › Offline sync.",
+      "partialNeedsCustomer": "Partial payment: choose a customer to record the rest as debt."
     },
     "pricingConflict": {
       "refresh": "Refresh prices to reselect",
