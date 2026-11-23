@@ -248,8 +248,8 @@ export function StocktakeForm({
       </div>}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="min-w-0 overflow-hidden rounded-card bg-surface shadow-e1">
-          <div className="border-b border-border-soft bg-surface px-4 py-4 sm:px-5">
+        <section className="min-w-0 rounded-card bg-surface shadow-e1">
+          <div className="rounded-t-card border-b border-border-soft bg-surface px-4 py-4 sm:px-5">
             <div className="relative">
               <div className="flex gap-2">
                 <ProductSearchPicker
@@ -381,7 +381,7 @@ export function StocktakeForm({
                   );
                 })}
               </div>
-              <div className="hidden lg:block">
+              <div className="hidden overflow-hidden rounded-b-card lg:block">
                 <table className="w-full table-fixed text-sm">
                 <colgroup>
                   <col className="w-[35%]" />
