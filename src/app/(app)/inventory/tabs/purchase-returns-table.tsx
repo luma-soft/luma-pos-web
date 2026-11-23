@@ -1,16 +1,16 @@
 "use client";
 
+import { isDeletedProductName } from "@/lib/products/deleted-product";
+import { ProductRecordLink } from "@/components/product-record-link";
 import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { productLineDisplayName } from "@/lib/products/variant-presentation";
 
-import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { usePhoneLayout } from "@/components/use-phone-layout";
 import { MobilePurchaseReturnDetail, PurchaseReturnMobileRow } from "./purchase-return-mobile";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
-import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { getPurchaseReturns } from "@/lib/data/purchase-returns";
 
@@ -120,14 +120,15 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
             return (
             <article key={item.id} className="space-y-2 p-3 text-sm">
               <div className="flex items-start justify-between gap-3">
-                <Link
-                  href={Routes.product(item.productId)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-11 min-w-11 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                <ProductRecordLink
+                  productId={item.productId}
+                  deleted={isDeletedProductName(item.productName)}
+                  newTab
+                  className="inline-flex min-h-11 min-w-11 flex-1 items-center break-words font-semibold"
+                  linkClassName="text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 >
                   {productLineDisplayName(item)}
-                </Link>
+                </ProductRecordLink>
                 <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.total))}</div>
               </div>
               <div className="text-xs text-slate-500">{item.sku} · {formatNumber(Number(item.quantity))} {item.unitName}</div>
@@ -161,7 +162,7 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
                 return (
                   <tr key={item.id}>
                     <td className="px-3 py-3">
-                      <Link href={Routes.product(item.productId)} target="_blank" rel="noreferrer" className="font-medium text-primary-600 hover:underline">{item.sku}</Link>
+                      <ProductRecordLink productId={item.productId} deleted={isDeletedProductName(item.productName)} newTab className="font-medium" linkClassName="text-primary-600 hover:underline">{item.sku}</ProductRecordLink>
                     </td>
                     <td className="px-3 py-3">
                       <div className="min-w-40 break-words font-medium">{productLineDisplayName(item)}</div>

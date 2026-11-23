@@ -86,6 +86,7 @@ export async function getInternalUseIssues(storeId: string, { limit = 50, ...fil
       productId: internalUseItems.productId,
       sku: products.sku,
       productName: internalUseItems.productName,
+      productDeleted: sql<boolean>`coalesce(${products.lifecycleStatus} = 'deleted', false)`,
       productVariantName: products.variantName, productSpecs: products.specs,
       unitName: internalUseItems.unitName,
       unitMultiplier: internalUseItems.unitMultiplier,

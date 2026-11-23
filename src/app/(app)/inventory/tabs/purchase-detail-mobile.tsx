@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { ProductRecordLink } from "@/components/product-record-link";
+import { isDeletedProductName } from "@/lib/products/deleted-product";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Copy, Pencil, Printer, Undo2, XCircle } from "lucide-react";
@@ -95,10 +96,12 @@ export function MobilePurchaseDetail({ purchase, onBack }: { purchase: PurchaseR
               ? `${formatNumber(Number(item.discountInput))}% · `
               : "";
             return (
-              <Link
+              <ProductRecordLink
                 key={item.id}
-                href={Routes.product(item.productId)}
-                className="block space-y-[5px] px-4 py-ios-row active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+                productId={item.productId}
+                deleted={isDeletedProductName(item.productName)}
+                className="block space-y-[5px] px-4 py-ios-row"
+                linkClassName="active:bg-black/[0.04] dark:active:bg-white/[0.06]"
               >
                 <span className="flex items-baseline gap-2">
                   <span className="line-clamp-2 min-w-0 flex-1 text-[15px] font-semibold">{productLineDisplayName(item)}</span>
@@ -113,7 +116,7 @@ export function MobilePurchaseDetail({ purchase, onBack }: { purchase: PurchaseR
                 <span className="block text-[11px] text-ios-label-secondary">
                   {td("unitAfterDiscount")}: {formatCurrency(quantity > 0 ? Number(item.total) / quantity : Number(item.unitCost))}
                 </span>
-              </Link>
+              </ProductRecordLink>
             );
           })}
         </MobileGroupedSection>

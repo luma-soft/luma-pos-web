@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { ProductRecordLink } from "@/components/product-record-link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { Check, ChevronRight, Pencil, Printer, Trash2 } from "lucide-react";
@@ -12,7 +12,6 @@ import { LabeledRow, MenuAction } from "@/app/(app)/partners/tabs/customer-mobil
 import { approveInternalUse, deleteInternalUse } from "@/lib/actions/internal-use";
 import { internalUseReasonLabel } from "@/lib/inventory/internal-use-reason";
 import { productLineDisplayName } from "@/lib/products/variant-presentation";
-import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import type { getInternalUseIssues } from "@/lib/data/internal-use";
 import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
@@ -103,7 +102,7 @@ export function MobileInternalUseDetail({ row, capabilities, onBack }: { row: In
 
         <MobileGroupedSection title={t("items", { count: row.items.length })}>
           {row.items.map((item) => (
-            <Link key={item.id} href={Routes.product(item.productId)} className="block space-y-[5px] px-4 py-ios-row active:bg-black/[0.04] dark:active:bg-white/[0.06]">
+            <ProductRecordLink key={item.id} productId={item.productId} deleted={item.productDeleted} className="block space-y-[5px] px-4 py-ios-row" linkClassName="active:bg-black/[0.04] dark:active:bg-white/[0.06]">
               <span className="flex items-baseline gap-2">
                 <span className="line-clamp-2 min-w-0 flex-1 text-[15px] font-semibold">{productLineDisplayName(item)}</span>
                 <span className="shrink-0 text-[15px] tabular-nums">{formatCurrency(item.total)}</span>
@@ -111,7 +110,7 @@ export function MobileInternalUseDetail({ row, capabilities, onBack }: { row: In
               <span className="block text-[12px] text-ios-label-secondary">
                 {item.sku ?? "—"} · {formatNumber(item.quantity)} {item.unitName} × {formatCurrency(item.unitCost)}
               </span>
-            </Link>
+            </ProductRecordLink>
           ))}
         </MobileGroupedSection>
 

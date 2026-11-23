@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { isDeletedProductName } from "@/lib/products/deleted-product";
+import { ProductRecordLink } from "@/components/product-record-link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ChevronRight, Package, Pencil, Printer, Trash2 } from "lucide-react";
@@ -11,7 +12,6 @@ import { mobileLedgerDateTime } from "@/components/partners/partner-mobile-ledge
 import { LabeledRow, MenuAction } from "@/app/(app)/partners/tabs/customer-mobile";
 import { deletePurchaseReturn } from "@/lib/actions/purchase-returns";
 import { productLineDisplayName } from "@/lib/products/variant-presentation";
-import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import type { getPurchaseReturns } from "@/lib/data/purchase-returns";
 import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
@@ -140,7 +140,7 @@ export function MobilePurchaseReturnDetail({
           {row.items.map((item) => {
             const pricing = linePricing(item);
             return (
-              <Link key={item.id} href={Routes.product(item.productId)} className="block space-y-[5px] px-4 py-ios-row active:bg-black/[0.04] dark:active:bg-white/[0.06]">
+              <ProductRecordLink key={item.id} productId={item.productId} deleted={isDeletedProductName(item.productName)} className="block space-y-[5px] px-4 py-ios-row" linkClassName="active:bg-black/[0.04] dark:active:bg-white/[0.06]">
                 <span className="flex items-baseline gap-2">
                   <span className="line-clamp-2 min-w-0 flex-1 text-[15px] font-semibold">{productLineDisplayName(item)}</span>
                   <span className="shrink-0 text-[15px] tabular-nums">{formatCurrency(Number(item.total))}</span>
@@ -150,7 +150,7 @@ export function MobilePurchaseReturnDetail({
                 </span>
                 {pricing.discount > 0 && <span className="block text-[11px] text-ios-label-secondary">{t("discount")}: {formatCurrency(pricing.discount)}</span>}
                 <span className="block text-[11px] text-ios-label-secondary">{t("unitAfterDiscount")}: {formatCurrency(pricing.unitCostAfterDiscount)}</span>
-              </Link>
+              </ProductRecordLink>
             );
           })}
         </MobileGroupedSection>

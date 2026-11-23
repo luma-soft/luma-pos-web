@@ -1,7 +1,8 @@
 "use client";
 
+import { isDeletedProductName } from "@/lib/products/deleted-product";
+import { ProductRecordLink } from "@/components/product-record-link";
 import { useEffect, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ChevronRight, Copy, Printer, Scale, Trash2 } from "lucide-react";
@@ -223,9 +224,11 @@ export function MobileStocktakeDetail({
                   </>
                 );
                 const className = "block rounded-[18px] border border-border bg-surface px-3.5 py-3.5";
-                return item.productId
-                  ? <Link key={item.id} href={Routes.product(item.productId)} className={cn(className, "active:bg-black/[0.03]")}>{body}</Link>
-                  : <div key={item.id} className={className}>{body}</div>;
+                return (
+                  <ProductRecordLink key={item.id} productId={item.productId} deleted={isDeletedProductName(item.productName)} className={className} linkClassName="active:bg-black/[0.03]">
+                    {body}
+                  </ProductRecordLink>
+                );
               })}
             </div>
           </>

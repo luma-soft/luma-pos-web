@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { Routes } from "@/lib/routes";
+import { ProductRecordLink } from "@/components/product-record-link";
+import { isDeletedProductName } from "@/lib/products/deleted-product";
 
 export function OrderProductLink({
   productId,
@@ -9,11 +9,13 @@ export function OrderProductLink({
   productName: string;
 }) {
   return (
-    <Link
-      href={Routes.productDetail(productId)}
-      className="inline-flex min-h-11 min-w-11 items-center font-medium text-primary-600 hover:underline lg:min-h-0 lg:min-w-0"
+    <ProductRecordLink
+      productId={productId}
+      deleted={isDeletedProductName(productName)}
+      className="inline-flex min-h-11 min-w-11 items-center font-medium lg:min-h-0 lg:min-w-0"
+      linkClassName="text-primary-600 hover:underline"
     >
       {productName}
-    </Link>
+    </ProductRecordLink>
   );
 }

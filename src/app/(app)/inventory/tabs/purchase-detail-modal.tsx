@@ -1,5 +1,7 @@
 "use client";
 
+import { isDeletedProductName } from "@/lib/products/deleted-product";
+import { ProductRecordLink } from "@/components/product-record-link";
 import { productLineDisplayName } from "@/lib/products/variant-presentation";
 
 import { type ReactNode, useCallback } from "react";
@@ -153,14 +155,15 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
             return (
               <article key={item.id} className="space-y-2 p-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
-                  <Link
-                    href={Routes.product(item.productId)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex min-h-11 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11"
+                  <ProductRecordLink
+                    productId={item.productId}
+                    deleted={isDeletedProductName(item.productName)}
+                    newTab
+                    className="inline-flex min-h-11 min-w-11 flex-1 items-center break-words font-semibold"
+                    linkClassName="text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                   >
                     {productLineDisplayName(item)}
-                  </Link>
+                  </ProductRecordLink>
                   <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.total))}</div>
                 </div>
                 <div className="text-xs text-slate-500">{item.sku} · {formatNumber(Number(item.quantity))} {item.unitName || item.baseUnit}</div>
@@ -193,9 +196,9 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
                 return (
                   <tr key={item.id}>
                     <td className="px-3 py-3">
-                      <Link href={Routes.product(item.productId)} target="_blank" rel="noreferrer" className="font-medium text-primary-600 hover:underline">
+                      <ProductRecordLink productId={item.productId} deleted={isDeletedProductName(item.productName)} newTab className="font-medium" linkClassName="text-primary-600 hover:underline">
                         {item.sku}
-                      </Link>
+                      </ProductRecordLink>
                     </td>
                     <td className="px-3 py-3">
                       <div className="font-medium">{productLineDisplayName(item)}</div>
