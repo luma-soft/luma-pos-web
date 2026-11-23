@@ -2746,6 +2746,7 @@
       "name": "Tên",
       "reference": "Nội dung",
       "waiting": "Đang chờ SePay xác nhận...",
+      "waitingManual": "Chờ thu ngân kiểm tra và xác nhận",
       "confirmed": "Đã xác nhận thanh toán",
       "manualConfirm": "Xác nhận đã chuyển khoản",
       "manualConfirming": "Đang xác nhận…",

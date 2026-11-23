@@ -2746,6 +2746,7 @@
       "name": "Name",
       "reference": "Reference",
       "waiting": "Waiting for SePay confirmation...",
+      "waitingManual": "Waiting for cashier to check and confirm",
       "confirmed": "Payment confirmed",
       "manualConfirm": "Confirm transfer received",
       "manualConfirming": "Confirming…",

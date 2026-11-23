@@ -13,7 +13,9 @@ const account = {
   accountNumber: "123456789",
   subAccount: null,
   accountName: "HAI DANG",
+  webhookEnabled: true,
 };
+let sepayNotificationsEnabled = false;
 const query = {
   from() { return this; },
   where() { return this; },
@@ -60,6 +62,9 @@ mock.module("@/lib/payments/service", () => ({
     };
   },
 }));
+mock.module("@/lib/data/settings", () => ({
+  getRawStorePrefs: async () => ({ payments: { sepayNotificationsEnabled } }),
+}));
 mock.module("@/lib/payments/service-core", () => ({
   SEPAY_PAYMENT_TIMEOUT_MS: 10 * 60 * 1000,
 }));
@@ -104,5 +109,22 @@ test("creates a QR session without creating an order", async () => {
     clientRequestId: "web-pos:inv-1:1",
   });
   expect(capturedPaymentInput).toBeUndefined();
-  expect((await response.json()).data.paymentId).toBe("session-id");
+  const data = (await response.json()).data;
+  expect(data.paymentId).toBe("session-id");
+  expect(data.qrImageUrl).toStartWith("https://haidangshop.com/api/payments/vietqr?bank=VPB&acc=123456789");
+  expect(data.autoConfirm).toBe(false);
+});
+
+test("reports auto-confirm only when SePay notifications and the account webhook are on", async () => {
+  sepayNotificationsEnabled = true;
+  const request = () => new Request("https://haidangshop.com/api/payments/sepay", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ amount: 1000, clientRequestId: "web-pos:inv-2:1" }),
+  });
+  expect((await (await POST(request())).json()).data.autoConfirm).toBe(true);
+  account.webhookEnabled = false;
+  expect((await (await POST(request())).json()).data.autoConfirm).toBe(false);
+  account.webhookEnabled = true;
+  sepayNotificationsEnabled = false;
 });

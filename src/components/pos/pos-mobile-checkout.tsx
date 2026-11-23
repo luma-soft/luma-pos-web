@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { Banknote, Check, CheckCircle2, ChevronLeft, ChevronRight, FileSearch, Loader2, QrCode, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
+import { Banknote, Check, CheckCircle2, ChevronLeft, ChevronRight, FileSearch, Loader2, QrCode, ShieldCheck, UserRound, type LucideIcon, Clock3 } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { MobileActionSheet } from "@/components/mobile-detail-nav";
 import { useHideMobileTabBar } from "@/components/mobile-tabbar-visibility";
@@ -49,6 +49,8 @@ type Qr = {
   accountNumber: string;
   reference: string;
   received: boolean;
+  /** False when SePay auto-confirmation is off: no automatic check is running. */
+  autoConfirm: boolean;
   owedNotice: string | null;
   /** Resolves to an error message, or null when confirmed. */
   onManualConfirm: () => Promise<string | null>;
@@ -338,7 +340,11 @@ function QrSection({ qr }: { qr: Qr }) {
         <p className="flex items-center gap-2 text-[17px] text-ios-green"><CheckCircle2 className="size-5" aria-hidden="true" />{tc("pos.sepay.confirmed")}</p>
       ) : (
         <>
-          <p className="flex items-center gap-2 text-[15px] text-ios-label-secondary"><Loader2 className="size-4 animate-spin" aria-hidden="true" />{t("waitingForPayment")}</p>
+          {qr.autoConfirm ? (
+            <p className="flex items-center gap-2 text-[15px] text-ios-label-secondary"><Loader2 className="size-4 animate-spin" aria-hidden="true" />{t("waitingForPayment")}</p>
+          ) : (
+            <p className="flex items-center gap-2 text-[15px] text-ios-label-secondary"><Clock3 className="size-4" aria-hidden="true" />{tc("pos.sepay.waitingManual")}</p>
+          )}
           <button
             type="button"
             onClick={() => void confirmManually()}

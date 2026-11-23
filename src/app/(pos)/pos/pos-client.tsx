@@ -11,7 +11,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Plus, ListPlus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ChevronDown, ShieldCheck, SlidersHorizontal, Star, UserRound, PackagePlus, Sparkles, Package, Minus, AlertTriangle } from "lucide-react";
+import { Search, Plus, ListPlus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ChevronDown, ShieldCheck, SlidersHorizontal, Star, UserRound, PackagePlus, Sparkles, Package, Minus, AlertTriangle, Clock3 } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import { Combobox } from "@/components/combobox";
@@ -213,6 +213,8 @@ type SepayCheckout = {
   amount: number;
   qrImageUrl: string;
   status: string;
+  /** False when SePay auto-confirmation is off; the cashier must confirm the transfer. Missing = legacy server (auto). */
+  autoConfirm?: boolean;
   bankAccount: {
     bankCode: string;
     gateway: string | null;
@@ -4149,6 +4151,7 @@ export function PosClient({
               accountNumber: sepayCheckout?.bankAccount.accountNumber ?? "",
               reference: sepayCheckout?.reference ?? "",
               received: sepayReceived,
+              autoConfirm: sepayCheckout?.autoConfirm !== false,
               owedNotice,
               onManualConfirm: confirmSepayPaymentManually,
             } : null,
@@ -4404,6 +4407,7 @@ function SepayCheckoutModal({
   const t = useTranslations();
   const confirmed = checkout != null && ["confirmed", "reconciled", "manual_confirmed"].includes(checkout.status);
   const manuallyConfirmed = checkout?.status === "manual_confirmed";
+  const autoConfirm = checkout?.autoConfirm !== false;
   const [manualConfirming, setManualConfirming] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
 
@@ -4458,10 +4462,10 @@ function SepayCheckoutModal({
             </div>
             <div className={cn(
               "flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold",
-              confirmed ? "bg-ok-soft text-ok" : "bg-in-soft text-in"
+              confirmed ? "bg-ok-soft text-ok" : autoConfirm || loading ? "bg-in-soft text-in" : "bg-surface-2 text-slate-600 dark:text-slate-300"
             )}>
-              {confirmed ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <Loader2 className="h-4 w-4 shrink-0 animate-spin" />}
-              <span>{loading ? t("pos.sepay.preparing") : manuallyConfirmed ? t("pos.sepay.manualConfirmed") : confirmed ? t("pos.sepay.confirmed") : t("pos.sepay.waiting")}</span>
+              {confirmed ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : autoConfirm || loading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Clock3 className="h-4 w-4 shrink-0" />}
+              <span>{loading ? t("pos.sepay.preparing") : manuallyConfirmed ? t("pos.sepay.manualConfirmed") : confirmed ? t("pos.sepay.confirmed") : autoConfirm ? t("pos.sepay.waiting") : t("pos.sepay.waitingManual")}</span>
             </div>
           </div>
 
@@ -4493,7 +4497,7 @@ function SepayCheckoutModal({
                     {manualError && <div className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">{manualError}</div>}
                   </div>
                 )}
-                {!confirmed && <div className="text-xs leading-5 text-slate-500">{t("pos.sepay.checkingHint")}</div>}
+                {!confirmed && autoConfirm && <div className="text-xs leading-5 text-slate-500">{t("pos.sepay.checkingHint")}</div>}
               </>
             ) : (
               <div className="flex min-h-32 items-center justify-center rounded-xl border border-border bg-canvas p-4 text-center text-sm text-slate-500">

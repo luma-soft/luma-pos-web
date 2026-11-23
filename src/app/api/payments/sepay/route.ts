@@ -11,6 +11,7 @@ import {
 } from "@/lib/payments/service";
 import { SEPAY_PAYMENT_TIMEOUT_MS } from "@/lib/payments/service-core";
 import { buildVietQrImageUrl } from "@/lib/payments/vietqr";
+import { getRawStorePrefs } from "@/lib/data/settings";
 
 export async function POST(request: Request) {
   const gate = await requireMobileSalesAccess();
@@ -61,6 +62,9 @@ export async function POST(request: Request) {
   const profileId = await getProfileId(gate.userId);
   // Absolute URL: native clients load the QR image directly from this server.
   const qrOrigin = new URL(request.url).origin;
+  // Whether a verified SePay webhook will confirm this transfer; otherwise the cashier confirms it manually.
+  const prefs = await getRawStorePrefs(gate.storeId);
+  const autoConfirm = account.webhookEnabled && prefs.payments.sepayNotificationsEnabled;
   if (!orderId) {
     const result = await createPendingSepayPaymentSession({
       storeId: gate.storeId,
@@ -93,6 +97,7 @@ export async function POST(request: Request) {
           accountName: account.accountName,
         },
         status: "pending",
+      autoConfirm,
         expiresAt: result.data.expiresAt.toISOString(),
       },
     });
@@ -129,6 +134,7 @@ export async function POST(request: Request) {
         accountName: account.accountName,
       },
       status: "pending",
+      autoConfirm,
       expiresAt: new Date(result.data.createdAt.getTime() + SEPAY_PAYMENT_TIMEOUT_MS).toISOString(),
     },
   });
