@@ -4300,7 +4300,12 @@
         "time": "Time",
         "seller": "Seller",
         "total": "Total",
-        "status": "Status"
+        "status": "Status",
+        "payment": "Payment",
+        "paid": "Paid",
+        "remaining": "Outstanding",
+        "items": "{count} items",
+        "refunded": "Refunded"
       },
       "debtCols": {
         "code": "Voucher code",

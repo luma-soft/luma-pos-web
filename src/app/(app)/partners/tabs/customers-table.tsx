@@ -46,7 +46,7 @@ import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { setCustomerActive } from "@/lib/actions/partners";
 import type { CustomerFilters, CustomerListResult } from "@/lib/data/partners";
 import { CustomerEdit } from "../../customers/[id]/customer-edit";
-import { OrderStatusBadge } from "../../orders/status-badges";
+import { OrderStatusBadge, PaymentStatusBadge } from "../../orders/status-badges";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { CustomerReceivableActions } from "@/components/partners/customer-receivable-actions";
@@ -818,6 +818,23 @@ function CustomerInfoPanel({ customer }: { customer: CustomerRow }) {
   );
 }
 
+function useSalesPaymentMethodLabel() {
+  const t = useTranslations();
+  return (row: CustomerRow["salesHistory"][number]) => {
+    const method = row.paymentMethod;
+    if (!method) return null;
+    const key = row.kind === "return" ? `returns.refundMethods.${method}` : `pos.payMethods.${method}`;
+    return t.has(key) ? t(key) : method;
+  };
+}
+
+function salesPaymentAmounts(row: CustomerRow["salesHistory"][number]) {
+  const total = Number(row.total);
+  const paid = Number(row.amountPaid);
+  const remaining = row.kind === "order" && row.status !== "cancelled" ? Math.max(total - paid, 0) : 0;
+  return { total, paid, remaining };
+}
+
 function CustomerSalesPanel({
   customer,
   returnPrintTemplates,
@@ -826,6 +843,7 @@ function CustomerSalesPanel({
   returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
 }) {
   const t = useTranslations();
+  const methodLabel = useSalesPaymentMethodLabel();
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -866,14 +884,42 @@ function CustomerSalesPanel({
                   {formatDate(row.createdAt)} ·{" "}
                   {row.sellerName ?? t("customers.emptyValue")}
                 </div>
-                <div className="text-right text-sm font-semibold tabular-nums">
-                  {formatCurrency(Number(row.total))}
+                {row.productNames ? (
+                  <div className="line-clamp-2 text-xs text-slate-600 dark:text-slate-300">
+                    {t("customers.expand.salesCols.items", { count: row.itemCount })} · {row.productNames}
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <PaymentStatusBadge status={row.paymentStatus} />
+                    {methodLabel(row) ? (
+                      <span className="truncate text-xs text-slate-500">{methodLabel(row)}</span>
+                    ) : null}
+                  </div>
+                  <div className="text-right text-sm font-semibold tabular-nums">
+                    {formatCurrency(Number(row.total))}
+                  </div>
                 </div>
+                {(() => {
+                  const { paid, remaining } = salesPaymentAmounts(row);
+                  return (
+                    <div className="flex justify-between gap-3 text-xs tabular-nums text-slate-500">
+                      <span>
+                        {row.kind === "return" ? t("customers.expand.salesCols.refunded") : t("customers.expand.salesCols.paid")}: {formatCurrency(Math.abs(paid))}
+                      </span>
+                      {remaining > 0 ? (
+                        <span className="font-semibold text-er">
+                          {t("customers.expand.salesCols.remaining")}: {formatCurrency(remaining)}
+                        </span>
+                      ) : null}
+                    </div>
+                  );
+                })()}
               </article>
             ))}
           </div>
           <div className="hidden min-h-0 flex-1 overscroll-contain overflow-auto lg:block">
-            <table className="w-full min-w-[860px] text-sm">
+            <table className="w-full min-w-[1080px] text-sm">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
                   <th className="px-3 py-3">
@@ -887,6 +933,15 @@ function CustomerSalesPanel({
                   </th>
                   <th className="px-3 py-3 text-right">
                     {t("customers.expand.salesCols.total")}
+                  </th>
+                  <th className="px-3 py-3 text-right">
+                    {t("customers.expand.salesCols.paid")}
+                  </th>
+                  <th className="px-3 py-3 text-right">
+                    {t("customers.expand.salesCols.remaining")}
+                  </th>
+                  <th className="px-3 py-3">
+                    {t("customers.expand.salesCols.payment")}
                   </th>
                   <th className="px-3 py-3">
                     {t("customers.expand.salesCols.status")}
@@ -912,6 +967,14 @@ function CustomerSalesPanel({
                           className="text-primary-600 hover:underline"
                         />
                       )}
+                      {row.productNames ? (
+                        <div
+                          className="mt-0.5 max-w-[260px] truncate text-xs font-normal text-slate-500"
+                          title={row.productNames}
+                        >
+                          {t("customers.expand.salesCols.items", { count: row.itemCount })} · {row.productNames}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap text-slate-700 dark:text-slate-200">
                       {formatDate(row.createdAt)}
@@ -921,6 +984,27 @@ function CustomerSalesPanel({
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums font-semibold">
                       {formatCurrency(Number(row.total))}
+                    </td>
+                    {(() => {
+                      const { paid, remaining } = salesPaymentAmounts(row);
+                      return (
+                        <>
+                          <td className="px-3 py-3 text-right tabular-nums">
+                            {formatCurrency(paid)}
+                          </td>
+                          <td className={cn("px-3 py-3 text-right tabular-nums", remaining > 0 ? "font-semibold text-er" : "text-slate-400")}>
+                            {formatCurrency(remaining)}
+                          </td>
+                        </>
+                      );
+                    })()}
+                    <td className="px-3 py-3">
+                      <div className="flex flex-col items-start gap-1">
+                        <PaymentStatusBadge status={row.paymentStatus} />
+                        {methodLabel(row) ? (
+                          <span className="text-xs text-slate-500">{methodLabel(row)}</span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-3 py-3">
                       <OrderStatusBadge status={row.status} />

@@ -53,6 +53,7 @@ export type CustomerSalesHistoryRow = {
   createdAt: Date;
   sellerName: string | null;
   total: string;
+  amountPaid: string;
   status: string;
   itemCount: number;
   paymentStatus: string;
@@ -475,6 +476,7 @@ export async function getCustomers(
         createdAt: order.createdAt,
         sellerName: order.sellerName,
         total: order.total,
+        amountPaid: order.amountPaid,
         status: order.status,
         itemCount: Number(order.itemCount),
         paymentStatus: order.paymentStatus,
@@ -505,6 +507,7 @@ export async function getCustomers(
         createdAt: ret.createdAt,
         sellerName: ret.sellerName,
         total: String(-Number(ret.totalRefund)),
+        amountPaid: String(-Number(ret.totalRefund)),
         status: "returned",
         itemCount: Number(ret.itemCount),
         paymentStatus: "refunded",

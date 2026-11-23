@@ -4300,7 +4300,12 @@
         "time": "Thời gian",
         "seller": "Người bán",
         "total": "Tổng cộng",
-        "status": "Trạng thái"
+        "status": "Trạng thái",
+        "payment": "Thanh toán",
+        "paid": "Khách đã trả",
+        "remaining": "Còn nợ",
+        "items": "{count} mặt hàng",
+        "refunded": "Đã hoàn"
       },
       "debtCols": {
         "code": "Mã phiếu",
