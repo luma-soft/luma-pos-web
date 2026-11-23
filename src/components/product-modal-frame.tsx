@@ -15,9 +15,16 @@ import { cn } from "@/lib/utils";
 
 type ProductModalNavigation = "back" | "push" | "replace";
 const ProductModalDismissContext = createContext<(() => void) | null>(null);
+const ProductModalCloseContext = createContext<(() => void) | null>(null);
 
 export function useDismissProductModalAfterSave() {
   return useContext(ProductModalDismissContext);
+}
+
+/** Closes the enclosing product modal the same way its close button does
+ * (history back for intercepted routes, so the list keeps its filters). */
+export function useCloseProductModal() {
+  return useContext(ProductModalCloseContext);
 }
 
 export function shouldHandleProductModalEscape(
@@ -114,6 +121,7 @@ export function ProductModalFrame({
 
   return (
     <ProductModalDismissContext.Provider value={dismiss}>
+      <ProductModalCloseContext.Provider value={close}>
       <div
         className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-5"
         onMouseDown={onBackdropMouseDown}
@@ -133,6 +141,7 @@ export function ProductModalFrame({
           {children}
         </div>
       </div>
+      </ProductModalCloseContext.Provider>
     </ProductModalDismissContext.Provider>
   );
 }

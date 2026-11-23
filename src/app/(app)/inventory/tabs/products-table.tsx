@@ -65,6 +65,8 @@ import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { deleteProduct, setProductActive } from "@/lib/actions/products";
+import { useCloseProductModal } from "@/components/product-modal-frame";
+import { useRefreshAppDataOnReturn } from "@/components/app-data-sync-provider";
 import { setCameraMaterial } from "@/lib/actions/products";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { modalActionSizeClassName } from "@/components/ui/button-variants";
@@ -2026,6 +2028,8 @@ function ProductActionBar({ product, cameraMaterials = false, variant = "bar" }:
   const pathname = usePathname();
   const params = useSearchParams();
   const dialog = useConfirmDialog();
+  const closeProductModal = useCloseProductModal();
+  const scheduleAppDataRefreshOnReturn = useRefreshAppDataOnReturn();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [moreOpen, setMoreOpen] = useState(false);
@@ -2127,7 +2131,11 @@ function ProductActionBar({ product, cameraMaterials = false, variant = "bar" }:
     sp.delete("expanded");
     sp.delete("detailProductId");
     if (pathname.startsWith("/products/")) {
-      router.replace(`${Routes.Inventory}?tab=products`);
+      // Leave the detail modal the way it was opened: an intercepted modal
+      // goes back to the list entry, keeping its filters (status, search...).
+      scheduleAppDataRefreshOnReturn(Routes.Inventory);
+      if (closeProductModal) closeProductModal();
+      else router.replace(`${Routes.Inventory}?tab=products`);
       return;
     }
     const query = sp.toString();
