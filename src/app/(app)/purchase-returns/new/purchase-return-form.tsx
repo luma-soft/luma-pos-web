@@ -27,6 +27,7 @@ import type { AiActionPreview } from "@/lib/ai/actions";
 import type { PurchaseFormOptions } from "@/lib/data/inventory";
 import type { getPurchaseReturn, PurchaseReturnProductRow } from "@/lib/data/purchase-returns";
 import type { getPurchase } from "@/lib/data/inventory";
+import { withListFilters } from "@/lib/list-return-navigation";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { useProductCatalog } from "@/components/product-catalog-provider";
@@ -288,7 +289,8 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
     if (res.ok) {
       savedSuccessfully = true;
       void catalog.refresh();
-      const destination = Routes.purchaseReturnDetail(res.data.id);
+      // Editing returns to the list the user came from; new records show unfiltered.
+        const destination = initial ? withListFilters(Routes.purchaseReturnDetail(res.data.id)) : Routes.purchaseReturnDetail(res.data.id);
       setSavedHref(destination);
       router.push(destination);
     }

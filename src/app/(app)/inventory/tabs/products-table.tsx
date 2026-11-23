@@ -60,6 +60,7 @@ import {
   stopRowToggle,
   type DataTableColumn,
 } from "@/components/data-table";
+import { withListFilters } from "@/lib/list-return-navigation";
 import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { OrderDetailLink } from "@/components/order-detail-link";
@@ -2135,7 +2136,7 @@ function ProductActionBar({ product, cameraMaterials = false, variant = "bar" }:
       // goes back to the list entry, keeping its filters (status, search...).
       scheduleAppDataRefreshOnReturn(Routes.Inventory);
       if (closeProductModal) closeProductModal();
-      else router.replace(`${Routes.Inventory}?tab=products`);
+      else router.replace(withListFilters(`${Routes.Inventory}?tab=products`));
       return;
     }
     const query = sp.toString();

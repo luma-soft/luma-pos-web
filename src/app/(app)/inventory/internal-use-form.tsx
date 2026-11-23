@@ -17,6 +17,7 @@ import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
 import { createInternalUse, updateInternalUse } from "@/lib/actions/internal-use";
 import { getCatalogWarehouseStock } from "@/lib/product-catalog";
+import { withListFilters } from "@/lib/list-return-navigation";
 import { Routes } from "@/lib/routes";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -192,7 +193,8 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
       if (res.ok) {
         savedSuccessfully = true;
         void catalog.refresh();
-        const destination = Routes.internalUseDetail(res.data.id);
+        // Editing returns to the list the user came from; new records show unfiltered.
+        const destination = initial ? withListFilters(Routes.internalUseDetail(res.data.id)) : Routes.internalUseDetail(res.data.id);
         setSavedResult({
           href: destination,
           message: intent === "draft" ? t("internalUse.savedDraft") : t("internalUse.submitted"),

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2, Trash2 } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
+import { withListFilters } from "@/lib/list-return-navigation";
 import { Routes } from "@/lib/routes";
 import { cancelQuote, convertQuoteToOrder } from "@/lib/actions/orders";
 import { cn } from "@/lib/utils";
@@ -32,7 +33,7 @@ export function QuoteCreateOrderButton({
     setBusy(true);
     const res = await convertQuoteToOrder(quoteId);
     setBusy(false);
-    if (res.ok) router.push(Routes.salesOrder(quoteId, "completed"));
+    if (res.ok) router.push(withListFilters(Routes.salesOrder(quoteId, "completed")));
     else await dialog.alert({ description: t(res.error as never), variant: "destructive" });
   }
 
@@ -75,7 +76,7 @@ export function BookingCreateOrderButton({
     setBusy(true);
     const res = await convertQuoteToOrder(bookingId);
     setBusy(false);
-    if (res.ok) router.push(Routes.salesOrder(bookingId, "completed"));
+    if (res.ok) router.push(withListFilters(Routes.salesOrder(bookingId, "completed")));
     else await dialog.alert({ description: t(res.error as never), variant: "destructive" });
   }
 

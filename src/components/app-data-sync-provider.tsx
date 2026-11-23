@@ -3,6 +3,7 @@
 import { createContext, startTransition, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { shouldRefreshDeferredAppPath } from "@/lib/sync/deferred-app-route-refresh";
+import { rememberListLocation } from "@/lib/list-return-navigation";
 
 const AppDataRevisionContext = createContext<string | null>(null);
 const RefreshOnReturnContext = createContext<((path: string) => void) | null>(null);
@@ -29,6 +30,10 @@ export function AppDataSyncProvider({
   const scheduleRefreshOnReturn = useCallback((path: string) => {
     pendingRefreshPathsRef.current.add(path);
   }, []);
+
+  useEffect(() => {
+    rememberListLocation(pathname, query);
+  }, [pathname, query]);
 
   useEffect(() => {
     const routeChanged = previousRouteKeyRef.current !== routeKey;

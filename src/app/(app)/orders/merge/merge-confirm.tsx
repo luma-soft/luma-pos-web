@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2, GitMerge } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
+import { withListFilters } from "@/lib/list-return-navigation";
 import { Routes } from "@/lib/routes";
 import { mergeOrders } from "@/lib/actions/order-edit";
 
@@ -33,7 +34,7 @@ export function MergeConfirm({ ids, disabled }: { ids: string[]; disabled: boole
     setError("");
     const res = await mergeOrders(ids);
     setBusy(false);
-    if (res.ok) router.push(Routes.salesOrder(res.data.id, "completed"));
+    if (res.ok) router.push(withListFilters(Routes.salesOrder(res.data.id, "completed")));
     else setError(t(res.error as never));
   }
 

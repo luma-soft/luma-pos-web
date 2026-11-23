@@ -1,5 +1,6 @@
 "use client";
 
+import { withListFilters } from "@/lib/list-return-navigation";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -38,7 +39,7 @@ export function InventoryDocumentActions({ kind, id, code, status, capabilities,
       const result = await (kind === "internal-use" ? deleteInternalUse(id) : deletePurchaseReturn(id));
       if (!result.ok) { setError(t(result.error as never)); return; }
       void catalog.refresh();
-      router.replace(`/inventory?tab=${kind === "internal-use" ? "internal" : "purchase-returns"}`);
+      router.replace(withListFilters(`/inventory?tab=${kind === "internal-use" ? "internal" : "purchase-returns"}`));
       router.refresh();
     } catch { setError("Không thể xóa phiếu. Vui lòng thử lại."); }
     finally { setBusy(false); }

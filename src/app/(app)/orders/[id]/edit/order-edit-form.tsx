@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2, Save, Trash2 } from "lucide-react";
+import { withListFilters } from "@/lib/list-return-navigation";
 import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -131,7 +132,7 @@ export function OrderEditForm({ orderId, orderCode, warehouseId, initial }: Prop
       items: items.filter((l) => l.quantity > 0).map((line) => ({ ...line, manualUnitPrice: line.preDiscountUnitPrice ?? line.unitPrice })),
     });
     setBusy(false);
-    if (res.ok) router.push(Routes.salesOrder(orderId, "completed"));
+    if (res.ok) router.push(withListFilters(Routes.salesOrder(orderId, "completed")));
     else setError(t(res.error as never));
   }
 

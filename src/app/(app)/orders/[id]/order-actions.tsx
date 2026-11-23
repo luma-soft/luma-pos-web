@@ -9,6 +9,7 @@ import { sendOrderInvoiceZalo } from "@/lib/actions/zalo";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { MoneyInput } from "@/components/ui/money-input";
 import { formatCurrency, cn } from "@/lib/utils";
+import { withListFilters } from "@/lib/list-return-navigation";
 import { Routes } from "@/lib/routes";
 import { buttonVariants, modalActionSizeClassName } from "@/components/ui/button-variants";
 
@@ -28,7 +29,7 @@ export function CreateInvoiceFromDraftButton({ orderId }: { orderId: string }) {
     setBusy(true);
     const result = await createInvoiceFromDraft(orderId);
     setBusy(false);
-    if (result.ok) router.push(Routes.salesOrder(orderId, "completed"));
+    if (result.ok) router.push(withListFilters(Routes.salesOrder(orderId, "completed")));
     else await dialog.alert({ description: t(result.error as never), variant: "destructive" });
   }
 

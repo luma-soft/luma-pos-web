@@ -1,5 +1,6 @@
 "use client";
 
+import { OVERLAY_ONLY_PARAMS } from "@/lib/list-return-navigation";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FloatingMenuPortal } from "@/components/ui/floating-menu-portal";
 import { Fragment, isValidElement, type ReactNode, type SyntheticEvent, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -57,12 +58,7 @@ export function dataTableResultSetKey(
   // Overlay-only URL fields are not result-set filters; keep the list's scroll.
   // productId/productKind may also be genuine list filters (for example order search).
   const isProductEditor = resultSetParams.has("productModal");
-  for (const key of [
-    "detailOrderId", "detailPurchaseId", "detailCustomerId", "detailSupplierId",
-    "detailProductId", "detailTab",
-    "productModal", "copyFrom", "copyGroup", "sameTypeAs",
-    "returnTo", "onlineListing", "onlineProductId", "shopeeProductId",
-  ]) resultSetParams.delete(key);
+  for (const key of OVERLAY_ONLY_PARAMS) resultSetParams.delete(key);
   if (isProductEditor) {
     resultSetParams.delete("productId");
     resultSetParams.delete("productKind");
