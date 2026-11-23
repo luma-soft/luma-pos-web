@@ -184,7 +184,9 @@ scope `drive.file`, account đang đăng nhập trong Chrome. Helper xác nhận
 `Backups/LumaPOS` truy cập được. Config nằm tại
 `/Users/Shared/LumaPOS/secrets/rclone.conf`, owner `_lumapos_svc`, mode `0600`.
 Ngày 2026-11-14, một archive rehearsal đã upload lên Drive, tải về và restore
-thành công vào database cô lập `lumapos_drive_restore_20261114_173914`. Verifier
+thành công vào database cô lập `lumapos_drive_restore_20261114_173914`
+(database này sau đó trở thành production và được đổi tên thành `lumapos_prod`
+ngày 2026-11-23; các database rehearsal khác đã xóa). Verifier
 đối chiếu 150 bảng public và ghi nhận 4.544 mục media có checksum khớp. Đây là
 rehearsal, không phải backup của nguồn production hoặc final snapshot. Thư mục
 `backup-staging` hiện tồn tại với owner `_lumapos_svc`, mode `0700`. Chưa cài
