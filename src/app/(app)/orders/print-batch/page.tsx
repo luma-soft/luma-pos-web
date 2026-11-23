@@ -6,7 +6,8 @@ import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { getDefaultSepayBankAccount } from "@/lib/data/payment-bank-accounts";
 import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
 import { buildPrintPaymentQr, formatPrintPaymentReference, resolvePrintPaymentQrAccount } from "@/lib/print/payment-qr";
-import { buildBatchDebtSummaries } from "@/lib/print/batch-debt-summary";
+import { buildBatchDebtSummaries, type BatchDebtLedgerEntry } from "@/lib/print/batch-debt-summary";
+import { getCustomerPartnerDetail } from "@/lib/data/partners";
 import { PrintDoc } from "@/components/print/print-doc";
 import { shouldShowPrintTax } from "@/lib/print/template-shared";
 import { BatchDebtSummary } from "@/components/print/batch-debt-summary";
@@ -128,6 +129,33 @@ export default async function PrintBatchPage({ searchParams }: Props) {
     };
   });
 
+  const qrLabels = {
+    title: t("pos.sepay.title"),
+    bank: t("pos.sepay.bank"),
+    account: t("pos.sepay.account"),
+    name: t("pos.sepay.name"),
+    reference: t("pos.sepay.reference"),
+  };
+  const summaryCustomerIds = template.options.showBatchDebtSummary
+    ? [...orders.reduce((counts, order) => {
+        if (order.status === "completed" && order.customerId) {
+          counts.set(order.customerId, (counts.get(order.customerId) ?? 0) + 1);
+        }
+        return counts;
+      }, new Map<string, number>())]
+        .filter(([, count]) => count >= 2)
+        .map(([customerId]) => customerId)
+    : [];
+  const summaryCustomers = new Map(
+    (await Promise.all(
+      summaryCustomerIds.map((customerId) => getCustomerPartnerDetail(context.storeId, customerId).catch(() => null)),
+    ))
+      .filter((customer): customer is NonNullable<typeof customer> => customer !== null)
+      .map((customer) => [customer.id, customer]),
+  );
+  const ledgers = new Map<string, BatchDebtLedgerEntry[]>(
+    [...summaryCustomers.values()].map((customer) => [customer.id, customer.debtLedger]),
+  );
   const debtSummaries = template.options.showBatchDebtSummary
     ? buildBatchDebtSummaries(orders.map((order) => ({
         id: order.id,
@@ -135,32 +163,59 @@ export default async function PrintBatchPage({ searchParams }: Props) {
         status: order.status,
         customerId: order.customerId,
         customerName: order.customerName,
+        customerPhone: order.customerPhone,
         createdAt: order.createdAt,
         total: Number(order.total),
         paid: Number(order.amountPaid),
         currentCustomerDebt: Number(order.customerDebt ?? 0),
-      })))
+      })), ledgers)
     : [];
   const debtLabels = {
     title: t("print.debtSummary.title"),
     customer: t("print.debtSummary.customer"),
+    phone: t("print.debtSummary.phone"),
+    period: t("print.debtSummary.period"),
     printedAt: t("print.debtSummary.printedAt"),
+    index: t("print.index"),
+    invoicesSection: t("print.debtSummary.invoicesSection"),
     invoice: t("print.debtSummary.invoice"),
     invoiceDate: t("print.debtSummary.invoiceDate"),
     invoiceTotal: t("print.debtSummary.invoiceTotal"),
     paid: t("print.debtSummary.paid"),
     remaining: t("print.debtSummary.remaining"),
+    total: t("print.debtSummary.total"),
+    movementsSection: t("print.debtSummary.movementsSection"),
+    movementCode: t("print.debtSummary.movementCode"),
+    movementType: t("print.debtSummary.movementType"),
+    movementAmount: t("print.debtSummary.movementAmount"),
+    reconciliationSection: t("print.debtSummary.reconciliationSection"),
     openingDebt: t("print.debtSummary.openingDebt"),
     openingCredit: t("print.debtSummary.openingCredit"),
-    batchTotal: t("print.debtSummary.batchTotal"),
-    batchPaid: t("print.debtSummary.batchPaid"),
-    batchRemaining: t("print.debtSummary.batchRemaining"),
+    increases: t("print.debtSummary.increases"),
+    decreases: t("print.debtSummary.decreases"),
     currentDebt: t("print.debtSummary.currentDebt"),
+    currentCredit: t("print.debtSummary.currentCredit"),
+    inWords: t("print.inWords"),
+    customerSign: t("print.debtSummary.customerSign"),
+    sellerSign: t("print.debtSummary.sellerSign"),
+    signHint: t("print.signHint"),
   };
-  const debtPages = debtSummaries.map((summary) => ({
-    key: `debt-${summary.customerId}`,
-    content: <BatchDebtSummary template={template} size={size} summary={summary} printedAt={new Date()} labels={debtLabels} />,
-  }));
+  const printedAt = new Date();
+  const debtPages = debtSummaries.map((summary) => {
+    const customerCode = summaryCustomers.get(summary.customerId)?.code ?? summary.invoices[0]?.code ?? "";
+    const paymentQr = buildPrintPaymentQr({
+      enabled: template.options.showPaymentQr,
+      alwaysShow: false,
+      account: resolvePrintPaymentQrAccount(template.options, defaultBankAccount),
+      amount: summary.currentDebt > 0 ? summary.currentDebt : undefined,
+      reference: formatPrintPaymentReference(template.options.paymentQrContentTemplate, customerCode),
+      labels: qrLabels,
+    });
+    return {
+      key: `debt-${summary.customerId}`,
+      content: <BatchDebtSummary template={template} size={size} summary={summary} printedAt={printedAt} labels={debtLabels} paymentQr={paymentQr} />,
+    };
+  });
   const pages = [...invoicePages, ...debtPages];
 
   return (

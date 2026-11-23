@@ -4852,18 +4852,29 @@
     "debtSummary": {
       "title": "TỔNG HỢP CÔNG NỢ",
       "customer": "Khách hàng",
+      "phone": "Điện thoại",
+      "period": "Kỳ đối chiếu",
       "printedAt": "Ngày in",
+      "invoicesSection": "Hóa đơn",
       "invoice": "Hóa đơn",
       "invoiceDate": "Ngày",
       "invoiceTotal": "Tiền hàng",
       "paid": "Đã trả",
       "remaining": "Còn nợ",
+      "total": "Tổng cộng",
+      "movementsSection": "Thanh toán & phát sinh khác trong kỳ",
+      "movementCode": "Chứng từ",
+      "movementType": "Nội dung",
+      "movementAmount": "Số tiền",
+      "reconciliationSection": "Đối chiếu công nợ",
       "openingDebt": "Công nợ đầu kỳ",
       "openingCredit": "Khách trả dư đầu kỳ",
-      "batchTotal": "Tiền hàng trong kỳ",
-      "batchPaid": "Đã thanh toán trong kỳ",
-      "batchRemaining": "Còn nợ phát sinh trong kỳ",
-      "currentDebt": "CÔNG NỢ CUỐI KỲ"
+      "increases": "Phát sinh tăng",
+      "decreases": "Phát sinh giảm",
+      "currentDebt": "CÔNG NỢ CUỐI KỲ",
+      "currentCredit": "KHÁCH TRẢ DƯ CUỐI KỲ",
+      "customerSign": "Khách hàng",
+      "sellerSign": "Người lập"
     }
   },
   "printSettings": {
