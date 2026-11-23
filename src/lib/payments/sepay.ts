@@ -1,5 +1,4 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-export { buildVietQrImageUrl as buildSepayVietQrImageUrl } from "@/lib/print/payment-qr";
 
 export type SepayWebhookInput = {
   providerEventId: string;

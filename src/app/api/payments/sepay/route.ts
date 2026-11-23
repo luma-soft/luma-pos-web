@@ -10,7 +10,7 @@ import {
   createPendingSepayPaymentSession,
 } from "@/lib/payments/service";
 import { SEPAY_PAYMENT_TIMEOUT_MS } from "@/lib/payments/service-core";
-import { buildSepayVietQrImageUrl } from "@/lib/payments/sepay";
+import { buildVietQrImageUrl } from "@/lib/payments/vietqr";
 
 export async function POST(request: Request) {
   const gate = await requireMobileSalesAccess();
@@ -59,6 +59,8 @@ export async function POST(request: Request) {
   }
 
   const profileId = await getProfileId(gate.userId);
+  // Absolute URL: native clients load the QR image directly from this server.
+  const qrOrigin = new URL(request.url).origin;
   if (!orderId) {
     const result = await createPendingSepayPaymentSession({
       storeId: gate.storeId,
@@ -76,12 +78,12 @@ export async function POST(request: Request) {
         paymentId: result.data.id,
         reference: result.data.reference,
         amount: Math.round(amount),
-        qrImageUrl: buildSepayVietQrImageUrl({
+        qrImageUrl: buildVietQrImageUrl({
           bankCode: account.bankCode,
           accountNumber: account.accountNumber,
           amount,
           reference: result.data.reference,
-        }),
+        }, qrOrigin),
         bankAccount: {
           id: account.id,
           bankCode: account.bankCode,
@@ -112,12 +114,12 @@ export async function POST(request: Request) {
       paymentId: result.data.id,
       reference: result.data.reference,
       amount: Math.round(amount),
-      qrImageUrl: buildSepayVietQrImageUrl({
+      qrImageUrl: buildVietQrImageUrl({
         bankCode: account.bankCode,
         accountNumber: account.accountNumber,
         amount,
         reference: result.data.reference,
-      }),
+      }, qrOrigin),
       bankAccount: {
         id: account.id,
         bankCode: account.bankCode,

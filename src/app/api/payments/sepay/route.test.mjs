@@ -63,9 +63,6 @@ mock.module("@/lib/payments/service", () => ({
 mock.module("@/lib/payments/service-core", () => ({
   SEPAY_PAYMENT_TIMEOUT_MS: 10 * 60 * 1000,
 }));
-mock.module("@/lib/payments/sepay", () => ({
-  buildSepayVietQrImageUrl: () => "https://qr.sepay.vn/test.png",
-}));
 
 const { POST } = await import("./route");
 

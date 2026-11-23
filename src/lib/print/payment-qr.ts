@@ -1,3 +1,7 @@
+import { buildVietQrImageUrl } from "@/lib/payments/vietqr";
+
+export { buildVietQrImageUrl };
+
 export interface PrintPaymentQr {
   title: string;
   qrImageUrl: string;
@@ -53,23 +57,6 @@ export function resolvePrintPaymentQrAccount(
     accountNumber,
     accountName: options.paymentQrCustomAccountName?.trim() || "",
   };
-}
-
-export function buildVietQrImageUrl(input: {
-  bankCode: string;
-  accountNumber: string;
-  amount?: number;
-  reference: string;
-}) {
-  const params = new URLSearchParams({
-    acc: input.accountNumber,
-    bank: input.bankCode,
-    des: input.reference,
-  });
-  if (input.amount != null && input.amount > 0) {
-    params.set("amount", String(Math.round(input.amount)));
-  }
-  return `https://qr.sepay.vn/img?${params.toString()}`;
 }
 
 export function buildPrintPaymentQr(input: {

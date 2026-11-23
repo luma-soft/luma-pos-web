@@ -21,7 +21,7 @@ test("hides the QR for a fully paid invoice by default", () => {
 
 test("builds a generic account QR when always-show is enabled", () => {
   const qr = buildPrintPaymentQr({ enabled: true, alwaysShow: true, account, reference: "HD001", labels });
-  const params = new URL(qr.qrImageUrl).searchParams;
+  const params = new URL(qr.qrImageUrl, "https://pos.test").searchParams;
 
   expect(qr).not.toBeNull();
   expect(params.has("amount")).toBe(false);
@@ -30,7 +30,7 @@ test("builds a generic account QR when always-show is enabled", () => {
 
 test("prefills the outstanding amount when the invoice still has a balance", () => {
   const qr = buildPrintPaymentQr({ enabled: true, account, amount: 125000, reference: "HD002", labels });
-  expect(new URL(qr.qrImageUrl).searchParams.get("amount")).toBe("125000");
+  expect(new URL(qr.qrImageUrl, "https://pos.test").searchParams.get("amount")).toBe("125000");
 });
 
 test("does not build a QR when the option is disabled or no bank account exists", () => {
