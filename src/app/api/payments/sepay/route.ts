@@ -12,6 +12,7 @@ import {
 import { SEPAY_PAYMENT_TIMEOUT_MS } from "@/lib/payments/service-core";
 import { buildVietQrImageUrl } from "@/lib/payments/vietqr";
 import { getRawStorePrefs } from "@/lib/data/settings";
+import { publicRequestOrigin } from "@/lib/http/public-origin";
 
 export async function POST(request: Request) {
   const gate = await requireMobileSalesAccess();
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
 
   const profileId = await getProfileId(gate.userId);
   // Absolute URL: native clients load the QR image directly from this server.
-  const qrOrigin = new URL(request.url).origin;
+  const qrOrigin = publicRequestOrigin(request);
   // Whether a verified SePay webhook will confirm this transfer; otherwise the cashier confirms it manually.
   const prefs = await getRawStorePrefs(gate.storeId);
   const autoConfirm = account.webhookEnabled && prefs.payments.sepayNotificationsEnabled;

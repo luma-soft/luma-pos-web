@@ -82,3 +82,16 @@ export function buildVietQrImageUrl(input: VietQrInput, origin?: string | null) 
   const base = origin ? origin.replace(/\/+$/, "") : "";
   return `${base}${VIETQR_IMAGE_PATH}?${params.toString()}`;
 }
+
+/**
+ * For this web app, load a Luma VietQR image from the page's own origin.
+ * The server's absolute URL may name a host the browser cannot reach.
+ */
+export function sameOriginVietQrImageUrl(url: string) {
+  try {
+    const parsed = new URL(url, "http://luma.invalid");
+    return parsed.pathname === VIETQR_IMAGE_PATH ? `${parsed.pathname}${parsed.search}` : url;
+  } catch {
+    return url;
+  }
+}

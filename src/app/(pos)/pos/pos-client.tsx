@@ -154,6 +154,7 @@ import { isSellPriceBelowPurchase, purchasePriceForSoldUnit } from "@/lib/pos/be
 import { calculateTaxBreakdown } from "@/lib/tax/calculations";
 import { productDisplayName } from "@/lib/products/variant-presentation";
 import { sortProductsBySort } from "@/lib/product-sort-policy";
+import { sameOriginVietQrImageUrl } from "@/lib/payments/vietqr";
 
 type CartLine = {
   key: string;
@@ -2689,7 +2690,7 @@ export function PosClient({
           }
           const paymentQr: PrintPaymentQr = {
             title: t("pos.sepay.title"),
-            qrImageUrl: paymentJson.data.qrImageUrl,
+            qrImageUrl: sameOriginVietQrImageUrl(paymentJson.data.qrImageUrl),
             bankLabel: t("pos.sepay.bank"),
             accountLabel: t("pos.sepay.account"),
             nameLabel: t("pos.sepay.name"),

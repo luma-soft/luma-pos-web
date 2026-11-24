@@ -15,6 +15,7 @@ import {
   hashCustomerRequestToken,
 } from "@/lib/services/customer-request-token";
 import { serviceCustomerRequestLinkSchema } from "@/lib/services/schemas";
+import { publicRequestOrigin } from "@/lib/http/public-origin";
 
 export async function POST(request: Request) {
   const gate = await requireMobileServiceManager();
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
       after: { code: created.code, name: project.name }, metadata: { projectId: project.id, expiresAt } });
     return created;
   });
-  const origin = new URL(request.url).origin;
+  const origin = publicRequestOrigin(request);
   return mobileOk({
     ...row,
     url: `${origin}/portal/service-request/${token}`,

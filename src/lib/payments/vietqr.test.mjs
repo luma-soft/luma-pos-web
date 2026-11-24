@@ -44,3 +44,10 @@ test("image URL points at the Luma VietQR route", () => {
   expect(buildVietQrImageUrl({ bankCode: "VCB", accountNumber: "1" }, "https://pos.example.com/"))
     .toBe("https://pos.example.com/api/payments/vietqr?bank=VCB&acc=1");
 });
+
+test("sameOriginVietQrImageUrl strips an unreachable host from Luma QR URLs only", () => {
+  const { sameOriginVietQrImageUrl } = require("./vietqr");
+  expect(sameOriginVietQrImageUrl("https://localhost:3200/api/payments/vietqr?bank=VPB&acc=1&amount=5000"))
+    .toBe("/api/payments/vietqr?bank=VPB&acc=1&amount=5000");
+  expect(sameOriginVietQrImageUrl("https://qr.example.com/img.png")).toBe("https://qr.example.com/img.png");
+});
