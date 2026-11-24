@@ -5033,6 +5033,11 @@
     "previewHint": "Khi in thật, mẫu tự dàn trang theo khổ A4/A5/K80 đã chọn.",
     "errors": {
       "cannotDeleteDefault": "Không thể xóa mẫu mặc định. Hãy chọn một mẫu khác trước."
+    },
+    "batchDebtSummaryPosition": "Vị trí trang tổng hợp công nợ",
+    "batchDebtSummaryPositions": {
+      "start": "Đầu file (trước hóa đơn)",
+      "end": "Cuối file (sau hóa đơn)"
     }
   },
   "labelSettings": {

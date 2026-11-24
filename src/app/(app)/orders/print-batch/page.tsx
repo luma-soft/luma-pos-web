@@ -216,7 +216,9 @@ export default async function PrintBatchPage({ searchParams }: Props) {
       content: <BatchDebtSummary template={template} size={size} summary={summary} printedAt={printedAt} labels={debtLabels} paymentQr={paymentQr} />,
     };
   });
-  const pages = [...invoicePages, ...debtPages];
+  const pages = template.options.batchDebtSummaryPosition === "start"
+    ? [...debtPages, ...invoicePages]
+    : [...invoicePages, ...debtPages];
 
   return (
     <>

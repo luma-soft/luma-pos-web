@@ -76,6 +76,7 @@ test("a4 can hide each signature position independently", () => {
 
 test("batch debt summary is enabled for existing and new templates by default", () => {
   expect(defaultTemplate("order").options.showBatchDebtSummary).toBe(true);
+  expect(defaultTemplate("order").options.batchDebtSummaryPosition).toBe("end");
 });
 
 test("document defaults only enable payment QR for sales invoices", () => {

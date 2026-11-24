@@ -486,6 +486,29 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                           </label>
                         ))}
                       </div>
+                      {group.key === "batch" && selected.options.showBatchDebtSummary && (
+                        <Field label={t("printSettings.batchDebtSummaryPosition")} className="mt-3 sm:max-w-md">
+                          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t("printSettings.batchDebtSummaryPosition")}>
+                            {(["start", "end"] as const).map((position) => (
+                              <button
+                                key={position}
+                                type="button"
+                                role="radio"
+                                aria-checked={selected.options.batchDebtSummaryPosition === position}
+                                onClick={() => patch({ options: { ...defaultOptionsForDocType(selected.docType), ...selected.options, batchDebtSummaryPosition: position } })}
+                                className={cn(
+                                  "min-h-11 rounded-lg border px-3 py-2 text-left text-sm font-semibold",
+                                  selected.options.batchDebtSummaryPosition === position
+                                    ? "border-primary-600 bg-primary-50 text-primary-800 dark:bg-primary-950/40 dark:text-primary-200"
+                                    : "border-border text-slate-600 dark:text-slate-300",
+                                )}
+                              >
+                                {t(`printSettings.batchDebtSummaryPositions.${position}`)}
+                              </button>
+                            ))}
+                          </div>
+                        </Field>
+                      )}
                       {group.key === "pricing" && (selected.options.showTax || selected.options.autoShowTaxWhenPresent) && (
                         <Field label={t("printSettings.taxLabel")} className="mt-3 sm:max-w-md">
                           <input

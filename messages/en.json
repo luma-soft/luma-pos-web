@@ -5033,6 +5033,11 @@
     "previewHint": "Actual printing reflows per selected A4/A5/K80 size.",
     "errors": {
       "cannotDeleteDefault": "The default template cannot be deleted. Choose another template first."
+    },
+    "batchDebtSummaryPosition": "Debt summary position",
+    "batchDebtSummaryPositions": {
+      "start": "Start of file (before invoices)",
+      "end": "End of file (after invoices)"
     }
   },
   "labelSettings": {

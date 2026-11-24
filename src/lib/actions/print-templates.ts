@@ -52,6 +52,7 @@ const saveSchema = z.object({
     showDebt: z.boolean(),
     showCustomerDebtBalance: z.boolean().default(false),
     showBatchDebtSummary: z.boolean().default(true),
+    batchDebtSummaryPosition: z.enum(["start", "end"]).default("end"),
     showDiscount: z.boolean(),
     showTax: z.boolean(),
     autoShowTaxWhenPresent: z.boolean().optional(),
