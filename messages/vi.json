@@ -3400,6 +3400,7 @@
     "passwordTooShort": "Mật khẩu tối thiểu 6 ký tự"
   },
   "documentTime": {
+    "reset": "Dùng giờ hiện tại",
     "now": "Hiện tại",
     "purchase": "Thời gian nhập",
     "purchaseReturn": "Thời gian trả hàng",
@@ -4818,6 +4819,7 @@
     }
   },
   "print": {
+    "previewTitle": "Xem trước bản in",
     "title": "In hóa đơn",
     "printBtn": "In",
     "shareBtn": "Chia sẻ",

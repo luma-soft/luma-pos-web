@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DateInput } from "@/components/ui/date-input";
 import { cn } from "@/lib/utils";
@@ -46,15 +47,29 @@ export function DocumentTimeField({
   return (
     <div className={className}>
       <label className="mb-1 block text-xs font-medium text-slate-500">{label}</label>
-      <DateInput
-        type="datetime-local"
-        value={value}
-        max={toLocalDateTimeValue(new Date())}
-        placeholder={placeholder ?? t("now")}
-        aria-label={label}
-        onChange={(event) => onChange(event.target.value)}
-        className={cn("min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm", inputClassName)}
-      />
+      <div className="relative">
+        <DateInput
+          type="datetime-local"
+          value={value}
+          max={toLocalDateTimeValue(new Date())}
+          placeholder={placeholder ?? t("now")}
+          aria-label={label}
+          wideTrailingInset={Boolean(value)}
+          onChange={(event) => onChange(event.target.value)}
+          className={cn("min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm", inputClassName)}
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            aria-label={t("reset")}
+            title={t("reset")}
+            className="absolute inset-y-0 right-11 grid w-9 place-items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+          >
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

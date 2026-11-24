@@ -73,6 +73,7 @@ export function PosMobileCheckout({
   pricing,
   payment,
   notice,
+  timeField,
   extras,
   printTemplates,
   printTemplateId,
@@ -94,6 +95,8 @@ export function PosMobileCheckout({
   pricing: Pricing;
   payment: Payment | null;
   notice?: ReactNode;
+  /** Sale/return time card, shown under the total like CheckoutSheet.swift. */
+  timeField?: ReactNode;
   /** Web-only fields (project, delivery time, hold…) kept below the native sections. */
   extras?: ReactNode;
   printTemplates: { id: string; name: string }[];
@@ -139,6 +142,7 @@ export function PosMobileCheckout({
           <div className="text-[15px] font-extrabold">{t(adjustments ? "total" : "refundTotal")}</div>
           <div className="mt-1 text-[30px] font-black leading-9 tabular-nums">{formatCurrency(total)}</div>
         </section>
+        {timeField && <section className={card}>{timeField}</section>}
 
         <fieldset disabled={locked} className={cn("min-w-0", card)}>
           <h2 className="text-[13px] font-extrabold uppercase text-ios-label-tertiary">{pricing.heading}</h2>

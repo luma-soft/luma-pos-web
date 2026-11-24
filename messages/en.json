@@ -3400,6 +3400,7 @@
     "passwordTooShort": "Password must be at least 6 characters"
   },
   "documentTime": {
+    "reset": "Use current time",
     "now": "Now",
     "purchase": "Received at",
     "purchaseReturn": "Returned at",
@@ -4818,6 +4819,7 @@
     }
   },
   "print": {
+    "previewTitle": "Print preview",
     "title": "Print invoice",
     "printBtn": "Print",
     "shareBtn": "Share",

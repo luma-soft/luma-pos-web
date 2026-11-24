@@ -6,9 +6,12 @@ import { createPortal } from "react-dom";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLocale } from "next-intl";
 import { cn } from "@/lib/utils";
+import { usePhoneLayout } from "@/components/use-phone-layout";
 
 type DateInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> & {
   type: "date" | "datetime-local";
+  /** Leaves room for a caller-rendered action (e.g. clear) beside the calendar icon. */
+  wideTrailingInset?: boolean;
 };
 
 function isoDay(date: Date) {
@@ -29,9 +32,11 @@ export function isDateInputValueValid(value: string, type: DateInputProps["type"
 
 /** Shared calendar and local date/time entry; never opens an OS date picker. */
 export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
-  ({ type, value, defaultValue, name, className, min, max, disabled, readOnly, required, onInvalid, onChange, onKeyDown, onClick, placeholder, ...props }, forwardedRef) => {
+  ({ type, wideTrailingInset = false, value, defaultValue, name, className, min, max, disabled, readOnly, required, onInvalid, onChange, onKeyDown, onClick, placeholder, ...props }, forwardedRef) => {
     const locale = useLocale();
     const vi = locale.startsWith("vi");
+    // Phones open the calendar as a full-screen sheet (iOS parity).
+    const phone = usePhoneLayout();
     const initialValue = String(value ?? defaultValue ?? "");
     const [internalValue, setInternalValue] = React.useState(initialValue);
     const committedValue = value === undefined ? internalValue : String(value);
@@ -65,6 +70,10 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
         if (!rootRef.current?.contains(target) && !popupRef.current?.contains(target)) setOpen(false);
       };
       const reposition = () => {
+        if (phone) {
+          setPosition({ position: "fixed", inset: 0 });
+          return;
+        }
         const rect = rootRef.current?.getBoundingClientRect();
         if (!rect) return;
         const width = Math.min(320, window.innerWidth - 16);
@@ -84,7 +93,7 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
         window.removeEventListener("resize", reposition);
         window.removeEventListener("scroll", reposition, true);
       };
-    }, [open]);
+    }, [open, phone]);
 
     React.useEffect(() => {
       const form = inputRef.current?.form;
@@ -128,7 +137,10 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
     const dayCount = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
     const time = (draft.split("T")[1] || "00:00").slice(0, 5);
     const validDraft = (!required || Boolean(draft)) && isDateInputValueValid(draft, type, min, max);
-    const buttonStyle = "grid min-h-10 min-w-10 place-items-center rounded-lg text-sm hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-30";
+    const navButtonStyle = "grid size-11 shrink-0 place-items-center rounded-full text-primary-600 hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary-600";
+    const buttonStyle = phone
+      ? "grid aspect-square min-h-11 w-full place-items-center rounded-full text-[17px] hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-30"
+      : "grid min-h-10 min-w-10 place-items-center rounded-lg text-sm hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-30";
 
     return (
       <div ref={rootRef} className="relative min-w-0">
@@ -141,7 +153,7 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
           value={committedValue}
           placeholder={placeholder ?? (dateTime ? "YYYY-MM-DDTHH:mm" : "YYYY-MM-DD")}
           autoComplete="off"
-          className={cn("h-11 w-full min-w-0 rounded-lg border border-border bg-surface px-3 pr-12 text-base outline-none focus:border-primary-600 disabled:opacity-50 lg:text-sm", className, "pr-12")}
+          className={cn("h-11 w-full min-w-0 rounded-lg border border-border bg-surface px-3 pr-12 text-base outline-none focus:border-primary-600 disabled:opacity-50 lg:text-sm", className, wideTrailingInset ? "pr-20" : "pr-12")}
           onClick={(event) => { onClick?.(event); if (!event.defaultPrevented && !readOnly) openCalendar(); }}
           onKeyDown={(event) => {
             onKeyDown?.(event);
@@ -153,18 +165,30 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
           <CalendarDays className="size-4" />
         </button>
         {open && !disabled && !readOnly && createPortal(
-          <div ref={popupRef} id={popupId} role="dialog" aria-label={chooseLabel} style={position} className="z-[115] overflow-auto rounded-xl border border-border bg-surface p-3 text-slate-900 shadow-e2 dark:text-slate-100" onKeyDown={(event) => {
+          <div ref={popupRef} id={popupId} role="dialog" aria-label={chooseLabel} style={position} className={cn(
+            "overflow-auto text-slate-900 dark:text-slate-100",
+            phone
+              ? "z-[130] flex flex-col bg-canvas px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
+              : "z-[115] rounded-xl border border-border bg-surface p-3 shadow-e2",
+          )} onKeyDown={(event) => {
             if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
           }}>
+            {phone && (
+              <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center">
+                <button type="button" onClick={close} className="justify-self-start rounded-full bg-surface px-4 py-2.5 text-[17px] text-primary-600 shadow-sm ring-1 ring-black/5 dark:ring-white/10">{vi ? "Hủy" : "Cancel"}</button>
+                <span className="text-[17px] font-semibold">{dateTime ? legacyTextByFlag(vi, "8698d9e5abb9") : chooseLabel}</span>
+                <span />
+              </div>
+            )}
             <label className="mb-2 block text-xs font-medium">
-              {dateTime ? (legacyTextByFlag(vi, "8698d9e5abb9")) : (legacyTextByFlag(vi, "69790dda07ce"))}
-              <input type="text" value={draft} aria-invalid={!validDraft} placeholder={dateTime ? "YYYY-MM-DDTHH:mm" : "YYYY-MM-DD"} className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-primary-600" onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (validDraft) { change(draft); close(); } } }} />
+              <span className={cn(phone && "sr-only")}>{dateTime ? (legacyTextByFlag(vi, "8698d9e5abb9")) : (legacyTextByFlag(vi, "69790dda07ce"))}</span>
+              <input type="text" value={draft} aria-invalid={!validDraft} placeholder={dateTime ? "YYYY-MM-DDTHH:mm" : "YYYY-MM-DD"} className={cn("mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary-600", phone ? "text-base" : "text-sm")} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (validDraft) { change(draft); close(); } } }} />
             </label>
             {!validDraft && <p className="mb-2 text-xs text-red-600">{legacyTextByFlag(vi, "84eec5799fdb")}</p>}
             <div className="mb-2 flex items-center justify-between">
-              <button type="button" className={buttonStyle} aria-label={legacyTextByFlag(vi, "c89cb47c4a30")} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}><ChevronLeft className="size-4" /></button>
-              <span className="text-sm font-semibold" aria-live="polite">{new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(month)}</span>
-              <button type="button" className={buttonStyle} aria-label={legacyTextByFlag(vi, "8d5d6dafe0af")} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}><ChevronRight className="size-4" /></button>
+              <button type="button" className={phone ? navButtonStyle : buttonStyle} aria-label={legacyTextByFlag(vi, "c89cb47c4a30")} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}><ChevronLeft className="size-4" /></button>
+              <span className={cn("font-semibold", phone ? "text-[17px]" : "text-sm")} aria-live="polite">{new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(month)}</span>
+              <button type="button" className={phone ? navButtonStyle : buttonStyle} aria-label={legacyTextByFlag(vi, "8d5d6dafe0af")} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}><ChevronRight className="size-4" /></button>
             </div>
             <div className="grid grid-cols-7" role="grid" aria-label={chooseLabel}>
               {(vi ? ["T2", "T3", "T4", "T5", "T6", "T7", "CN"] : ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]).map((day) => <span key={day} className="py-2 text-center text-xs text-slate-500">{day}</span>)}
@@ -191,7 +215,7 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
                 else event.target.value = time;
               }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} />
             </label>}
-            <div className="mt-3 flex justify-between gap-2 border-t border-border pt-2">
+            <div className={cn("mt-3 flex justify-between gap-2 border-t border-border pt-2", phone && "mt-auto pt-3")}>
               <button type="button" disabled={required} className="min-h-11 rounded-lg px-3 text-sm text-slate-600 hover:bg-surface-2 disabled:opacity-50" onClick={() => { change(""); close(); }}>{legacyTextByFlag(vi, "0462d45bf155")}</button>
               <button type="button" disabled={!validDraft} className="min-h-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50" onClick={() => { change(draft); close(); }}>{legacyTextByFlag(vi, "7b131edeebbd")}</button>
             </div>

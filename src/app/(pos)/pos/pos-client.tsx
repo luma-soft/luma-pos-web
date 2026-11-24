@@ -108,6 +108,7 @@ import {
 } from "@/lib/pos/draft-kind-switch";
 import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
 import { PosMobileCheckout } from "@/components/pos/pos-mobile-checkout";
+import { PosPrintPreviewScreen } from "@/components/pos/pos-print-preview-screen";
 import { usePhoneLayout } from "@/components/use-phone-layout";
 import { buildExpectedPosPricing, countPosPricingConflicts, requestPosOrder } from "@/lib/pos/checkout-pricing";
 import { defaultPosSellableUnitName, isPosUnitSellable, resolvePosCartUnit } from "@/lib/pos/cart-unit";
@@ -205,6 +206,8 @@ type PosPrintJob = {
   isTemporarySlip: boolean;
   showPaymentTotals: boolean;
   paymentQr?: PrintPaymentQr | null;
+  /** Print page of the saved document, for sharing from the phone preview. */
+  shareHref?: string | null;
 };
 type SepayCheckout = {
   paymentId: string;
@@ -723,6 +726,8 @@ export function PosClient({
   const [printSize, setPrintSize] = useState<PaperSize | null>(null); // đang in phiếu tạm
   const [selectedPrintTemplateIds, setSelectedPrintTemplateIds] = useState<PosPrintTemplateSelections>(defaultPrintTemplates);
   const [printJob, setPrintJob] = useState<PosPrintJob | null>(null);
+  // Phones show the iOS-style preview first; printing starts from there.
+  const [previewJob, setPreviewJob] = useState<PosPrintJob | null>(null);
   useEffect(() => {
     const viewport = window.visualViewport;
     if (viewport == null) return;
@@ -1888,16 +1893,72 @@ export function PosClient({
   }
 
   function startPrint(job: PosPrintJob) {
+    if (phone) {
+      setPreviewJob(job);
+      return;
+    }
+    printNow(job);
+  }
+
+  function printNow(job: PosPrintJob) {
     setPrintJob(job);
     setPrintSize(job.template.paperDefault);
   }
 
-  function buildPrintJob(input: { template: PrintTemplate; title: string; code: string; paymentQr?: PrintPaymentQr | null; isTemporarySlip?: boolean }): PosPrintJob {
+  function renderPrintDoc(job: PosPrintJob, size: PaperSize) {
+    return (
+      <PrintDoc
+        template={job.template}
+        size={size}
+        title={job.title}
+        code={job.code}
+        date={job.date}
+        partyLabel={t("orders.cols.customer")}
+        partyName={job.partyName}
+        partyPhone={job.partyPhone}
+        projectName={job.projectName || null}
+        sellerLabel={t("orders.detail.seller")}
+        items={job.items}
+        totals={[
+          { label: t("pos.subtotal"), value: job.totals.subtotal, kind: "subtotal" },
+          ...(job.totals.discount > 0 ? [{ label: t("pos.discount"), value: job.totals.discount, negative: true, kind: "discount" as const }] : []),
+          ...(shouldShowPrintTax(job.template.options, job.totals.tax) ? [{ label: t("pos.tax"), value: job.totals.tax, ratePercent: job.totals.taxRate, kind: "tax" as const }] : []),
+          ...(job.totals.shipping > 0 ? [{ label: t("pos.shipping"), value: job.totals.shipping, kind: "shipping" as const }] : []),
+        ]}
+        grandTotalLabel={t(job.template.docType === "return" ? "returns.totalRefund" : "print.grandTotal")}
+        grandTotal={job.grandTotal}
+        paymentQr={job.paymentQr}
+        afterTotals={job.template.options.showDebt && job.showPaymentTotals
+          ? [
+              { label: t("print.paid"), value: job.paid },
+              ...(job.isTemporarySlip || job.remaining > 0
+                ? [{ label: t("print.remaining"), value: job.remaining, bold: true }]
+                : []),
+            ]
+          : []}
+        inWordsLabel={t("print.inWords")}
+        signatures={[t("print.buyerSign"), t("print.delivererSign"), t("print.sellerSign")]}
+        signHint={t("print.signHint")}
+        cols={{
+          index: t("print.index"),
+          product: t("orders.cols.product"),
+          unit: t("orders.cols.unit"),
+          qty: t(job.template.docType === "return" ? "returns.cols.returnNow" : "orders.cols.qty"),
+          unitPrice: t("orders.cols.unitPrice"),
+          discount: t("orders.cols.discount"),
+          lineTotal: t("orders.cols.lineTotal"),
+        }}
+      />
+    );
+  }
+
+  function buildPrintJob(input: { template: PrintTemplate; title: string; code: string; paymentQr?: PrintPaymentQr | null; isTemporarySlip?: boolean; shareHref?: string | null }): PosPrintJob {
     const printLines = isReturnDraft ? cart.filter((line) => line.quantity > 0) : cart;
     return {
       template: input.template,
       title: input.title,
       code: input.code,
+      shareHref: input.shareHref ?? null,
       date: (saleTime ? new Date(saleTime) : new Date()).toISOString(),
       partyName: customer?.name ?? t("pos.walkInCustomer"),
       partyPhone: customer?.phone,
@@ -2642,6 +2703,7 @@ export function PosClient({
             title: t("print.titles.order"),
             code: res.data.code,
             paymentQr,
+            shareHref: `${Routes.order(res.data.id)}/print`,
           });
           closeInvoice(activeId);
           setSepayCheckout({ ...paymentJson.data, orderId: res.data.id, orderCode: res.data.code, });
@@ -2654,6 +2716,7 @@ export function PosClient({
           template: submittedTemplate,
           title: submitMode === "quote" ? t("print.titles.quote") : submitMode === "booking" ? t("print.titles.booking") : t("print.titles.order"),
           code: res.data.code,
+          shareHref: `${Routes.order(res.data.id)}/print`,
         });
         setSubmittingMode(null);
         if (paymentSessionId) {
@@ -3349,6 +3412,14 @@ export function PosClient({
     ? null
     : invoices.find((inv) => inv.id === draftKindPickerId) ?? null;
 
+  const saleTimeField = (
+    <DocumentTimeField
+      label={isReturnDraft ? t("documentTime.return") : t("pos.saleTime")}
+      value={saleTime ?? ""}
+      placeholder={sourceInvoice?.mode === "edit" && sourceInvoice.saleTime ? sourceInvoice.saleTime : undefined}
+      onChange={setSaleTime}
+    />
+  );
   const checkoutExtras = (
     <>
           {!isReturnDraft && cart.some(usesCompanyPrice) && (
@@ -3384,12 +3455,7 @@ export function PosClient({
               />
             </div>
           )}
-          <DocumentTimeField
-            label={isReturnDraft ? t("documentTime.return") : t("pos.saleTime")}
-            value={saleTime ?? ""}
-            placeholder={sourceInvoice?.mode === "edit" && sourceInvoice.saleTime ? sourceInvoice.saleTime : undefined}
-            onChange={setSaleTime}
-          />
+          {!phone && saleTimeField}
           {isBookingDraft && (
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-500">{t("pos.deliveryTime")}</label>
@@ -4170,6 +4236,7 @@ export function PosClient({
             } : null,
           }}
           notice={isDraftEditMode ? t("pos.invoiceEdit.draftPaymentHint") : isEditMode ? t("pos.invoiceEdit.editFootnote") : undefined}
+          timeField={saleTimeField}
           extras={(
             <>
               {checkoutExtras}
@@ -4353,50 +4420,19 @@ export function PosClient({
       </RowPreviewModal>
 
       {/* Phiếu tạm để in (ẩn trên màn hình, chỉ hiện khi in) */}
+      {previewJob && (
+        <PosPrintPreviewScreen
+          onClose={() => setPreviewJob(null)}
+          onPrint={() => printNow(previewJob)}
+          shareUrl={previewJob.shareHref}
+          shareTitle={`${previewJob.title} ${previewJob.code}`}
+        >
+          {renderPrintDoc(previewJob, previewJob.template.paperDefault)}
+        </PosPrintPreviewScreen>
+      )}
       {printSize && printJob && createPortal(
         <div className="pos-print-root">
-          <PrintDoc
-            template={printJob.template}
-            size={printSize}
-            title={printJob.title}
-            code={printJob.code}
-            date={printJob.date}
-            partyLabel={t("orders.cols.customer")}
-            partyName={printJob.partyName}
-            partyPhone={printJob.partyPhone}
-            projectName={printJob.projectName || null}
-            sellerLabel={t("orders.detail.seller")}
-            items={printJob.items}
-            totals={[
-              { label: t("pos.subtotal"), value: printJob.totals.subtotal, kind: "subtotal" },
-              ...(printJob.totals.discount > 0 ? [{ label: t("pos.discount"), value: printJob.totals.discount, negative: true, kind: "discount" as const }] : []),
-              ...(shouldShowPrintTax(printJob.template.options, printJob.totals.tax) ? [{ label: t("pos.tax"), value: printJob.totals.tax, ratePercent: printJob.totals.taxRate, kind: "tax" as const }] : []),
-              ...(printJob.totals.shipping > 0 ? [{ label: t("pos.shipping"), value: printJob.totals.shipping, kind: "shipping" as const }] : []),
-            ]}
-            grandTotalLabel={t(printJob.template.docType === "return" ? "returns.totalRefund" : "print.grandTotal")}
-            grandTotal={printJob.grandTotal}
-            paymentQr={printJob.paymentQr}
-            afterTotals={printJob.template.options.showDebt && printJob.showPaymentTotals
-              ? [
-                  { label: t("print.paid"), value: printJob.paid },
-                  ...(printJob.isTemporarySlip || printJob.remaining > 0
-                    ? [{ label: t("print.remaining"), value: printJob.remaining, bold: true }]
-                    : []),
-                ]
-              : []}
-            inWordsLabel={t("print.inWords")}
-            signatures={[t("print.buyerSign"), t("print.delivererSign"), t("print.sellerSign")]}
-            signHint={t("print.signHint")}
-            cols={{
-              index: t("print.index"),
-              product: t("orders.cols.product"),
-              unit: t("orders.cols.unit"),
-              qty: t(printJob.template.docType === "return" ? "returns.cols.returnNow" : "orders.cols.qty"),
-              unitPrice: t("orders.cols.unitPrice"),
-              discount: t("orders.cols.discount"),
-              lineTotal: t("orders.cols.lineTotal"),
-            }}
-          />
+          {renderPrintDoc(printJob, printSize)}
         </div>,
         document.body
       )}
