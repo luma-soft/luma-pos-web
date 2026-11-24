@@ -9,16 +9,16 @@ const at = new Date("2026-11-17T13:14:54.000Z");
 describe("kiotVietPosCode", () => {
   test("uses the Luma POS code shape with the source timestamp in UTC", () => {
     const code = kiotVietPosCode("sale", "HD003430.01", at);
-    expect(code).toMatch(/^DH-261117-131454[0-9A-Z]{2}$/);
+    expect(code).toMatch(/^DH261117131454[0-9A-Z]{2}$/);
     expect(isKiotVietStyleCode(code)).toBe(false);
   });
 
   test("is stable for the same source and moves on for the next attempt", () => {
     expect(kiotVietPosCode("purchase", "PN001280", at)).toBe(kiotVietPosCode("purchase", "PN001280", at));
     expect(kiotVietPosCode("purchase", "PN001280", at, 1)).not.toBe(kiotVietPosCode("purchase", "PN001280", at));
-    expect(kiotVietPosCode("customer", "KH000112", at)).toStartWith("KH-261117-");
-    expect(kiotVietPosCode("supplier", "NCC000060", at)).toStartWith("NCC-261117-");
-    expect(kiotVietPosCode("supplier_return", "THN000076", at)).toStartWith("THN-261117-");
+    expect(kiotVietPosCode("customer", "KH000112", at)).toStartWith("KH261117");
+    expect(kiotVietPosCode("supplier", "NCC000060", at)).toStartWith("NCC261117");
+    expect(kiotVietPosCode("supplier_return", "THN000076", at)).toStartWith("THN261117");
   });
 
   test("recognises KiotViet-style codes", () => {

@@ -444,7 +444,7 @@ export async function getOrder(storeId: string, id: string) {
   const { userNote, systemNote } = separateMergeNotes(order.note, {
     mergedFromCodes,
     mergedIntoCode,
-    isMergedDocument: order.code.startsWith("DHG-") && order.documentType === "sale",
+    isMergedDocument: order.code.startsWith("DHG") && order.documentType === "sale",
     isMergedSource: order.status === "merged",
   });
 

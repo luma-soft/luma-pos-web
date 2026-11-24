@@ -102,14 +102,14 @@ export function isUniqueViolation(e: unknown): boolean {
   return pgErrorCode(e) === "23505" || (e instanceof Error && e.message.includes("duplicate key"));
 }
 
-/** Mã chứng từ: DH-250607-1432XX */
+/** Mã chứng từ viết liền: DH2506071432XX (tiền tố, ngày YYMMDD, giờ HHMMSS, 2 ký tự). */
 export function generateCode(prefix: string): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   const date = `${String(d.getFullYear()).slice(2)}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
   const time = `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
   const rand = Math.random().toString(36).slice(2, 4).toUpperCase();
-  return `${prefix}-${date}-${time}${rand}`;
+  return `${prefix}${date}${time}${rand}`;
 }
 
 export const toMoney = (n: number) => n.toFixed(2);

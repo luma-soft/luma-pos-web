@@ -27,7 +27,7 @@ const pad = (value: number) => String(value).padStart(2, "0");
  *
  * Luma POS owns record codes; the KiotViet code is kept only in
  * `kiotviet_source_mappings`. The shape matches `generateCode()`
- * (`PREFIX-YYMMDD-HHMMSSxx`, UTC like the POS server clock), but the timestamp
+ * (`PREFIXYYMMDDHHMMSSxx`, UTC like the POS server clock), but the timestamp
  * comes from the source record and the suffix is derived from the KiotViet
  * identity, so the same source always proposes the same code. `attempt` moves
  * to the next candidate when a code is already taken.
@@ -44,7 +44,7 @@ export function kiotVietPosCode(
   const time = `${pad(at.getUTCHours())}${pad(at.getUTCMinutes())}${pad(at.getUTCSeconds())}`;
   const digest = createHash("sha256").update(`${entity}\0${externalId}\0${attempt}`).digest("hex");
   const suffix = BigInt(`0x${digest.slice(0, 12)}`).toString(36).toUpperCase().padStart(2, "0").slice(-2);
-  return `${KIOTVIET_POS_CODE_PREFIX[entity]}-${date}-${time}${suffix}`;
+  return `${KIOTVIET_POS_CODE_PREFIX[entity]}${date}${time}${suffix}`;
 }
 
 /** Codes that still carry a KiotViet identity rather than a Luma POS code. */
