@@ -1,7 +1,10 @@
 # Kế hoạch: đóng gói máy chủ LumaPOS thành một app cài trên Mac
 
-- **Ngày:** 2026-11-23
+- **Ngày:** 2026-11-23, cập nhật 2026-11-24
 - **Trạng thái:** Đề xuất, chưa triển khai
+- **Ràng buộc (2026-11-24):** không có tài khoản Apple Developer. Không dùng
+  Developer ID, notarize, team ID hay `SMAppService.daemon`; app ký ad-hoc và
+  chỉ cài trên máy của chủ cửa hàng.
 - **Liên quan:** [ADR-0002](adr/0002-self-hosted-postgresql-nextjs.md),
   [ADR-0003](adr/0003-google-drive-backups.md),
   [self-hosted-operations.md](self-hosted-operations.md),
@@ -11,9 +14,10 @@
 ## 1. Mục tiêu
 
 Cài máy chủ LumaPOS lên một Mac mới chỉ bằng một file `.dmg`: kéo app vào
-Applications, mở app, làm theo trình hướng dẫn, kết thúc với
-`pos.haidangshop.com` chạy trên máy mới. Không cần Terminal, Homebrew, mã
-nguồn hay chép plist bằng tay.
+Applications, cho phép mở lần đầu (mục 4, giai đoạn 5), làm theo trình hướng
+dẫn, kết thúc với `pos.haidangshop.com` chạy trên máy mới. Không cần
+Homebrew, mã nguồn hay chép plist bằng tay; Terminal chỉ cần cho một lệnh gỡ
+cờ cách ly nếu người cài chọn cách đó.
 
 Phạm vi:
 
@@ -28,7 +32,7 @@ một máy, chạy hai primary song song (HA tự động).
 
 | Thành phần | Cách đang chạy | Vấn đề khi đóng gói |
 |---|---|---|
-| App Mac | Console SwiftUI, không sandbox, ký ad-hoc, macOS 14+. Giám sát launchd, log, health, nút **Cập nhật web** | Chưa có trình cài, chưa ký Developer ID |
+| App Mac | Console SwiftUI, không sandbox, ký ad-hoc, macOS 14+. Giám sát launchd, log, health, nút **Cập nhật web** | Chưa có trình cài; không có tài khoản Apple Developer nên chỉ ký ad-hoc |
 | Next.js | `bun run start:self-hosted` trong `/Users/Shared/LumaPOS/app` (888 MB, gồm `node_modules` và mã nguồn) | Build trên máy từ checkout Git |
 | Worker sync / notifications / backups | `bun run …` chạy file `.ts` trong `src/scripts` | Cần `node_modules` đầy đủ |
 | PostgreSQL 17 | Homebrew, LaunchAgent của user `cvthien` | Chỉ chạy khi user đó đăng nhập; phụ thuộc Homebrew |
@@ -45,25 +49,19 @@ deploy` đã có rollback.
 ## 3. Kiến trúc đích
 
 ```
-LumaPOS.app (Developer ID, notarized)
+LumaPOS.app (ký ad-hoc, không notarize)
 └─ Contents/
    ├─ MacOS/LumaPOS                      ← console + trình hướng dẫn (SwiftUI)
-   ├─ Library/LaunchDaemons/
-   │   ├─ com.lumapos.helper.plist       ← helper root, đăng ký qua SMAppService
-   │   ├─ com.lumapos.postgres.plist
-   │   ├─ com.lumapos.web.plist
-   │   ├─ com.lumapos.sync.plist
-   │   ├─ com.lumapos.notifications.plist
-   │   ├─ com.lumapos.backups.plist
-   │   └─ com.lumapos.cloudflared.plist
-   ├─ Helpers/lumapos-helper             ← XPC daemon chạy root (thay lumapos-admin + sudoers)
-   └─ Resources/runtime/
-       ├─ postgresql-17/{bin,lib,share}  ← binary relocatable, arm64
-       ├─ bun, cloudflared, rclone
-       ├─ web/                           ← Next.js `output: "standalone"`
-       ├─ workers/lumapos-{sync,notifications,backups,restore,maintenance,migrate}
-       │                                   ← `bun build --compile`, mỗi worker một file
-       └─ migrations/                    ← SQL drizzle
+   └─ Resources/
+       ├─ admin/lumapos-admin            ← helper root (bản mở rộng của ops/macos/lumapos-admin)
+       ├─ launchd/com.lumapos.{postgres,web,sync,notifications,backups,cloudflared}.plist
+       └─ runtime/
+           ├─ postgresql-17/{bin,lib,share}  ← binary relocatable, arm64
+           ├─ bun, cloudflared, rclone
+           ├─ web/                           ← Next.js `output: "standalone"`
+           ├─ workers/lumapos-{sync,notifications,backups,restore,maintenance,migrate}
+           │                                   ← `bun build --compile`, mỗi worker một file
+           └─ migrations/                    ← SQL drizzle
 ```
 
 Dữ liệu ở ngoài app, để thay app không mất gì:
@@ -81,19 +79,24 @@ Quyết định thiết kế:
 
 1. **Chạy runtime từ `/Users/Shared/LumaPOS/current`, không chạy thẳng từ trong
    app bundle.** Daemon không phụ thuộc việc app bị kéo đi chỗ khác hay bị
-   Sparkle thay; cập nhật = helper chép runtime mới, chuyển symlink, khởi động
-   lại, rollback nếu health lỗi (giống `lumapos-admin deploy`).
-   Riêng `com.lumapos.helper` chạy từ bundle (bắt buộc với SMAppService).
-2. **SMAppService thay sudoers.** Helper root chỉ nhận một danh sách lệnh cố
-   định qua XPC (cài, cập nhật runtime, bật/tắt dịch vụ, đọc log, migrate,
-   restore, chuyển máy), kiểm tra chữ ký code của app gọi tới
-   (`SecCode` + team ID). Người dùng duyệt một lần trong *Cài đặt hệ thống ›
-   Mục đăng nhập*. Sau khi chuyển xong, gỡ `lumapos-admin` và rule sudoers.
+   thay; cập nhật = helper chép runtime mới, chuyển symlink, khởi động lại,
+   rollback nếu health lỗi (giống `lumapos-admin deploy`).
+2. **Giữ mô hình helper hiện tại, không dùng SMAppService.** Không có team ID
+   thì không đăng ký `SMAppService.daemon` ổn định được và không kiểm tra được
+   "đúng app LumaPOS gọi tới" bằng chữ ký. Lần cài đầu, trình hướng dẫn hỏi
+   mật khẩu admin **một lần** (hộp thoại macOS) để chép `lumapos-admin` vào
+   `/usr/local/libexec` (owner `root:wheel`, mode `0755`), cài rule sudoers
+   chỉ cho phép đúng file đó, và chép plist vào `/Library/LaunchDaemons`.
+   Sau đó app gọi `sudo -n lumapos-admin <lệnh>` như hiện nay. An toàn dựa
+   vào: helper thuộc root, không ai khác sửa được; danh sách lệnh cố định;
+   mọi đường dẫn do helper tự tính; tham số được kiểm tra.
 3. **PostgreSQL thành LaunchDaemon riêng**, user `_lumapos_db`, chỉ nghe
    socket + `127.0.0.1`. Không còn phụ thuộc user nào đăng nhập.
-4. **Bản web và worker đi theo phiên bản app.** Một version app = một commit
-   web cố định. Đơn giản cho cửa hàng, dễ rollback; giá phải trả là mỗi lần
-   cập nhật web phải phát hành app (tự động hóa ở giai đoạn 5).
+4. **Bản web và worker tách khỏi app.** Không notarize thì mỗi lần thay app
+   có thể phải cho phép mở lại, nên app nên ít đổi. Runtime (web + worker +
+   PostgreSQL bản vá) là gói riêng `lumapos-runtime-<version>.tar.zst`, app tự
+   tải, kiểm tra chữ ký EdDSA và SHA-256, rồi helper cài. Bản `.dmg` đầu tiên
+   vẫn chứa sẵn một runtime để cài được khi chưa có mạng.
 5. **Secrets không bao giờ nằm trong app hay bản cập nhật.** Trình hướng dẫn
    sinh hoặc nhận chúng lúc cài, helper ghi với owner/mode đúng.
 
@@ -130,7 +133,7 @@ Repo `luma-pos-web`.
 Mac; backup tự động và một lần `db:restore` vào DB tạm đều thành công; không
 còn thư mục `src/` và `node_modules` đầy đủ trong release.
 
-### Giai đoạn 2 — PostgreSQL, công cụ đi kèm và helper root (2–3 ngày)
+### Giai đoạn 2 — PostgreSQL, công cụ đi kèm và helper root (2 ngày)
 
 Repo `luma-pos-app/native-macos` (+ script build trong `luma-pos-web/ops`).
 
@@ -138,26 +141,27 @@ Repo `luma-pos-app/native-macos` (+ script build trong `luma-pos-web/ops`).
    `--prefix` tương đối, hoặc dùng bản dựng sẵn có giấy phép phân phối lại,
    kiểu Postgres.app); bỏ những gì không cần (docs, `pgxs`). Ghi rõ phiên bản
    và checksum vào `manifest.json`.
-2. Đóng kèm `bun`, `cloudflared`, `rclone` với phiên bản cố định; ký lại bằng
-   Developer ID (bắt buộc để notarize, vì chúng nằm trong bundle).
-3. Target mới `LumaPOSHelper` (command-line, chạy root) + protocol XPC dùng
-   chung. Lệnh tối thiểu:
-   `installRuntime(version)`, `activateRuntime(version)`, `rollbackRuntime()`,
-   `service(start|stop|restart, label)`, `readLog(label, lines)`,
-   `initDatabase()`, `runMigrations()`, `restoreBackup(archiveID)`,
-   `writeSecret(name, data)`, `createServiceAccounts()`, `exportForMove()`,
-   `importFromMove()`, `uninstall(keepData:)`.
+2. Đóng kèm `bun`, `cloudflared`, `rclone` với phiên bản cố định (giữ chữ ký
+   gốc của nhà phát hành; không cần ký lại vì không notarize). Ghi checksum
+   vào `manifest.json`.
+3. Mở rộng `ops/macos/lumapos-admin` (bash, đã có `deploy`, `service`, `log`)
+   thêm các lệnh: `install-runtime <file>`, `activate-runtime <version>`,
+   `rollback-runtime`, `create-accounts`, `init-database`, `migrate`,
+   `restore <archive-id>`, `write-secret <name>` (đọc từ stdin),
+   `export-for-move`, `import-from-move`, `uninstall [--keep-data]`.
    Mọi đường dẫn do helper tự tính, không nhận đường dẫn tự do từ app.
-4. Plist trong `Contents/Library/LaunchDaemons` dùng `BundleProgram` cho
-   helper; các dịch vụ khác trỏ `/Users/Shared/LumaPOS/current/...` và
+4. Lệnh `bootstrap` (chạy một lần qua hộp mật khẩu admin): chép helper vào
+   `/usr/local/libexec`, cài sudoers (`visudo -cf` trước khi đặt), chép plist
+   trong `Resources/launchd` vào `/Library/LaunchDaemons` (`root:wheel`,
+   `0644`). Plist dịch vụ trỏ `/Users/Shared/LumaPOS/current/...` và
    `UserName` `_lumapos_svc` / `_lumapos_db`.
-5. `AdminHelper.swift`: thay `sudo -n lumapos-admin` bằng client XPC; giữ
-   đường lùi `lumapos-admin` đến khi giai đoạn 4 xong.
-6. Bật Hardened Runtime; entitlement tối thiểu; `CODE_SIGN_STYLE` Manual với
-   Developer ID Application cho bản phát hành.
+5. `AdminHelper.swift`: thêm các lệnh mới; nếu helper trên máy cũ hơn helper
+   trong app thì chạy lại `bootstrap` (một lần nhập mật khẩu).
+6. App vẫn ký ad-hoc; bật Hardened Runtime không bắt buộc. Kiểm tra app chạy
+   được trên Mac khác sau khi gỡ cờ cách ly (giai đoạn 5).
 
-**Xong khi:** trên một Mac thử (hoặc VM macOS 14), app ký Developer ID đăng
-ký được helper, helper tạo được user dịch vụ, khởi tạo PGDATA, bật PostgreSQL
+**Xong khi:** trên một Mac thử (hoặc VM macOS 14), app chạy `bootstrap` với
+một lần nhập mật khẩu, tạo được user dịch vụ, khởi tạo PGDATA, bật PostgreSQL
 như daemon hệ thống, và sống qua khởi động lại máy khi không ai đăng nhập.
 
 ### Giai đoạn 3 — Trình hướng dẫn cài đặt (2–3 ngày)
@@ -168,8 +172,9 @@ Màn mới trong app Mac (VI/EN, theo `LumaTheme`), hiện khi chưa có
 1. **Kiểm tra máy:** macOS ≥ 14, Apple silicon, dung lượng trống ≥ 20 GB,
    múi giờ `Asia/Ho_Chi_Minh` (đề nghị đổi nếu khác), cổng 3000/5432 trống,
    không có PostgreSQL Homebrew đang chạy cùng cổng.
-2. **Cho phép helper:** hướng dẫn mở *Mục đăng nhập* và bật LumaPOS; app chờ
-   `SMAppService.status == .enabled`.
+2. **Cấp quyền quản trị một lần:** giải thích app sẽ cài dịch vụ hệ thống,
+   rồi chạy `lumapos-admin bootstrap` qua hộp mật khẩu macOS. App không thấy
+   mật khẩu.
 3. **Chuẩn bị hệ thống:** tạo `_lumapos_svc`, `_lumapos_db`, thư mục, quyền;
    cài runtime đi kèm; `initdb`; tạo role `lumapos_runtime` (mật khẩu ngẫu
    nhiên, chỉ ghi vào `runtime.env`) và DB `lumapos_prod`.
@@ -223,22 +228,34 @@ Terminal lần nào.
 kể cả trường hợp đối chiếu sai cố ý; store Mac chạy bằng cách cài mới ≥ 3 ngày
 không lỗi.
 
-### Giai đoạn 5 — Ký, notarize, phát hành và cập nhật (1–2 ngày)
+### Giai đoạn 5 — Đóng gói, phát hành và tự cập nhật (1–2 ngày)
 
-1. Script `luma-pos-app/native-macos/scripts/release.sh`: build runtime (giai
-   đoạn 1) → nhúng vào app → `xcodebuild archive` → ký Developer ID mọi binary
-   lồng nhau → `notarytool submit --wait` → `stapler staple` → tạo `.dmg` →
-   ký + notarize `.dmg`. Chỉ dùng CLI, không dùng Organizer.
-2. Cập nhật tự động bằng Sparkle 2 (EdDSA): feed `appcast.xml` + file `.dmg`
-   trên Cloudflare R2 (đã dùng cho media). App hiện "Có bản mới", người dùng
-   bấm cập nhật; sau khi app mới mở, helper cài runtime mới với rollback.
-3. Không cập nhật trong giờ bán hàng trừ khi người dùng chọn "Cập nhật ngay";
+1. Script `luma-pos-app/native-macos/scripts/release.sh` (chỉ CLI):
+   build runtime (giai đoạn 1) → `xcodebuild` Release, ký ad-hoc
+   (`CODE_SIGN_IDENTITY=-`) → nhúng runtime ban đầu → `hdiutil` tạo `.dmg` →
+   ghi SHA-256 của `.dmg`.
+2. **Mở app lần đầu trên máy mới** (Gatekeeper chặn app chưa notarize):
+   - Cách chính: mở app, bị chặn, vào *Cài đặt hệ thống › Quyền riêng tư &
+     Bảo mật*, bấm **Vẫn mở**. Làm một lần cho mỗi bản app.
+   - Cách thay thế: `xattr -dr com.apple.quarantine /Applications/LumaPOS.app`.
+   - Hoặc chép `.dmg` qua AirDrop/USB rồi vẫn phải làm một trong hai bước trên.
+   Viết hướng dẫn có ảnh vào `README` của `.dmg`.
+3. **Cập nhật runtime (thường xuyên):** khóa EdDSA riêng giữ trên máy build
+   (ngoài repo). `release.sh --runtime-only` tạo gói runtime + `manifest.json`
+   đã ký, đưa lên Cloudflare R2 (đã dùng cho media) với một
+   `runtime-feed.json`. App kiểm tra feed định kỳ, xác minh chữ ký bằng khóa
+   công khai nhúng trong app, rồi `lumapos-admin install-runtime` +
+   `activate-runtime` có rollback. Không cần cho phép mở lại.
+4. **Cập nhật app (hiếm):** feed báo có bản app mới, app mở trang tải `.dmg`;
+   người dùng thay app và cho phép mở lại theo bước 2. Không dùng Sparkle cho
+   app vì không notarize.
+5. Không cập nhật trong giờ bán hàng trừ khi người dùng chọn "Cập nhật ngay";
    mặc định đề nghị sau giờ đóng cửa.
-4. Giữ đường cập nhật cũ ("build từ checkout") chỉ cho bản Debug trên máy dev.
+6. Giữ đường cập nhật cũ ("build từ checkout") cho bản Debug trên máy dev.
 
-**Xong khi:** một commit web mới → chạy `release.sh` → store Mac nhận cập
-nhật qua Sparkle, chuyển runtime, health xanh; thử rollback bằng một bản cố
-tình hỏng.
+**Xong khi:** một commit web mới → `release.sh --runtime-only` → store Mac
+nhận runtime qua feed, chuyển runtime, health xanh; thử rollback bằng một bản
+cố tình hỏng và thử từ chối một gói có chữ ký sai.
 
 ## 5. Nâng cấp PostgreSQL
 
@@ -251,8 +268,14 @@ tình hỏng.
 
 ## 6. Bảo mật
 
-- Helper XPC chỉ chấp nhận app cùng team ID và bundle ID
-  `com.lumasoft.lumapos.mac`; danh sách lệnh cố định, tham số có kiểm tra.
+- Helper `lumapos-admin` thuộc root, mode `0755`, rule sudoers chỉ cho đúng
+  file đó; danh sách lệnh cố định, tham số có kiểm tra, không nhận đường dẫn
+  tự do. Không kiểm tra được app gọi tới bằng chữ ký (không có team ID), nên
+  bất kỳ tiến trình nào của user admin cũng gọi được các lệnh này — giống mức
+  rủi ro hiện tại, đã ghi trong `ops/macos/README.md`.
+- Gói runtime chỉ được cài khi chữ ký EdDSA khớp khóa công khai nhúng trong
+  app và SHA-256 từng file khớp `manifest.json`. Khóa bí mật không nằm trong
+  repo hay trên store Mac.
 - Secrets ghi bởi helper, owner `_lumapos_svc`, mode `0600`; không log, không
   hiện trên UI, không nằm trong bản cập nhật, crash report hay archive chuyển
   máy ngoài kênh TLS đã ghim.
@@ -265,7 +288,7 @@ tình hỏng.
 ## 7. Kiểm thử
 
 - Unit test Swift: phân tích manifest, máy trạng thái của trình hướng dẫn,
-  protocol XPC (helper giả).
+  lệnh `lumapos-admin` (kiểm tra tham số, chạy với thư mục giả).
 - Test web: build standalone khởi động được, worker biên dịch chạy được
   `--help`/`--dry-run`, migrate trên DB trống.
 - Diễn tập trên VM macOS 14 (Virtualization.framework hoặc UTM): cài mới, khôi
@@ -278,11 +301,11 @@ tình hỏng.
 |---|---|
 | Next standalone thiếu file (wasm, native module) | Test mọi route dùng `mediainfo.js`/`exifr`; giữ chế độ chạy cũ đến khi chạy ổn 1 ngày |
 | `bun build --compile` không bundle được thư viện nào đó | Fallback: worker chạy `bun` với `node_modules` tối thiểu đã trace |
-| Notarize từ chối binary lồng nhau (PostgreSQL, rclone, cloudflared) | Ký lại từng file với Hardened Runtime trong `release.sh`; kiểm tra bằng `codesign --verify --deep --strict` |
-| SMAppService daemon cần người dùng duyệt, dễ bị bỏ qua | Trình hướng dẫn chặn ở bước này, có hình hướng dẫn và nút mở đúng trang Cài đặt |
+| Gatekeeper chặn app chưa notarize; macOS mới có thể siết thêm | Hướng dẫn "Vẫn mở" có ảnh + lệnh `xattr`; app ít đổi vì runtime cập nhật riêng; nếu sau này có tài khoản Apple Developer thì thêm notarize mà không đổi kiến trúc |
+| Binary đi kèm bị gắn cờ cách ly sau khi chép | Helper gỡ cờ cách ly khi cài runtime vào `/Users/Shared/LumaPOS/runtime` |
+| Mất khóa EdDSA ký runtime | Lưu bản sao khóa trong trình quản lý mật khẩu; app mới có thể nhúng khóa công khai mới |
 | Chuyển máy lỗi giữa chừng | Máy cũ chỉ tắt sau khi đối chiếu đạt; máy cũ giữ dữ liệu 7 ngày |
-| App lớn (~400–500 MB) | Chấp nhận; Sparkle tải bản đầy đủ. Sau này có thể dùng delta update |
-| Cập nhật web phải phát hành app → chậm hơn hiện tại | Tự động hóa `release.sh`; bản Debug vẫn build từ checkout |
+| App lớn (~400–500 MB) | Chỉ tải `.dmg` khi cài mới; cập nhật thường xuyên chỉ tải gói runtime (~150–250 MB) |
 
 ## 9. Liên quan VPS
 
@@ -293,20 +316,21 @@ trình chuyển máy ở giai đoạn 4 nên tách phần dump/đối chiếu th
 
 ## 10. Cần chốt trước khi làm
 
-1. Tài khoản Apple Developer dùng cho Developer ID (cùng team với TestFlight?).
+1. ~~Tài khoản Apple Developer~~ — đã chốt 2026-11-24: không có; dùng ký
+   ad-hoc, không notarize, runtime cập nhật riêng.
 2. Nguồn PostgreSQL đóng kèm: tự build hay dùng bản dựng sẵn (kiểm tra giấy
    phép phân phối lại).
-3. Web đi theo phiên bản app (đề xuất) hay tải runtime riêng.
-4. Nơi đặt feed Sparkle: R2 với domain `updates.haidangshop.com` hay tên khác.
-5. Có cần chế độ chỉ-LAN (không Cloudflare) trong trình hướng dẫn ngay từ đầu.
+3. Nơi đặt feed runtime và `.dmg`: R2 với domain `updates.haidangshop.com` hay
+   tên khác.
+4. Có cần chế độ chỉ-LAN (không Cloudflare) trong trình hướng dẫn ngay từ đầu.
 
 ## 11. Ước tính
 
 | Giai đoạn | Thời gian |
 |---|---|
 | 1. Runtime gọn | 1–2 ngày |
-| 2. PostgreSQL + helper | 2–3 ngày |
+| 2. PostgreSQL + helper | 2 ngày |
 | 3. Trình hướng dẫn | 2–3 ngày |
 | 4. Chuyển máy + chuyển store Mac | 2 ngày |
-| 5. Ký, phát hành, cập nhật | 1–2 ngày |
-| **Tổng** | **8–12 ngày làm việc** |
+| 5. Đóng gói, phát hành, tự cập nhật runtime | 1–2 ngày |
+| **Tổng** | **8–11 ngày làm việc** |
