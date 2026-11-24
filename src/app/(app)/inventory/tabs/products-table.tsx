@@ -2123,8 +2123,17 @@ function ProductActionBar({ product, cameraMaterials = false, variant = "bar" }:
     startTransition(async () => {
       const res = await setCameraMaterial({ productId: product.id, enabled: !cameraMaterials });
       if (res.ok) clearExpandedAndRefresh();
-      else setError(t(res.error as never));
+      else showError(t(res.error as never));
     });
+  }
+
+  /**
+   * The phone "…" sheet closes as soon as an action is chosen, so an error
+   * written inside it would never be seen; phones show it as an alert instead.
+   */
+  function showError(message: string) {
+    if (variant === "menu") void dialog.alert({ description: message, variant: "destructive" });
+    else setError(message);
   }
 
   function clearExpandedAndRefresh() {
@@ -2160,7 +2169,7 @@ function ProductActionBar({ product, cameraMaterials = false, variant = "bar" }:
       if (res.ok) {
         await catalog.refresh();
         clearExpandedAndRefresh();
-      } else setError(t(res.error as never));
+      } else showError(t(res.error as never));
     });
   }
 
@@ -2186,7 +2195,7 @@ function ProductActionBar({ product, cameraMaterials = false, variant = "bar" }:
         isActive: nextActive,
       });
       if (res.ok) router.refresh();
-      else setError(t(res.error as never));
+      else showError(t(res.error as never));
     });
   }
 
@@ -2222,7 +2231,6 @@ function ProductActionBar({ product, cameraMaterials = false, variant = "bar" }:
         <MobileMenuAction icon={Plus} label={t("mobile.products.addSameType")} onSelect={() => go(productModalHref({ productModal: product.variantGroup ? "groupAdd" : "sameType", sameTypeAs: sameTypeSourceId }))} />
         <MobileMenuAction icon={Ban} label={t(nextActive ? "mobile.products.resumeSelling" : "mobile.products.stopSelling")} disabled={pending} onSelect={() => void toggleActive()} />
         <MobileMenuAction icon={Trash2} label={t("mobile.products.delete")} destructive disabled={pending} onSelect={() => void removeProduct()} />
-        {error && <p className="text-sm font-medium text-er">{error}</p>}
       </div>
     );
   }

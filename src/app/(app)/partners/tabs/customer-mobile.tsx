@@ -235,6 +235,7 @@ export function MobileCustomerDetail({
   onBack: () => void;
 }) {
   const t = useTranslations("mobile.customers");
+  const tRoot = useTranslations();
   const router = useRouter();
   const dialog = useConfirmDialog();
   const [editOpen, setEditOpen] = useState(false);
@@ -251,7 +252,10 @@ export function MobileCustomerDetail({
     if (result.ok) {
       onBack();
       router.refresh();
+      return;
     }
+    // The actions sheet has already closed, so the failure needs its own alert.
+    await dialog.alert({ description: tRoot(result.error as never), variant: "destructive" });
   }
 
   return (
