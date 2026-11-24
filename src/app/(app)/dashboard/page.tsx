@@ -1,4 +1,5 @@
 
+import { FitText } from "@/components/fit-text";
 import { productDisplayName } from "@/lib/products/variant-presentation";
 import Link from "next/link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
@@ -157,7 +158,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                         <Package className="size-[18px]" strokeWidth={2.2} />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[15px] font-semibold">{productDisplayName(product)}</span>
+                        <FitText className="block truncate text-[15px] font-semibold">{productDisplayName(product)}</FitText>
                         <span className="mt-0.5 block truncate text-[12px] text-ios-label-secondary">
                           {unit
                             ? t("mobile.dashboard.stockOfMin", { stock: formatNumber(stock), unit, min: formatNumber(min) })
@@ -205,9 +206,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                         <PaymentStatusBadge status={order.paymentStatus} />
                       </span>
                     </div>
-                    <span className="max-w-[45%] shrink-0 text-right text-[15px] font-semibold tabular-nums [overflow-wrap:anywhere]">
+                    <FitText className="block max-w-[45%] shrink-0 truncate text-right text-[15px] font-semibold tabular-nums" minScale={0.75}>
                       {formatCurrency(Number(order.total))}
-                    </span>
+                    </FitText>
                   </div>
                 ))}
               </div>
@@ -508,13 +509,13 @@ function DashboardDebtCard({
                 </div>
               )}
             </div>
-            <b className={cn(
-              "shrink-0 text-right tabular-nums",
+            <FitText className={cn(
+              "block max-w-[45%] shrink-0 truncate text-right font-bold tabular-nums",
               mobile ? "text-[12px] font-semibold" : "text-[13px]",
               kind === "customer" ? (mobile ? "text-ios-red" : "text-er") : (mobile ? "text-ios-orange" : "text-warn"),
-            )}>
+            )} minScale={0.75}>
               {formatCurrency(Number(row.currentDebt))}
-            </b>
+            </FitText>
           </div>
         );
       })}

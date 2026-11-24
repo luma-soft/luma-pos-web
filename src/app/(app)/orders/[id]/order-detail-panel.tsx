@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FitText } from "@/components/fit-text";
 import type { ReactNode } from "react";
 import { getLocale, getTranslations } from "next-intl/server";
 import { ExternalLink } from "lucide-react";
@@ -177,7 +178,7 @@ export async function OrderDetailPanel({
       {/* NativeInvoiceDetailView: summary, products, payment info, totals, history and note cards. */}
       <div className="space-y-ios-section px-ios-inset pb-8 pt-3 lg:hidden">
         <section className="rounded-[22px] bg-surface p-ios-inset">
-          <div className="break-words text-[22px] font-bold leading-7">{order.code}</div>
+          <FitText className="block truncate text-[22px] font-bold leading-7" minScale={0.7}>{order.code}</FitText>
           <div className="mt-1.5 text-[17px]">
             <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} openInCurrentTab className="!min-h-0 text-ios-accent" />
           </div>
@@ -192,7 +193,7 @@ export async function OrderDetailPanel({
                 {t(`mobile.orderDetail.payment.${order.paymentStatus === "paid" ? "paid" : order.paymentStatus === "partial" || order.paymentStatus === "deposit" ? "partial" : "unpaid"}`)}
               </span>
             )}
-            <span className="ml-auto shrink-0 whitespace-nowrap text-[20px] font-bold tabular-nums text-ios-accent">{formatCurrency(total)}</span>
+            <FitText className="ml-auto block min-w-0 shrink truncate text-right text-[20px] font-bold tabular-nums text-ios-accent" minScale={0.7}>{formatCurrency(total)}</FitText>
           </div>
           {(mergedSource && order.replacedByOrderId) || order.returns.length > 0 ? (
             <div className="mt-2 flex flex-wrap gap-3 text-[15px] font-semibold">
@@ -232,7 +233,7 @@ export async function OrderDetailPanel({
                       <div className="mt-1 text-[13px] text-ios-orange">{t("returns.returnedQty", { qty: formatNumber(order.returnedByItem[item.id]), unit: item.unitName })}</div>
                     )}
                   </div>
-                  <div className="shrink-0 text-right text-[15px] tabular-nums">{formatCurrency(Number(item.total))}</div>
+                  <FitText className="block max-w-[45%] shrink-0 truncate text-right text-[15px] tabular-nums" minScale={0.75}>{formatCurrency(Number(item.total))}</FitText>
                 </div>
               );
             })}
@@ -271,7 +272,7 @@ export async function OrderDetailPanel({
                     <Link href={`/sales?tab=returns&expandedReturn=${encodeURIComponent(row.id)}`} className="font-semibold text-ios-accent">{row.code}</Link>
                     <div className="mt-0.5 text-[13px] text-ios-label-secondary">{mobileDocumentTimestamp(row.createdAt, locale)} · {t(`returns.reasons.${row.reason}` as never)}</div>
                   </div>
-                  <div className={cn("shrink-0 font-semibold tabular-nums", row.status === "cancelled" ? "text-ios-label-tertiary line-through" : "text-ios-red")}>- {formatCurrency(Number(row.totalRefund))}</div>
+                  <FitText className={cn("block max-w-[50%] shrink-0 truncate font-semibold tabular-nums", row.status === "cancelled" ? "text-ios-label-tertiary line-through" : "text-ios-red")} minScale={0.75}>- {formatCurrency(Number(row.totalRefund))}</FitText>
                 </div>
               ))}
             </div>
@@ -292,7 +293,7 @@ export async function OrderDetailPanel({
                       {[mobileDocumentTimestamp(payment.createdAt, locale), payment.reference, payment.note].filter(Boolean).join(" · ")}
                     </div>
                   </div>
-                  <div className="shrink-0 text-[15px] font-semibold tabular-nums text-ios-green">+ {formatCurrency(Number(payment.amount))}</div>
+                  <FitText className="block max-w-[50%] shrink-0 truncate text-[15px] font-semibold tabular-nums text-ios-green" minScale={0.75}>+ {formatCurrency(Number(payment.amount))}</FitText>
                 </div>
               ))}
             </div>
@@ -607,8 +608,8 @@ function InfoLine({
 function MobileInfoRow({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <span className="text-ios-label-secondary">{label}</span>
-      <span className={cn("text-right tabular-nums", valueClassName)}>{value}</span>
+      <span className="shrink-0 text-ios-label-secondary">{label}</span>
+      <FitText className={cn("block min-w-0 truncate text-right tabular-nums", valueClassName)} minScale={0.75}>{value}</FitText>
     </div>
   );
 }

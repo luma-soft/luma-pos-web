@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FitText } from "@/components/fit-text";
 import { CheckCircle2, ChevronRight, Circle, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -230,14 +231,14 @@ export function MobileMetricTileContent({
     <>
       <span className="flex h-5 items-center gap-1.5">
         <Icon className={cn("size-[18px] shrink-0", iconTintClass[tint])} strokeWidth={2.4} aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate text-[min(15px,3.4vw)] font-semibold tracking-[-0.01em] text-ios-label-secondary">{label}</span>
+        <FitText className="block min-w-0 flex-1 truncate text-[min(15px,3.4vw)] font-semibold tracking-[-0.01em] text-ios-label-secondary" minScale={0.75}>{label}</FitText>
         {accessory}
       </span>
       <span className="mt-1 flex h-6 items-center gap-1">
-        <span className="min-w-0 flex-1 truncate text-[20px] font-bold leading-6 tabular-nums text-ios-label">{value}</span>
+        <FitText className="block min-w-0 flex-1 truncate text-[20px] font-bold leading-6 tabular-nums text-ios-label" minScale={0.7}>{value}</FitText>
         {showsChevron && <ChevronRight className="size-[15px] shrink-0 text-ios-label-tertiary" strokeWidth={2.75} aria-hidden="true" />}
       </span>
-      <span className="mt-1 block h-4 truncate text-[12px] leading-4 text-ios-label-secondary">{detail}</span>
+      <FitText className="mt-1 block h-4 truncate text-[12px] leading-4 text-ios-label-secondary" minScale={0.8}>{detail}</FitText>
     </>
   );
 }
@@ -269,7 +270,7 @@ export function MobileQuickActionGrid({
             <span className="grid size-[50px] shrink-0 place-items-center rounded-full bg-primary-600/12 text-primary-600">
               <Icon className="size-[22px]" strokeWidth={2.2} aria-hidden="true" />
             </span>
-            <span className="w-full truncate text-[12px] font-semibold leading-[18px]">{label}</span>
+            <FitText className="block w-full truncate text-[12px] font-semibold leading-[18px]" minScale={0.8}>{label}</FitText>
           </Link>
         ))}
       </div>
