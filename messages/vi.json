@@ -2984,7 +2984,9 @@
     "retry": "Thử lại",
     "retrying": "Đang thử lại…",
     "reload": "Tải lại trang",
-    "digest": "mã lỗi: {digest}"
+    "digest": "mã lỗi: {digest}",
+    "appUpdatedTitle": "Ứng dụng vừa được cập nhật",
+    "appUpdatedDescription": "Trang này đang dùng phiên bản cũ. Tải lại trang để tiếp tục — thao tác vừa rồi chưa được ghi nhận."
   },
   "portal": {
     "linkTitle": "Link đặt hàng online",
