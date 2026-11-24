@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { invalidInputError } from "@/lib/schemas/document-time";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
 import type { StoreContext } from "@/lib/auth/store-context";
@@ -32,7 +33,7 @@ export async function createOrderForSalesPrincipal(
   }
 
   const parsed = createOrderSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (!parsed.success) return { ok: false, error: invalidInputError(parsed.error) };
   if (parsed.data.clientId) {
     const [existing] = await db.select({ id: orders.id, code: orders.code })
       .from(orders)

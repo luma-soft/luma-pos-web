@@ -1,5 +1,6 @@
 "use server";
 
+import { invalidInputError } from "@/lib/schemas/document-time";
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { and, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -236,7 +237,7 @@ export async function createExchangeForUser(
   input: CreateExchangeOutput,
 ): Promise<ActionResult<ExchangeResult>> {
   const parsed = createExchangeSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (!parsed.success) return { ok: false, error: invalidInputError(parsed.error) };
   const v = parsed.data;
   const context = await resolveStoreContextForUser(userId);
   if (!context) return { ok: false, error: "errors.unauthorized" };
@@ -375,6 +376,7 @@ export async function createExchangeForUser(
         sourceOrderId: order.id,
         sourceMode: "exchange",
         note: `Đổi hàng từ ${order.code}${v.note ? ` · ${v.note}` : ""}`,
+        ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
         createdBy: profileId,
       }).returning({ id: orders.id, code: orders.code });
       await tx.insert(orderItems).values(replacementItems.map((item, lineOrder) => ({
@@ -404,6 +406,7 @@ export async function createExchangeForUser(
         exchangeDifference: toMoney(difference),
         exchangeSettlementMethod: difference > 0 ? v.settlementMethod : v.refundMethod,
         note: v.note || null,
+        ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
         createdBy: profileId,
       }).returning({ id: returns.id, code: returns.code });
       await tx.insert(returnItems).values(returnedRows.map((row, lineOrder) => ({
@@ -516,6 +519,7 @@ export async function createExchangeForUser(
           method: "exchange_credit",
           reference: returned.code,
           note: `Giá trị hàng đổi ${returned.code}`,
+          ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
           createdBy: profileId,
         });
       }
@@ -527,6 +531,7 @@ export async function createExchangeForUser(
           amount: toMoney(difference),
           method: v.settlementMethod,
           note: `Bù chênh lệch đổi hàng ${returned.code}`,
+          ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
           createdBy: profileId,
         });
         await recordCashTx(tx, {
@@ -540,6 +545,7 @@ export async function createExchangeForUser(
           note: `Bù chênh lệch ${exchangeOrder.code}`,
           createdBy: profileId,
           shiftId: currentShift?.id ?? null,
+          createdAt: v.occurredAt,
         });
       } else if (
         difference < -1e-9 &&
@@ -557,6 +563,7 @@ export async function createExchangeForUser(
           note: `Hoàn chênh lệch ${returned.code}`,
           createdBy: profileId,
           shiftId: currentShift?.id ?? null,
+          createdAt: v.occurredAt,
         });
       }
 
@@ -698,7 +705,7 @@ export async function createReturnForUser(
 ): Promise<ActionResult<{ id: string; code: string; gatewayRefundId?: string }>> {
 
   const parsed = createReturnSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (!parsed.success) return { ok: false, error: invalidInputError(parsed.error) };
   const v = parsed.data;
   const context = await resolveStoreContextForUser(userId);
   if (!context) return { ok: false, error: "errors.unauthorized" };
@@ -805,6 +812,7 @@ export async function createReturnForUser(
         refundMethod: v.refundMethod,
         totalRefund: toMoney(totalRefund),
         note: v.note || null,
+        ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
         createdBy: profileId,
       }).returning({ id: returns.id, code: returns.code });
 
@@ -876,6 +884,7 @@ export async function createReturnForUser(
           type: "out", fund: fundForMethod(v.refundMethod), amount: totalRefund,
           category: "refund", refType: "return", refId: ret.id,
           note: `Hoàn trả ${ret.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
+          createdAt: v.occurredAt,
         });
       }
 
@@ -1190,7 +1199,7 @@ export async function createPosReturn(
   const gate = await requireManager();
   if (!gate.ok) return gate;
   const parsed = createPosReturnSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (!parsed.success) return { ok: false, error: invalidInputError(parsed.error) };
   const v = parsed.data;
 
   try {
@@ -1282,6 +1291,7 @@ export async function createPosReturn(
         refundMethod: v.refundMethod,
         totalRefund: toMoney(totalRefund),
         note: v.note || null,
+        ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
         createdBy: profileId,
       }).returning({ id: returns.id, code: returns.code });
 
@@ -1356,6 +1366,7 @@ export async function createPosReturn(
           note: `Hoàn trả ${ret.code}`,
           createdBy: profileId,
           shiftId: currentShift?.id ?? null,
+          createdAt: v.occurredAt,
         });
       }
 

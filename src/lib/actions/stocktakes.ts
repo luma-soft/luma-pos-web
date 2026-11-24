@@ -2,6 +2,7 @@
 
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { z } from "zod";
+import { documentTimeSchema, invalidInputError } from "@/lib/schemas/document-time";
 import { and, asc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { products, stockLevels, stockLotMovements, stockLots, stockMovements, stocktakeItems, stocktakes } from "@/db/schema";
@@ -19,6 +20,7 @@ const createSchema = z.object({
   warehouseId: z.uuid(),
   note: z.string().optional(),
   balanceNow: z.boolean().default(false), // Hoàn thành ngay (cân bằng kho) hay Lưu tạm
+  occurredAt: documentTimeSchema,
   items: z.array(z.object({
     productId: z.uuid(),
     actualQty: z.number().min(0),
@@ -34,7 +36,7 @@ export async function createStocktake(
   if (!gate.ok) return gate;
   const userId = gate.userId;
   const parsed = createSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (!parsed.success) return { ok: false, error: invalidInputError(parsed.error) };
   const v = parsed.data;
 
   // 1 SP chỉ xuất hiện 1 lần trong phiếu
@@ -51,6 +53,7 @@ export async function createStocktake(
         warehouseId: v.warehouseId,
         status: "draft",
         note: v.note || null,
+        ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
         createdBy: profileId,
       }).returning({ id: stocktakes.id, code: stocktakes.code });
 

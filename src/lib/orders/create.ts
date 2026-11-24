@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { invalidInputError } from "@/lib/schemas/document-time";
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -92,7 +93,7 @@ export async function createOrderForUser(
   },
 ): Promise<ActionResult<{ id: string; code: string }>> {
   const parsed = createOrderSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (!parsed.success) return { ok: false, error: invalidInputError(parsed.error) };
   const v = parsed.data;
   const context = await resolveStoreContextForUser(userId);
   if (!context) return { ok: false, error: "errors.unauthorized" };
@@ -355,6 +356,8 @@ export async function createOrderForUser(
       };
       if (v.source?.mode === "edit" || isDraftEdit) orderInsert.createdAt = sourceOrder.createdAt;
       // A cashier-chosen sale time overrides both "now" and the source time.
+      // It dates the document, payment and cash receipt only: stock movements
+      // keep the real posting time so inventory cost replay stays consistent.
       if (v.saleTime) orderInsert.createdAt = v.saleTime;
       const saleAt = v.saleTime;
 
@@ -564,7 +567,6 @@ export async function createOrderForUser(
             refType: "order",
             refId: order.id,
             note: `${order.code} · ${i.productName} · ${i.quantity} ${i.unitName}`,
-            ...(saleAt ? { createdAt: saleAt } : {}),
             createdBy: profileId,
           });
         }
@@ -597,12 +599,6 @@ export async function createOrderForUser(
             },
           });
 
-      if (saleAt && !(v.source?.mode === "edit" && sourceIsSale)) {
-        // Backdated stock movements change the cost timeline after that point.
-        const affected = await tx.selectDistinct({ productId: stockMovements.productId }).from(stockMovements)
-          .where(and(eq(stockMovements.storeId, storeId), eq(stockMovements.refId, order.id)));
-        await revalueInventoryProducts(tx, storeId, affected.map((row) => row.productId));
-      }
       if (v.source?.mode === "edit" && sourceIsSale) {
         const affected = await tx.selectDistinct({ productId: stockMovements.productId }).from(stockMovements)
           .where(and(eq(stockMovements.storeId, storeId), inArray(stockMovements.refId, [sourceOrder.id, order.id])));

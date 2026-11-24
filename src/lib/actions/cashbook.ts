@@ -2,6 +2,7 @@
 
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { z } from "zod";
+import { documentTimeSchema, invalidInputError } from "@/lib/schemas/document-time";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { cashTransactions } from "@/db/schema";
@@ -21,6 +22,7 @@ const schema = z.object({
   category: z.enum(["expense", "other", "debt_collect", "supplier_payment"]),
   counterparty: z.string().trim().max(200).optional().default(""),
   note: z.string().min(1, { error: "validation.required" }),
+  occurredAt: documentTimeSchema,
 });
 
 const cancelSchema = z.object({
@@ -38,7 +40,7 @@ export async function createCashTx(input: CreateCashTxInput): Promise<ActionResu
 
 export async function createCashTxForUser(userId: string, input: CreateCashTxInput): Promise<ActionResult> {
   const parsed = schema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (!parsed.success) return { ok: false, error: invalidInputError(parsed.error) };
   const v = parsed.data;
 
   try {
@@ -58,6 +60,7 @@ export async function createCashTxForUser(userId: string, input: CreateCashTxInp
         counterparty: v.counterparty || null,
         refType: "manual",
         note: v.note,
+        ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
         createdBy: profileId,
       }).returning({ id: cashTransactions.id, code: cashTransactions.code });
       await recordActivity(tx, {

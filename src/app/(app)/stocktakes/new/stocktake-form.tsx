@@ -1,5 +1,6 @@
 "use client";
 
+import { DocumentTimeField, documentTimePayload } from "@/components/document-time-field";
 import { productDisplayName } from "@/lib/products/variant-presentation";
 
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -83,6 +84,7 @@ export function StocktakeForm({
   const [searchOpen, setSearchOpen] = useState(false);
   const [lines, setLines] = useState<Line[]>(initialLines);
   const [note, setNote] = useState(initialNote);
+  const [occurredAt, setOccurredAt] = useState("");
   const [busy, setBusy] = useState<"draft" | "balance" | null>(null);
   const [savedResult, setSavedResult] = useState<{ href: string; balanced: boolean } | null>(null);
   const submitInFlightRef = useRef(false);
@@ -195,6 +197,7 @@ export function StocktakeForm({
       const res = await createStocktake({
         warehouseId,
         note: note || undefined,
+        occurredAt: documentTimePayload(occurredAt),
         balanceNow,
         items: lines.map((l) => ({ productId: l.product.id, actualQty: l.actualQty })),
       });
@@ -471,7 +474,8 @@ export function StocktakeForm({
             </div>
           </div>
 
-          <div className="mt-4">
+          <DocumentTimeField className="mt-4" label={t("documentTime.stocktake")} value={occurredAt} onChange={setOccurredAt} />
+          <div className="mt-3">
             <Input
               value={note} onChange={(e) => setNote(e.target.value)}
               placeholder={t("orders.detail.notePlaceholder")}

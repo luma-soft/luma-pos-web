@@ -1,5 +1,6 @@
 "use client";
 
+import { DocumentTimeField, documentTimePayload } from "@/components/document-time-field";
 import { productDisplayName } from "@/lib/products/variant-presentation";
 import { catalogTextByFlag, legacyTextByFlag } from "@/lib/i18n/catalog-text";
 
@@ -60,6 +61,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
   const [department, setDepartment] = useState(initial?.department ?? "");
   const [reason, setReason] = useState(initial?.reason ?? "");
   const [note, setNote] = useState(initial?.note ?? "");
+  const [occurredAt, setOccurredAt] = useState("");
   const [lines, setLines] = useState<Line[]>(() => initial?.items.map((item) => {
     const product = catalog.products.find((p) => p.id === item.productId);
     const multiplier = Number(item.unitMultiplier);
@@ -186,6 +188,7 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
         department: department ? labelOf(deptOpts, department) : undefined,
         reason: reason ? (initial?.reason === reason ? reason : labelOf(reasonOpts, reason)) : undefined,
         note: note || undefined,
+        occurredAt: documentTimePayload(occurredAt),
         items: lines.map((l) => ({ productId: l.productId, productName: l.productName, unitName: l.unitName, unitMultiplier: l.unitMultiplier, quantity: l.quantity, unitCost: l.unitCost })),
       };
       try {
@@ -415,9 +418,13 @@ export function InternalUseForm({ warehouse, initial, canCompletePending = false
       </section>
 
       <aside className="w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto">
-          <div className="mb-5 flex items-center justify-between gap-3">
-            <div className="h-10 rounded-lg border border-border-soft bg-canvas px-3 py-2 text-sm font-semibold text-slate-400">{documentDate}</div>
-          </div>
+          <DocumentTimeField
+            className="mb-5"
+            label={t("documentTime.internalUse")}
+            value={occurredAt}
+            placeholder={initial ? documentDate : undefined}
+            onChange={setOccurredAt}
+          />
 
           <div className="space-y-4 text-sm">
             <PanelRow label={t("internalUse.autoCodeLabel")}><span className="rounded-lg border border-border-soft bg-canvas px-3 py-2 font-semibold text-slate-400">{initial?.code ?? t("internalUse.autoCode")}</span></PanelRow>

@@ -1,5 +1,6 @@
 "use server";
 
+import { invalidInputError } from "@/lib/schemas/document-time";
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -94,7 +95,7 @@ export async function createInternalUse(
   if (!gate.ok) return gate;
 
   const parsed = createInternalUseSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (!parsed.success) return { ok: false, error: invalidInputError(parsed.error) };
   const v = parsed.data;
 
   try {
@@ -119,6 +120,7 @@ export async function createInternalUse(
         status,
         totalCost: toMoney(totalCost),
         note: v.note || null,
+        ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
         createdBy: profileId,
         approvedBy: status === "approved" ? profileId : null,
         approvedAt: status === "approved" ? sql`now()` : null,
@@ -171,7 +173,8 @@ export async function updateInternalUse(id: string, input: CreateInternalUseInpu
   if (!gate.ok) return gate;
   if (!canCreateInternalUse(gate.role)) return { ok: false, error: "errors.forbidden" };
   const parsed = createInternalUseSchema.safeParse(input);
-  if (!z.string().uuid().safeParse(id).success || !parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "errors.invalidData" };
+  if (!parsed.success) return { ok: false, error: invalidInputError(parsed.error) };
   const v = parsed.data;
   try {
     const profileId = await getProfileId(gate.userId);
@@ -198,6 +201,7 @@ export async function updateInternalUse(id: string, input: CreateInternalUseInpu
       await tx.insert(internalUseItems).values(items);
       const totalCost = toMoney(v.items.reduce((sum, item) => sum + item.quantity * item.unitCost, 0));
       await tx.update(internalUseIssues).set({ warehouseId, department: v.department || null, reason: v.reason || null, note: v.note || null, totalCost, status: nextStatus,
+          ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
           ...(nextStatus === "approved" && issue.status !== "approved" ? { approvedBy: profileId, approvedAt: sql`now()` } : {}) })
         .where(and(eq(internalUseIssues.storeId, gate.storeId), eq(internalUseIssues.id, id)));
       if (nextStatus === "approved") await postStock(tx, gate.storeId, { ...issue, warehouseId, reason: v.reason || null }, items, profileId);

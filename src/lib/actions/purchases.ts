@@ -1,5 +1,6 @@
 "use server";
 
+import { invalidInputError } from "@/lib/schemas/document-time";
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -48,7 +49,7 @@ export async function savePurchaseDraft(
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
   const parsed = createPurchaseSchema.extend({ id: updatePurchaseSchema.shape.id.optional() }).safeParse(input);
-  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (!parsed.success) return { ok: false, error: invalidInputError(parsed.error) };
   const v = parsed.data;
   const totals = calcPurchaseTotals({ ...v, amountPaid: 0 });
   try {
@@ -81,6 +82,7 @@ export async function savePurchaseDraft(
         vatRate: String(v.vatRate), tax: toMoney(totals.tax), shippingFee: toMoney(v.shippingFee),
         total: toMoney(totals.total), amountPaid: toMoney(0), costEffectiveAt: null,
         invoiceNumber: v.invoiceNumber?.trim().slice(0, 50) || null, note: v.note || null,
+        ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
       };
       const [po] = existing
         ? await tx.update(purchaseOrders).set(values)
@@ -134,7 +136,7 @@ export async function createPurchase(
   const userId = gate.userId;
 
   const parsed = createPurchaseSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (!parsed.success) return { ok: false, error: invalidInputError(parsed.error) };
   const v = parsed.data;
   const totals = calcPurchaseTotals(v);
 
@@ -183,6 +185,8 @@ export async function createPurchase(
         amountPaid: toMoney(totals.paid),
         invoiceNumber: v.invoiceNumber?.trim()?.slice(0, 50) || null,
         note: v.note || null,
+        // Chosen document time; costEffectiveAt keeps the real posting time.
+        ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
         createdBy: profileId,
       }).returning({ id: purchaseOrders.id, code: purchaseOrders.code });
 
@@ -287,6 +291,7 @@ export async function createPurchase(
           type: "out", fund: "cash", amount: totals.paid,
           category: "supplier_payment", refType: "purchase", refId: po.id,
           note: `Trả NCC ${po.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
+          createdAt: v.occurredAt,
         });
       }
 
@@ -340,7 +345,7 @@ export async function updatePurchase(
   const userId = gate.userId;
 
   const parsed = updatePurchaseSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (!parsed.success) return { ok: false, error: invalidInputError(parsed.error) };
   const v = parsed.data;
   const proposedTotals = calcPurchaseTotals(v);
 
@@ -609,7 +614,13 @@ export async function updatePurchase(
           supplierId: v.supplierId,
           warehouseId: v.warehouseId,
           status: "received",
-          ...(po.status === "draft" ? { costEffectiveAt: sql`clock_timestamp()` } : {}),
+          ...(po.status === "draft"
+            ? { costEffectiveAt: sql`clock_timestamp()` }
+            : v.occurredAt && !po.costEffectiveAt
+              // Legacy receipts replay cost by createdAt; pin it before redating.
+              ? { costEffectiveAt: po.createdAt }
+              : {}),
+          ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
           subtotal: toMoney(totals.subtotal),
           discount: toMoney(totals.discount),
           vatRate: String(v.vatRate),

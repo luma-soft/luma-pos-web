@@ -3,6 +3,7 @@ import { getPurchase, getPurchaseFormOptions, getPurchaseProductRowsByIds } from
 import { PurchaseForm } from "../../new/purchase-form";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
+import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,7 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
         invoiceNumber: purchase.invoiceNumber ?? "",
         amountPaid: Number(purchase.amountPaid),
         note: purchase.note ?? "",
+        occurredAtLabel: formatDate(purchase.createdAt),
         items: purchase.items.map((i) => ({
           productId: i.productId,
           unitName: i.unitName,

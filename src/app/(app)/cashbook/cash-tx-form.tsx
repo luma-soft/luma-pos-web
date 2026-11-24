@@ -1,5 +1,6 @@
 "use client";
 
+import { DocumentTimeField, documentTimePayload } from "@/components/document-time-field";
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -28,6 +29,7 @@ export function CashTxForm() {
   const [category, setCategory] = useState<"expense" | "other" | "debt_collect" | "supplier_payment">("expense");
   const [counterparty, setCounterparty] = useState("");
   const [note, setNote] = useState("");
+  const [occurredAt, setOccurredAt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const phone = usePhoneLayout();
@@ -36,11 +38,11 @@ export function CashTxForm() {
     if (amount <= 0 || !note.trim() || busy) return;
     setBusy(true);
     setError("");
-    const res = await createCashTx({ type, fund, amount, category, counterparty, note });
+    const res = await createCashTx({ type, fund, amount, category, counterparty, note, occurredAt: documentTimePayload(occurredAt) });
     setBusy(false);
     if (res.ok) {
       setOpen(false);
-      setAmount(0); setCounterparty(""); setNote("");
+      setAmount(0); setCounterparty(""); setNote(""); setOccurredAt("");
       router.refresh();
     } else setError(t(res.error as never));
   }
@@ -86,6 +88,7 @@ export function CashTxForm() {
                   <span className="block text-[13px] text-ios-label-secondary">{t("mobile.finance.note")}</span>
                   <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} className="mt-1 w-full resize-none bg-transparent text-[17px] outline-none" />
                 </label>
+                <DocumentTimeField className="px-4 py-2" label={t("documentTime.cash")} value={occurredAt} onChange={setOccurredAt} />
               </MobileGroupedSection>
               {error && <p className="px-4 text-[13px] text-ios-red">{error}</p>}
             </div>
@@ -143,6 +146,7 @@ export function CashTxForm() {
         onChange={(e) => setCounterparty(e.target.value)} className="w-48" />
       <Input value={note} placeholder={t("cashbook.notePlaceholder")}
         onChange={(e) => setNote(e.target.value)} className="w-56" />
+      <DocumentTimeField className="w-56" label={t("documentTime.cash")} value={occurredAt} onChange={setOccurredAt} />
       <Button type="button" onClick={submit} disabled={busy || amount <= 0 || !note.trim()} loading={busy} tx="common.save" />
       <Button type="button" variant="ghost" size="iconSm" onClick={() => setOpen(false)}><X className="w-4 h-4" /></Button>
       {error && <Text as="p" variant="destructive" size="xs" className="w-full" text={error} />}

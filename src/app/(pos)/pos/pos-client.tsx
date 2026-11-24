@@ -7,6 +7,7 @@ import { prepareInvoicePriceBookSwitch, prepareLinePriceBookSwitch, resolveSelec
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 
 import { DateInput } from "@/components/ui/date-input";
+import { DocumentTimeField, documentTimeDate, documentTimePayload } from "@/components/document-time-field";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -326,11 +327,6 @@ function orderSharedDraftRecords<T extends SharedPosDraftRecord>(records: readon
 }
 
 /** Đơn rỗng. id truyền vào để lần đầu dùng id cố định, các tab sau dùng Date.now. */
-function localDateTimeInputValue(date: Date) {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
 function makeDraft(id?: string, kind: PosDraftKind = "invoice", defaultTaxRate = 0): PosDraft {
   return {
     id: id ?? `inv-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
@@ -1902,7 +1898,7 @@ export function PosClient({
       template: input.template,
       title: input.title,
       code: input.code,
-      date: (saleTime && !isReturnDraft ? new Date(saleTime) : new Date()).toISOString(),
+      date: (saleTime ? new Date(saleTime) : new Date()).toISOString(),
       partyName: customer?.name ?? t("pos.walkInCustomer"),
       partyPhone: customer?.phone,
       projectName: projectName || null,
@@ -2528,7 +2524,7 @@ export function PosClient({
       projectId: projectId || null,
       projectName: projectName || undefined,
       deliveryDate: submitMode === "booking" && deliveryDate ? deliveryDate : undefined,
-      saleTime: saleTime ? new Date(saleTime).toISOString() : undefined,
+      saleTime: documentTimePayload(saleTime),
       discount: discountVnd,
       taxEnabled,
       taxRate,
@@ -2802,6 +2798,7 @@ export function PosClient({
         reason: "other",
         refundMethod: payMethod === "credit" ? "debt_deduct" : payMethod,
         note: orderNote || undefined,
+        occurredAt: documentTimeDate(saleTime),
         items: cart.filter((l) => l.quantity > 0).map((l) => ({
           ...buildPosOrderItemPayload(l),
           restock: true,
@@ -3387,19 +3384,12 @@ export function PosClient({
               />
             </div>
           )}
-          {!isReturnDraft && (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">{t("pos.saleTime")}</label>
-              <DateInput
-                type="datetime-local"
-                value={saleTime ?? ""}
-                max={localDateTimeInputValue(new Date())}
-                placeholder={sourceInvoice?.mode === "edit" && sourceInvoice.saleTime ? sourceInvoice.saleTime : t("pos.saleTimeNow")}
-                onChange={(e) => setSaleTime(e.target.value)}
-                className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-              />
-            </div>
-          )}
+          <DocumentTimeField
+            label={isReturnDraft ? t("documentTime.return") : t("pos.saleTime")}
+            value={saleTime ?? ""}
+            placeholder={sourceInvoice?.mode === "edit" && sourceInvoice.saleTime ? sourceInvoice.saleTime : undefined}
+            onChange={setSaleTime}
+          />
           {isBookingDraft && (
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-500">{t("pos.deliveryTime")}</label>

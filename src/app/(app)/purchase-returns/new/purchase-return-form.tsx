@@ -1,5 +1,6 @@
 "use client";
 
+import { DocumentTimeField, documentTimeDate } from "@/components/document-time-field";
 import { productDisplayName } from "@/lib/products/variant-presentation";
 
 import { getCatalogWarehouseStock } from "@/lib/product-catalog";
@@ -16,7 +17,7 @@ import { Combobox } from "@/components/combobox";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { MobileFormLineCard } from "@/components/mobile-ui";
 import { Button } from "@/components/ui/button";
-import { Input, Textarea } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
@@ -100,6 +101,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   const [applyDebt, setApplyDebt] = useState(initial ? Number(initial.debtAmount) > 0 : true);
   const [editedDebt, setEditedDebt] = useState(Number(initial?.debtAmount ?? 0));
   const [note, setNote] = useState(initial?.note ?? "");
+  const [occurredAt, setOccurredAt] = useState("");
   const [busy, setBusy] = useState(false);
   const [savedHref, setSavedHref] = useState<string | null>(null);
   const submitInFlightRef = useRef(false);
@@ -273,6 +275,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
       refundMethod: clampedRefund > 0 ? refundMethod : null,
       debtAmount,
       note: note || undefined,
+      occurredAt: documentTimeDate(occurredAt),
       items: selectedLines.map((line) => ({
         purchaseOrderItemId: line.purchaseOrderItemId ?? null,
         productId: line.productId,
@@ -544,9 +547,12 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
         </div>
 
         <aside className="w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto">
-          <div className="grid gap-2">
-            <Input value={documentDate} readOnly className="text-slate-500" />
-          </div>
+          <DocumentTimeField
+            label={t("documentTime.purchaseReturn")}
+            value={occurredAt}
+            placeholder={initial ? documentDate : undefined}
+            onChange={setOccurredAt}
+          />
 
           <Combobox
             value={supplierId}

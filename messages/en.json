@@ -2717,7 +2717,6 @@
       "momo": "MoMo"
     },
     "errors": {
-      "saleTimeFuture": "Sale time cannot be in the future.",
       "creditNeedsCustomer": "Credit sales require a saved customer.",
       "pricingChanged": "Prices, promotions or unit conversions changed. The order has not been saved or paid; your cart is preserved. Refresh and review the prices before submitting again.",
       "unitUnavailable": "This unit is no longer available for direct sale. Choose another unit that is for sale.",
@@ -2763,7 +2762,6 @@
     "saveQuote": "Save quote",
     "placeBooking": "Place booking",
     "saleTime": "Sale time",
-    "saleTimeNow": "Now",
     "deliveryTime": "Delivery time",
     "quotePricingDetails": "Quotation details",
     "paymentDetails": "Payment details",
@@ -3401,7 +3399,17 @@
     "phone": "Invalid phone number",
     "passwordTooShort": "Password must be at least 6 characters"
   },
+  "documentTime": {
+    "now": "Now",
+    "purchase": "Received at",
+    "purchaseReturn": "Returned at",
+    "return": "Returned at",
+    "cash": "Time",
+    "stocktake": "Counted at",
+    "internalUse": "Issued at"
+  },
   "errors": {
+    "documentTimeFuture": "Document time cannot be in the future.",
     "unauthorized": "Session expired — please sign in again.",
     "invalidData": "Invalid data.",
     "versionConflict": "This record was updated on the server.",

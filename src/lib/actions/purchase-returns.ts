@@ -1,5 +1,6 @@
 "use server";
 
+import { invalidInputError } from "@/lib/schemas/document-time";
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { and, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -76,7 +77,7 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
   const userId = gate.userId;
 
   const parsed = createPurchaseReturnSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  if (!parsed.success) return { ok: false, error: invalidInputError(parsed.error) };
   const v = parsed.data;
   const totals = calcTotals(v);
 
@@ -168,6 +169,7 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
         refundMethod: totals.refundAmount > 0 ? (v.refundMethod ?? "cash") : null,
         debtAmount: toMoney(totals.debtAmount),
         note: v.note || null,
+        ...(v.occurredAt ? { createdAt: v.occurredAt } : {}),
         createdBy: previous?.createdBy ?? profileId,
       };
       const [ret] = previous
@@ -241,6 +243,7 @@ async function savePurchaseReturn(input: CreatePurchaseReturnOutput, id?: string
           note: `NCC hoàn tiền ${ret.code}`,
           createdBy: profileId,
           shiftId: currentShift?.id ?? null,
+          createdAt: v.occurredAt,
         });
       }
 

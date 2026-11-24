@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { documentTimeSchema } from "./document-time";
 
 export const purchaseReturnItemSchema = z.object({
   purchaseOrderItemId: z.uuid().nullable().optional(),
@@ -20,6 +21,7 @@ export const createPurchaseReturnSchema = z.object({
   refundMethod: z.enum(["cash", "bank_transfer"]).nullable().optional(),
   debtAmount: z.number().min(0).default(0),
   note: z.string().optional(),
+  occurredAt: documentTimeSchema,
   items: z.array(purchaseReturnItemSchema).min(1, { error: "purchaseReturns.errors.emptyItems" }),
 });
 

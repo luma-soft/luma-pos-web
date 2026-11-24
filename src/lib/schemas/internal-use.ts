@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { documentTimeSchema } from "./document-time";
 
 export const internalUseItemSchema = z.object({
   productId: z.string().uuid(),
@@ -15,6 +16,7 @@ export const createInternalUseSchema = z.object({
   department: z.string().optional(),
   reason: z.string().optional(),
   note: z.string().optional(),
+  occurredAt: documentTimeSchema,
   items: z.array(internalUseItemSchema).min(1),
 });
 

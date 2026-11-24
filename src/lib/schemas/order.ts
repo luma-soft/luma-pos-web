@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { documentTimeSchema } from "./document-time";
 
 /** Schema dùng chung client/server cho tạo đơn POS. */
 export const checkoutPricingSnapshotSchema = z.object({
@@ -54,9 +55,7 @@ export const createOrderSchema = z.object({
   deliveryDate: z.coerce.date().optional(),
   // Backdated sale time chosen at checkout; omitted means "now" (or the
   // source invoice's time when editing). Future times are rejected.
-  saleTime: z.coerce.date()
-    .refine((date) => date.getTime() <= Date.now() + 5 * 60_000, { error: "pos.errors.saleTimeFuture" })
-    .optional(),
+  saleTime: documentTimeSchema,
   note: z.string().optional(),
   discount: z.number().min(0).default(0),
   taxEnabled: z.boolean().default(true),
@@ -207,6 +206,7 @@ export const createPurchaseSchema = z.object({
   invoiceNumber: z.string().optional(),     // số hóa đơn đầu vào
   note: z.string().optional(),
   amountPaid: z.number().min(0).default(0),
+  occurredAt: documentTimeSchema,
   items: z.array(purchaseItemSchema).min(1, { error: "purchases.errors.emptyItems" }),
 });
 export type CreatePurchaseInput = z.input<typeof createPurchaseSchema>;

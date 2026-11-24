@@ -1,5 +1,6 @@
 "use client";
 
+import { DocumentTimeField, documentTimeDate } from "@/components/document-time-field";
 import { productDisplayName } from "@/lib/products/variant-presentation";
 
 import Link from "next/link";
@@ -169,6 +170,8 @@ export type PurchaseFormInitialValues = {
   invoiceNumber: string;
   amountPaid: number;
   note: string;
+  /** Formatted current document time, shown while the time is left unchanged. */
+  occurredAtLabel?: string;
   items: {
     productId: string;
     quantity: number;
@@ -268,6 +271,7 @@ export function PurchaseForm({
   const [amountPaid, setAmountPaid] = useState(initialValues?.amountPaid ?? 0);
   const [payFull, setPayFull] = useState(false);
   const [note, setNote] = useState(initialValues?.note ?? "");
+  const [occurredAt, setOccurredAt] = useState("");
   const [pendingAction, setPendingAction] = useState<"receive" | "draft" | null>(null);
   const [savedReceipt, setSavedReceipt] = useState<{ href: string; code: string; isDraft: boolean } | null>(null);
   const submitInFlightRef = useRef(false);
@@ -524,6 +528,7 @@ export function PurchaseForm({
       discount, vatRate, shippingFee,
       invoiceNumber: invoiceNumber || undefined,
       note: note || undefined,
+      occurredAt: documentTimeDate(occurredAt),
       amountPaid: action === "draft" ? 0 : paid,
       // quy về đơn vị gốc cho action (SL gốc = SL×hệ số; giá vốn/đơn vị gốc = giá nhập/hệ số)
       items: lines.map((l) => ({
@@ -584,6 +589,7 @@ export function PurchaseForm({
     shippingFee !== (initialValues?.shippingFee ?? 0) ||
     invoiceNumber !== (initialValues?.invoiceNumber ?? "") ||
     amountPaid !== (initialValues?.amountPaid ?? 0) ||
+    occurredAt !== "" ||
     note !== (initialValues?.note ?? "");
 
   return (
@@ -915,6 +921,12 @@ export function PurchaseForm({
             <Text as="div" variant="muted" size="xs" weight="medium" className="mb-1" text={t("purchases.invoiceNumber")} />
             <Input value={invoiceNumber} onChange={(e) => { clearError(); setInvoiceNumber(e.target.value); }} placeholder={t("purchases.invoiceNumberPlaceholder")} />
           </div>
+          <DocumentTimeField
+            label={t("documentTime.purchase")}
+            value={occurredAt}
+            placeholder={initialValues?.occurredAtLabel}
+            onChange={(value) => { clearError(); setOccurredAt(value); }}
+          />
 
           <div className="mt-1 pt-3 border-t border-border space-y-2.5 text-sm">
             <div className="flex justify-between items-center"><span className="text-slate-500">{t("purchases.subtotal")} ({lines.length})</span><span className="tabular-nums">{formatCurrency(subtotal)}</span></div>

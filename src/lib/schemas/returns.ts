@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { orderItemSchema } from "@/lib/schemas/order";
+import { documentTimeSchema } from "./document-time";
 
 export const returnItemInputSchema = z.object({
   orderItemId: z.uuid(),
@@ -32,6 +33,7 @@ export const createReturnSchema = z.object({
   reason: z.string().min(1, { error: "validation.required" }),
   refundMethod: refundMethodSchema,
   note: z.string().optional(),
+  occurredAt: documentTimeSchema,
   items: returnItemsInputSchema,
 }).superRefine((value, ctx) => {
   if (gatewayRefundMethods.has(value.refundMethod) && !value.clientId) {
@@ -55,6 +57,7 @@ export const createExchangeSchema = z.object({
   reason: z.string().min(1, { error: "validation.required" }),
   refundMethod: refundMethodSchema,
   note: z.string().optional(),
+  occurredAt: documentTimeSchema,
   items: returnItemsInputSchema,
   exchangeItems: z.array(z.object({
     productId: z.uuid(),
@@ -89,6 +92,7 @@ export const createPosReturnSchema = z.object({
   reason: z.string().min(1, { error: "validation.required" }),
   refundMethod: z.enum(["cash", "bank_transfer", "debt_deduct"]),
   note: z.string().optional(),
+  occurredAt: documentTimeSchema,
   items: z.array(orderItemSchema.safeExtend({
     restock: z.boolean().default(true),
   })).min(1, { error: "returns.errors.emptyItems" }),
