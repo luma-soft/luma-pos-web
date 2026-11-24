@@ -354,6 +354,9 @@ export async function createOrderForUser(
         createdBy: isDraftEdit ? sourceOrder?.createdBy ?? profileId : profileId,
       };
       if (v.source?.mode === "edit" || isDraftEdit) orderInsert.createdAt = sourceOrder.createdAt;
+      // A cashier-chosen sale time overrides both "now" and the source time.
+      if (v.saleTime) orderInsert.createdAt = v.saleTime;
+      const saleAt = v.saleTime;
 
       let order: { id: string; code: string };
       if (isDraftEdit) {
@@ -361,7 +364,7 @@ export async function createOrderForUser(
         await tx.delete(orderItems).where(and(eq(orderItems.storeId, storeId), eq(orderItems.orderId, sourceOrderId)));
         const [updated] = await tx.update(orders).set({
           ...orderInsert,
-          createdAt: sourceOrder!.createdAt,
+          createdAt: orderInsert.createdAt ?? sourceOrder!.createdAt,
           updatedAt: sql`now()`,
         }).where(and(
           eq(orders.storeId, storeId),
@@ -450,6 +453,7 @@ export async function createOrderForUser(
                 note: sepaySession.note,
               }
             : { reference: v.payment.reference?.trim() || null }),
+          ...(saleAt ? { createdAt: saleAt } : {}),
           createdBy: profileId,
         });
         if (sepaySession) {
@@ -466,6 +470,7 @@ export async function createOrderForUser(
           type: "in", fund: fundForMethod(v.payment.method), amount: paid,
           category: "sale", refType: "order", refId: order.id,
           note: order.code, createdBy: profileId, shiftId: currentShift?.id ?? null,
+          createdAt: saleAt,
         });
         await recordActivity(tx, {
           storeId, actorId: profileId, action: "order.payment.recorded", entityType: "order", entityId: order.id,
@@ -559,6 +564,7 @@ export async function createOrderForUser(
             refType: "order",
             refId: order.id,
             note: `${order.code} · ${i.productName} · ${i.quantity} ${i.unitName}`,
+            ...(saleAt ? { createdAt: saleAt } : {}),
             createdBy: profileId,
           });
         }
@@ -591,6 +597,12 @@ export async function createOrderForUser(
             },
           });
 
+      if (saleAt && !(v.source?.mode === "edit" && sourceIsSale)) {
+        // Backdated stock movements change the cost timeline after that point.
+        const affected = await tx.selectDistinct({ productId: stockMovements.productId }).from(stockMovements)
+          .where(and(eq(stockMovements.storeId, storeId), eq(stockMovements.refId, order.id)));
+        await revalueInventoryProducts(tx, storeId, affected.map((row) => row.productId));
+      }
       if (v.source?.mode === "edit" && sourceIsSale) {
         const affected = await tx.selectDistinct({ productId: stockMovements.productId }).from(stockMovements)
           .where(and(eq(stockMovements.storeId, storeId), inArray(stockMovements.refId, [sourceOrder.id, order.id])));

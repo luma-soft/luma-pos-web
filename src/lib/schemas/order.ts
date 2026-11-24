@@ -52,6 +52,11 @@ export const createOrderSchema = z.object({
   projectName: z.string().optional(),
   deliveryAddress: z.string().optional(),
   deliveryDate: z.coerce.date().optional(),
+  // Backdated sale time chosen at checkout; omitted means "now" (or the
+  // source invoice's time when editing). Future times are rejected.
+  saleTime: z.coerce.date()
+    .refine((date) => date.getTime() <= Date.now() + 5 * 60_000, { error: "pos.errors.saleTimeFuture" })
+    .optional(),
   note: z.string().optional(),
   discount: z.number().min(0).default(0),
   taxEnabled: z.boolean().default(true),

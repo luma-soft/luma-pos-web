@@ -2717,6 +2717,7 @@
       "momo": "MoMo"
     },
     "errors": {
+      "saleTimeFuture": "Thời gian bán không được ở tương lai.",
       "creditNeedsCustomer": "Ghi nợ cần chọn khách hàng có hồ sơ.",
       "pricingChanged": "Giá bán, khuyến mại hoặc quy đổi đơn vị đã thay đổi. Đơn chưa được lưu/thanh toán; giỏ hàng vẫn được giữ. Hãy làm mới và kiểm tra lại giá trước khi chốt.",
       "unitUnavailable": "Đơn vị này đã ngừng bán trực tiếp. Hãy chọn đơn vị khác đang bán.",
@@ -2761,6 +2762,8 @@
     },
     "saveQuote": "Lưu báo giá",
     "placeBooking": "Đặt hàng",
+    "saleTime": "Thời gian bán",
+    "saleTimeNow": "Hiện tại",
     "deliveryTime": "Thời gian giao hàng",
     "quotePricingDetails": "Chi tiết báo giá",
     "paymentDetails": "Chi tiết thanh toán",

@@ -171,6 +171,7 @@ export function sharedPosRecordToDraft(record: SharedPosDraftRecord): Record<str
     taxRate: number(tab.taxRate),
     shippingFee: number(tab.shippingFee),
     payMethod: text(metadata.payMethod) ?? "cash",
+    saleTime: text(metadata.saleTime),
     paidInput: metadata.paidInput == null ? null : number(metadata.paidInput),
     note: text(tab.note),
     source,
@@ -267,6 +268,7 @@ export function webDraftToSharedPayload(
   });
   const metadata = {
     webDraftKind: text(draft.kind) ?? "invoice",
+    saleTime: text(draft.saleTime) ?? null,
     payMethod: text(draft.payMethod) ?? "cash",
     paidInput: draft.paidInput == null ? null : number(draft.paidInput),
     cameraQuote: draft.cameraQuote === true,

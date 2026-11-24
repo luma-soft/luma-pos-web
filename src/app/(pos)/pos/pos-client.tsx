@@ -283,6 +283,8 @@ interface PosDraft {
   projectId: string;
   projectName: string;
   deliveryDate?: string;
+  /** Local "YYYY-MM-DDTHH:mm" chosen by the cashier; empty = sell at current time. */
+  saleTime?: string;
   priceBook: PriceBook;
   discountInput: number;
   discountMode: "vnd" | "pct";
@@ -324,6 +326,11 @@ function orderSharedDraftRecords<T extends SharedPosDraftRecord>(records: readon
 }
 
 /** Đơn rỗng. id truyền vào để lần đầu dùng id cố định, các tab sau dùng Date.now. */
+function localDateTimeInputValue(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function makeDraft(id?: string, kind: PosDraftKind = "invoice", defaultTaxRate = 0): PosDraft {
   return {
     id: id ?? `inv-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
@@ -1140,6 +1147,7 @@ export function PosClient({
     projectId,
     projectName,
     deliveryDate,
+    saleTime,
     discountInput,
     discountMode,
     taxRate,
@@ -1214,6 +1222,7 @@ export function PosClient({
   const setProjectId = (v: string) => patchActive({ projectId: v });
   const setProjectName = (v: string) => patchActive({ projectName: v });
   const setDeliveryDate = (v: string) => patchActive({ deliveryDate: v });
+  const setSaleTime = (v: string) => patchActive({ saleTime: v || undefined });
   const setDiscountInput = (v: number) => patchActive({ discountInput: v });
   const setDiscountMode = (v: "vnd" | "pct") => patchActive({ discountMode: v });
   const setTaxRate = (v: number) => patchActive({ taxRate: v });
@@ -1893,7 +1902,7 @@ export function PosClient({
       template: input.template,
       title: input.title,
       code: input.code,
-      date: new Date().toISOString(),
+      date: (saleTime && !isReturnDraft ? new Date(saleTime) : new Date()).toISOString(),
       partyName: customer?.name ?? t("pos.walkInCustomer"),
       partyPhone: customer?.phone,
       projectName: projectName || null,
@@ -2519,6 +2528,7 @@ export function PosClient({
       projectId: projectId || null,
       projectName: projectName || undefined,
       deliveryDate: submitMode === "booking" && deliveryDate ? deliveryDate : undefined,
+      saleTime: saleTime ? new Date(saleTime).toISOString() : undefined,
       discount: discountVnd,
       taxEnabled,
       taxRate,
@@ -3374,6 +3384,19 @@ export function PosClient({
                 onChange={(e) => { setProjectName(e.target.value); setProjectId(""); }}
                 placeholder={t("pos.projectPlaceholder")}
                 className="min-h-11 min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-base lg:text-sm"
+              />
+            </div>
+          )}
+          {!isReturnDraft && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">{t("pos.saleTime")}</label>
+              <DateInput
+                type="datetime-local"
+                value={saleTime ?? ""}
+                max={localDateTimeInputValue(new Date())}
+                placeholder={sourceInvoice?.mode === "edit" && sourceInvoice.saleTime ? sourceInvoice.saleTime : t("pos.saleTimeNow")}
+                onChange={(e) => setSaleTime(e.target.value)}
+                className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
               />
             </div>
           )}
