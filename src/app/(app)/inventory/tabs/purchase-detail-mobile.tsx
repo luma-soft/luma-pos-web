@@ -1,5 +1,6 @@
 "use client";
 
+import { FitText } from "@/components/fit-text";
 import { ProductRecordLink } from "@/components/product-record-link";
 import { isDeletedProductName } from "@/lib/products/deleted-product";
 import { useRouter } from "next/navigation";
@@ -104,7 +105,7 @@ export function MobilePurchaseDetail({ purchase, onBack }: { purchase: PurchaseR
                 linkClassName="active:bg-black/[0.04] dark:active:bg-white/[0.06]"
               >
                 <span className="flex items-baseline gap-2">
-                  <span className="line-clamp-2 min-w-0 flex-1 text-[15px] font-semibold">{productLineDisplayName(item)}</span>
+                  <FitText className="line-clamp-2 min-w-0 flex-1 text-[15px] font-semibold">{productLineDisplayName(item)}</FitText>
                   <span className="shrink-0 text-[15px] tabular-nums">{formatCurrency(Number(item.total))}</span>
                 </span>
                 <span className="block text-[12px] text-ios-label-secondary">

@@ -1,5 +1,6 @@
 "use client";
 
+import { FitText } from "@/components/fit-text";
 import { positiveQuantityOrDefault } from "@/lib/quantity";
 import { resolvePosBasePrice, resolvePosUnitPrice } from "@/lib/pos/price-book-price";
 import { unpaidSourceInvoicePaymentDraft } from "@/lib/pos/source-invoice-payment";
@@ -3173,12 +3174,12 @@ export function PosClient({
                   >
                     <PosLineThumbnail product={l.product} />
                     <span className="min-w-0 flex-1">
-                      <span className={cn("line-clamp-2 text-[15px] font-semibold leading-5", stockInsufficient && "text-ios-red")}>
+                      <FitText className={cn("line-clamp-2 text-[15px] font-semibold leading-5", stockInsufficient && "text-ios-red")}>
                         {productDisplayName(l.product)}
                         {l.isQuickLine && (
                           <span className="ml-1.5 inline-flex rounded-full bg-ios-orange/12 px-1.5 py-0.5 align-middle text-[11px] font-semibold text-ios-orange">{t("pos.quickLine.badge")}</span>
                         )}
-                      </span>
+                      </FitText>
                       <span className={cn("mt-1 block text-[13px]", stockManaged && Number(l.product.stock) <= 0 ? "text-ios-red" : "text-ios-label-secondary")}>
                         {stockManaged
                           ? t("mobile.pos.stock", { stock: formatNumber(Number(l.product.stock) / (l.unitMultiplier || 1)), unit: l.unitName })
@@ -3204,9 +3205,9 @@ export function PosClient({
                     type="button"
                     disabled={isCameraQuoteDraft}
                     onClick={() => openLineEditorScreen(l.key)}
-                    className={cn("min-w-0 flex-1 truncate text-left text-[15px] font-bold tabular-nums", belowPurchasePrice && "text-ios-red")}
+                    className={cn("min-w-0 flex-1 text-left text-[15px] font-bold tabular-nums", belowPurchasePrice && "text-ios-red")}
                   >
-                    {formatCurrency(eff.price)}
+                    <FitText className="block truncate" minScale={0.85}>{formatCurrency(eff.price)}</FitText>
                   </button>
                   <button
                     type="button"
@@ -3226,7 +3227,7 @@ export function PosClient({
                     increaseLabel={t("mobile.pos.increase")}
                     quantityLabel={t("mobile.pos.quantity")}
                   />
-                  <span className="min-w-0 flex-1 truncate text-right text-[15px] font-bold tabular-nums">{formatCurrency(eff.price * l.quantity)}</span>
+                  <FitText className="block min-w-0 flex-1 truncate text-right text-[15px] font-bold tabular-nums" minScale={0.85}>{formatCurrency(eff.price * l.quantity)}</FitText>
                 </div>
               </div>
               <div className="hidden items-center gap-2 px-3 py-2 lg:flex">
@@ -4824,7 +4825,7 @@ function LinePriceEditor({
         <div className="flex shrink-0 items-center gap-3.5 border-b border-border px-5 pb-4 pt-2">
           {screen.thumbnail}
           <div className="min-w-0 flex-1">
-            <div className="line-clamp-2 text-[17px] font-bold leading-[22px]">{productDisplayName(line.product)}</div>
+            <FitText className="line-clamp-2 text-[17px] font-bold leading-[22px]">{productDisplayName(line.product)}</FitText>
             {screen.code && <div className="mt-1 truncate font-mono text-[13px] font-semibold text-ios-label-secondary">{screen.code}</div>}
           </div>
         </div>

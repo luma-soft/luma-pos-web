@@ -1,5 +1,6 @@
 "use client";
 
+import { FitText } from "@/components/fit-text";
 import type { ReactNode } from "react";
 import { useLongPress } from "@/components/use-long-press";
 import { cn } from "@/lib/utils";
@@ -72,15 +73,16 @@ export function MobileDocumentRow({
             className="absolute inset-0 -left-ios-inset [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ios-accent active:bg-black/[0.04] dark:active:bg-white/[0.06]"
           />
           <div className="pointer-events-none relative flex items-baseline justify-between gap-3">
-            <div className="min-w-0 flex-1 truncate text-[17px] font-semibold leading-[22px]">
+            <FitText className="block min-w-0 flex-1 truncate text-[17px] font-semibold leading-[22px]" minScale={0.8}>
               {customer}
-            </div>
-            <span className={cn(
-              "min-w-0 max-w-[52%] shrink-0 text-right text-[17px] font-semibold leading-[22px] tabular-nums [overflow-wrap:anywhere]",
+            </FitText>
+            {/* InvoiceHistoryRow: the total stays on one line and shrinks to 75%. */}
+            <FitText className={cn(
+              "block min-w-0 max-w-[52%] shrink-0 truncate text-right text-[17px] font-semibold leading-[22px] tabular-nums",
               amountTone === "danger" && "text-ios-red",
-            )}>
+            )} minScale={0.75}>
               {amount}
-            </span>
+            </FitText>
           </div>
           {status != null && (
             <div className="pointer-events-none relative mt-1.5 text-[15px] leading-5 text-ios-label-secondary">{status}</div>

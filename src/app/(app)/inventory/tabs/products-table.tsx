@@ -1,5 +1,6 @@
 "use client";
 
+import { FitText } from "@/components/fit-text";
 import {
   matchesInventoryProductSearch,
   matchesProductVariant,
@@ -766,9 +767,9 @@ export function ProductMobileRow({
         <div className="pointer-events-none relative flex min-w-0 items-center gap-3">
           <ProductThumbnail product={product} largeOnMobile tone={stockTone} />
           <div className="min-w-0 flex-1">
-            <div className="line-clamp-2 break-words text-[17px] font-semibold leading-[22px] text-ios-label">
+            <FitText className="line-clamp-2 break-words text-[17px] font-semibold leading-[22px] text-ios-label">
               {displayName}
-            </div>
+            </FitText>
             <div className="mt-1 truncate text-[15px] leading-5 text-ios-label-secondary">{product.sku || "—"}</div>
             {!variantRow && product.categoryName && (
               <div className="mt-0.5 truncate text-[15px] leading-5 text-ios-label-secondary">{product.categoryName}</div>
@@ -780,9 +781,10 @@ export function ProductMobileRow({
             )}
           </div>
           <div className="flex min-w-[90px] max-w-[43%] shrink-0 flex-col items-end gap-1.5 self-stretch text-right">
-            <div className="max-w-full break-words text-[17px] font-semibold leading-[22px] tabular-nums text-ios-label">
+            {/* NativeProductRow: price and stock stay on one line and shrink to 80%. */}
+            <FitText className="block max-w-full truncate text-[17px] font-semibold leading-[22px] tabular-nums text-ios-label" minScale={0.8}>
               {retailDisplay}
-            </div>
+            </FitText>
             {!group && unitOptions.length > 1 ? (
               <div className="pointer-events-auto relative z-10 max-w-full">
                 <ProductUnitSelector
@@ -796,12 +798,12 @@ export function ProductMobileRow({
             ) : (
               <span className="truncate text-[15px] text-ios-label-secondary">{projected.unitName}</span>
             )}
-            <span className={cn(
-              "mt-auto max-w-full break-words text-[17px] leading-[22px]",
+            <FitText className={cn(
+              "mt-auto block max-w-full truncate text-[17px] leading-[22px]",
               tracked ? NATIVE_STOCK_TEXT[stockTone] : "text-ios-label-secondary",
-            )}>
+            )} minScale={0.8}>
               {!tracked ? stockDisplay : projected.totalStock === 0 ? t("mobile.products.stockOut") : t("mobile.inventory.onHand", { stock: stockDisplay })}
-            </span>
+            </FitText>
           </div>
         </div>
       </div>
@@ -841,7 +843,7 @@ function ProductGroupMobileButton({
     >
       <ProductThumbnail product={product} largeOnMobile />
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 break-words text-[17px] font-semibold leading-[22px] text-ios-label">{name}</span>
+        <FitText className="line-clamp-2 break-words text-[17px] font-semibold leading-[22px] text-ios-label">{name}</FitText>
         {summaryLabel && <span className="mt-1 block truncate text-[15px] leading-5 text-ios-label-secondary">{summaryLabel}</span>}
         <span className="mt-1 inline-flex items-center gap-1 text-[17px] text-ios-accent">
           {countLabel}
@@ -849,8 +851,8 @@ function ProductGroupMobileButton({
         </span>
       </span>
       <span className="flex max-w-[40%] shrink-0 flex-col items-end gap-1.5 self-stretch text-right">
-        <span className="text-[17px] font-semibold leading-[22px] tabular-nums text-ios-label">{priceLabel}</span>
-        <span className="text-[15px] leading-5 text-ios-label-secondary">{stockLabel}</span>
+        <FitText className="block max-w-full truncate text-[17px] font-semibold leading-[22px] tabular-nums text-ios-label" minScale={0.72}>{priceLabel}</FitText>
+        <FitText className="block max-w-full truncate text-[15px] leading-5 text-ios-label-secondary" minScale={0.8}>{stockLabel}</FitText>
       </span>
     </button>
   );
@@ -2659,7 +2661,7 @@ function ProductMobileHero({ product }: { product: ProductRow }) {
         {imageCount > 1 && <span className="absolute bottom-1 right-1 rounded-full bg-black/60 px-1.5 py-px text-[11px] font-bold text-white">+{imageCount - 1}</span>}
       </div>
       <div className="min-w-0 flex-1 space-y-1.5">
-        <h2 className="line-clamp-2 text-[17px] font-bold leading-[22px] [overflow-wrap:anywhere]">{productDisplayName(product)}</h2>
+        <h2><FitText className="line-clamp-2 text-[17px] font-bold leading-[22px] [overflow-wrap:anywhere]">{productDisplayName(product)}</FitText></h2>
         <p className="truncate text-[15px] text-ios-label-secondary">{[product.sku || "—", product.categoryName].filter(Boolean).join(" · ")}</p>
         <span className={cn("inline-flex rounded-full px-2 py-[3px] text-[13px] font-semibold leading-[18px]", tone)}>
           {!tracked ? t("products.stock.notTracked") : stock === 0 ? t("mobile.products.stockOut") : t("mobile.products.stockLeft", { stock: productStockDisplay(product, t("products.stock.notTracked")) })}

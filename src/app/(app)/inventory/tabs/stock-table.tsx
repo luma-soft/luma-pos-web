@@ -1,5 +1,6 @@
 "use client";
 
+import { FitText } from "@/components/fit-text";
 import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { productDisplayName } from "@/lib/products/variant-presentation";
 import { useState } from "react";
@@ -88,7 +89,7 @@ export function StockTable({ rows: serverRows, loadMore, stock }: {
               <Package className="size-5" strokeWidth={2.2} aria-hidden="true" />
             </span>
             <span className="min-w-0 flex-1 space-y-1">
-              <span className="line-clamp-2 block text-[17px] font-semibold leading-[22px]">{productDisplayName(row)}</span>
+              <FitText className="line-clamp-2 block text-[17px] font-semibold leading-[22px]">{productDisplayName(row)}</FitText>
               <span className="block truncate text-[13px] text-ios-label-secondary">SKU: {row.sku}</span>
               {min > 0 && <span className="block truncate text-[12px] text-ios-label-secondary">{t("mobile.stocktakes.minLevel", { value: formatNumber(min), unit: row.baseUnit })}</span>}
             </span>
