@@ -132,19 +132,20 @@ export function TouchTargetToggle({
       aria-label={ariaLabel}
       disabled={disabled}
       onClick={() => onChange?.(!checked)}
-      className="relative h-11 w-11 shrink-0 rounded-full transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:h-[21px] lg:w-[38px]"
+      className="relative h-11 w-11 shrink-0 rounded-full transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 max-lg:w-[52px] lg:h-[21px] lg:w-[38px]"
     >
       <span
         aria-hidden="true"
         className={cn(
-          "absolute left-1/2 top-1/2 h-[21px] w-[38px] -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors",
-          checked ? "bg-primary-600" : "bg-border",
+          // Phones use the 51×31 iOS switch; desktop keeps the compact one.
+          "absolute left-1/2 top-1/2 h-[21px] w-[38px] -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors max-lg:h-[31px] max-lg:w-[51px]",
+          checked ? "bg-primary-600 max-lg:bg-ios-accent" : "bg-border max-lg:bg-black/[0.12] dark:max-lg:bg-white/20",
         )}
       >
         <span
           className={cn(
-            "absolute top-[3px] h-[15px] w-[15px] rounded-full bg-white shadow-sm transition-[left]",
-            checked ? "left-[20px]" : "left-[3px]",
+            "absolute top-[3px] h-[15px] w-[15px] rounded-full bg-white shadow-sm transition-[left] max-lg:top-[2px] max-lg:size-[27px] max-lg:shadow-[0_2px_6px_rgb(0_0_0/0.18)]",
+            checked ? "left-[20px] max-lg:left-[22px]" : "left-[3px] max-lg:left-[2px]",
           )}
         />
       </span>

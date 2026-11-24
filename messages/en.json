@@ -5822,6 +5822,11 @@
           "directKctProduction": "Not subject to VAT, PIT 1.5% (Production, transport and VAT-exempt goods-related services)",
           "directKctServices": "Not subject to VAT, PIT 2% (VAT-exempt services and construction without materials)"
         }
+      },
+      "paymentNotes": {
+        "cash": "Accept cash payments.",
+        "qr": "Accept bank transfers and manual QR payments.",
+        "credit": "Requires a customer on the sale and adds the amount to their balance."
       }
     },
     "offlineSync": {

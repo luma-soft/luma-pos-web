@@ -22,6 +22,7 @@ export function VietnamAddressFields({
   error,
   className,
   idPrefix = "address",
+  iosPhone = false,
 }: {
   value: VietnamAddressValue;
   onChange: (next: VietnamAddressValue) => void;
@@ -29,6 +30,8 @@ export function VietnamAddressFields({
   error?: string;
   className?: string;
   idPrefix?: string;
+  /** Phones show 15pt secondary labels and 48pt, 17pt fields like the native forms. */
+  iosPhone?: boolean;
 }) {
   const t = useTranslations();
   const locale = useLocale();
@@ -36,8 +39,9 @@ export function VietnamAddressFields({
   const [wards, setWards] = useState<Option[]>([]);
   const [loadingProvinces, setLoadingProvinces] = useState(false);
   const [loadingWards, setLoadingWards] = useState(false);
-  const labelClassName = "mb-1 block text-xs font-medium text-slate-500";
-  const inputClassName = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm";
+  const labelClassName = cn("mb-1 block text-xs font-medium text-slate-500", iosPhone && "max-lg:mb-1.5 max-lg:text-[15px] max-lg:font-normal max-lg:text-ios-label-secondary");
+  const inputClassName = cn("min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm", iosPhone && "max-lg:min-h-12 max-lg:rounded-[12px] max-lg:border-ios-stroke/40 max-lg:px-4 max-lg:text-[17px]");
+  const selectClassName = cn("w-full", iosPhone && "max-lg:[&>button]:h-12 max-lg:[&>button]:rounded-[12px] max-lg:[&>button]:border-ios-stroke/40 max-lg:[&>button]:px-4 max-lg:[&>button]:text-[17px]");
 
   useEffect(() => {
     let cancelled = false;
@@ -103,7 +107,7 @@ export function VietnamAddressFields({
           placeholder={loadingProvinces ? t("settings.storeAddress.loadingProvinces") : t("settings.storeAddress.chooseProvince")}
           allowClear
           disabled={disabled || loadingProvinces}
-          className="w-full"
+          className={selectClassName}
         />
       </div>
       <div>
@@ -121,7 +125,7 @@ export function VietnamAddressFields({
             : t(value.addressProvinceCode ? "settings.storeAddress.chooseWard" : "settings.storeAddress.chooseProvinceFirst")}
           allowClear
           disabled={disabled || !value.addressProvinceCode || loadingWards}
-          className="w-full"
+          className={selectClassName}
         />
         {error && <span className="mt-1 block text-xs text-er" role="alert">{error}</span>}
       </div>

@@ -5822,6 +5822,11 @@
           "directKctProduction": "KCT GTGT, TNCN 1,5% (Sản xuất, vận tải, dịch vụ gắn với hàng hóa không chịu thuế GTGT)",
           "directKctServices": "KCT GTGT, TNCN 2% (Dịch vụ, xây dựng không bao thầu vật liệu không chịu thuế GTGT)"
         }
+      },
+      "paymentNotes": {
+        "cash": "Nhận thanh toán trực tiếp bằng tiền mặt.",
+        "qr": "Nhận chuyển khoản ngân hàng và thanh toán QR thủ công.",
+        "credit": "Đơn cần có khách hàng và số tiền sẽ được cộng vào công nợ."
       }
     },
     "offlineSync": {

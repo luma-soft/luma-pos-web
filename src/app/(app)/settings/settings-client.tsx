@@ -83,9 +83,9 @@ const DEVICES = [
   { ico: "💳", name: "POS terminal / SoftPOS", labelKey: "cardReader", status: "unconfigured", detail: "Configure in Payments" },
 ];
 const PAYMENTS = [
-  { ico: "💵", labelKey: "cash", id: "cash", enabled: true, color: "#15803D", note: "Always available · change calc built-in" },
-  { ico: "📱", labelKey: "qr", id: "qr", enabled: true, color: "#1D4ED8", note: "Dynamic QR · auto-confirm · Napas" },
-  { ico: "🧾", labelKey: "credit", id: "credit", enabled: true, color: "#B45309", note: "Saved customer required · server-owned debt" },
+  { ico: "💵", labelKey: "cash", id: "cash", enabled: true, color: "#15803D" },
+  { ico: "📱", labelKey: "qr", id: "qr", enabled: true, color: "#1D4ED8" },
+  { ico: "🧾", labelKey: "credit", id: "credit", enabled: true, color: "#B45309" },
 ];
 const VAT_RATES = [
   { rate: 0 },
@@ -240,11 +240,12 @@ function isVisibleSection(id: SectionId) {
 /* ── helpers (luma classes mapping prototype) ── */
 function Card({ title, vi, action, children }: { title: string; vi: string; action?: React.ReactNode; children?: React.ReactNode }) {
   return (
-    <div className="bg-surface rounded-card shadow-e2 mb-4">
-      <div className="px-4.5 py-3 border-b border-border-soft bg-canvas rounded-t-card flex items-center justify-between gap-3">
+    // Phones: an iOS inset-grouped card with a plain 17pt title (no tinted header bar or English subtitle).
+    <div className="bg-surface rounded-card shadow-e2 mb-4 max-lg:mb-ios-section max-lg:rounded-[22px] max-lg:shadow-none">
+      <div className="px-4.5 py-3 border-b border-border-soft bg-canvas rounded-t-card flex items-center justify-between gap-3 max-lg:rounded-t-[22px] max-lg:border-0 max-lg:bg-transparent max-lg:px-ios-inset max-lg:pb-0 max-lg:pt-3.5">
         <div>
-          <div className="text-xs font-bold">{title}</div>
-          <div className="text-[10px] italic text-slate-400 mt-px">{vi}</div>
+          <div className="text-xs font-bold max-lg:text-[17px] max-lg:font-semibold max-lg:leading-[22px]">{title}</div>
+          <div className="text-[10px] italic text-slate-400 mt-px max-lg:hidden">{vi}</div>
         </div>
         {action}
       </div>
@@ -252,13 +253,13 @@ function Card({ title, vi, action, children }: { title: string; vi: string; acti
     </div>
   );
 }
-const FL = "text-[9px] font-bold uppercase tracking-wide text-slate-500";
+const FL = "text-[9px] font-bold uppercase tracking-wide text-slate-500 max-lg:text-[15px] max-lg:font-normal max-lg:normal-case max-lg:tracking-normal max-lg:text-ios-label-secondary";
 const rightHeader = (label: string) => <span className="block w-full text-right">{label}</span>;
-const FI = "min-h-11 w-full px-[11px] py-[9px] bg-canvas border-[1.5px] border-border rounded-[10px] text-[13px] focus:border-primary-500 focus:outline-none lg:min-h-0";
-const ROW = "flex min-h-11 items-center justify-between gap-3 px-3.5 py-2.5 bg-canvas rounded-[10px] border border-border-soft min-w-11";
-const btnS = "inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-border-soft px-3 text-xs font-semibold transition hover:bg-surface-2";
-const btnF = "inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white transition hover:brightness-110";
-const searchableTouch = "[&>button]:h-11 lg:[&>button]:h-10";
+const FI = "min-h-11 w-full px-[11px] py-[9px] bg-canvas border-[1.5px] border-border rounded-[10px] text-[13px] focus:border-primary-500 focus:outline-none lg:min-h-0 max-lg:min-h-12 max-lg:rounded-[12px] max-lg:border max-lg:border-ios-stroke/40 max-lg:bg-surface max-lg:px-4 max-lg:text-[17px] max-lg:focus:border-ios-accent disabled:max-lg:text-ios-label-secondary";
+const ROW = "flex min-h-11 items-center justify-between gap-3 px-3.5 py-2.5 bg-canvas rounded-[10px] border border-border-soft min-w-11 max-lg:min-h-[52px] max-lg:rounded-none max-lg:border-0 max-lg:border-b max-lg:border-border max-lg:bg-transparent max-lg:px-0 max-lg:last:border-b-0";
+const btnS = "inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-border-soft px-3 text-xs font-semibold transition hover:bg-surface-2 max-lg:h-12 max-lg:!rounded-[14px] max-lg:border-ios-stroke/60 max-lg:px-4 max-lg:text-[17px] max-lg:text-ios-accent";
+const btnF = "inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white transition hover:brightness-110 max-lg:h-[50px] max-lg:!rounded-[14px] max-lg:bg-ios-accent max-lg:px-5 max-lg:text-[17px]";
+const searchableTouch = "[&>button]:h-11 lg:[&>button]:h-10 max-lg:[&>button]:h-12 max-lg:[&>button]:rounded-[12px] max-lg:[&>button]:border-ios-stroke/40 max-lg:[&>button]:px-4 max-lg:[&>button]:text-[17px]";
 
 async function readSettingsBankAccounts() {
   const result = await loadSettingsPaymentBankAccounts();
@@ -370,7 +371,7 @@ export function SettingsClient({
       <div className={cn("min-w-0 flex-1 flex-col overflow-hidden", mobileSectionSelected ? "flex" : "hidden lg:flex")}>
         <SettingsMobileNavBar title={settingsTextByFlag(L, `ui.sections.${active}.title`)} onBack={() => setMobileSectionSelected(false)} />
         <div className={cn(
-          "flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] lg:px-7",
+          "flex-1 overflow-y-auto px-ios-inset pb-[calc(env(safe-area-inset-bottom)+3rem)] lg:px-7",
           active === "tax" ? "pt-3 lg:pt-0 lg:pb-6" : "py-3 lg:py-6",
         )}>
         <div className={cn("hidden lg:block", active === "tax" && "lg:pt-4")}>
@@ -467,6 +468,7 @@ function StoreSection({ L, store, canManage }: { L: boolean; store: StoreSetting
         </div>
         <VietnamAddressFields
           idPrefix="store-settings-address"
+          iosPhone
           value={{
             addressLine: form.addressLine,
             addressProvinceCode: form.addressProvinceCode,
@@ -1671,6 +1673,8 @@ function HardwareSection({ L, prefs, canManage }: { L: boolean; prefs: StorePref
           <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} />
         </div>
       </Card>
+      {/* Sample devices, not detected hardware: phones (like iOS) leave this preview out. */}
+      <div className="max-lg:hidden">
       <Card title={settingsTextByFlag(L, "legacy.b440eb4f8ce5")} vi={settingsTextByFlag(L, "legacy.bc838bfce768")}>
         <div className="p-4 flex flex-col gap-2">
           {DEVICES.map((d, i) => (
@@ -1688,6 +1692,7 @@ function HardwareSection({ L, prefs, canManage }: { L: boolean; prefs: StorePref
           ))}
         </div>
       </Card>
+      </div>
     </>
   );
 }
@@ -1767,7 +1772,7 @@ function PaymentsSection({
               return (
                 <div key={p.id} className={ROW}>
                   <span className="w-9 h-9 rounded-[10px] grid place-items-center text-lg shrink-0" style={{ background: p.color + "22", border: `1px solid ${p.color}33` }}>{p.ico}</span>
-                  <div className="flex-1 min-w-0"><div className="text-xs font-bold">{settingsTextByFlag(L, `ui.payments.${p.labelKey}`)}</div><div className="text-[10px] text-slate-500">{p.note}</div></div>
+                  <div className="flex-1 min-w-0"><div className="text-xs font-bold max-lg:text-[17px] max-lg:font-normal">{settingsTextByFlag(L, `ui.payments.${p.labelKey}`)}</div><div className="text-[10px] text-slate-500 max-lg:text-[13px] max-lg:text-ios-label-secondary">{settingsTextByFlag(L, `ui.paymentNotes.${p.labelKey}`)}</div></div>
                   <TouchTargetToggle checked={pm[id]} onChange={() => toggle(id)} aria-label={settingsTextByFlag(L, `ui.payments.${p.labelKey}`)} />
                 </div>
               );
@@ -3107,8 +3112,8 @@ function CtrlRow({ title, desc, checked, onChange }: { title: string; desc?: str
   return (
     <div className={ROW}>
       <div className="flex-1 mr-3">
-        <div className="text-xs font-bold">{title}</div>
-        {desc && <div className="text-[10px] italic text-slate-500 mt-px">{desc}</div>}
+        <div className="text-xs font-bold max-lg:text-[17px] max-lg:font-normal max-lg:leading-[22px]">{title}</div>
+        {desc && <div className="text-[10px] italic text-slate-500 mt-px max-lg:mt-0.5 max-lg:text-[13px] max-lg:not-italic max-lg:leading-[18px] max-lg:text-ios-label-secondary">{desc}</div>}
       </div>
       <TouchTargetToggle checked={checked} onChange={onChange ?? (() => {})} aria-label={title} />
     </div>
@@ -3125,8 +3130,9 @@ function SaveBar({ L, labels, dirty, saved, pending, canManage, onSave, error = 
   if (!canManage) return <p className={cn("text-[11px] text-slate-400 italic mt-1", className)}>{copy.permission}</p>;
   if (!dirty && !saved) return null;
   return (
-    <div className={cn("flex items-center gap-2 pt-1", className)}>
-      <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? copy.unsaved : copy.saved)}</span>
+    // Phones: status line above a full-width save button.
+    <div className={cn("flex items-center gap-2 pt-1 max-lg:flex-col max-lg:items-stretch max-lg:pt-2", className)}>
+      <span className={cn("text-[11px] flex-1 max-lg:text-center max-lg:text-[13px]", error ? "text-er" : "text-slate-500")}>{error || (dirty ? copy.unsaved : copy.saved)}</span>
       <button disabled={!dirty || pending} onClick={onSave} className={cn(btnF, "disabled:opacity-50")}>
         {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{copy.save}
       </button>
