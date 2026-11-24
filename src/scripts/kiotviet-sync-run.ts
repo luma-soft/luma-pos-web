@@ -31,6 +31,9 @@ import { runKiotVietDataSyncCli } from "./sync-kiotviet-data";
  * - Discontinued KiotViet products ("Đang kinh doanh" = 0) are never created.
  *   New active products are listed for creation through the POS product API
  *   (they get POS SKUs), then linked with kiotviet-pos-codes --map-product.
+ * - A "new" KiotViet product that matches exactly one unmapped POS product by
+ *   name and unit is linked to it instead (with --apply); look-alikes that are
+ *   ambiguous are held for review. POS products are never created twice.
  */
 
 const DOCUMENT_PHASES = [
@@ -55,6 +58,61 @@ export interface NewProduct {
 
 const text = (value: unknown) => normalizeKiotVietText(value);
 const isActive = (row: ProductRow) => text(row["Đang kinh doanh"]) !== "0";
+
+export interface PosProductCandidate { sku: string; name: string; baseUnit: string }
+export interface ExistingProductMatches {
+  /** KiotViet SKU → POS SKU of the one unmapped POS product with the same name and unit. */
+  links: Map<string, string>;
+  /** KiotViet products that look like several POS products, or carry attributes; never created or linked. */
+  held: Array<{ kiotvietSku: string; reason: string; candidates: string[] }>;
+}
+
+const productNameKey = (name: string) => name.normalize("NFC").toLocaleLowerCase("vi").replace(/\s+/g, " ").trim();
+const unitKey = (unit: string) => unit.normalize("NFC").toLocaleLowerCase("vi").trim();
+
+/**
+ * Finds POS products a "new" KiotViet product already is. A product created in
+ * POS and later keyed into KiotViet has no mapping yet, so without this check
+ * the runbook would create it a second time (the 2026-10/11 duplicates).
+ *
+ * A link needs exactly one unmapped POS product with the same name and unit,
+ * and the name must be unique among the new KiotViet products. Products with
+ * KiotViet attributes (size, mã…) or several look-alikes are held for review.
+ */
+export function matchExistingPosProducts(
+  newProducts: Array<Pick<NewProduct, "kiotvietSku" | "name" | "baseUnit"> & { hasAttributes?: boolean }>,
+  unmappedPosProducts: PosProductCandidate[],
+): ExistingProductMatches {
+  const posByName = new Map<string, PosProductCandidate[]>();
+  for (const product of unmappedPosProducts) {
+    const key = productNameKey(product.name);
+    posByName.set(key, [...(posByName.get(key) ?? []), product]);
+  }
+  const kvNameCount = new Map<string, number>();
+  for (const product of newProducts) {
+    const key = productNameKey(product.name);
+    kvNameCount.set(key, (kvNameCount.get(key) ?? 0) + 1);
+  }
+  const links = new Map<string, string>();
+  const held: ExistingProductMatches["held"] = [];
+  const claimed = new Set<string>();
+  for (const product of newProducts) {
+    const key = productNameKey(product.name);
+    const sameName = posByName.get(key) ?? [];
+    if (sameName.length === 0) continue;
+    const candidates = sameName.map((item) => item.sku);
+    const sameUnit = sameName.filter((item) => unitKey(item.baseUnit) === unitKey(product.baseUnit));
+    if (product.hasAttributes) held.push({ kiotvietSku: product.kiotvietSku, reason: "sản phẩm KiotViet có thuộc tính, POS có sản phẩm cùng tên", candidates });
+    else if ((kvNameCount.get(key) ?? 0) > 1) held.push({ kiotvietSku: product.kiotvietSku, reason: "nhiều sản phẩm KiotViet mới cùng tên", candidates });
+    else if (sameUnit.length !== 1) held.push({ kiotvietSku: product.kiotvietSku, reason: sameUnit.length === 0 ? "POS có sản phẩm cùng tên nhưng khác ĐVT" : "POS có nhiều sản phẩm cùng tên", candidates });
+    else if (claimed.has(sameUnit[0]!.sku)) held.push({ kiotvietSku: product.kiotvietSku, reason: "sản phẩm POS cùng tên đã được nối", candidates });
+    else {
+      claimed.add(sameUnit[0]!.sku);
+      links.set(product.kiotvietSku, sameUnit[0]!.sku);
+    }
+  }
+  return { links, held };
+}
 
 export async function runKiotVietSync(argv: string[]) {
   const directory = argv.find((argument) => !argument.startsWith("--"));
@@ -98,7 +156,7 @@ export async function runKiotVietSync(argv: string[]) {
   // 2. Products: never create discontinued ones; list new active ones.
   const { db } = await import("../db");
   const schema = await import("../db/schema");
-  const { and, eq, isNull } = await import("drizzle-orm");
+  const { and, eq, inArray, isNull } = await import("drizzle-orm");
   const [storeRow] = await db.select({ id: schema.stores.id }).from(schema.stores).where(eq(schema.stores.slug, "hai-dang")).limit(1);
   const storeId = storeRow!.id;
   const posSkus = new Set((await db.select({ sku: schema.products.sku }).from(schema.products).where(eq(schema.products.storeId, storeId))).map((row) => row.sku));
@@ -130,6 +188,31 @@ export async function runKiotVietSync(argv: string[]) {
       category: category ?? "", brand: text(row["Thương hiệu"]) || null, barcode: text(row["Mã vạch"]) || null,
     });
   }
+  // 2b. A "new" KiotViet product may be one POS created first: link it, never create a twin.
+  const mappedProductIds = new Set((await db.select({ productId: schema.productSourceMappings.productId }).from(schema.productSourceMappings)
+    .where(and(eq(schema.productSourceMappings.storeId, storeId), eq(schema.productSourceMappings.provider, "kiotviet"))))
+    .map((row) => row.productId));
+  const unmappedPosProducts = (await db.select({
+    id: schema.products.id, sku: schema.products.sku, name: schema.products.name, baseUnit: schema.products.baseUnit,
+  }).from(schema.products).where(and(
+    eq(schema.products.storeId, storeId),
+    inArray(schema.products.lifecycleStatus, ["active", "draft"]),
+    eq(schema.products.isVariantParent, false),
+  ))).filter((product) => !mappedProductIds.has(product.id));
+  const existing = matchExistingPosProducts(
+    newProducts.map((item) => ({ ...item, hasAttributes: text(kvProducts.get(item.kiotvietSku)?.["Thuộc tính"]) !== "" })),
+    unmappedPosProducts,
+  );
+  const linkedExisting = [...existing.links].map(([kiotvietSku, posSku]) => ({ kiotvietSku, posSku, name: text(kvProducts.get(kiotvietSku)?.["Tên hàng"]) }));
+  const heldProducts = existing.held.map((item) => ({ ...item, name: text(kvProducts.get(item.kiotvietSku)?.["Tên hàng"]) }));
+  const notNew = new Set([...existing.links.keys(), ...existing.held.map((item) => item.kiotvietSku)]);
+  newProducts.splice(0, newProducts.length, ...newProducts.filter((item) => !notNew.has(item.kiotvietSku)));
+  if (apply && linkedExisting.length > 0) {
+    await runKiotVietPosCodes(["--store=hai-dang", ...linkedExisting.map((item) => `--map-product=${item.kiotvietSku}=${item.posSku}`), "--apply"]);
+    for (const item of linkedExisting) mappedSkus.add(item.kiotvietSku);
+  }
+  const willLink = new Set(linkedExisting.map((item) => item.kiotvietSku));
+
   if (apply && unitsReady.length > 0) {
     await runKiotVietPosCodes(["--store=hai-dang", `--units-from=${join(directory, productFile)}`, ...unitsReady.map((sku) => `--unit=${sku}`), "--apply"]);
     for (const sku of unitsReady) unitSkus.add(sku);
@@ -143,11 +226,12 @@ export async function runKiotVietSync(argv: string[]) {
     for (const row of workbook.rows) {
       const code = text(row[definition.code]);
       const sku = text(row["Mã hàng"]);
-      if (!kept.has(code) || !sku || inPos(sku) || (!apply && unitsReady.includes(sku))) continue;
+      if (!kept.has(code) || !sku || inPos(sku) || (!apply && (unitsReady.includes(sku) || willLink.has(sku)))) continue;
       const product = kvProducts.get(sku);
       const reason = !product ? "sản phẩm không có trong danh sách KiotViet"
         : !isActive(product) ? "sản phẩm đã ngừng kinh doanh (không tạo trong POS)"
-          : waiting.has(sku) ? "chờ tạo sản phẩm mới trong POS" : "sản phẩm chưa khớp";
+          : notNew.has(sku) ? "sản phẩm giống sản phẩm POS có sẵn, chờ duyệt nối"
+            : waiting.has(sku) ? "chờ tạo sản phẩm mới trong POS" : "sản phẩm chưa khớp";
       kept.delete(code);
       held.push({ phase: definition.phase, code, reason, detail: `${sku} ${product ? text(product["Tên hàng"]) : ""}`.trim() });
     }
@@ -199,6 +283,10 @@ export async function runKiotVietSync(argv: string[]) {
     ...(held.length ? held.map((item) => `- ${item.phase} **${item.code}** — ${item.reason}${item.detail ? ` (${item.detail})` : ""}`) : ["- Không có"]),
     "",
     "## Sản phẩm",
+    `- Nối với sản phẩm POS có sẵn (cùng tên, cùng ĐVT) ${apply ? "đã nối" : "sẽ nối"}: ${linkedExisting.length}`,
+    ...linkedExisting.map((item) => `  - ${item.kiotvietSku} → ${item.posSku} · ${item.name}`),
+    `- Giống sản phẩm POS có sẵn, chờ duyệt (không tạo, không nối): ${heldProducts.length}`,
+    ...heldProducts.map((item) => `  - ${item.kiotvietSku} · ${item.name} — ${item.reason} (${item.candidates.join(", ")})`),
     `- Sản phẩm mới còn kinh doanh cần tạo trong POS: ${newProducts.length}`,
     ...newProducts.map((item) => `  - ${item.kiotvietSku} · ${item.name} · ${item.baseUnit} · giá vốn ${item.costPrice} · giá bán ${item.retailPrice} · nhóm ${item.category}${item.brand ? ` · ${item.brand}` : ""}`),
     `- ĐVT quy đổi ${apply ? "đã gắn" : "sẽ gắn"}: ${unitsReady.join(", ") || "—"}`,
@@ -211,7 +299,7 @@ export async function runKiotVietSync(argv: string[]) {
     ...(apply ? [`- Đã ghi: ${applied.map((item) => item.phase).join(", ") || "không có thay đổi"}`] : []),
   ];
   writeFileSync(reportPath, `${lines.join("\n")}\n`);
-  writeFileSync(reportPath.replace(/\.md$/, ".json"), JSON.stringify({ apply, held, newProducts, unitsReady, unitsWaiting, blockers, applied }, null, 2));
+  writeFileSync(reportPath.replace(/\.md$/, ".json"), JSON.stringify({ apply, held, linkedExisting, heldProducts, newProducts, unitsReady, unitsWaiting, blockers, applied }, null, 2));
   return { reportPath, apply, held, newProducts, blockers, applied };
 }
 

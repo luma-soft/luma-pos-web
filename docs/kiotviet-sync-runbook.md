@@ -50,6 +50,12 @@ Báo cáo liệt kê:
 
 ## 3. Sản phẩm mới (nếu báo cáo có)
 
+Trước khi coi một sản phẩm KiotViet là "mới", `kiotviet-sync-run` dò sản phẩm POS **chưa có mapping KiotViet**:
+- Có đúng 1 sản phẩm POS cùng tên (không phân biệt hoa/thường, khoảng trắng) và cùng ĐVT gốc: tự nối khi chạy `--apply`, không tạo sản phẩm mới.
+- Có thuộc tính KiotViet, có nhiều sản phẩm trùng tên, hoặc khác ĐVT: nằm ở mục "chờ duyệt". Kiểm tra rồi nối tay bằng `--map-product` hoặc tạo mới. Không tạo mới khi chưa kiểm tra.
+
+Bản trùng cũ (POS + bản sao mã KiotViet) gộp bằng `src/scripts/merge-duplicate-products.ts` (chạy thử trước, thêm `--apply` để ghi).
+
 1. Tạo sản phẩm gốc bằng `POST /api/mobile/products` (phiên Owner trên POS) hoặc trên giao diện. **Không truyền `sku`** để POS tự sinh mã; không thêm ĐVT; nhập tên, nhóm, thương hiệu, ĐVT gốc, giá vốn và giá bán trước thuế theo báo cáo.
 2. Nối SKU KiotViet vào sản phẩm vừa tạo:
    ```bash
