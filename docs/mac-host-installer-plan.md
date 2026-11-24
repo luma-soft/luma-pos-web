@@ -107,6 +107,16 @@ sang giai đoạn sau.
 
 ### Giai đoạn 1 — Bản runtime gọn, không cần mã nguồn (1–2 ngày)
 
+> **Đã triển khai 2026-11-24** (commit `05913beb`, store Mac chạy bản này).
+> Khác so với kế hoạch: worker không dùng `bun build --compile` (mỗi file
+> ~61 MB vì nhúng Bun) mà `bun build` thành `workers/*.js` chạy bằng Bun dùng
+> chung; release ghép phẳng ở gốc (`server.js`, `.next`) để `lumapos-admin
+> deploy` không phải đổi; chưa tạo file `.tar.zst` (để giai đoạn 5). Kết quả:
+> release 117 MB (trước 888 MB); web, sync, notifications chạy từ release
+> mới, health `ready`. **Còn lại:** worker backup vẫn chạy từ thư mục riêng
+> `backup-worker-main-f06214e80321` (plist root, cần mật khẩu admin để đổi);
+> chưa diễn tập `restore` bằng bundle mới.
+
 Repo `luma-pos-web`.
 
 1. `next.config.ts`: thêm `output: "standalone"`; giữ
