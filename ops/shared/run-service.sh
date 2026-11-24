@@ -55,6 +55,34 @@ set +a
 cd "$app_root"
 umask 077
 
+# Runtime layout (build-release.sh default): standalone Next.js server at the
+# release root and bundled workers; no source tree or package scripts.
+if [[ -f "$app_root/manifest.json" && -f "$app_root/server.js" && -d "$app_root/workers" ]]; then
+  case "$service_name" in
+    web)
+      # The standalone server binds to HOSTNAME; keep it on loopback.
+      export HOSTNAME=127.0.0.1
+      exec "$bun_bin" server.js
+      ;;
+    sync)
+      exec "$bun_bin" workers/process-sync-events.js
+      ;;
+    notifications)
+      exec "$bun_bin" workers/process-notification-outbox.js
+      ;;
+    backups)
+      exec "$bun_bin" workers/run-database-backups.js --scheduled
+      ;;
+    maintenance:media-cleanup|maintenance:notifications|maintenance:einvoices)
+      exec "$bun_bin" workers/run-self-hosted-maintenance.js "--task=${service_name#maintenance:}"
+      ;;
+    *)
+      printf '%s\n' "Unknown LumaPOS service name." >&2
+      exit 64
+      ;;
+  esac
+fi
+
 case "$service_name" in
   web)
     exec "$bun_bin" run start:self-hosted

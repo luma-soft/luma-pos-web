@@ -4,6 +4,9 @@ import createNextIntlPlugin from "next-intl/plugin";
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
+  // Self-hosted releases (ops/macos/build-release.sh) ship the standalone
+  // server; other builds keep the default output.
+  ...(process.env.LUMAPOS_NEXT_OUTPUT === "standalone" ? { output: "standalone" as const } : {}),
   serverExternalPackages: ["mediainfo.js", "exifr"],
   outputFileTracingIncludes: {
     "/api/mobile/**": ["node_modules/mediainfo.js/dist/MediaInfoModule.wasm"],

@@ -88,12 +88,25 @@ trong đó ghi commit của nó. Một lần cập nhật gồm hai bước:
 1. **Build** — `ops/macos/build-release.sh`, chạy bằng tài khoản Mac thường
    (không cần quyền admin):
    - xuất commit `HEAD` của checkout (`git archive`, nên thay đổi chưa commit
-     không được đưa vào) tới `/Users/Shared/LumaPOS/app-next`;
-   - clone APFS `node_modules` của release đang chạy nếu `bun.lock` không đổi,
-     ngược lại chạy `bun install --frozen-lockfile`;
-   - `next build` với một `DATABASE_URL` giả chỉ để import module; build không
-     kết nối database và không nhúng giá trị này vào output. Dịch vụ đọc giá
-     trị thật từ `secrets/runtime*.env`.
+     không được đưa vào) tới thư mục build cố định
+     `/Users/Shared/LumaPOS/app-build`, giữ `node_modules` giữa các lần build
+     và chỉ chạy `bun install --frozen-lockfile` khi `bun.lock` đổi;
+   - `next build` ở chế độ standalone (`LUMAPOS_NEXT_OUTPUT=standalone`) với
+     một `DATABASE_URL` giả chỉ để import module; build không kết nối database
+     và không nhúng giá trị này vào output. Dịch vụ đọc giá trị thật từ
+     `secrets/runtime*.env`;
+   - đóng gói worker (`sync`, `notifications`, `backups`, `restore`,
+     `maintenance`, migrate) bằng `bun build` thành `workers/*.js` chạy bằng
+     Bun dùng chung, không cần `node_modules` đầy đủ;
+   - ghép release vào `/Users/Shared/LumaPOS/app-next`: server standalone ở
+     gốc (`server.js`, `.next`, `node_modules` đã trace), `.next/static`,
+     `public/`, `workers/`, `drizzle/`, `ops/shared/run-service.sh`,
+     `RELEASE_COMMIT` và `manifest.json` (phiên bản, commit, SHA-256 từng
+     file). Kích thước khoảng 120 MB, so với ~900 MB của kiểu cũ.
+   - `run-service.sh` nhận ra kiểu này qua `manifest.json` + `server.js` và
+     chạy `bun server.js` / `bun workers/<tên>.js`. Đặt
+     `LUMAPOS_RELEASE_LAYOUT=classic` để build kiểu cũ (toàn bộ mã nguồn +
+     `node_modules`, chạy `bun run …`) nếu cần quay lại.
 2. **Deploy** — `lumapos-admin deploy`, chạy bằng root:
    - từ chối `app-next` thiếu `.next/BUILD_ID`, chứa file `.env*`, hoặc có
      symlink ở `app-next`, `.next`, `.next/cache`;
