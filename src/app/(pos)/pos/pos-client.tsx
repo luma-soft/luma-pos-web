@@ -3563,7 +3563,11 @@ export function PosClient({
           <button
             type="button"
             disabled={cart.length === 0}
-            onClick={() => setMobileView("cart")}
+            onClick={() => {
+              // Like CheckoutSheet.swift: checkout opens on cash unless a QR payment is still waiting.
+              if (!sepayActive && payMethod !== "cash") setPayMethod("cash");
+              setMobileView("cart");
+            }}
             className="flex h-[54px] min-w-0 flex-[1.2] items-center justify-center rounded-[14px] bg-ios-accent px-3 text-[17px] font-bold text-white disabled:bg-black/[0.06] disabled:text-ios-label-secondary dark:disabled:bg-white/[0.1]"
           >
             <span className="truncate">{isQuoteDraft ? t("common.confirm") : primaryActionLabel}</span>
