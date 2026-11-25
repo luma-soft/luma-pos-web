@@ -13,6 +13,7 @@ import {
   ReceiptText,
   Ruler,
   Trash2,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -202,14 +203,25 @@ export function TileCalculator() {
             {copyState === "copied" ? t("copied") : t("copySummary")}
           </Button>
         )}
+        mobileAction={(
+          <button
+            type="button"
+            onClick={copySummary}
+            aria-label={copyState === "copied" ? t("copied") : t("copySummary")}
+            data-button-radius="pill"
+            className="grid size-11 shrink-0 place-items-center rounded-full border border-black/[0.06] bg-surface/90 text-ios-accent shadow-[0_2px_10px_rgb(0_0_0/0.08)] backdrop-blur-md dark:border-white/10 [&_svg]:size-5"
+          >
+            {copyState === "copied" ? <Check /> : copyState === "error" ? <CircleAlert /> : <Copy />}
+          </button>
+        )}
       />
 
-      <main className="mx-auto w-full max-w-[94rem] px-4 py-5 sm:px-6 sm:py-7">
+      <main className="mx-auto w-full max-w-[94rem] px-4 py-5 sm:px-6 sm:py-7 max-lg:px-ios-inset max-lg:pb-[calc(env(safe-area-inset-bottom)+2rem)] max-lg:pt-2">
         {copyState === "error" && (
           <p role="alert" className="mb-4 text-sm font-medium text-er">{t("copyFailed")}</p>
         )}
 
-        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[13rem_minmax(28rem,1fr)_20rem]">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[13rem_minmax(28rem,1fr)_20rem] max-lg:gap-ios-section">
           <RoomNavigator
             rooms={rooms}
             activeRoomId={activeRoom.id}
@@ -270,13 +282,21 @@ function RoomNavigator({ rooms, activeRoomId, calculations, number, onSelect, on
   const activeRoomRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    activeRoomRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    // Scroll only the room strip; scrollIntoView would also scroll the page
+    // (on phones the strip sits below the project summary).
+    const item = activeRoomRef.current;
+    const strip = item?.parentElement;
+    if (!item || !strip || strip.scrollWidth <= strip.clientWidth) return;
+    const left = item.offsetLeft - strip.offsetLeft;
+    if (left < strip.scrollLeft || left + item.offsetWidth > strip.scrollLeft + strip.clientWidth) {
+      strip.scrollTo({ left: Math.max(0, left - 8), behavior: "smooth" });
+    }
   }, [activeRoomId]);
 
   return (
-    <nav aria-label={t("rooms")} className="rounded-card border border-border bg-surface p-3 shadow-e1 xl:col-span-2 2xl:col-span-1 2xl:sticky 2xl:top-[4.625rem]">
+    <nav aria-label={t("rooms")} className="rounded-card border border-border bg-surface p-3 shadow-e1 xl:col-span-2 2xl:col-span-1 2xl:sticky 2xl:top-[4.625rem] max-lg:rounded-[22px] max-lg:border-0 max-lg:shadow-none">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-slate-500">{t("roomGroups", { count: rooms.length })}</p>
+        <p className="text-xs font-semibold text-slate-500 max-lg:pl-1 max-lg:text-[15px] max-lg:font-semibold max-lg:text-ios-label">{t("roomGroups", { count: rooms.length })}</p>
         <Button type="button" variant="ghost" size="sm" onClick={onAdd}><Plus /> {t("addRoomShort")}</Button>
       </div>
       <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain pb-1 2xl:flex-col 2xl:overflow-visible 2xl:pb-0">
@@ -356,8 +376,8 @@ function RoomCard({
   const skirtLinked = room.skirtMaterialSourceId !== "";
 
   return (
-    <article className="overflow-hidden rounded-card border border-border bg-surface shadow-e1">
-      <header className="flex items-center gap-3 border-b border-border-soft bg-surface-2/70 px-4 py-3.5 sm:px-5">
+    <article className="overflow-hidden rounded-card border border-border bg-surface shadow-e1 max-lg:rounded-[22px] max-lg:border-0 max-lg:shadow-none">
+      <header className="flex items-center gap-3 border-b border-border-soft bg-surface-2/70 px-4 py-3.5 sm:px-5 max-lg:bg-transparent max-lg:px-ios-inset">
         <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary-100 font-mono text-xs font-bold text-primary-700 dark:bg-primary-950/60 dark:text-primary-300">
           {String(index + 1).padStart(2, "0")}
         </span>
@@ -384,8 +404,8 @@ function RoomCard({
         </Button>
       </header>
 
-      <div className="space-y-6 p-4 sm:p-5">
-        <section className="rounded-xl border border-primary-200 bg-primary-50/45 p-4 dark:border-primary-900 dark:bg-primary-950/20">
+      <div className="space-y-6 p-4 sm:p-5 max-lg:space-y-4 max-lg:p-ios-inset">
+        <section className="rounded-xl border border-primary-200 bg-primary-50/45 p-4 dark:border-primary-900 dark:bg-primary-950/20 max-lg:rounded-[14px] max-lg:border-0 max-lg:bg-canvas dark:max-lg:bg-canvas">
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div>
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t("roomQuantity")}</p>
@@ -582,28 +602,42 @@ function ProjectSummary({ rooms, calculations, totals, materialGroups, number, c
   currency: Intl.NumberFormat;
 }) {
   const t = useTranslations("tileCalculator");
+  // Phones collapse the material groups, like the iOS DisclosureGroup.
+  const [groupsOpen, setGroupsOpen] = useState(false);
   return (
-    <aside className="overflow-hidden rounded-card border border-border bg-surface shadow-e1 xl:sticky xl:top-[4.625rem]">
-      <div className="border-b border-border-soft bg-primary-50/70 px-5 py-4 dark:bg-primary-950/25">
+    <aside className="overflow-hidden rounded-card border border-border bg-surface shadow-e1 xl:sticky xl:top-[4.625rem] max-lg:order-first max-lg:rounded-[22px] max-lg:border-0 max-lg:shadow-none">
+      <div className="border-b border-border-soft bg-primary-50/70 px-5 py-4 dark:bg-primary-950/25 max-lg:bg-transparent max-lg:px-ios-inset dark:max-lg:bg-transparent">
         <p className="text-xs font-semibold tracking-[0.12em] text-primary-700 uppercase dark:text-primary-300">{t("projectSummary")}</p>
         <p className="mt-2 font-mono text-3xl font-bold tracking-tight text-slate-950 dark:text-white">{currency.format(totals.totalCost)}</p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("estimatedTotal")}</p>
       </div>
 
-      <dl className="divide-y divide-border-soft px-5">
+      <dl className="divide-y divide-border-soft px-5 max-lg:px-ios-inset">
         <SummaryLine label={t("floorRequired")} value={`${number.format(totals.floorArea)} m²`} detail={t("tileCount", { count: totals.floorTiles })} />
         <SummaryLine label={t("wallRequired")} value={`${number.format(totals.wallArea)} m²`} detail={t("tileCount", { count: totals.wallTiles })} />
         <SummaryLine label={t("skirtRequired")} value={`${number.format(totals.skirtLength)} m`} detail={t("sourceTileCount", { count: totals.skirtSourceTiles })} />
       </dl>
 
-      <div className="border-t border-border-soft px-5 py-4">
-        <div className="flex items-center justify-between gap-3">
+      <div className="border-t border-border-soft px-5 py-4 max-lg:px-ios-inset">
+        <div className="flex items-center justify-between gap-3 max-lg:hidden">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t("materialsSummary")}</h2>
           <span className="rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-700 dark:bg-primary-950/40 dark:text-primary-300">
             {t("materialGroupCount", { count: materialGroups.length })}
           </span>
         </div>
-        <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pr-1">
+        <button
+          type="button"
+          onClick={() => setGroupsOpen((open) => !open)}
+          aria-expanded={groupsOpen}
+          className="flex w-full items-center justify-between gap-3 text-left lg:hidden"
+        >
+          <span className="min-w-0">
+            <span className="block text-[17px] font-semibold">{t("materialsSummary")}</span>
+            <span className="block text-[13px] text-ios-label-secondary">{t("materialGroupCount", { count: materialGroups.length })}</span>
+          </span>
+          <ChevronDown className={cn("size-5 shrink-0 text-ios-label-secondary transition-transform", groupsOpen && "rotate-180")} aria-hidden="true" />
+        </button>
+        <div className={cn("mt-3 max-h-80 space-y-2 overflow-y-auto pr-1 max-lg:max-h-none max-lg:overflow-visible max-lg:pr-0", !groupsOpen && "max-lg:hidden")}>
           {materialGroups.map((group) => {
             const names = group.roomIds
               .map((roomId) => rooms.find((room) => room.id === roomId)?.name)
@@ -627,7 +661,7 @@ function ProjectSummary({ rooms, calculations, totals, materialGroups, number, c
         </div>
       </div>
 
-      <div className="border-t border-border-soft px-5 py-4">
+      <div className="border-t border-border-soft px-5 py-4 max-lg:hidden">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t("byRoom")}</h2>
         <div className="mt-3 space-y-3">
           {rooms.map((room, index) => (
@@ -688,7 +722,7 @@ function CalculatorSection({ icon, title, description, tinted, defaultOpen, chil
         </span>
       )}
       description={description}
-      className={cn("overflow-hidden rounded-xl shadow-none", tinted && "bg-primary-50/50 dark:bg-primary-950/15")}
+      className={cn("overflow-hidden rounded-xl shadow-none max-lg:rounded-[16px] max-lg:border-0 max-lg:bg-canvas dark:max-lg:bg-canvas [&>*]:max-lg:border-border/60", tinted && "bg-primary-50/50 dark:bg-primary-950/15")}
     >
       {children}
     </Section>

@@ -255,9 +255,9 @@ export function ElectricalLabelsClient() {
 
   return (
     <>
-      <div className="mx-auto grid w-full max-w-[1600px] gap-4 p-4 [&_button]:min-h-11 [&_button]:min-w-11 sm:p-6 lg:[&_button]:min-h-0 lg:[&_button]:min-w-0 xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]">
-        <div className="min-w-0 space-y-4">
-          <Section
+      <div className="mx-auto grid w-full max-w-[1600px] gap-4 p-4 max-lg:gap-ios-section max-lg:px-ios-inset max-lg:pb-[calc(env(safe-area-inset-bottom)+2rem)] max-lg:pt-2 [&_button]:min-h-11 [&_button]:min-w-11 sm:p-6 lg:[&_button]:min-h-0 lg:[&_button]:min-w-0 xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]">
+        <div className="min-w-0 space-y-4 max-lg:space-y-ios-section">
+          <Section className="max-lg:rounded-[22px] max-lg:border-0 max-lg:shadow-none"
             collapsible={false}
             title={t("deviceTitle")}
             description={t("deviceDescription")}
@@ -301,7 +301,7 @@ export function ElectricalLabelsClient() {
             </div>
           </Section>
 
-          <Section
+          <Section className="max-lg:rounded-[22px] max-lg:border-0 max-lg:shadow-none"
             collapsible={false}
             title={t("circuitsTitle")}
             description={t("circuitsDescription")}
@@ -315,7 +315,7 @@ export function ElectricalLabelsClient() {
             <div className="space-y-3">
               {circuits.map((circuit, index) => (
                 <div
-                  className="grid gap-3 rounded-xl border border-border bg-surface-2 p-3 sm:grid-cols-[120px_minmax(0,1.35fr)_minmax(0,1fr)_84px_44px] sm:items-end lg:grid-cols-[44px_minmax(0,1.35fr)_minmax(0,1fr)_84px_32px]"
+                  className="grid gap-3 rounded-xl border border-border bg-surface-2 p-3 max-lg:rounded-[16px] max-lg:border-0 max-lg:bg-canvas sm:grid-cols-[120px_minmax(0,1.35fr)_minmax(0,1fr)_84px_44px] sm:items-end lg:grid-cols-[44px_minmax(0,1.35fr)_minmax(0,1fr)_84px_32px]"
                   key={circuit.id}
                 >
                   <div className="flex items-center gap-2 sm:block sm:self-center">
@@ -379,7 +379,7 @@ export function ElectricalLabelsClient() {
             </div>
           </Section>
 
-          <Section collapsible={false} title={t("appearanceTitle")} description={t("appearanceDescription")}>
+          <Section className="max-lg:rounded-[22px] max-lg:border-0 max-lg:shadow-none" collapsible={false} title={t("appearanceTitle")} description={t("appearanceDescription")}>
             <div className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label={t("labelHeight")}>
@@ -463,7 +463,7 @@ export function ElectricalLabelsClient() {
         </div>
 
         <div className="min-w-0">
-          <div className="overflow-hidden rounded-card border border-border bg-surface shadow-e1 2xl:sticky 2xl:top-[74px]">
+          <div className="overflow-hidden rounded-card border border-border bg-surface shadow-e1 2xl:sticky 2xl:top-[74px] max-lg:rounded-[22px] max-lg:border-0 max-lg:shadow-none">
             <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 sm:px-5">
               <div>
                 <Text as="h2" weight="bold">{t("preview")}</Text>

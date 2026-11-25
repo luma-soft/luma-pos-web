@@ -9,25 +9,29 @@ export function ToolPageHeader({
   title,
   description,
   actions,
+  mobileAction,
 }: {
   eyebrow: ReactNode;
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
+  /** Phones: a trailing navigation-bar button, as on iOS. The caption and `actions` row is then not shown on phones. */
+  mobileAction?: ReactNode;
 }) {
   const t = useTranslations();
   return (
     <>
       {/* Phones: iOS 26 bar (back to the tools list, centred title), then the caption and actions. */}
-      <div className="bg-canvas md:hidden print:hidden">
+      {/* `contents` so the bar sticks to the page, not to this wrapper. */}
+      <div className="contents md:hidden print:hidden">
         <div className="sticky top-0 z-20 grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 bg-canvas/85 px-ios-inset pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur-xl">
           <Link href={Routes.Tools} aria-label={t("common.back")} data-button-radius="pill" className="grid size-11 shrink-0 place-items-center rounded-full border border-black/[0.06] bg-surface/90 text-ios-label shadow-[0_2px_10px_rgb(0_0_0/0.08)] backdrop-blur-md dark:border-white/10">
             <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden="true" />
           </Link>
           <h1 className="truncate text-center text-[17px] font-semibold">{title}</h1>
-          <span aria-hidden="true" />
+          {mobileAction ?? <span aria-hidden="true" />}
         </div>
-        {(description || actions) && (
+        {!mobileAction && (description || actions) && (
           <div className="flex items-start gap-3 px-ios-inset pb-3 pt-1">
             {description && <p className="min-w-0 flex-1 text-[15px] leading-5 text-ios-label-secondary">{description}</p>}
             {actions && <div className="shrink-0 [&_button]:min-h-11">{actions}</div>}
