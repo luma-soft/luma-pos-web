@@ -71,7 +71,14 @@ export async function getMediaLibrarySnapshot(
   const overview = overviewResult.rows[0];
   if (!overview) throw new MediaLibraryError("errors.serverError", 500);
   const hasMore = pageResult.rows.length > query.limit;
-  const items = await Promise.all(rows.map((row) => signLibraryRow(row, actor)));
+  // One missing object (deleted file, restored database without its media
+  // folder) must not take the whole library down; skip that tile instead.
+  const signed = await Promise.allSettled(rows.map((row) => signLibraryRow(row, actor)));
+  const items = signed.flatMap((result, index) => {
+    if (result.status === "fulfilled") return [result.value];
+    console.warn("[media-library] skipped item", rows[index].id, result.reason instanceof Error ? result.reason.message : result.reason);
+    return [];
+  });
 
   return {
     items,

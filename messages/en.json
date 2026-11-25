@@ -466,7 +466,8 @@
       "delete": "Could not delete this file. Please try again.",
       "save": "Could not download the photos. Please try again.",
       "share": "Could not share the photos. Please try again."
-    }
+    },
+    "info": "Info"
   },
   "notifications": {
     "title": "Notifications",

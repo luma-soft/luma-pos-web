@@ -4,10 +4,12 @@ import { useLocale, useTranslations } from "next-intl";
 import {
   ArrowDownToLine,
   FileText,
+  Info,
   Link2,
   LoaderCircle,
   LockKeyhole,
   Trash2,
+  X,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -38,7 +40,10 @@ export function LibraryPreview({
   const [failed, setFailed] = useState(false);
   const [zoomed, setZoomed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [infoOpen, setInfoOpen] = useState(false);
   const current = resolved ?? item;
+  // Phones show images in the iOS LumaImageViewer: black, full screen, own chrome.
+  const phoneViewer = item.kind === "image";
   const sourcePreset = libraryItemSourcePreset(current);
   const albumLabel = sourcePreset ? t(`sourceAlbums.${sourcePreset}`) : current.album;
   const sizeLabel = libraryItemSizeKnown(current) ? formatLibraryBytes(current.sizeBytes, locale) : t("unknownSize");
@@ -56,10 +61,24 @@ export function LibraryPreview({
       });
     return () => controller.abort();
   }, [item.id, attempt]);
+  async function extract(signal: AbortSignal) {
+    const next = await libraryRequest<MediaLibraryItem>("/api/mobile/library", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "extract-metadata", id: item.id }),
+      signal,
+    });
+    if (!signal.aborted) {
+      setResolved(next);
+      setFailed(false);
+    }
+    return next.metadata ?? null;
+  }
   return (
     <LibraryDialog
       wide
       fixedHeight
+      phoneViewer={phoneViewer}
       title={current.title}
       description={`${albumLabel} · ${sizeLabel}`}
       onClose={onClose}
@@ -109,7 +128,54 @@ export function LibraryPreview({
         </div>
       }
     >
-      <div className="grid min-w-0 sm:h-full sm:min-h-0 sm:grid-cols-[minmax(0,1fr)_240px] sm:grid-rows-[minmax(0,1fr)]">
+      {phoneViewer && (
+        <PhoneImageViewer
+          item={current}
+          subtitle={`${albumLabel} · ${sizeLabel}`}
+          imageUrl={resolved && !failed ? libraryImageDisplayUrl(resolved) : null}
+          failed={failed}
+          canDelete={libraryCanDelete(current, canManage)}
+          onRetry={() => {
+            setFailed(false);
+            setAttempt((value) => value + 1);
+          }}
+          onClose={onClose}
+          onDelete={onDelete}
+          onInfo={() => setInfoOpen(true)}
+        />
+      )}
+      {phoneViewer && infoOpen && (
+        <div className="fixed inset-0 z-10 flex items-end bg-black/40 lg:hidden" onClick={() => setInfoOpen(false)}>
+          <div
+            role="dialog"
+            aria-label={t("info")}
+            onClick={(event) => event.stopPropagation()}
+            className="flex max-h-[80dvh] w-full flex-col rounded-t-[22px] bg-canvas text-foreground"
+          >
+            <div className="flex items-center gap-3 px-ios-inset pb-1 pt-3">
+              <h2 className="min-w-0 flex-1 truncate text-[17px] font-semibold">{t("info")}</h2>
+              <button
+                type="button"
+                onClick={() => setInfoOpen(false)}
+                aria-label={common("close")}
+                data-button-radius="pill"
+                className="grid size-9 shrink-0 place-items-center rounded-full bg-black/[0.06] text-ios-label-secondary dark:bg-white/10"
+              >
+                <X className="size-4" strokeWidth={2.6} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
+              <LibraryPreviewDetails
+                item={current}
+                canManage={canManage}
+                extractionReady={Boolean(resolved || (!current.source && failed))}
+                onExtract={extract}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      <div className={cn("grid min-w-0 sm:h-full sm:min-h-0 sm:grid-cols-[minmax(0,1fr)_240px] sm:grid-rows-[minmax(0,1fr)]", phoneViewer && "max-lg:hidden")}>
         <div
           role="region"
           aria-label={current.title}
@@ -175,19 +241,7 @@ export function LibraryPreview({
           item={current}
           canManage={canManage}
           extractionReady={Boolean(resolved || (!current.source && failed))}
-          onExtract={async (signal) => {
-            const next = await libraryRequest<MediaLibraryItem>("/api/mobile/library", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "extract-metadata", id: item.id }),
-              signal,
-            });
-            if (!signal.aborted) {
-              setResolved(next);
-              setFailed(false);
-            }
-            return next.metadata ?? null;
-          }}
+          onExtract={extract}
         />
       </div>
     </LibraryDialog>
@@ -253,4 +307,107 @@ export function LibraryPreviewDetails({ item, canManage, extractionReady = true,
             onExtract={onExtract}
           />
         </aside>;
+}
+
+/** Phone image viewer, like LumaImageViewer on iOS: close, title and download on top, actions below. */
+function PhoneImageViewer({
+  item,
+  subtitle,
+  imageUrl,
+  failed,
+  canDelete,
+  onRetry,
+  onClose,
+  onDelete,
+  onInfo,
+}: {
+  item: MediaLibraryItem;
+  subtitle: string;
+  imageUrl: string | null;
+  failed: boolean;
+  canDelete: boolean;
+  onRetry: () => void;
+  onClose: () => void;
+  onDelete: () => void;
+  onInfo: () => void;
+}) {
+  const t = useTranslations("mediaLibrary");
+  const common = useTranslations("common");
+  const circle = "grid size-[42px] shrink-0 place-items-center rounded-full bg-white/[0.12] text-white outline-none focus-visible:ring-2 focus-visible:ring-white/60";
+  return (
+    <div className="flex min-h-0 flex-1 flex-col bg-black text-white lg:hidden">
+      <div className="flex items-center gap-3 px-ios-inset pb-2.5 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
+        <button type="button" onClick={onClose} aria-label={common("close")} data-button-radius="pill" className={circle}>
+          <X className="size-[18px]" strokeWidth={2.6} aria-hidden="true" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] font-semibold">{item.title}</p>
+          <p className="truncate text-[12px] text-white/70">{subtitle}</p>
+        </div>
+        <a
+          href={`/api/mobile/library?open=${encodeURIComponent(item.id)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={t("download")}
+          data-button-radius="pill"
+          className={circle}
+        >
+          <ArrowDownToLine className="size-5" strokeWidth={2.4} aria-hidden="true" />
+        </a>
+      </div>
+      {item.source && (
+        <p className="flex items-center gap-1.5 px-ios-inset pb-2 text-[13px] text-white/[0.78]">
+          <Link2 className="size-3.5 shrink-0" aria-hidden="true" />
+          <span className="line-clamp-2">{t("linkedSource", { source: item.source.label })}</span>
+        </p>
+      )}
+      <div className="relative min-h-0 flex-1">
+        {failed ? (
+          <div className="grid h-full place-items-center p-6 text-center text-[13px] text-white/70">
+            <div>
+              <p>{t("errors.load")}</p>
+              <button type="button" onClick={onRetry} className="mt-3 min-h-11 px-4 text-[15px] font-semibold text-ios-accent">
+                {t("retry")}
+              </button>
+            </div>
+          </div>
+        ) : imageUrl ? (
+          <LumaImage
+            unoptimized
+            fill
+            src={imageUrl}
+            alt={item.title}
+            containerClassName="absolute inset-0 bg-black"
+            className="object-contain"
+            sizes="100vw"
+            fallbackLabel={t("errors.load")}
+          />
+        ) : (
+          <div className="grid h-full place-items-center">
+            <LoaderCircle aria-label={t("loading")} className="size-6 animate-spin text-white/80" />
+          </div>
+        )}
+      </div>
+      <div className="flex flex-col items-center gap-2 px-ios-inset pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-center">
+        <button type="button" onClick={onInfo} className="inline-flex min-h-11 items-center gap-1.5 px-3 text-[15px] font-medium text-ios-accent">
+          <Info className="size-[18px]" aria-hidden="true" />
+          {t("info")}
+        </button>
+        {item.note?.trim() && <p className="line-clamp-2 text-[13px] text-white/[0.88]">{item.note}</p>}
+        {item.tags.length > 0 && (
+          <p className="line-clamp-2 text-[12px] text-ios-accent">{item.tags.map((tag) => `#${tag}`).join("  ")}</p>
+        )}
+        {canDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-[12px] bg-ios-red/15 px-4 text-[15px] font-semibold text-ios-red"
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+            {common("delete")}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }

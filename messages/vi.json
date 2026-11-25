@@ -466,7 +466,8 @@
       "delete": "Không thể xóa tệp. Hãy thử lại.",
       "save": "Không thể lưu ảnh. Hãy thử lại.",
       "share": "Không thể chia sẻ ảnh. Hãy thử lại."
-    }
+    },
+    "info": "Thông tin"
   },
   "notifications": {
     "title": "Thông báo",

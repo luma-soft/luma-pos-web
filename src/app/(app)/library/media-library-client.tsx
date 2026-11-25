@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   Check,
+  ChevronLeft,
   Download,
   FileText,
   Film,
+  HardDrive,
   Image as ImageIcon,
   Images,
   LockKeyhole,
@@ -59,6 +62,8 @@ type BatchDeleteResult = {
   failed: Array<{ id: string; error: string }>;
 };
 
+const NAV_CIRCLE = "grid size-11 shrink-0 place-items-center rounded-full border border-black/[0.06] bg-surface/90 shadow-[0_2px_10px_rgb(0_0_0/0.08)] backdrop-blur-md dark:border-white/10";
+
 export function MediaLibraryClient({
   initialSnapshot,
   storeId,
@@ -68,6 +73,7 @@ export function MediaLibraryClient({
 }) {
   const t = useTranslations("mediaLibrary");
   const common = useTranslations("common");
+  const router = useRouter();
   const locale = useLocale();
   const confirmDialog = useConfirmDialog();
   const dataRevision = useAppDataRevision();
@@ -330,7 +336,36 @@ export function MediaLibraryClient({
   const total = snapshot.page?.totalItems ?? snapshot.items.length;
   return (
     <div className={cn("min-h-full bg-canvas", selectedIds.size > 0 && "pb-24")}>
-      <header className="border-b border-border bg-surface">
+      {/* Phones: NativeMediaLibraryView nav bar (back, inline title, + button) and usage caption. */}
+      <div className="sticky top-0 z-20 flex items-center gap-3 bg-canvas/85 px-ios-inset pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur-xl lg:hidden">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          aria-label={common("back")}
+          data-button-radius="pill"
+          className={cn(NAV_CIRCLE, "text-ios-label")}
+        >
+          <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden="true" />
+        </button>
+        <h1 className="min-w-0 flex-1 truncate text-center text-[17px] font-semibold">{t("title")}</h1>
+        {snapshot.canManage ? (
+          <button
+            type="button"
+            disabled={Boolean(selectionAction)}
+            onClick={() => setUploadOpen(true)}
+            aria-label={t("upload")}
+            data-button-radius="pill"
+            className={cn(NAV_CIRCLE, "text-ios-accent disabled:opacity-40")}
+          >
+            <Plus className="size-6" strokeWidth={2.4} aria-hidden="true" />
+          </button>
+        ) : <span className="size-11 shrink-0" aria-hidden="true" />}
+      </div>
+      <p className="flex items-center gap-1.5 px-ios-inset pt-2 text-[12px] tabular-nums text-ios-label-secondary lg:hidden">
+        <HardDrive className="size-3.5 shrink-0" aria-hidden="true" />
+        {t("storageUsage", { count: libraryTotal, size: formatLibraryBytes(libraryBytes, locale) })}
+      </p>
+      <header className="border-b border-border bg-surface max-lg:hidden">
         <div className="mx-auto max-w-[1600px] px-4 py-4 sm:px-6 lg:px-8 lg:py-5">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -362,9 +397,9 @@ export function MediaLibraryClient({
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1600px] py-3 sm:px-4 lg:px-6">
+      <div className="mx-auto max-w-[1600px] py-3 sm:px-4 lg:px-6 max-lg:pt-3">
         <div className="min-w-0 space-y-4">
-          <section aria-label={t("filters")} className="px-3 sm:px-0">
+          <section aria-label={t("filters")} className="px-3 sm:px-0 max-lg:px-ios-inset">
             <div className="flex items-center gap-2">
               <ListSearchFilterBar
                 search={
@@ -392,7 +427,7 @@ export function MediaLibraryClient({
                 disabled={loading}
                 aria-label={common("refresh")}
                 title={common("refresh")}
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-border bg-surface text-slate-500 transition hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary-600 disabled:opacity-50"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-border bg-surface text-slate-500 max-lg:hidden transition hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary-600 disabled:opacity-50"
               >
                 <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
               </button>

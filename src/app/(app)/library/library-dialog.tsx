@@ -18,6 +18,7 @@ export function LibraryDialog({
   wide = false,
   fixedHeight = false,
   placement = "center",
+  phoneViewer = false,
   onClose,
 }: {
   title: string;
@@ -29,6 +30,8 @@ export function LibraryDialog({
   /** Preview panes own desktop scrolling inside a stable viewport-sized frame. */
   fixedHeight?: boolean;
   placement?: "center" | "drawer";
+  /** Phones: black full-screen image viewer; the children draw their own chrome. */
+  phoneViewer?: boolean;
   onClose: () => void;
 }) {
   const common = useTranslations("common");
@@ -87,9 +90,10 @@ export function LibraryDialog({
           ? "sm:h-[min(800px,calc(100dvh-4rem))]"
           : "sm:h-fit"),
         placement === "center" && wide && "sm:max-w-5xl",
+        phoneViewer && "max-lg:m-0 max-lg:max-h-none max-lg:h-dvh max-lg:max-w-none max-lg:rounded-none max-lg:border-0 max-lg:bg-black max-lg:text-white",
       )}
     >
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-4 py-3 sm:px-6 sm:py-4">
+      <header className={cn("flex shrink-0 items-center justify-between gap-4 border-b border-border px-4 py-3 sm:px-6 sm:py-4", phoneViewer && "max-lg:hidden")}>
         <div className="min-w-0">
           <h2
             id={titleId}
@@ -120,11 +124,12 @@ export function LibraryDialog({
       <div className={cn(
         "min-h-0 flex-1 overflow-y-auto overscroll-contain",
         placement === "center" && fixedHeight && "sm:overflow-hidden",
+        phoneViewer && "max-lg:flex max-lg:flex-col max-lg:overflow-hidden",
       )}>
         {children}
       </div>
       {footer && (
-        <footer className="shrink-0 border-t border-border bg-surface px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+        <footer className={cn("shrink-0 border-t border-border bg-surface px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4", phoneViewer && "max-lg:hidden")}>
           {footer}
         </footer>
       )}
