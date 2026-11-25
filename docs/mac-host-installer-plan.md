@@ -306,6 +306,19 @@ Terminal lần nào.
 3. Cập nhật `self-hosted-operations.md`, `ops/macos/README.md`,
    README app Mac.
 
+> **Đã làm 2026-11-26 (helper v8, chưa diễn tập giữa hai Mac).** Thay cho
+> kênh LAN có mã ghép đôi, chuyển máy bằng **tệp**: màn Bảo trì › "Dừng và
+> xuất dữ liệu" chạy `export-for-move` (dừng và `launchctl disable` web,
+> worker, sao lưu và tunnel để không tự chạy lại sau reboot; worker
+> `export-store` ghi archive cùng định dạng sao lưu Drive, mã hóa bằng khóa
+> sao lưu, vào `/Users/Shared/LumaPOS/exports` cho người dùng). Máy mới chọn
+> "Tệp chuyển máy" trong trình hướng dẫn: `set-backup-key` rồi `restore-file`.
+> `cancel-move` chạy lại máy cũ. Tunnel: đăng nhập Cloudflare trên máy mới tạo
+> tunnel mới và `route dns --overwrite-dns` trỏ tên miền sang máy mới. Đối
+> chiếu số dòng: chưa có ngoài checksum từng tệp trong manifest và thẻ
+> AES-GCM. Chuyển store Mac hiện tại sang cách cài mới (mục 2) chưa làm: cần
+> có mặt chủ cửa hàng, ngoài giờ bán.
+
 **Xong khi:** đã diễn tập chuyển máy hoàn chỉnh giữa hai Mac (hoặc Mac + VM),
 kể cả trường hợp đối chiếu sai cố ý; store Mac chạy bằng cách cài mới ≥ 3 ngày
 không lỗi.
@@ -334,6 +347,17 @@ không lỗi.
 5. Không cập nhật trong giờ bán hàng trừ khi người dùng chọn "Cập nhật ngay";
    mặc định đề nghị sau giờ đóng cửa.
 6. Giữ đường cập nhật cũ ("build từ checkout") cho bản Debug trên máy dev.
+
+> **Đã làm 2026-11-26.** `luma-pos-app/native-macos/scripts/release.sh` (CLI):
+> ký gói runtime bằng Ed25519 (`ops/macos/runtime-signing.mjs`, khóa riêng ở
+> `~/Library/Application Support/LumaPOS/release/`, LibreSSL của macOS không có
+> Ed25519 nên dùng `node:crypto` qua bun), kiểm tra với khóa công khai trong
+> app, build Release ký ad-hoc, nhúng runtime vào `Contents/Resources/runtime`,
+> ký lại, tạo `.dmg` (kèm hướng dẫn mở lần đầu) và `.sha256`; `--runtime-only`
+> tạo gói + `runtime-feed.json`. App chỉ cài gói có chữ ký khớp (trình hướng
+> dẫn chọn sẵn gói trong app; Bảo trì › Phần mềm máy chủ cài gói mới + quay
+> lại bản trước). **Chưa có:** nơi đặt feed (mục 10.3) nên app chưa tự kiểm
+> tra cập nhật; cập nhật runtime hiện bằng cách chọn tệp gói.
 
 **Xong khi:** một commit web mới → `release.sh --runtime-only` → store Mac
 nhận runtime qua feed, chuyển runtime, health xanh; thử rollback bằng một bản
