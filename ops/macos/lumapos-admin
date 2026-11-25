@@ -10,6 +10,9 @@
 #       Put /Users/Shared/LumaPOS/app-next (built by build-release.sh) in place
 #       of /Users/Shared/LumaPOS/app and restart web, sync and notifications.
 #       Restores the previous release if /api/health/live does not answer.
+#       Then restarts the backup worker onto the new release only while it
+#       is idle (no backup stage directory and no pg_dump/rclone child), so a
+#       running backup is never cut.
 #   lumapos-admin service start|stop|restart <web|sync|notifications|backups|cloudflared>
 #   lumapos-admin log <web|sync|notifications|backups|cloudflared> [lines]
 #   lumapos-admin version
@@ -19,7 +22,7 @@ set -uo pipefail
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 umask 022
 
-readonly HELPER_VERSION=1
+readonly HELPER_VERSION=3
 readonly LUMAPOS_ROOT=/Users/Shared/LumaPOS
 readonly LIVE_ROOT="$LUMAPOS_ROOT/app"
 readonly STAGING_ROOT="$LUMAPOS_ROOT/app-next"
@@ -107,6 +110,55 @@ prune_previous() {
   done
 }
 
+# The backup worker runs from the live release but is not stopped for a
+# deploy: a backup in progress (pg_dump, encryption, rclone upload) must not be
+# killed. Restart it onto the new release only when it is idle;
+# otherwise it keeps running the previous code until the next deploy.
+descendants_of() {
+  local child
+  for child in $(pgrep -P "$1" 2>/dev/null); do
+    printf '%s\n' "$child"
+    descendants_of "$child"
+  done
+}
+
+# Busy = any descendant that is not Bun itself (the classic layout runs the
+# worker under `bun run`, which always has a Bun child).
+backup_tools_running() {
+  local process command
+  for process in $(descendants_of "$1"); do
+    command="$(ps -o comm= -p "$process" 2>/dev/null)" || continue
+    [[ -n "$command" && "$(basename "$command")" != bun ]] && return 0
+  done
+  return 1
+}
+
+# A backup also has in-process phases (checksums, encryption) with no child.
+# Its private stage directory (.lumapos-backup-*) exists from the first step
+# to the last, and the worker removes leftovers when it starts.
+backup_stage_present() {
+  local env_file stage_root
+  env_file="$(/usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables:LUMAPOS_ENV_FILE' \
+    /Library/LaunchDaemons/com.lumapos.backups.plist 2>/dev/null)"
+  [[ -n "$env_file" && -f "$env_file" ]] \
+    && stage_root="$(sed -n 's/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}LUMAPOS_BACKUP_STAGING_ROOT=//p' "$env_file" \
+      | tail -n 1 | tr -d "\"'")"
+  [[ -n "${stage_root:-}" && "$stage_root" == /* ]] || return 1
+  compgen -G "$stage_root/.lumapos-backup-*" >/dev/null
+}
+
+refresh_backups() {
+  is_loaded backups || return 0
+  local pid
+  pid="$(launchctl print "$(target_of backups)" 2>/dev/null | awk '/^\tpid = /{print $3; exit}')"
+  if backup_stage_present || { [[ "$pid" =~ ^[0-9]+$ ]] && backup_tools_running "$pid"; }; then
+    step "backups busy"
+    return 0
+  fi
+  launchctl kickstart -k "$(target_of backups)" >/dev/null 2>&1 && step "backups restarted"
+  return 0
+}
+
 cmd_deploy() {
   check_staging
   [[ -d "$LIVE_ROOT" && ! -L "$LIVE_ROOT" ]] || fail "No live release at $LIVE_ROOT"
@@ -133,6 +185,7 @@ cmd_deploy() {
   step "start"
   if load_services "${DEPLOY_SERVICES[@]}" && wait_live; then
     step "live"
+    refresh_backups
     prune_previous
     return 0
   fi

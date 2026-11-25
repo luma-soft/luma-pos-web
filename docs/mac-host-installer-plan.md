@@ -113,9 +113,9 @@ sang giai đoạn sau.
 > chung; release ghép phẳng ở gốc (`server.js`, `.next`) để `lumapos-admin
 > deploy` không phải đổi; chưa tạo file `.tar.zst` (để giai đoạn 5). Kết quả:
 > release 117 MB (trước 888 MB); web, sync, notifications chạy từ release
-> mới, health `ready`. **Còn lại:** worker backup vẫn chạy từ thư mục riêng
-> `backup-worker-main-f06214e80321` (plist root, cần mật khẩu admin để đổi);
-> chưa diễn tập `restore` bằng bundle mới.
+> mới, health `ready`. Ngày 2026-11-25 worker backup cũng chuyển sang `app`
+> (`ExitTimeOut` 900; `lumapos-admin` v3 chỉ khởi động lại nó khi rảnh).
+> **Còn lại:** chưa diễn tập `restore` bằng bundle mới.
 
 Repo `luma-pos-web`.
 

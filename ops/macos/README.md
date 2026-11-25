@@ -123,8 +123,13 @@ trong đó ghi commit của nó. Một lần cập nhật gồm hai bước:
    - giữ hai `app-prev-*` mới nhất để rollback thủ công. `app-failed-*` không
      tự xoá; xoá tay sau khi đã xem lỗi.
 
-Worker sao lưu (`com.lumapos.backups`) chạy từ thư mục riêng ghi trong plist
-của nó và **không** được cập nhật bởi quy trình này.
+Worker sao lưu (`com.lumapos.backups`) cũng chạy từ `app` (từ 2026-11-25) nhưng
+không bị dừng cùng web: sau khi web lên, `lumapos-admin` chỉ khởi động lại nó
+khi đang rảnh, tức là không có thư mục tạm `.lumapos-backup-*` trong
+`LUMAPOS_BACKUP_STAGING_ROOT` và không có tiến trình con (`pg_dump`, `tar`,
+`rclone`). Nếu đang sao lưu, bước deploy in `STEP:backups busy` và worker chạy
+tiếp code cũ tới lần deploy sau. Plist của nó đặt `ExitTimeOut` 900 giây để
+`SIGTERM` có đủ thời gian kết thúc một lần sao lưu.
 
 ### Từ app Mac
 
