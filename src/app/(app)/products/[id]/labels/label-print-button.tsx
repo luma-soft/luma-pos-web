@@ -2,7 +2,15 @@
 
 import { Printer } from "lucide-react";
 
-export function LabelPrintButton({ label }: { label: string }) {
+export function LabelPrintButton({ label, variant = "button" }: { label: string; variant?: "button" | "nav" }) {
+  if (variant === "nav") {
+    // iOS confirmation toolbar item: accent text, no chrome.
+    return (
+      <button type="button" onClick={() => window.print()} className="min-h-11 text-[17px] font-semibold text-ios-accent">
+        {label}
+      </button>
+    );
+  }
   return (
     <button
       type="button"

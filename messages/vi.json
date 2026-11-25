@@ -3305,7 +3305,11 @@
       "codeSource": "Nguồn mã",
       "codeSourceBarcode": "Mã vạch",
       "codeSourceSku": "SKU",
-      "labelsUnit": "tem"
+      "labelsUnit": "tem",
+      "selectedCount": "{count} sản phẩm đã chọn",
+      "lineQuantities": "Số lượng từng tem",
+      "stock": "Tồn: {count}",
+      "removeLine": "Bỏ {name}"
     },
     "variants": {
       "applyTitle": "Áp dụng cho hàng hóa con cùng loại",

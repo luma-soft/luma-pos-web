@@ -147,11 +147,20 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
-      <ModalLayerSurface as="section" closeHref={`${Routes.Inventory}?tab=products`} lockScroll role="dialog" aria-modal="true" aria-labelledby="label-print-title" className="flex h-dvh w-full max-w-7xl flex-col overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl print:h-auto print:max-w-none print:overflow-visible print:border-0 print:shadow-none">
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-5 print:hidden">
+      <ModalLayerSurface as="section" closeHref={`${Routes.Inventory}?tab=products`} lockScroll role="dialog" aria-modal="true" aria-labelledby="label-print-title" className="flex h-dvh w-full max-w-7xl flex-col overflow-hidden bg-surface max-lg:bg-canvas shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl print:h-auto print:max-w-none print:overflow-visible print:border-0 print:shadow-none">
+        {/* Phones: ProductLabelPrintView nav bar (Cancel · title · Print). */}
+        <header className="flex shrink-0 items-center gap-2 px-ios-inset pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] lg:hidden print:hidden">
+          <Link href={`${Routes.Inventory}?tab=products`} className="flex min-h-11 w-24 items-center text-[17px] text-ios-accent">{t("common.cancel")}</Link>
+          <div className="min-w-0 flex-1 text-center">
+            <h1 className="truncate text-[17px] font-semibold">{t("products.labels.title")}</h1>
+            <p className="truncate text-[12px] text-ios-label-secondary">{isBatch ? t("products.labels.selectedCount", { count: products.length }) : product.name}</p>
+          </div>
+          <div className="flex w-24 justify-end"><LabelPrintButton label={t("products.labels.print")} variant="nav" /></div>
+        </header>
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-5 max-lg:hidden print:hidden">
           <div className="min-w-0">
             <h1 id="label-print-title" className="truncate text-lg font-bold">{t("products.labels.title")}</h1>
-            <p className="mt-0.5 truncate text-sm text-slate-500">{isBatch ? `${products.length} sản phẩm đã chọn` : product.name}</p>
+            <p className="mt-0.5 truncate text-sm text-slate-500">{isBatch ? t("products.labels.selectedCount", { count: products.length }) : product.name}</p>
           </div>
           <div className="flex items-center gap-2">
             <LabelPrintButton label={t("products.labels.print")} />
@@ -159,8 +168,8 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           </div>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-5 print:block print:overflow-visible print:p-0">
-        <InstantFilterForm className="mb-4 shrink-0 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden sm:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-5 max-lg:gap-ios-section max-lg:overflow-y-auto max-lg:overscroll-contain max-lg:px-ios-inset max-lg:pb-[calc(env(safe-area-inset-bottom)+1rem)] max-lg:pt-2 print:block print:overflow-visible print:p-0">
+        <InstantFilterForm className="mb-4 shrink-0 grid gap-3 rounded-card border border-border bg-surface p-4 max-lg:mb-0 max-lg:gap-4 max-lg:rounded-[22px] max-lg:border-0 max-lg:p-ios-inset print:hidden sm:grid-cols-[minmax(0,1fr)_280px]">
           {query.ids && <input type="hidden" name="ids" value={query.ids} />}
           {query.from && <input type="hidden" name="from" value={query.from} />}
           <Field label={t("products.labels.template")}><Select name="templateId" defaultValue={template.id} options={templates.map((item) => ({ value: item.id, label: item.name }))} rootClassName="w-full" searchable /></Field>
@@ -168,21 +177,21 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
             <MoneyInput name="price" min={0} step={1000} defaultValue={hasPriceOverride ? Number(query.price) : isBatch ? undefined : Number(product.retailPrice)} placeholder={isBatch ? "Giá riêng theo sản phẩm" : undefined} suffix="đ" className="h-11 bg-canvas lg:h-10" />
           </Field>
           {showLabelLineControls && (
-            <div className="overflow-hidden rounded-lg border border-border-soft sm:col-span-2">
-              <div className="border-b border-border-soft px-3 py-2 text-sm font-semibold">Số lượng từng tem</div>
-              <div className="max-h-64 overflow-auto">
-                <table className="w-full min-w-[720px] text-sm">
-                  <thead className="sticky top-0 z-10 border-b border-border-soft bg-canvas text-left text-xs font-semibold text-slate-500 shadow-sm [&_th]:bg-canvas">
-                    <tr><th className="w-11 px-3 py-2" aria-label="Thao tác" /><th className="px-3 py-2">Mã hàng</th><th className="px-3 py-2">Tên hàng</th><th className="px-3 py-2">Đơn vị tính</th><th className="w-32 px-3 py-2 text-right">{t("products.labels.quantity")}</th></tr>
+            <div className="overflow-hidden rounded-lg border border-border-soft sm:col-span-2 max-lg:-mx-ios-inset max-lg:rounded-none max-lg:border-0 max-lg:border-t max-lg:border-border">
+              <div className="border-b border-border-soft px-3 py-2 text-sm font-semibold max-lg:border-border max-lg:px-ios-inset max-lg:pt-3 max-lg:text-[13px] max-lg:text-ios-label-secondary">{t("products.labels.lineQuantities")}</div>
+              <div className="max-h-64 overflow-auto max-lg:max-h-none max-lg:overflow-visible">
+                <table className="w-full min-w-[720px] text-sm max-lg:block max-lg:min-w-0">
+                  <thead className="max-lg:hidden sticky top-0 z-10 border-b border-border-soft bg-canvas text-left text-xs font-semibold text-slate-500 shadow-sm [&_th]:bg-canvas">
+                    <tr><th className="w-11 px-3 py-2" aria-label={t("common.actions")} /><th className="px-3 py-2">Mã hàng</th><th className="px-3 py-2">Tên hàng</th><th className="px-3 py-2">Đơn vị tính</th><th className="w-32 px-3 py-2 text-right">{t("products.labels.quantity")}</th></tr>
                   </thead>
-                  <tbody className="divide-y divide-border-soft">
+                  <tbody className="divide-y divide-border-soft max-lg:block max-lg:divide-border">
                     {labelProducts.map((labelProduct) => (
-                      <tr key={labelProduct.key}>
-                        <td className="px-3 py-2"><Link href={removeLabelHref(labelProduct.key)} aria-label={`Bỏ ${labelProduct.name} (${labelProduct.baseUnit})`} className="grid h-9 w-9 place-items-center rounded-md text-slate-400 hover:bg-er-soft hover:text-er min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"><Trash2 className="h-4 w-4 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" /></Link></td>
-                        <td className="px-3 py-2 font-mono text-xs text-slate-500">{labelProduct.sku}</td>
-                        <td className="px-3 py-2 font-medium">{labelProduct.name}</td>
-                        <td className="px-3 py-2 text-slate-500"><span>{labelProduct.baseUnit}</span><span className="ml-1 text-xs text-slate-400">· Tồn: {formatNumber(labelProduct.availableQuantity)}</span></td>
-                        <td className="px-3 py-2"><NumberInput name={`qty_${labelProduct.key}`} min={1} max={5000} defaultValue={labelProduct.quantity} thousandSeparator={false} className="h-10 w-24 bg-canvas min-h-11 lg:min-h-0 min-h-11 lg:min-h-0" /></td>
+                      <tr key={labelProduct.key} className="max-lg:grid max-lg:grid-cols-[minmax(0,1fr)_auto_auto] max-lg:items-center max-lg:gap-x-2 max-lg:px-ios-inset max-lg:py-2.5">
+                        <td className="px-3 py-2 max-lg:col-start-3 max-lg:row-span-3 max-lg:row-start-1 max-lg:-mr-2 max-lg:p-0"><Link href={removeLabelHref(labelProduct.key)} aria-label={t("products.labels.removeLine", { name: `${labelProduct.name} (${labelProduct.baseUnit})` })} className="grid h-9 w-9 place-items-center rounded-md text-slate-400 hover:bg-er-soft hover:text-er min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 max-lg:text-ios-red"><Trash2 className="h-4 w-4 max-lg:size-5" /></Link></td>
+                        <td className="px-3 py-2 font-mono text-xs text-slate-500 max-lg:col-start-1 max-lg:row-start-2 max-lg:p-0 max-lg:text-[13px] max-lg:text-ios-label-secondary">{labelProduct.sku}</td>
+                        <td className="px-3 py-2 font-medium max-lg:col-start-1 max-lg:row-start-1 max-lg:p-0 max-lg:text-[17px] max-lg:font-semibold max-lg:leading-[22px]">{labelProduct.name}</td>
+                        <td className="px-3 py-2 text-slate-500 max-lg:col-start-1 max-lg:row-start-3 max-lg:p-0 max-lg:text-[13px] max-lg:text-ios-label-secondary"><span>{labelProduct.baseUnit}</span><span className="ml-1 text-xs text-slate-400 max-lg:text-[13px] max-lg:text-ios-label-secondary">· {t("products.labels.stock", { count: formatNumber(labelProduct.availableQuantity) })}</span></td>
+                        <td className="px-3 py-2 max-lg:col-start-2 max-lg:row-span-3 max-lg:row-start-1 max-lg:p-0"><NumberInput name={`qty_${labelProduct.key}`} min={1} max={5000} defaultValue={labelProduct.quantity} thousandSeparator={false} className="h-10 w-24 bg-canvas min-h-11 lg:min-h-0 max-lg:h-11 max-lg:w-20 max-lg:rounded-[12px] max-lg:text-center max-lg:text-[17px]" /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -192,16 +201,16 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           )}
         </InstantFilterForm>
 
-        <section className="flex min-h-0 flex-1 flex-col rounded-card border border-border bg-surface p-4 print:block print:border-0 print:bg-white print:p-0">
+        <section className="flex min-h-0 flex-1 flex-col rounded-card border border-border bg-surface p-4 max-lg:flex-none max-lg:rounded-[22px] max-lg:border-0 max-lg:p-ios-inset print:block print:border-0 print:bg-white print:p-0">
           <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-2 print:hidden">
-            <h2 className="text-sm font-semibold text-slate-500">{t("products.labels.preview")}</h2>
-            <p className="text-xs text-slate-500">
+            <h2 className="text-sm font-semibold text-slate-500 max-lg:text-[17px] max-lg:text-ios-label">{t("products.labels.preview")}</h2>
+            <p className="text-xs text-slate-500 max-lg:text-[13px] max-lg:text-ios-label-secondary">
               {template.name} · {template.widthMm}x{template.heightMm}mm · {labels.length} {t("products.labels.labelsUnit")}
             </p>
           </div>
-          <div className="min-h-0 flex-1 overflow-auto print:overflow-visible">
+          <div className="min-h-0 flex-1 overflow-auto max-lg:overflow-y-visible print:overflow-visible">
             <div
-              className="grid justify-center"
+              className="grid justify-center max-lg:justify-start"
               style={{
                 gridTemplateColumns: `repeat(${template.columns}, ${template.widthMm}mm)`,
                 gap: `${template.gapMm}mm`,
@@ -234,7 +243,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="min-w-0">
-      <span className="mb-1 block text-xs font-semibold text-slate-500">{label}</span>
+      <span className="mb-1 block text-xs font-semibold text-slate-500 max-lg:mb-1.5 max-lg:text-[15px] max-lg:font-normal max-lg:text-ios-label-secondary">{label}</span>
       {children}
     </label>
   );

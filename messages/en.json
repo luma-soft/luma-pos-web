@@ -3305,7 +3305,11 @@
       "codeSource": "Code source",
       "codeSourceBarcode": "Barcode",
       "codeSourceSku": "SKU",
-      "labelsUnit": "labels"
+      "labelsUnit": "labels",
+      "selectedCount": "{count} products selected",
+      "lineQuantities": "Labels per line",
+      "stock": "Stock: {count}",
+      "removeLine": "Remove {name}"
     },
     "variants": {
       "applyTitle": "Apply to sibling child products",
