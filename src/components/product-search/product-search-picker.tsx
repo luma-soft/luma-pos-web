@@ -305,13 +305,16 @@ export function ProductSearchPicker<T>({
   const showLoading = searching || (catalogStatus === "loading" && visibleItems.length === 0);
   const activeOptionId = activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined;
 
+  // The overlay follows the visual viewport, but Safari 26 draws the keyboard
+  // and its accessory bar translucent; the spread shadow keeps the page behind
+  // them hidden.
   return (
     <div
       ref={rootRef}
       className={cn(
         "relative min-w-0",
         className,
-        fullScreen && "max-lg:fixed max-lg:inset-0 max-lg:z-[80] max-lg:flex max-lg:flex-col max-lg:bg-canvas max-lg:pt-[env(safe-area-inset-top)]",
+        fullScreen && "max-lg:fixed max-lg:inset-0 max-lg:z-[80] max-lg:flex max-lg:flex-col max-lg:bg-canvas max-lg:pt-[env(safe-area-inset-top)] max-lg:shadow-[0_0_0_100vh_var(--color-canvas)]",
       )}
       style={viewportFrame ? { top: viewportFrame.top, bottom: "auto", height: viewportFrame.height } : undefined}
       data-testid={testId}
