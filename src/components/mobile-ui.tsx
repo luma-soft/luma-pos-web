@@ -61,16 +61,17 @@ export function MobileRecordField({ label, value, tone = "neutral", className }:
 
 export function MobileFormLineCard({ title, subtitle, amount, children, actions }: MobileFormLineCardProps) {
   return (
-    <section className="rounded-2xl bg-surface p-4 shadow-e1 lg:hidden">
-      <div className="grid min-w-0 grid-cols-1 gap-2">
-        <div className="min-w-0">
-          <h3 className="truncate text-sm font-black">{title}</h3>
-          {subtitle != null && <p className="mt-0.5 truncate text-xs font-medium text-slate-400">{subtitle}</p>}
+    // iOS inset-grouped row card: name and code on the left, the line amount on the right.
+    <section className="rounded-[22px] bg-surface p-ios-inset lg:hidden">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-[17px] font-semibold leading-[22px]">{title}</h3>
+          {subtitle != null && <p className="mt-0.5 truncate text-[13px] text-ios-label-secondary">{subtitle}</p>}
         </div>
-        {amount != null && <div className="min-w-0 text-right text-sm font-black tabular-nums [overflow-wrap:anywhere]">{amount}</div>}
+        {amount != null && <div className="max-w-[55%] shrink-0 text-right text-[17px] font-semibold tabular-nums [overflow-wrap:anywhere]">{amount}</div>}
       </div>
       <div className="mt-3">{children}</div>
-      {actions != null && <div className="mt-3 flex min-h-11 items-center gap-2 border-t border-border-soft pt-2">{actions}</div>}
+      {actions != null && <div className="mt-3 flex min-h-11 items-center gap-2 border-t border-border pt-2">{actions}</div>}
     </section>
   );
 }

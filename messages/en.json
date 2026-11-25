@@ -4471,7 +4471,12 @@
     "invoiceNumber": "Input invoice number",
     "invoiceNumberPlaceholder": "Enter invoice no...",
     "subtotal": "Goods total",
-    "needPay": "Payable"
+    "needPay": "Payable",
+    "mobileContinue": "Continue",
+    "mobileCompleteTitle": "Complete receipt",
+    "mobileNoProducts": "No products yet",
+    "mobileAddProductsHint": "Add at least one product to the receipt.",
+    "mobileSelectSupplier": "Select supplier"
   },
   "purchaseReturns": {
     "title": "Purchase returns",

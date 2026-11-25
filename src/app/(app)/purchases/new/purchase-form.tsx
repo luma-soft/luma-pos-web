@@ -8,10 +8,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
-import { MobileFormLineCard } from "@/components/mobile-ui";
+import { MobileFormLineCard, TouchTargetToggle } from "@/components/mobile-ui";
 import { cn, formatCurrency } from "@/lib/utils";
 import { Combobox } from "@/components/combobox";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -274,6 +274,8 @@ export function PurchaseForm({
   const [occurredAt, setOccurredAt] = useState("");
   const [pendingAction, setPendingAction] = useState<"receive" | "draft" | null>(null);
   const [savedReceipt, setSavedReceipt] = useState<{ href: string; code: string; isDraft: boolean } | null>(null);
+  // Phones follow the iOS receiving flow: pick items first, then payment.
+  const [mobileStep, setMobileStep] = useState<"items" | "payment">("items");
   const submitInFlightRef = useRef(false);
   const busy = pendingAction !== null;
   const [error, setError] = useState("");
@@ -592,18 +594,54 @@ export function PurchaseForm({
     occurredAt !== "" ||
     note !== (initialValues?.note ?? "");
 
+  const supplierPicker = (
+    <Combobox value={supplierId} onChange={(value) => { clearError(); setSupplierId(value); }} allowClear={false}
+      placeholder={t(supplierOptions.length ? "products.fields.supplierPlaceholder" : "purchases.noSuppliers")}
+      options={supplierOptions.map((supplier) => ({ value: supplier.id, label: supplier.name }))}
+      actionLabel={t("suppliers.createNew")}
+      actionIcon={<Plus className="h-4 w-4" />}
+      onAction={() => { clearError(); setSupplierCreateOpen(true); }} />
+  );
+  const supplierDebt = selectedSupplier && (
+    <div className="mt-1.5 flex items-center justify-between gap-3 text-xs max-lg:mt-2 max-lg:text-[13px]">
+      <span className="text-slate-500 max-lg:text-ios-label-secondary">{t("purchases.currentSupplierDebt")}</span>
+      <span className={cn("tabular-nums font-semibold", Number(selectedSupplier.currentDebt) > 0 ? "text-warn" : "text-slate-400")}>
+        {formatCurrency(Number(selectedSupplier.currentDebt))}
+      </span>
+    </div>
+  );
+
   return (
-    <div className="min-h-full flex flex-col lg:h-dvh">
+    <div className="min-h-full flex flex-col lg:h-dvh max-lg:bg-canvas">
+      {/* Phones: iOS navigation bar — Cancel / Back, centred title per step. */}
+      <div className="sticky top-0 z-30 flex items-center gap-2 bg-canvas/85 px-ios-inset pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur-xl lg:hidden">
+        {mobileStep === "payment" ? (
+          <button type="button" onClick={() => setMobileStep("items")} className="inline-flex min-h-11 w-20 shrink-0 items-center text-[17px] text-ios-accent">
+            {t("common.back")}
+          </button>
+        ) : (
+          <Link href={backHref} className="inline-flex min-h-11 w-20 shrink-0 items-center text-[17px] text-ios-accent">
+            {t("common.cancel")}
+          </Link>
+        )}
+        <h1 className="min-w-0 flex-1 truncate text-center text-[17px] font-semibold">{mobileStep === "payment" ? t("purchases.mobileCompleteTitle") : title}</h1>
+        <span className="w-20 shrink-0" aria-hidden="true" />
+      </div>
       <MobileDetailHeader
         flush
         backHref={backHref}
         backLabel={t("common.back")}
         title={title}
+        className="max-lg:hidden"
       />
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-visible lg:overflow-hidden">
         {/* trái: tìm + bảng hàng */}
-        <div className="flex-1 min-w-0 min-h-[420px] lg:min-h-0 flex flex-col p-3 sm:p-4">
+        <div className={cn(
+          "flex-1 min-w-0 min-h-[420px] lg:min-h-0 flex flex-col p-3 sm:p-4",
+          "max-lg:min-h-0 max-lg:px-ios-inset max-lg:pb-[calc(env(safe-area-inset-bottom)+6.5rem)] max-lg:pt-1",
+          mobileStep === "payment" && "max-lg:hidden",
+        )}>
           <div className="relative mb-3">
             <div className="flex gap-2">
               <ProductSearchPicker
@@ -721,12 +759,26 @@ export function PurchaseForm({
             </div>
           )}
 
-          <div className="flex-1 min-h-[280px] overflow-visible bg-surface border border-border rounded-card lg:overflow-auto">
+          {/* Phones: supplier row above the items, like the iOS receiving screen. */}
+          <div className="mb-ios-section rounded-[22px] bg-surface p-ios-inset lg:hidden">
+            <span className="mb-1.5 block text-[15px] text-ios-label-secondary">{t("purchases.cols.supplier")} *</span>
+            {supplierPicker}
+            {supplierDebt}
+          </div>
+
+          <div className="flex-1 min-h-[280px] overflow-visible bg-surface border border-border rounded-card lg:overflow-auto max-lg:min-h-0 max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent">
             {lines.length === 0 ? (
-              <Text as="div" variant="muted" className="h-full grid place-items-center" text={t("purchases.pickProduct")} />
+              <>
+                <Text as="div" variant="muted" className="h-full grid place-items-center max-lg:hidden" text={t("purchases.pickProduct")} />
+                <div className="flex flex-col items-center px-8 pb-6 pt-14 text-center lg:hidden">
+                  <span className="grid size-14 place-items-center rounded-full bg-surface text-ios-label-secondary"><Search className="size-6" aria-hidden="true" /></span>
+                  <p className="mt-4 text-[17px] font-semibold">{t("purchases.mobileNoProducts")}</p>
+                  <p className="mt-1 text-[15px] text-ios-label-secondary">{t("purchases.mobileAddProductsHint")}</p>
+                </div>
+              </>
             ) : (
               <>
-                <div className="space-y-2 p-3 lg:hidden">
+                <div className="space-y-2 p-3 lg:hidden max-lg:space-y-ios-section max-lg:p-0">
                   {lines.map((l) => (
                     <MobileFormLineCard
                       key={l.productId}
@@ -746,7 +798,7 @@ export function PurchaseForm({
                           aria-label={t("orders.cols.lineTotal")}
                           value={purchaseLineTotal(l)}
                           onChange={(value) => patchLineTotal(l.productId, value ?? 0)}
-                          className="h-9 w-36 rounded-md border border-border bg-surface px-2 text-right text-sm font-black tabular-nums"
+                          className="h-9 w-36 rounded-md border border-border bg-surface px-2 text-right text-sm font-black tabular-nums max-lg:h-11 max-lg:w-32 max-lg:rounded-[12px] max-lg:text-[17px] max-lg:font-semibold"
                         />
                       )}
                       actions={(
@@ -761,7 +813,7 @@ export function PurchaseForm({
                         </Button>
                       )}
                     >
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-3 [&>div]:flex [&>div]:min-w-0 [&>div]:flex-col [&>div]:gap-1.5 [&>div]:space-y-0 [&>div]:text-[13px] [&>div]:font-normal [&>div]:text-ios-label-secondary">
                         <div className="space-y-1 text-xs font-semibold text-slate-500">
                           <span>{t("products.fields.baseUnit")}</span>
                           <Select
@@ -769,6 +821,7 @@ export function PurchaseForm({
                             value={l.unitName}
                             onChange={(event) => changeUnit(l.productId, event.target.value)}
                             className="h-11"
+                            rootClassName="w-full"
                             menuMinWidth={140}
                             options={[
                               { value: l.baseUnit, label: l.baseUnit },
@@ -776,7 +829,7 @@ export function PurchaseForm({
                             ]}
                           />
                         </div>
-                        <div className="col-span-2 space-y-1 text-xs font-semibold text-slate-500">
+                        <div className="order-3 col-span-2 space-y-1 text-xs font-semibold text-slate-500">
                           <span>{t("purchases.cols.qty")}</span>
                           <QuantityInput
                             min={0}
@@ -793,7 +846,7 @@ export function PurchaseForm({
                           <span>{t("purchases.cols.unitCost")}</span>
                           <MoneyInput aria-label={t("purchases.cols.unitCost")} value={l.unitCost} onChange={(value) => patch(l.productId, { unitCost: value ?? 0 })} className={cn(numCls, "h-11")} />
                         </div>
-                        <div className="space-y-1 text-xs font-semibold text-slate-500">
+                        <div className="order-4 col-span-2 space-y-1 text-xs font-semibold text-slate-500">
                           <span>{t("orders.cols.discount")}</span>
                           <div className="flex items-center gap-1">
                             {l.discMode === "vnd" ? <MoneyInput aria-label={t("orders.cols.discount")} min={0} value={l.discInput} placeholder="0" onChange={(discInput) => patch(l.productId, { discInput: discInput ?? 0 })} className={cn(numCls, "h-11 min-w-0")} /> : <NumberInput max={100} decimals={2} thousandSeparator={false} aria-label={t("orders.cols.discount")} min={0} value={l.discInput} placeholder="0" onChange={(discInput) => patch(l.productId, { discInput: discInput ?? 0 })} className={cn(numCls, "h-11 min-w-0")} />}
@@ -897,24 +950,27 @@ export function PurchaseForm({
         </div>
 
         {/* phải: NCC + tổng tiền */}
-        <div className="w-full lg:w-[380px] min-h-0 shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col pb-32 lg:pb-0 lg:overflow-hidden">
-          <div className="flex flex-col gap-3 p-3 sm:p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto [&>*]:shrink-0">
-          <div>
+        <div className={cn(
+          "w-full lg:w-[380px] min-h-0 shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col pb-32 lg:pb-0 lg:overflow-hidden",
+          "max-lg:border-0 max-lg:bg-transparent max-lg:pb-[calc(env(safe-area-inset-bottom)+9rem)]",
+          mobileStep === "items" && "max-lg:hidden",
+        )}>
+          <div className="flex flex-col gap-3 p-3 sm:p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto [&>*]:shrink-0 max-lg:mx-ios-inset max-lg:mt-1 max-lg:rounded-[22px] max-lg:bg-surface max-lg:p-ios-inset">
+          <div className="max-lg:hidden">
             <Text as="div" variant="muted" size="xs" weight="medium" className="mb-1" text={`${t("purchases.cols.supplier")} *`} />
-            <Combobox value={supplierId} onChange={(value) => { clearError(); setSupplierId(value); }} allowClear={false}
-              placeholder={t(supplierOptions.length ? "products.fields.supplierPlaceholder" : "purchases.noSuppliers")}
-              options={supplierOptions.map((supplier) => ({ value: supplier.id, label: supplier.name }))}
-              actionLabel={t("suppliers.createNew")}
-              actionIcon={<Plus className="h-4 w-4" />}
-              onAction={() => { clearError(); setSupplierCreateOpen(true); }} />
-            {selectedSupplier && (
-              <div className="mt-1.5 flex items-center justify-between gap-3 text-xs">
-                <span className="text-slate-500">{t("purchases.currentSupplierDebt")}</span>
-                <span className={cn("tabular-nums font-semibold", Number(selectedSupplier.currentDebt) > 0 ? "text-warn" : "text-slate-400")}>
-                  {formatCurrency(Number(selectedSupplier.currentDebt))}
-                </span>
-              </div>
-            )}
+            {supplierPicker}
+            {supplierDebt}
+          </div>
+          {/* Phones: who the receipt is from, as the iOS payment step's context row. */}
+          <div className="flex items-center justify-between gap-3 border-b border-border pb-3 lg:hidden">
+            <span className="min-w-0">
+              <span className="block text-[13px] text-ios-label-secondary">{t("purchases.cols.supplier")}</span>
+              <span className="block truncate text-[17px] font-semibold">{selectedSupplier?.name ?? "—"}</span>
+            </span>
+            <span className="shrink-0 text-right">
+              <span className="block text-[13px] text-ios-label-secondary">{t("purchases.subtotal")} ({lines.length})</span>
+              <span className="block text-[17px] font-semibold tabular-nums">{formatCurrency(subtotal)}</span>
+            </span>
           </div>
           {/* Receiving warehouse is temporarily hidden; retain the saved/default ID. */}
           <div>
@@ -942,7 +998,11 @@ export function PurchaseForm({
             </div>
             <div className="flex justify-between items-center text-base font-semibold pt-1"><span>{t("purchases.needPay")}</span><span className="text-primary-600 tabular-nums">{formatCurrency(total)}</span></div>
 
-            <label className="flex min-h-11 min-w-11 items-center gap-2 pt-1 text-sm lg:min-h-0 lg:min-w-0"><Checkbox checked={payFull} onChange={(e) => { clearError(); setPayFull(e.target.checked); }}  />{t("purchases.payFull")}</label>
+            <label className="flex min-h-11 min-w-11 items-center gap-2 pt-1 text-sm max-lg:hidden lg:min-h-0 lg:min-w-0"><Checkbox checked={payFull} onChange={(e) => { clearError(); setPayFull(e.target.checked); }}  />{t("purchases.payFull")}</label>
+            <div className="flex min-h-[52px] items-center justify-between gap-3 lg:hidden">
+              <span className="text-[17px]">{t("purchases.payFull")}</span>
+              <TouchTargetToggle checked={payFull} onChange={(checked) => { clearError(); setPayFull(checked); }} aria-label={t("purchases.payFull")} />
+            </div>
             {!payFull && (
               <div className="flex justify-between items-center gap-2"><span className="text-slate-500">{t("purchases.amountPaid")}</span><MoneyInput value={amountPaid || ""} placeholder="0" onChange={(v) => { clearError(); setAmountPaid(v ?? 0); }} className={cn(numCls, "w-36")} /></div>
             )}
@@ -966,7 +1026,7 @@ export function PurchaseForm({
           )}
           </div>
 
-          <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 shrink-0 border-t border-border bg-surface p-3 sm:p-4 lg:static">
+          <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 shrink-0 border-t border-border bg-surface p-3 sm:p-4 lg:static max-lg:bottom-0 max-lg:border-black/[0.08] dark:max-lg:border-white/10 max-lg:bg-surface/90 max-lg:px-ios-inset max-lg:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] max-lg:backdrop-blur-xl">
             {savedReceipt ? (
               <div role="status" className="rounded-card border border-primary-600/20 bg-primary-600/5 p-3">
                 <p className="text-sm font-semibold text-primary-700 dark:text-primary-300">
@@ -978,7 +1038,7 @@ export function PurchaseForm({
               </div>
             ) : (
               <>
-                {canSaveDraft && <p className="mb-2 text-xs text-slate-500">{t("purchases.draftHint")}</p>}
+                {canSaveDraft && <p className="mb-2 text-xs text-slate-500 max-lg:hidden">{t("purchases.draftHint")}</p>}
                 <div className="flex gap-2">
                   {canSaveDraft && <Button type="button" onClick={() => void submit("draft")} disabled={!canSubmit || busy} loading={pendingAction === "draft"} variant="outline" className="h-12 shrink-0 rounded-card font-semibold">
                     {t("purchases.saveDraft")}
@@ -992,6 +1052,24 @@ export function PurchaseForm({
           </div>
         </div>
       </div>
+
+      {/* Phones, step 1: amount due and Continue, like the iOS receiving action bar. */}
+      {mobileStep === "items" && !savedReceipt && (
+        <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-black/[0.08] bg-surface/90 dark:border-white/10 px-ios-inset pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur-xl lg:hidden">
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] text-ios-label-secondary">{t("purchases.needPay")} · {lines.length}</p>
+            <p className="truncate text-[17px] font-semibold tabular-nums">{formatCurrency(total)}</p>
+          </div>
+          <Button
+            type="button"
+            onClick={() => { clearError(); setMobileStep("payment"); window.scrollTo({ top: 0 }); }}
+            disabled={lines.length === 0 || !supplierId}
+            className="h-[50px] min-w-[9rem] shrink-0 !rounded-[14px] bg-ios-accent px-6 text-[17px] font-semibold"
+          >
+            {t("purchases.mobileContinue")}
+          </Button>
+        </div>
+      )}
 
       <SupplierCreateDialog
         open={supplierCreateOpen}

@@ -4471,7 +4471,12 @@
     "invoiceNumber": "Số hóa đơn đầu vào",
     "invoiceNumberPlaceholder": "Nhập số hóa đơn...",
     "subtotal": "Tổng tiền hàng",
-    "needPay": "Cần trả NCC"
+    "needPay": "Cần trả NCC",
+    "mobileContinue": "Tiếp tục",
+    "mobileCompleteTitle": "Hoàn tất nhập hàng",
+    "mobileNoProducts": "Chưa có hàng hóa",
+    "mobileAddProductsHint": "Thêm ít nhất một sản phẩm vào phiếu nhập.",
+    "mobileSelectSupplier": "Chọn nhà cung cấp"
   },
   "purchaseReturns": {
     "title": "Trả hàng nhập",
