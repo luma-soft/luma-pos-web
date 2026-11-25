@@ -9,6 +9,7 @@ import { RowPreviewModal } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { formatReportRange } from "./report-period-label";
 
 const PERIODS = [
   "today",
@@ -46,6 +47,7 @@ export function ReportPeriodFilter({
   const [dateModalOpen, setDateModalOpen] = useState(false);
   const [rangeModalOpen, setRangeModalOpen] = useState(false);
   const [draftPeriod, setDraftPeriod] = useState<ReportPeriod>(period);
+  const periodLabel = period === "custom" ? formatReportRange(from, to) : t(`reports.period.options.${period}` as never);
 
   function navigate(nextPeriod: string, nextFrom?: string, nextTo?: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -113,12 +115,12 @@ export function ReportPeriodFilter({
       >
         <span className="inline-flex min-w-0 items-center gap-2">
           <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">{t(`reports.period.options.${period}` as never)}</span>
+          <span className="truncate">{periodLabel}</span>
         </span>
         <span className="text-xs text-slate-500">{t("reports.period.label")}</span>
       </button>}
       <div className="hidden lg:block">
-        <ReportPeriodSelect period={period} onSelect={selectPeriod} className="h-9" />
+        <ReportPeriodSelect period={period} customLabel={period === "custom" ? periodLabel : undefined} onSelect={selectPeriod} className="h-9" />
       </div>
 
       <RowPreviewModal
@@ -264,10 +266,13 @@ export function ReportPeriodChips({
 
 function ReportPeriodSelect({
   period,
+  customLabel,
   onSelect,
   className,
 }: {
   period: ReportPeriod;
+  /** Applied custom range, shown in the trigger and on the custom option. */
+  customLabel?: string;
   onSelect: (value: string) => void;
   className?: string;
 }) {
@@ -284,7 +289,7 @@ function ReportPeriodSelect({
       )}
       options={PERIODS.filter((value) => value !== "week").map((value) => ({
         value,
-        label: t(`reports.period.options.${value}` as never),
+        label: value === "custom" && customLabel ? customLabel : t(`reports.period.options.${value}` as never),
       }))}
       onValueChange={onSelect}
     />

@@ -10,6 +10,7 @@ import { parsePageSize } from "@/lib/pagination";
 import { Routes } from "@/lib/routes";
 import { CustomersReport, OrdersReport, OverviewReport, ProductsReport } from "./report-dashboard";
 import { ReportPeriodFilter, type ReportPeriod } from "./report-period-filter";
+import { formatReportRange } from "./report-period-label";
 
 interface PageProps {
   searchParams: Promise<{
@@ -63,7 +64,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             </Link>
             <div className="min-w-0 text-center">
               <h1 className="truncate text-[17px] font-semibold">{t("reports.title")}</h1>
-              <p className="truncate text-[13px] text-ios-label-secondary">{t(`reports.period.options.${period}` as never)}</p>
+              <p className="truncate text-[13px] text-ios-label-secondary">{period === "custom" ? formatReportRange(dateRange.fromValue, dateRange.toValue) : t(`reports.period.options.${period}` as never)}</p>
             </div>
             <ReportPeriodFilter period={period} from={dateRange.fromValue} to={dateRange.toValue} mobileTrigger="circle" />
           </div>
