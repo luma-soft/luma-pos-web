@@ -102,9 +102,10 @@ const ARCHIVE_TRANSFER_TIMEOUT_MS = 6 * 60 * 60_000;
 function runRclone(
   config: GoogleDriveBackupConfig,
   args: string[],
-  options: { timeoutMs?: number; captureOutput?: boolean } = {},
+  options: { timeoutMs?: number; captureOutput?: boolean; maxOutputBytes?: number } = {},
 ): Promise<string> {
   const captureOutput = options.captureOutput ?? false;
+  const maxOutputBytes = options.maxOutputBytes ?? MAX_RCLONE_OUTPUT_BYTES;
   return new Promise((resolve, reject) => {
     const child = spawn(config.rcloneBin, [
       "--config", config.configPath,
@@ -131,7 +132,7 @@ function runRclone(
 
     child.stdout?.on("data", (chunk: Buffer) => {
       if (!captureOutput) return;
-      if (Buffer.byteLength(output) + chunk.byteLength > MAX_RCLONE_OUTPUT_BYTES) {
+      if (Buffer.byteLength(output) + chunk.byteLength > maxOutputBytes) {
         outputTooLarge = true;
         child.kill("SIGTERM");
         return;
@@ -176,7 +177,7 @@ function md5Hash(info: RcloneFileInfo) {
   return entry?.[1]?.toLowerCase() ?? null;
 }
 
-async function md5File(filePath: string) {
+export async function md5File(filePath: string) {
   const hash = createHash("md5");
   for await (const chunk of createReadStream(filePath)) hash.update(chunk as Buffer);
   return hash.digest("hex");
@@ -325,6 +326,53 @@ export async function downloadGoogleDriveBackupArchive(input: {
 
   await runRclone(config, ["copyto", remotePath, input.destinationPath], { timeoutMs: ARCHIVE_TRANSFER_TIMEOUT_MS });
   await chmod(input.destinationPath, 0o600);
+}
+
+/** Drive's MD5 of an uploaded archive, to check a download without the SHA-256 recorded on the old Mac. */
+export async function readGoogleDriveBackupArchiveMd5(input: {
+  archiveKey: string;
+  env?: NodeJS.ProcessEnv;
+}): Promise<string> {
+  const { config, blockers } = getConfig(input.env);
+  const remotePath = config ? getRemoteArchivePath(config.remoteRoot, input.archiveKey) : null;
+  if (!config || !remotePath || blockers.length > 0) throw new Error("BACKUP_DESTINATION_NOT_READY");
+  const md5 = md5Hash(await readRemoteFileInfo(config, remotePath));
+  if (!md5 || !/^[0-9a-f]{32}$/.test(md5)) throw new Error("GOOGLE_DRIVE_ARCHIVE_HASH_UNAVAILABLE");
+  return md5;
+}
+
+export type GoogleDriveBackupArchive = {
+  archiveKey: string;
+  sizeBytes: number;
+  modifiedAt: string;
+};
+
+const REMOTE_ARCHIVE_PATH_PATTERN = /^[0-9]{4}\/[0-9]{2}\/[0-9]{2}\/lumapos-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.lumaenc$/i;
+
+/**
+ * Archives in the Drive folder, newest first. A new Mac has no backup
+ * history of its own, so setup lists what is on Drive.
+ */
+export async function listGoogleDriveBackupArchives(input: {
+  limit?: number;
+  env?: NodeJS.ProcessEnv;
+} = {}): Promise<GoogleDriveBackupArchive[]> {
+  const { config, blockers } = getConfig(input.env);
+  if (!config || blockers.length > 0) throw new Error("BACKUP_DESTINATION_NOT_READY");
+  const output = await runRclone(config, [
+    "lsjson", "--recursive", "--files-only", "--no-mimetype", config.remoteRoot,
+  ], { timeoutMs: 120_000, captureOutput: true, maxOutputBytes: 8 * 1024 * 1024 });
+  const entries = JSON.parse(output) as Array<{ Path?: string; Size?: number; ModTime?: string }>;
+  return entries
+    .filter((entry) => typeof entry.Path === "string" && REMOTE_ARCHIVE_PATH_PATTERN.test(entry.Path)
+      && Number.isSafeInteger(entry.Size) && (entry.Size ?? 0) > 0)
+    .map((entry) => ({
+      archiveKey: `${GOOGLE_DRIVE_ARCHIVE_PREFIX}${entry.Path}`,
+      sizeBytes: entry.Size as number,
+      modifiedAt: new Date(entry.ModTime ?? 0).toISOString(),
+    }))
+    .sort((first, second) => second.modifiedAt.localeCompare(first.modifiedAt))
+    .slice(0, Math.max(1, Math.min(input.limit ?? 30, 200)));
 }
 
 export function isGoogleDriveArchiveKey(value: unknown): boolean {

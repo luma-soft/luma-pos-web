@@ -220,9 +220,24 @@ như daemon hệ thống, và sống qua khởi động lại máy khi không ai
 > đã cất) → `start-services` → hoàn tất. `lumapos-admin` v5 thêm các lệnh này;
 > `init-runtime-env` không bao giờ đổi khóa đã có.
 >
-> **Chưa có:** khôi phục từ Google Drive (đăng nhập rclone + `restore`), nhận từ
-> máy cũ (giai đoạn 4), đăng nhập Cloudflare trong app (`cloudflared tunnel
-> login`), chế độ LAN cho máy khác (web vẫn chỉ nghe `127.0.0.1`).
+> **Khôi phục từ Google Drive (2026-11-25, helper v6).** Bước cơ sở dữ liệu
+> giờ chỉ `init-database` + `init-runtime-env`; `migrate` chạy ở bước cửa hàng.
+> Bước cửa hàng có hai lựa chọn: cửa hàng mới (`migrate` + `provision-store`)
+> hoặc khôi phục: chọn `rclone.conf` của máy cũ + thư mục sao lưu
+> (`configure-drive`, tệp qua stdin), nhập khóa sao lưu cũ (`set-backup-key`,
+> chỉ khi DB còn trống), `list-backups` (worker `list-drive-backups` đọc thư
+> mục Drive, mới nhất trước), chọn bản → `restore-backup` (compat SQL, worker
+> `restore-database-backup` với staging trong `backup-staging`, rồi
+> `migrate`). Máy mới không có lịch sử sao lưu nên không có SHA-256: bản tải
+> về được so với MD5 của Drive, nội dung vẫn được thẻ AES-GCM xác thực. Khôi
+> phục xong thì bỏ qua bước khóa sao lưu (giữ khóa cũ). Đã thử với cụm
+> PostgreSQL 17 tạm và rclone giả: khôi phục đúng (dữ liệu, media, chủ sở
+> hữu), sai khóa / tải hỏng / DB đã có dữ liệu đều bị chặn.
+>
+> **Chưa có:** đăng nhập Google trong app (giờ cần `rclone.conf` của máy cũ),
+> thư mục Drive có dấu cách, nhận từ máy cũ (giai đoạn 4), đăng nhập
+> Cloudflare trong app (`cloudflared tunnel login`), chế độ LAN cho máy khác
+> (web vẫn chỉ nghe `127.0.0.1`).
 
 Màn mới trong app Mac (VI/EN, theo `LumaTheme`), hiện khi chưa có
 `/Users/Shared/LumaPOS/current`.

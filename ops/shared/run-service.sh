@@ -85,6 +85,14 @@ if [[ -f "$app_root/manifest.json" && -f "$app_root/server.js" && -d "$app_root/
       # arrives in LUMA_OWNER_PASSWORD, the rest as arguments.
       exec "$bun_bin" workers/provision-store.js "${@:2}"
       ;;
+    list-backups)
+      # One-shot, run by `lumapos-admin list-backups`.
+      exec "$bun_bin" workers/list-drive-backups.js
+      ;;
+    restore-backup)
+      # One-shot, run by `lumapos-admin restore-backup` on an empty database.
+      exec "$bun_bin" workers/restore-database-backup.js "${@:2}"
+      ;;
     *)
       printf '%s\n' "Unknown LumaPOS service name." >&2
       exit 64

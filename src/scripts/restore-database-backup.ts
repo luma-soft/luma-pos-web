@@ -13,6 +13,8 @@ import {
 import {
   downloadGoogleDriveBackupArchive,
   isGoogleDriveArchiveKey,
+  md5File,
+  readGoogleDriveBackupArchiveMd5,
   readGoogleDriveBackupReadiness,
 } from "@/lib/ops/google-drive-backups";
 import { postgresUtilityMajorVersion, resolvePostgresUtility } from "./postgres-tools";
@@ -45,9 +47,12 @@ if (
 ) {
   throw new Error("Archive path is not in a supported LumaPOS backup namespace");
 }
+// The SHA-256 shown in LumaPOS administration is checked when given. A new
+// Mac has no backup history, so without it the download is checked against
+// Drive's MD5 instead; the AES-GCM tag still authenticates the content.
 const expectedSha256 = argument("sha256")?.toLowerCase();
-if (remoteArchive && (!expectedSha256 || !/^[0-9a-f]{64}$/.test(expectedSha256))) {
-  throw new Error("Google Drive restore requires the SHA-256 value shown in LumaPOS administration");
+if (expectedSha256 !== undefined && !/^[0-9a-f]{64}$/.test(expectedSha256)) {
+  throw new Error("The SHA-256 value must be 64 hexadecimal characters");
 }
 const stagingRoot = process.env.LUMAPOS_BACKUP_STAGING_ROOT?.trim();
 const mediaRoot = process.env.MEDIA_LOCAL_ROOT?.trim();
@@ -142,7 +147,11 @@ try {
     if (!driveReadiness.configured) {
       throw new Error(`GOOGLE_DRIVE_NOT_READY:${driveReadiness.blockers.join(",")}`);
     }
+    const driveMd5 = expectedSha256 ? null : await readGoogleDriveBackupArchiveMd5({ archiveKey: archiveName });
     await downloadGoogleDriveBackupArchive({ archiveKey: archiveName, destinationPath: archivePath });
+    if (driveMd5 && await md5File(archivePath) !== driveMd5) {
+      throw new Error("Downloaded backup does not match the copy on Google Drive");
+    }
   }
   const archiveStats = await lstat(archivePath);
   if (!archiveStats.isFile() || archiveStats.isSymbolicLink() || archiveStats.size < MAGIC.byteLength + 12 + 16) {

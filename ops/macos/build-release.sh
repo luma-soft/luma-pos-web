@@ -109,6 +109,7 @@ worker_sources=(
   src/scripts/run-self-hosted-maintenance.ts
   src/db/apply-migrations-from-database-url.ts
   src/scripts/provision-store.ts
+  src/scripts/list-drive-backups.ts
 )
 for source in "${worker_sources[@]}"; do
   name="$(basename "$source" .ts)"

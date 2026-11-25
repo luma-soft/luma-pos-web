@@ -45,13 +45,21 @@
 #   lumapos-admin configure-tunnel <hostname>
 #       stdin: Cloudflare tunnel credentials JSON.
 #   lumapos-admin start-services
+#   lumapos-admin configure-drive <remote>
+#       stdin: rclone.conf with the Google Drive remote; sets the backup folder.
+#   lumapos-admin set-backup-key
+#       stdin: the old Mac's backup key; only while the database is empty.
+#   lumapos-admin list-backups
+#       The archives in the Drive folder, newest first, as JSON.
+#   lumapos-admin restore-backup <google-drive/YYYY/MM/DD/lumapos-<uuid>.lumaenc>
+#       Restores database and media into an empty install, then migrates.
 #
 # Progress lines start with "STEP:" so the Mac host console can show them.
 set -uo pipefail
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 umask 022
 
-readonly HELPER_VERSION=5
+readonly HELPER_VERSION=6
 readonly LUMAPOS_ROOT=/Users/Shared/LumaPOS
 readonly LIVE_ROOT="$LUMAPOS_ROOT/app"
 readonly STAGING_ROOT="$LUMAPOS_ROOT/app-next"
@@ -864,6 +872,89 @@ cmd_start_services() {
   step "services running"
 }
 
+# ---- restore from Google Drive (setup on a new Mac) ----
+
+# Runs a one-shot worker of the active runtime as the service user.
+run_worker() {
+  local app="$CURRENT_LINK/app"
+  sudo -u "$SERVICE_USER" -- /usr/bin/env -i \
+    PATH="$CURRENT_LINK/tools/bin:/usr/bin:/bin" \
+    TMPDIR="$LUMAPOS_ROOT/backup-staging/" \
+    LUMAPOS_APP_ROOT="$app" LUMAPOS_ENV_FILE="$RUNTIME_ENV" \
+    LUMAPOS_BUN_BIN="$CURRENT_LINK/tools/bin/bun" \
+    LUMAPOS_POSTGRES_BIN_DIR="$(postgres_bin)" \
+    LUMAPOS_RCLONE_BIN="$CURRENT_LINK/tools/bin/rclone" \
+    /bin/bash "$app/ops/shared/run-service.sh" "$@"
+}
+
+public_relation_count() {
+  db_psql -d "$DATABASE_NAME" -At -c "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r','p','S','v','m','f')"
+}
+
+# configure-drive <remote>; stdin: the rclone.conf that holds the Google
+# Drive remote (from the old Mac). <remote> is name:folder, as in
+# LUMAPOS_BACKUP_REMOTE.
+cmd_configure_drive() {
+  local remote="${1:-}"
+  [[ "$remote" =~ ^[A-Za-z0-9_-]+:[^[:space:][:cntrl:]\\]+$ && ${#remote} -le 200 && "$remote" != *..* && "$remote" != *:/* ]] \
+    || fail "Drive folder must look like lumapos:Backups/LumaPOS" 64
+  cmd_write_secret rclone.conf >/dev/null || exit $?
+  set_env_value LUMAPOS_RCLONE_CONFIG "$SECRETS_DIR/rclone.conf" \
+    && set_env_value LUMAPOS_BACKUP_REMOTE "$remote" \
+    && set_env_value LUMAPOS_BACKUP_PROVIDER google-drive \
+    || fail "Could not update runtime.env"
+  step "drive $remote"
+}
+
+# set-backup-key; stdin: the 64-hex backup key of the old Mac. Only while
+# the database is still empty: replacing the key of a store that already
+# has data would make its own archives unreadable.
+cmd_set_backup_key() {
+  local key count
+  IFS= read -r key || true
+  key="$(printf '%s' "$key" | tr -d '[:space:]' | tr 'A-F' 'a-f')"
+  [[ "$key" =~ ^[0-9a-f]{64}$ ]] || fail "The backup key must be 64 hexadecimal characters" 64
+  current_version >/dev/null || fail "No active runtime"
+  wait_postgres || fail "PostgreSQL is not running"
+  count="$(public_relation_count)" || fail "Could not inspect the database"
+  [[ "$count" == 0 ]] || fail "The database already has data; its backup key stays as it is" 65
+  set_env_value LUMAPOS_BACKUP_ENCRYPTION_KEY "$key" || fail "Could not update runtime.env"
+  step "backup key set"
+}
+
+# list-backups: one JSON line {"archives":[{archiveKey,sizeBytes,modifiedAt}]}.
+cmd_list_backups() {
+  current_version >/dev/null || fail "No active runtime"
+  [[ -f "$CURRENT_LINK/app/workers/list-drive-backups.js" ]] || fail "This runtime cannot list backups"
+  run_worker list-backups || fail "Could not read the backups on Google Drive (check rclone.conf and the folder)"
+}
+
+# restore-backup <google-drive/YYYY/MM/DD/lumapos-<uuid>.lumaenc>: restores
+# the database and media into this empty install, then applies the
+# migrations of the active runtime.
+cmd_restore_backup() {
+  local archive="${1:-}" app="$CURRENT_LINK/app" count
+  [[ "$archive" =~ ^google-drive/[0-9]{4}/[0-9]{2}/[0-9]{2}/lumapos-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.lumaenc$ ]] \
+    || fail "Unknown backup archive" 64
+  current_version >/dev/null || fail "No active runtime"
+  wait_postgres || fail "PostgreSQL is not running"
+  for name in web sync notifications backups; do
+    is_loaded "$name" && fail "Stop LumaPOS before restoring (service $name is running)" 65
+  done
+  count="$(public_relation_count)" || fail "Could not inspect the database"
+  [[ "$count" == 0 ]] || fail "The database already has data; restore needs an empty install" 65
+  [[ -f "$app/sql/bootstrap-local-postgres-compat.sql" ]] || fail "Runtime has no sql/ scripts"
+  step "compat"
+  { printf 'SET ROLE %s;\n' "$OWNER_ROLE"; cat "$app/sql/bootstrap-local-postgres-compat.sql"; } \
+    | db_psql -d "$DATABASE_NAME" >/dev/null || fail "Could not prepare the database"
+  step "download and restore (large backups take a while)"
+  run_worker restore-backup --confirm-empty-database --archive "$archive" >/dev/null \
+    || fail "Restore failed (check the backup key; see the message above)"
+  step "migrate"
+  run_migrations >/dev/null || fail "The backup was restored but migrations failed"
+  step "restored"
+}
+
 # ---- secrets ----
 
 cmd_write_secret() {
@@ -936,5 +1027,9 @@ case "${1:-}" in
   provision-store) shift; cmd_provision_store "$@" ;;
   configure-tunnel) shift; cmd_configure_tunnel "${1:-}" ;;
   start-services) cmd_start_services ;;
-  *) fail "Usage: lumapos-admin deploy | service start|stop|restart <name> | log <name> [lines] | version | status | bootstrap <user> | create-accounts | install-runtime <archive> [sha256] | activate-runtime <version> | rollback-runtime | init-database | migrate | write-secret <name> | init-runtime-env [public-url] | backup-key | provision-store <slug> <email> | configure-tunnel <hostname> | start-services" 64 ;;
+  configure-drive) shift; cmd_configure_drive "${1:-}" ;;
+  set-backup-key) cmd_set_backup_key ;;
+  list-backups) cmd_list_backups ;;
+  restore-backup) shift; cmd_restore_backup "${1:-}" ;;
+  *) fail "Usage: lumapos-admin deploy | service start|stop|restart <name> | log <name> [lines] | version | status | bootstrap <user> | create-accounts | install-runtime <archive> [sha256] | activate-runtime <version> | rollback-runtime | init-database | migrate | write-secret <name> | init-runtime-env [public-url] | backup-key | provision-store <slug> <email> | configure-tunnel <hostname> | start-services | configure-drive <remote> | set-backup-key | list-backups | restore-backup <archive>" 64 ;;
 esac
