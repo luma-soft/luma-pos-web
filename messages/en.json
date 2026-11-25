@@ -4543,7 +4543,8 @@
       "emptyItems": "Add at least 1 returned product.",
       "insufficientStock": "Return quantity exceeds current stock.",
       "qtyExceedsSource": "Return quantity exceeds the remaining amount from the source receipt."
-    }
+    },
+    "mobilePaymentTitle": "Payment and tax"
   },
   "inventory": {
     "title": "Inventory",

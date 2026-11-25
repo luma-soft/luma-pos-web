@@ -9,13 +9,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Search, Trash2 } from "lucide-react";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
 import { Combobox } from "@/components/combobox";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
-import { MobileFormLineCard } from "@/components/mobile-ui";
+import { MobileFormLineCard, TouchTargetToggle } from "@/components/mobile-ui";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -107,6 +108,8 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
   const submitInFlightRef = useRef(false);
   const [error, setError] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
+  // Phones follow the iOS return editor: pick items first, then payment and tax.
+  const [mobileStep, setMobileStep] = useState<"items" | "payment">("items");
 
   const linkedProductIds = useMemo(
     () => initialPurchase ? new Set(initialPurchase.items.map((item) => item.productId)) : null,
@@ -309,17 +312,48 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
 
   const numCls = "no-spinner min-h-11 w-full px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums lg:min-h-0";
 
+  const backHref = `${Routes.Inventory}?tab=purchase-returns`;
+  const formTitle = initial ? `Sửa phiếu ${initial.code}` : t("purchaseReturns.createTitle");
+  const supplierPicker = (
+    <Combobox
+      value={supplierId}
+      onChange={setSupplierId}
+      allowClear={false}
+      placeholder={t("purchaseReturns.supplierPlaceholder")}
+      options={options.suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))}
+    />
+  );
+
   return (
-    <div className="min-h-full flex flex-col lg:h-dvh">
+    <div className="min-h-full flex flex-col lg:h-dvh max-lg:bg-canvas">
+      {/* Phones: iOS navigation bar — Cancel / Back, centred title per step. */}
+      <div className="sticky top-0 z-30 flex items-center gap-2 bg-canvas/85 px-ios-inset pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur-xl lg:hidden">
+        {mobileStep === "payment" ? (
+          <button type="button" onClick={() => setMobileStep("items")} className="inline-flex min-h-11 w-20 shrink-0 items-center text-[17px] text-ios-accent">
+            {t("common.back")}
+          </button>
+        ) : (
+          <Link href={backHref} className="inline-flex min-h-11 w-20 shrink-0 items-center text-[17px] text-ios-accent">
+            {t("common.cancel")}
+          </Link>
+        )}
+        <h1 className="min-w-0 flex-1 truncate text-center text-[17px] font-semibold">{mobileStep === "payment" ? t("purchaseReturns.mobilePaymentTitle") : formTitle}</h1>
+        <span className="w-20 shrink-0" aria-hidden="true" />
+      </div>
       <MobileDetailHeader
         flush
-        backHref={`${Routes.Inventory}?tab=purchase-returns`}
+        backHref={backHref}
         backLabel={t("common.back")}
-        title={initial ? `Sửa phiếu ${initial.code}` : t("purchaseReturns.createTitle")}
+        title={formTitle}
+        className="max-lg:hidden"
       />
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-visible lg:overflow-hidden bg-canvas">
-        <div className="flex-1 min-w-0 min-h-[420px] lg:min-h-0 flex flex-col p-3 sm:p-4">
+        <div className={cn(
+          "flex-1 min-w-0 min-h-[420px] lg:min-h-0 flex flex-col p-3 sm:p-4",
+          "max-lg:min-h-0 max-lg:px-ios-inset max-lg:pb-[calc(env(safe-area-inset-bottom)+6.5rem)] max-lg:pt-1",
+          mobileStep === "payment" && "max-lg:hidden",
+        )}>
           <div className="relative mb-3">
             <div className="flex gap-2">
               <ProductSearchPicker
@@ -397,17 +431,22 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
             </div>
           </div>
 
-          <div className="flex-1 min-h-[320px] overflow-visible bg-surface border border-border rounded-card lg:overflow-auto">
+          {/* Phones: supplier card above the items, like the iOS return editor. */}
+          <div className="mb-ios-section rounded-[22px] bg-surface p-ios-inset lg:hidden">
+            <span className="mb-1.5 block text-[15px] text-ios-label-secondary">{t("purchases.cols.supplier")} *</span>
+            {supplierPicker}
+          </div>
+
+          <div className="flex-1 min-h-[320px] overflow-visible bg-surface border border-border rounded-card lg:overflow-auto max-lg:min-h-0 max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent">
             <div className="lg:hidden">
               {lines.length === 0 ? (
-                <div className="grid min-h-[320px] place-items-center px-4 text-center text-slate-400">
-                  <div>
-                    <div className="font-semibold text-slate-700 dark:text-slate-200">{t("purchaseReturns.emptyLinesTitle")}</div>
-                    <div className="mt-2 text-sm">{t("purchaseReturns.emptyLinesHint")}</div>
-                  </div>
+                <div className="flex flex-col items-center px-8 pb-6 pt-14 text-center">
+                  <span className="grid size-14 place-items-center rounded-full bg-surface text-ios-label-secondary"><Search className="size-6" aria-hidden="true" /></span>
+                  <p className="mt-4 text-[17px] font-semibold">{t("purchaseReturns.emptyLinesTitle")}</p>
+                  <p className="mt-1 text-[15px] text-ios-label-secondary">{t("purchaseReturns.emptyLinesHint")}</p>
                 </div>
               ) : (
-                <div className="space-y-2 p-3">
+                <div className="space-y-ios-section">
                   {lines.map((line) => {
                     const overStock = exceedsLimit(line);
                     const purchased = purchasedFromSource(line);
@@ -429,10 +468,10 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                           </Button>
                         )}
                       >
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-3 [&>div]:flex [&>div]:min-w-0 [&>div]:flex-col [&>div]:gap-1.5 [&>div]:space-y-0 [&>div]:text-[13px] [&>div]:font-normal [&>div]:text-ios-label-secondary">
                           <div className="space-y-1">
-                            <div className="text-xs font-semibold text-slate-500">{t(initialPurchase ? "purchaseReturns.remainingToReturn" : "purchaseReturns.availableStock", { stock: formatNumber(initialPurchase ? remainingFromSource(line) : availableStock(line)), unit: line.unitName })}</div>
-                            <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{line.unitName}</div>
+                            <div className="text-xs font-semibold text-slate-500 max-lg:text-[13px] max-lg:font-normal max-lg:text-ios-label-secondary">{t(initialPurchase ? "purchaseReturns.remainingToReturn" : "purchaseReturns.availableStock", { stock: formatNumber(initialPurchase ? remainingFromSource(line) : availableStock(line)), unit: line.unitName })}</div>
+                            <div className="text-sm font-semibold text-slate-700 dark:text-slate-200 max-lg:text-[17px] max-lg:font-normal max-lg:text-ios-label">{line.unitName}</div>
                           </div>
                           <div className="col-span-2 space-y-1 text-xs font-semibold text-slate-500">
                             <span>{t("purchaseReturns.cols.qty")}</span>
@@ -452,7 +491,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
                             {overStock && <span className="block text-er">{t("purchaseReturns.errors.qtyExceedsSource")}</span>}
                           </div>
                           <div className="space-y-1">
-                            <div className="text-xs font-semibold text-slate-500">{t("purchaseReturns.cols.unitCost")}</div>
+                            <div className="text-xs font-semibold text-slate-500 max-lg:text-[13px] max-lg:font-normal max-lg:text-ios-label-secondary">{t("purchaseReturns.cols.unitCost")}</div>
                             <div className="flex h-11 items-center justify-end rounded-md bg-canvas px-3 text-sm tabular-nums text-slate-500">{formatCurrency(line.unitCost)}</div>
                           </div>
                           <div className="space-y-1 text-xs font-semibold text-slate-500">
@@ -546,7 +585,11 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
           </div>
         </div>
 
-        <aside className="w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto">
+        <aside className={cn(
+          "w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto",
+          "max-lg:mx-ios-inset max-lg:mb-[calc(env(safe-area-inset-bottom)+7rem)] max-lg:mt-1 max-lg:w-auto max-lg:rounded-[22px] max-lg:border-0 max-lg:p-ios-inset",
+          mobileStep === "items" && "max-lg:hidden",
+        )}>
           <DocumentTimeField
             label={t("documentTime.purchaseReturn")}
             value={occurredAt}
@@ -554,13 +597,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
             onChange={setOccurredAt}
           />
 
-          <Combobox
-            value={supplierId}
-            onChange={setSupplierId}
-            allowClear={false}
-            placeholder={t("purchaseReturns.supplierPlaceholder")}
-            options={options.suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))}
-          />
+          <div className="max-lg:hidden">{supplierPicker}</div>
 
           <div className="space-y-2 pt-2 text-sm">
             <SummaryLine label={t("purchaseReturns.code")} value={initial?.code ?? t("purchaseReturns.autoCode")} />
@@ -594,10 +631,14 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
               </div>
               <MoneyInput value={refundAmount || ""} placeholder="0" onChange={(value) => setRefundAmount(value ?? 0)} className={cn(numCls, "w-36")} />
             </div>
-            <label className="flex min-h-11 min-w-11 items-center justify-between gap-3 rounded-lg border border-border-soft px-3 py-2 lg:min-h-0 lg:min-w-0">
+            <label className="flex min-h-11 min-w-11 items-center justify-between gap-3 rounded-lg border border-border-soft px-3 py-2 max-lg:hidden lg:min-h-0 lg:min-w-0">
               <span className="text-slate-600 dark:text-slate-300">{t("purchaseReturns.applyDebt")}</span>
               <Checkbox checked={applyDebt} onChange={(event) => setApplyDebt(event.target.checked)}  />
             </label>
+            <div className="flex min-h-[52px] items-center justify-between gap-3 lg:hidden">
+              <span className="text-[17px]">{t("purchaseReturns.applyDebt")}</span>
+              <TouchTargetToggle checked={applyDebt} onChange={setApplyDebt} aria-label={t("purchaseReturns.applyDebt")} />
+            </div>
             {initial && applyDebt ? <label className="flex items-center justify-between gap-3"><span>{t("purchaseReturns.debtAmount")}</span><MoneyInput aria-label={t("purchaseReturns.debtAmount")} value={editedDebt} onChange={(value) => setEditedDebt(value ?? 0)} className={cn(numCls, "w-36")} /></label> : <SummaryLine label={t("purchaseReturns.debtAmount")} value={formatCurrency(debtAmount)} />}
             {unsettled > 0 && <SummaryLine label={t("purchaseReturns.unsettledAmount")} value={formatCurrency(unsettled)} tone="warn" />}
           </div>
@@ -605,7 +646,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
           <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("orders.detail.notePlaceholder")} rows={3} className="resize-none" />
           {error && <Text as="p" variant="destructive" text={error} />}
 
-          <div className="sticky bottom-0 z-10 -mx-3 mt-auto grid grid-cols-2 gap-3 bg-surface px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:static lg:mx-0 lg:bg-transparent lg:p-0">
+          <div className="sticky bottom-0 z-10 -mx-3 mt-auto grid grid-cols-2 gap-3 bg-surface px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:static lg:mx-0 lg:bg-transparent lg:p-0 max-lg:fixed max-lg:inset-x-0 max-lg:z-30 max-lg:mx-0 max-lg:border-t max-lg:border-black/[0.08] max-lg:bg-surface/90 max-lg:px-ios-inset max-lg:backdrop-blur-xl dark:max-lg:border-white/10">
               {savedHref ? (
                 <div role="status" className="col-span-2 rounded-card border border-primary-600/20 bg-primary-600/5 p-3">
                   <p className="text-sm font-semibold text-primary-700 dark:text-primary-300">{t("purchaseReturns.savedMessage")}</p>
@@ -626,6 +667,24 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
           </div>
         </aside>
       </div>
+
+      {/* Phones, step 1: refund total and Continue, like the iOS return editor's action bar. */}
+      {mobileStep === "items" && !savedHref && (
+        <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-black/[0.08] bg-surface/90 px-ios-inset pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur-xl dark:border-white/10 lg:hidden">
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] text-ios-label-secondary">{t("purchaseReturns.supplierNeedReturn")} · {selectedLines.length}</p>
+            <p className="truncate text-[17px] font-semibold tabular-nums">{formatCurrency(totalRefund)}</p>
+          </div>
+          <Button
+            type="button"
+            onClick={() => { setMobileStep("payment"); window.scrollTo({ top: 0 }); }}
+            disabled={selectedLines.length === 0 || !supplierId}
+            className="h-[50px] min-w-[9rem] shrink-0 !rounded-[14px] bg-ios-accent px-6 text-[17px] font-semibold"
+          >
+            {t("purchases.mobileContinue")}
+          </Button>
+        </div>
+      )}
 
       <AiQuickActionModal
         open={aiQuickOpen}
