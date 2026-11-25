@@ -86,6 +86,18 @@ function getConfig(env: NodeJS.ProcessEnv = process.env): { config: GoogleDriveB
   };
 }
 
+// Google over IPv6 has been several times slower than IPv4 from the store
+// network, so rclone binds to IPv4 unless LUMAPOS_RCLONE_BIND says otherwise
+// (an address to bind to, or empty to let the system choose).
+function rcloneBindArgs(env: NodeJS.ProcessEnv = process.env): string[] {
+  const configured = env.LUMAPOS_RCLONE_BIND;
+  const bind = configured === undefined ? "0.0.0.0" : configured.trim();
+  return bind ? ["--bind", bind] : [];
+}
+
+// A ~470 MB archive over a slow uplink can take well over half an hour.
+const ARCHIVE_TRANSFER_TIMEOUT_MS = 3 * 60 * 60_000;
+
 function runRclone(
   config: GoogleDriveBackupConfig,
   args: string[],
@@ -96,6 +108,7 @@ function runRclone(
     const child = spawn(config.rcloneBin, [
       "--config", config.configPath,
       "--ask-password=false",
+      ...rcloneBindArgs(),
       ...args,
     ], {
       env: {
@@ -292,7 +305,7 @@ export async function uploadGoogleDriveBackupArchive(input: {
     throw new Error("BACKUP_ARCHIVE_INVALID");
   }
   const expectedMd5 = await md5File(input.localPath);
-  await runRclone(config, ["copyto", "--immutable", input.localPath, remotePath], { timeoutMs: 30 * 60_000 });
+  await runRclone(config, ["copyto", "--immutable", input.localPath, remotePath], { timeoutMs: ARCHIVE_TRANSFER_TIMEOUT_MS });
   const uploadedInfo = await readRemoteFileInfo(config, remotePath);
   if (uploadedInfo.IsDir === true || uploadedInfo.Size !== localInfo.size || md5Hash(uploadedInfo) !== expectedMd5) {
     throw new Error("GOOGLE_DRIVE_ARCHIVE_VERIFY_FAILED");
@@ -309,7 +322,7 @@ export async function downloadGoogleDriveBackupArchive(input: {
   const remotePath = config ? getRemoteArchivePath(config.remoteRoot, input.archiveKey) : null;
   if (!config || !remotePath || blockers.length > 0) throw new Error("BACKUP_DESTINATION_NOT_READY");
 
-  await runRclone(config, ["copyto", remotePath, input.destinationPath], { timeoutMs: 30 * 60_000 });
+  await runRclone(config, ["copyto", remotePath, input.destinationPath], { timeoutMs: ARCHIVE_TRANSFER_TIMEOUT_MS });
   await chmod(input.destinationPath, 0o600);
 }
 

@@ -360,7 +360,9 @@ async function createBackup(runId: string) {
         : error instanceof Error && error.message === "GOOGLE_DRIVE_ARCHIVE_VERIFY_FAILED"
           ? "BACKUP_REMOTE_VERIFY_FAILED"
           : "BACKUP_FAILED", runId]);
-    console.error("Database backup failed; see backup status in LumaPOS administration.");
+    // Only the internal error code; messages from tools are not logged.
+    const code = error instanceof Error && /^[A-Z0-9_:,a-z]+$/.test(error.message) ? error.message : "UNKNOWN";
+    console.error(`Database backup failed (${code}); see backup status in LumaPOS administration.`);
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }
@@ -370,7 +372,7 @@ async function recoverStaleRuns() {
   await connection.unsafe(`
     UPDATE public.database_backup_runs
     SET status = 'queued', started_at = NULL, failure_code = 'WORKER_RESTARTED'
-    WHERE status = 'running' AND started_at < now() - interval '2 hours'
+    WHERE status = 'running' AND started_at < now() - interval '4 hours'
   `);
 }
 
