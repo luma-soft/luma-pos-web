@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Hải Đăng POS" },
   icons: { icon: "/icon-192.png", apple: "/icon-180.png" },
+  // iOS Safari wraps phone numbers in tel: links before React hydrates, which
+  // breaks hydration (e.g. store phone in print previews). Links are explicit.
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {

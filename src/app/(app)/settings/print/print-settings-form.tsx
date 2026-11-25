@@ -639,7 +639,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
             <button
               type="button"
               onClick={() => setIsPreviewFullscreen((current) => !current)}
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold hover:bg-surface-2 lg:min-h-10 max-lg:!rounded-full max-lg:border-0 max-lg:text-[15px] max-lg:text-ios-accent"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold hover:bg-surface-2 lg:min-h-10 max-lg:!rounded-full max-lg:border-0 max-lg:bg-transparent max-lg:px-1 max-lg:text-[15px] max-lg:text-ios-accent"
               aria-label={t(isPreviewFullscreen ? "printSettings.exitFullscreenPreview" : "printSettings.fullscreenPreview")}
             >
               {isPreviewFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
