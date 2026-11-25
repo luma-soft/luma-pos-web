@@ -234,8 +234,17 @@ như daemon hệ thống, và sống qua khởi động lại máy khi không ai
 > PostgreSQL 17 tạm và rclone giả: khôi phục đúng (dữ liệu, media, chủ sở
 > hữu), sai khóa / tải hỏng / DB đã có dữ liệu đều bị chặn.
 >
-> **Chưa có:** đăng nhập Google trong app (giờ cần `rclone.conf` của máy cũ),
-> thư mục Drive có dấu cách, nhận từ máy cũ (giai đoạn 4), đăng nhập
+> **Đăng nhập Google trong app (2026-11-25).** Kết nối Drive có hai nguồn:
+> đăng nhập Google (Client ID + secret của OAuth client Desktop của cửa hàng;
+> app chạy `rclone authorize drive` của runtime bằng tài khoản người dùng, scope
+> `drive.file`, rồi tự tạo `rclone.conf`) hoặc tệp `rclone.conf` có sẵn. Dùng
+> cho cả khôi phục và cửa hàng mới: bước "Sao lưu" (trước là "Khóa sao lưu")
+> kết nối Drive cho sao lưu tự động, không bắt buộc. `configure-drive` giờ chạy
+> `rclone mkdir` dưới `_lumapos_svc` để tạo thư mục và kiểm tra kết nối. Khôi
+> phục phải dùng đúng OAuth client của máy cũ vì `drive.file` chỉ thấy tệp do
+> client đó tạo. Chưa thử đăng nhập Google thật (cần client của cửa hàng).
+>
+> **Chưa có:** thư mục Drive có dấu cách, đổi kết nối Drive sau khi cài, nhận từ máy cũ (giai đoạn 4), đăng nhập
 > Cloudflare trong app (`cloudflared tunnel login`), chế độ LAN cho máy khác
 > (web vẫn chỉ nghe `127.0.0.1`).
 

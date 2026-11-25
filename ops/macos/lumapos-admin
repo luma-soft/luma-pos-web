@@ -46,7 +46,8 @@
 #       stdin: Cloudflare tunnel credentials JSON.
 #   lumapos-admin start-services
 #   lumapos-admin configure-drive <remote>
-#       stdin: rclone.conf with the Google Drive remote; sets the backup folder.
+#       stdin: rclone.conf with the Google Drive remote; sets the backup folder
+#       and creates it on Drive when it does not exist yet.
 #   lumapos-admin set-backup-key
 #       stdin: the old Mac's backup key; only while the database is empty.
 #   lumapos-admin list-backups
@@ -898,11 +899,19 @@ cmd_configure_drive() {
   local remote="${1:-}"
   [[ "$remote" =~ ^[A-Za-z0-9_-]+:[^[:space:][:cntrl:]\\]+$ && ${#remote} -le 200 && "$remote" != *..* && "$remote" != *:/* ]] \
     || fail "Drive folder must look like lumapos:Backups/LumaPOS" 64
+  current_version >/dev/null || fail "No active runtime"
   cmd_write_secret rclone.conf >/dev/null || exit $?
   set_env_value LUMAPOS_RCLONE_CONFIG "$SECRETS_DIR/rclone.conf" \
     && set_env_value LUMAPOS_BACKUP_REMOTE "$remote" \
     && set_env_value LUMAPOS_BACKUP_PROVIDER google-drive \
     || fail "Could not update runtime.env"
+  # Creates the folder when it is new (a new store) and proves the
+  # connection works; rclone may refresh the token in rclone.conf.
+  step "check drive"
+  sudo -u "$SERVICE_USER" -- /usr/bin/env -i PATH=/usr/bin:/bin HOME="$LUMAPOS_ROOT/backup-staging" \
+    "$CURRENT_LINK/tools/bin/rclone" --config "$SECRETS_DIR/rclone.conf" --ask-password=false \
+    --bind 0.0.0.0 --contimeout 30s --timeout 60s --retries 2 mkdir "$remote" >/dev/null 2>&1 \
+    || fail "Could not reach the Google Drive folder $remote (check the sign-in or rclone.conf)"
   step "drive $remote"
 }
 
