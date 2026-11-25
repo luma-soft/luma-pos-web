@@ -50,6 +50,8 @@
 #       and creates it on Drive when it does not exist yet.
 #   lumapos-admin set-backup-key
 #       stdin: the old Mac's backup key; only while the database is empty.
+#   lumapos-admin set-network <local|lan>
+#       lan: the web server also listens on the store network (http, .local).
 #   lumapos-admin list-backups
 #       The archives in the Drive folder, newest first, as JSON.
 #   lumapos-admin restore-backup <google-drive/YYYY/MM/DD/lumapos-<uuid>.lumaenc>
@@ -60,7 +62,7 @@ set -uo pipefail
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 umask 022
 
-readonly HELPER_VERSION=6
+readonly HELPER_VERSION=7
 readonly LUMAPOS_ROOT=/Users/Shared/LumaPOS
 readonly LIVE_ROOT="$LUMAPOS_ROOT/app"
 readonly STAGING_ROOT="$LUMAPOS_ROOT/app-next"
@@ -873,6 +875,42 @@ cmd_start_services() {
   step "services running"
 }
 
+# ---- network ----
+
+# set-network <local|lan>: local keeps the web server on 127.0.0.1 (the
+# Cloudflare Tunnel still publishes it); lan also listens on the store
+# network at http://<LocalHostName>.local:3000 and lets the session cookie
+# work over plain http there.
+cmd_set_network() {
+  local mode="${1:-}" host
+  [[ -d "$SECRETS_DIR" && ! -L "$SECRETS_DIR" ]] || fail "Run bootstrap first"
+  case "$mode" in
+    local)
+      set_env_value LUMAPOS_LISTEN_ADDRESS 127.0.0.1 && set_env_value LUMAPOS_LAN_HTTP false \
+        || fail "Could not update runtime.env"
+      if [[ ! -f "$SECRETS_DIR/cloudflared.yml" && "$(env_value LUMAPOS_PUBLIC_URL)" == http://*.local:3000 ]]; then
+        set_env_value LUMAPOS_PUBLIC_URL "http://127.0.0.1:3000" || fail "Could not update runtime.env"
+      fi
+      ;;
+    lan)
+      host="$(scutil --get LocalHostName 2>/dev/null)"
+      [[ "$host" =~ ^[A-Za-z0-9-]{1,63}$ ]] || fail "This Mac has no usable local host name (System Settings > General > Sharing)"
+      set_env_value LUMAPOS_LISTEN_ADDRESS 0.0.0.0 && set_env_value LUMAPOS_LAN_HTTP true \
+        || fail "Could not update runtime.env"
+      # The tunnel's https address stays the public one when there is a tunnel.
+      if [[ ! -f "$SECRETS_DIR/cloudflared.yml" ]]; then
+        set_env_value LUMAPOS_PUBLIC_URL "http://$host.local:3000" || fail "Could not update runtime.env"
+      fi
+      ;;
+    *) fail "Network mode must be local or lan" 64 ;;
+  esac
+  if is_loaded web; then
+    step "restart web"
+    launchctl kickstart -k "$(target_of web)" >/dev/null 2>&1 && wait_live || fail "The web server did not come back"
+  fi
+  step "network $mode${host:+ $host.local}"
+}
+
 # ---- restore from Google Drive (setup on a new Mac) ----
 
 # Runs a one-shot worker of the active runtime as the service user.
@@ -1037,8 +1075,9 @@ case "${1:-}" in
   configure-tunnel) shift; cmd_configure_tunnel "${1:-}" ;;
   start-services) cmd_start_services ;;
   configure-drive) shift; cmd_configure_drive "${1:-}" ;;
+  set-network) shift; cmd_set_network "${1:-}" ;;
   set-backup-key) cmd_set_backup_key ;;
   list-backups) cmd_list_backups ;;
   restore-backup) shift; cmd_restore_backup "${1:-}" ;;
-  *) fail "Usage: lumapos-admin deploy | service start|stop|restart <name> | log <name> [lines] | version | status | bootstrap <user> | create-accounts | install-runtime <archive> [sha256] | activate-runtime <version> | rollback-runtime | init-database | migrate | write-secret <name> | init-runtime-env [public-url] | backup-key | provision-store <slug> <email> | configure-tunnel <hostname> | start-services | configure-drive <remote> | set-backup-key | list-backups | restore-backup <archive>" 64 ;;
+  *) fail "Usage: lumapos-admin deploy | service start|stop|restart <name> | log <name> [lines] | version | status | bootstrap <user> | create-accounts | install-runtime <archive> [sha256] | activate-runtime <version> | rollback-runtime | init-database | migrate | write-secret <name> | init-runtime-env [public-url] | backup-key | provision-store <slug> <email> | configure-tunnel <hostname> | start-services | configure-drive <remote> | set-backup-key | list-backups | restore-backup <archive> | set-network <local|lan>" 64 ;;
 esac

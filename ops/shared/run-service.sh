@@ -60,8 +60,13 @@ umask 077
 if [[ -f "$app_root/manifest.json" && -f "$app_root/server.js" && -d "$app_root/workers" ]]; then
   case "$service_name" in
     web)
-      # The standalone server binds to HOSTNAME; keep it on loopback.
-      export HOSTNAME=127.0.0.1
+      # The standalone server binds to HOSTNAME: loopback, or every
+      # interface in LAN mode (`lumapos-admin set-network lan`).
+      if [[ "${LUMAPOS_LISTEN_ADDRESS:-}" == "0.0.0.0" ]]; then
+        export HOSTNAME=0.0.0.0
+      else
+        export HOSTNAME=127.0.0.1
+      fi
       exec "$bun_bin" server.js
       ;;
     sync)
