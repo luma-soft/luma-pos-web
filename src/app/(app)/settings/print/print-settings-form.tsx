@@ -1,11 +1,12 @@
 "use client";
 
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select } from "@/components/ui/select";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Copy, Loader2, Maximize2, Minimize2, Plus, Save, Star, Trash2 } from "lucide-react";
+import { MobileDetailNav } from "@/components/mobile-detail-nav";
+import { MenuAction } from "@/app/(app)/partners/tabs/customer-mobile";
 import { PrintDoc } from "@/components/print/print-doc";
 import { PrintRichTextEditor } from "@/components/print/print-rich-text-editor";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
@@ -32,6 +33,18 @@ import {
   type PrintTemplate,
   type PrintTemplateStoreInfo,
 } from "@/lib/print/template-shared";
+import {
+  TEMPLATE_INPUT,
+  TemplateField as Field,
+  TemplateListPhone,
+  TemplateOptionList,
+  TemplateOptionRow,
+  TemplatePanel as Panel,
+  TemplateSegments,
+  TemplateStatus,
+  TemplateStepperRow,
+  templateChoiceClass,
+} from "../template-settings-ui";
 
 const TYPOGRAPHY_KEYS = [
   "storeName", "storeInfo", "documentTitle", "documentMeta", "customer",
@@ -244,7 +257,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
     });
   }
 
-  const inputCls = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm lg:min-h-10";
+  const inputCls = TEMPLATE_INPUT;
   const actionPending = isPending || pendingAction !== null;
   const previewQrReference = formatPrintPaymentReference(selected.options.paymentQrContentTemplate, "XX-000");
 
@@ -303,17 +316,40 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
         : [t("print.buyerSign"), t("print.delivererSign"), t("print.sellerSign")];
 
   return (
-    <div className="px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:p-6">
+    <>
+    {/* Phones: iOS navigation bar; template actions live in its "…" menu like the native designer. */}
+    <MobileDetailNav
+      title={t("printSettings.title")}
+      actions={(
+        <>
+          <MenuAction icon={Save} label={t("printSettings.saveTemplate")} onSelect={save} disabled={actionPending || customQrAccountInvalid} />
+          <MenuAction icon={Plus} label={t("printSettings.createTemplate")} onSelect={addTemplate} disabled={actionPending} />
+          <MenuAction icon={Copy} label={t("printSettings.duplicate")} onSelect={duplicateSelectedTemplate} disabled={!persisted || actionPending} />
+          <MenuAction icon={Star} label={t("printSettings.setDefault")} onSelect={makeSelectedTemplateDefault} disabled={!persisted || selected.isDefault || actionPending} />
+          <MenuAction icon={Trash2} label={t("printSettings.deleteTemplate")} onSelect={() => void removeTemplate()} disabled={!persisted || selected.isDefault || actionPending} destructive />
+        </>
+      )}
+    />
+    <div className="px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:p-6 max-lg:px-ios-inset max-lg:pt-2">
       <MobileDetailHeader
         backHref={Routes.Settings}
         backLabel={t("common.back")}
         title={t("printSettings.title")}
         subtitle={t("printSettings.settingsDesc")}
         flush
-        className="-mx-3 -mt-3 mb-5 md:-mx-6 md:-mt-6"
+        className="-mx-3 -mt-3 mb-5 md:-mx-6 md:-mt-6 max-lg:hidden"
       />
 
-      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-border">
+      <div className="mb-ios-section lg:hidden">
+        <TemplateSegments
+          label={t("printSettings.templateList")}
+          value={docType}
+          onChange={selectDocType}
+          options={PRINT_DOC_TYPES.map((item) => ({ value: item, label: t(`printSettings.docTypes.${item}`) }))}
+        />
+      </div>
+
+      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-border max-lg:hidden">
         {PRINT_DOC_TYPES.map((item) => (
           <button
             key={item}
@@ -331,9 +367,21 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
       </div>
 
       <div className="space-y-6">
-        <section className="space-y-4">
+        <section className="space-y-4 max-lg:space-y-ios-section">
+            <TemplateListPhone
+              title={t("printSettings.templateCount", { count: visible.length })}
+              templates={visible}
+              selectedId={selected.id}
+              onSelect={(id) => { setSelectedId(id); setMsg(null); }}
+              emptyLabel={t("printSettings.emptyTemplates")}
+              subtitle={(item) => [
+                item.paperDefault.toUpperCase(),
+                t(item.isDefault ? "printSettings.isDefault" : "printSettings.optional"),
+                ...(item.isActive ? [] : [t("printSettings.statusInactive")]),
+              ].join(" · ")}
+            />
             <Panel>
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] max-lg:hidden">
                 <div className="min-w-0">
                   <span className="mb-1 block text-xs font-semibold text-slate-500">{t("printSettings.templateList")}</span>
                   <Select
@@ -353,7 +401,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   {t("common.add")}
                 </button>
               </div>
-              <div className="mt-4 grid items-end gap-3 border-t border-border-soft pt-4 sm:grid-cols-[minmax(220px,1fr)_auto]">
+              <div className="mt-4 grid items-end gap-3 border-t border-border-soft pt-4 sm:grid-cols-[minmax(220px,1fr)_auto] max-lg:mt-0 max-lg:border-0 max-lg:pt-0">
                 <Field label={t("printSettings.templateName")}><input value={selected.name} onChange={(event) => patch({ name: event.target.value })} className={inputCls} /></Field>
                 <Field label={t("printSettings.paperDefault")}>
                   <div className="flex gap-1.5">
@@ -365,6 +413,8 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                         className={cn(
                           "min-h-11 rounded-lg border px-3 text-xs font-bold uppercase lg:min-h-10 min-w-11 lg:min-w-0",
                           selected.paperDefault === size ? "border-primary-600 bg-primary-600 text-white" : "border-border text-slate-600 dark:text-slate-300",
+                          "max-lg:flex-1",
+                          templateChoiceClass(selected.paperDefault === size),
                         )}
                       >
                         {size}
@@ -376,15 +426,20 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
             </Panel>
 
             <Panel title={`${t("printSettings.fontSize")} (px)`}>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-2 max-lg:block">
                 {TYPOGRAPHY_KEYS.map((key) => (
-                  <div key={key} className="flex min-h-11 items-center gap-2 rounded-lg border border-border-soft px-3 py-2">
-                    <span className="min-w-0 flex-1 text-sm font-semibold">{t(`printSettings.typography.${key}`)}</span>
-                    <button type="button" aria-label={`${t("printSettings.decreaseFont")} ${key}`} onClick={() => patchTypography(key, selected.options.typography[key] - 1)} className="min-h-9 min-w-9 rounded border border-border">−</button>
-                    <span className="w-12 text-center text-sm font-bold">{selected.options.typography[key]} px</span>
-                    <button type="button" aria-label={`${t("printSettings.increaseFont")} ${key}`} onClick={() => patchTypography(key, selected.options.typography[key] + 1)} className="min-h-9 min-w-9 rounded border border-border">+</button>
-                    <button type="button" aria-label={`${t("printSettings.resetFont")} ${key}`} onClick={() => patchTypography(key, defaultOptionsForDocType(selected.docType).typography[key])} className="min-h-9 min-w-9 rounded border border-border">↺</button>
-                  </div>
+                  <TemplateStepperRow
+                    key={key}
+                    label={t(`printSettings.typography.${key}`)}
+                    value={selected.options.typography[key]}
+                    unit="px"
+                    onDecrease={() => patchTypography(key, selected.options.typography[key] - 1)}
+                    onIncrease={() => patchTypography(key, selected.options.typography[key] + 1)}
+                    onReset={() => patchTypography(key, defaultOptionsForDocType(selected.docType).typography[key])}
+                    decreaseLabel={`${t("printSettings.decreaseFont")} ${t(`printSettings.typography.${key}`)}`}
+                    increaseLabel={`${t("printSettings.increaseFont")} ${t(`printSettings.typography.${key}`)}`}
+                    resetLabel={`${t("printSettings.resetFont")} ${t(`printSettings.typography.${key}`)}`}
+                  />
                 ))}
               </div>
             </Panel>
@@ -392,7 +447,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
             {qrApplies && selected.options.showPaymentQr && (
               <Panel title={t("printSettings.qrSection")}>
                 <Field label={t("printSettings.qrAccountSource")}>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid gap-2 sm:grid-cols-2 max-lg:grid-cols-2">
                     {(["default", "custom"] as const).map((source) => (
                       <button
                         key={source}
@@ -404,6 +459,8 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                           selected.options.paymentQrAccountSource === source
                             ? "border-primary-600 bg-primary-50 text-primary-800 dark:bg-primary-950/40 dark:text-primary-200"
                             : "border-border text-slate-600 dark:text-slate-300",
+                          "max-lg:text-center",
+                          templateChoiceClass(selected.options.paymentQrAccountSource === source),
                         )}
                       >
                         {t(`printSettings.qrAccountSources.${source}`)}
@@ -444,13 +501,12 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   </Field>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">{t("printSettings.qrContentHint", { invoiceCode: "{invoiceCode}" })}</p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {QR_VISIBILITY_OPTIONS.map((key) => (
-                    <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0">
-                      <Checkbox checked={selected.options[key]} onChange={(event) => patchOption(key, event.target.checked)} />
-                      {t(`printSettings.qrVisibility.${key}`)}
-                    </label>
-                  ))}
+                <div className="mt-3">
+                  <TemplateOptionList>
+                    {QR_VISIBILITY_OPTIONS.map((key) => (
+                      <TemplateOptionRow key={key} label={t(`printSettings.qrVisibility.${key}`)} checked={selected.options[key]} onChange={(checked) => patchOption(key, checked)} />
+                    ))}
+                  </TemplateOptionList>
                 </div>
               </Panel>
             )}
@@ -465,7 +521,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
             </Panel>
 
             <Panel title={t("printSettings.optionsSection")}>
-              <div className="space-y-4">
+              <div className="space-y-4 max-lg:space-y-5">
                 {OPTION_GROUPS.map((group) => {
                   const options = group.options
                     .filter((key) => printOptionApplies(docType, key))
@@ -475,17 +531,14 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   if (options.length === 0) return null;
                   return (
                     <section key={group.key} aria-labelledby={`print-option-group-${group.key}`}>
-                      <h3 id={`print-option-group-${group.key}`} className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                      <h3 id={`print-option-group-${group.key}`} className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 max-lg:mb-0 max-lg:text-[13px] max-lg:font-semibold max-lg:tracking-normal max-lg:text-ios-label-secondary">
                         {t(`printSettings.optionGroups.${group.key}`)}
                       </h3>
-                      <div className="grid gap-2 sm:grid-cols-2">
+                      <TemplateOptionList>
                         {options.map((key) => (
-                          <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0 min-w-11 lg:min-w-0">
-                            <Checkbox checked={Boolean(selected.options[key])} onChange={(event) => patchOption(key, event.target.checked)} />
-                            {t(`printSettings.toggles.${key}`)}
-                          </label>
+                          <TemplateOptionRow key={key} label={t(`printSettings.toggles.${key}`)} checked={Boolean(selected.options[key])} onChange={(checked) => patchOption(key, checked)} />
                         ))}
-                      </div>
+                      </TemplateOptionList>
                       {group.key === "batch" && selected.options.showBatchDebtSummary && (
                         <Field label={t("printSettings.batchDebtSummaryPosition")} className="mt-3 sm:max-w-md">
                           <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t("printSettings.batchDebtSummaryPosition")}>
@@ -501,6 +554,8 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                                   selected.options.batchDebtSummaryPosition === position
                                     ? "border-primary-600 bg-primary-50 text-primary-800 dark:bg-primary-950/40 dark:text-primary-200"
                                     : "border-border text-slate-600 dark:text-slate-300",
+                                  "max-lg:text-center",
+                                  templateChoiceClass(selected.options.batchDebtSummaryPosition === position),
                                 )}
                               >
                                 {t(`printSettings.batchDebtSummaryPositions.${position}`)}
@@ -549,7 +604,9 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
               <PrintRichTextEditor key={selected.id} value={selected.footerNote} onChange={(footerNote) => patch({ footerNote })} />
             </Panel>
 
-            <div className="fixed bottom-[calc(8.75rem+env(safe-area-inset-bottom))] right-4 z-50 flex flex-col items-end gap-3 lg:bottom-6 lg:right-6">
+            <TemplateStatus msg={msg} />
+
+            <div className="fixed bottom-[calc(8.75rem+env(safe-area-inset-bottom))] right-4 z-50 flex flex-col items-end gap-3 lg:bottom-6 lg:right-6 max-lg:hidden">
               {msg && <span role="status" aria-live="polite" className={cn("max-w-[min(90vw,28rem)] rounded-xl border border-border bg-surface/95 px-3 py-2 text-sm font-medium shadow-e2 backdrop-blur", msg.ok ? "text-ok" : "text-er")}>{msg.text}</span>}
               <div role="group" aria-label={t("printSettings.templateActions")} className="flex items-center gap-2 rounded-2xl border border-border bg-surface/95 p-2 shadow-xl backdrop-blur">
                 <button type="button" onClick={save} disabled={actionPending || customQrAccountInvalid} title={t("common.save")} aria-label={t("common.save")} className="grid h-12 w-12 place-items-center rounded-full bg-primary-600 text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
@@ -578,11 +635,11 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
           )}
         >
           <div className="mb-2 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-bold">{t("printSettings.preview")}</h2>
+            <h2 className="text-sm font-bold max-lg:text-[17px] max-lg:font-semibold">{t("printSettings.preview")}</h2>
             <button
               type="button"
               onClick={() => setIsPreviewFullscreen((current) => !current)}
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold hover:bg-surface-2 lg:min-h-10"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold hover:bg-surface-2 lg:min-h-10 max-lg:!rounded-full max-lg:border-0 max-lg:text-[15px] max-lg:text-ios-accent"
               aria-label={t(isPreviewFullscreen ? "printSettings.exitFullscreenPreview" : "printSettings.fullscreenPreview")}
             >
               {isPreviewFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
@@ -591,7 +648,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
           </div>
           <div className={cn(
             "overflow-auto rounded-card border border-border bg-slate-200 p-4 dark:bg-slate-950",
-            isPreviewFullscreen ? "min-h-0 flex-1" : "max-h-[900px]",
+            isPreviewFullscreen ? "min-h-0 flex-1" : "max-h-[900px] max-lg:max-h-[480px] max-lg:rounded-[22px] max-lg:border-0",
           )} ref={previewSurfaceRef}>
             <div className="mx-auto w-max">
                 <PrintDoc
@@ -647,23 +704,6 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
         </section>
       </div>
     </div>
-  );
-}
-
-function Panel({ title, children }: { title?: string; children: ReactNode }) {
-  return (
-    <div className="rounded-card border border-border bg-surface p-3 md:p-5">
-      {title && <h2 className="mb-3 text-sm font-bold">{title}</h2>}
-      {children}
-    </div>
-  );
-}
-
-function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
-  return (
-    <label className={cn("block", className)}>
-      <span className="mb-1 block text-xs font-semibold text-slate-500">{label}</span>
-      {children}
-    </label>
+    </>
   );
 }

@@ -5053,7 +5053,14 @@
     "batchDebtSummaryPositions": {
       "start": "Đầu file (trước hóa đơn)",
       "end": "Cuối file (sau hóa đơn)"
-    }
+    },
+    "saveTemplate": "Lưu mẫu in",
+    "createTemplate": "Tạo mẫu",
+    "templateCount": "{count} mẫu",
+    "isDefault": "Mặc định",
+    "optional": "Tùy chọn",
+    "statusInactive": "Ngừng dùng",
+    "emptyTemplates": "Chưa có mẫu cho loại chứng từ này"
   },
   "labelSettings": {
     "title": "Mẫu tem mã",
@@ -5093,7 +5100,10 @@
     },
     "errors": {
       "defaultRequired": "Cần có mẫu mặc định khác trước khi ngừng dùng mẫu này."
-    }
+    },
+    "saveTemplate": "Lưu mẫu tem",
+    "createTemplate": "Tạo mẫu tem",
+    "templateCount": "{count} mẫu tem"
   },
   "payments": {
     "errors": {

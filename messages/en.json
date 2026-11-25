@@ -5053,7 +5053,14 @@
     "batchDebtSummaryPositions": {
       "start": "Start of file (before invoices)",
       "end": "End of file (after invoices)"
-    }
+    },
+    "saveTemplate": "Save template",
+    "createTemplate": "New template",
+    "templateCount": "{count} templates",
+    "isDefault": "Default",
+    "optional": "Optional",
+    "statusInactive": "Inactive",
+    "emptyTemplates": "No template for this document type"
   },
   "labelSettings": {
     "title": "Barcode label templates",
@@ -5093,7 +5100,10 @@
     },
     "errors": {
       "defaultRequired": "Set another default before deactivating this template."
-    }
+    },
+    "saveTemplate": "Save label template",
+    "createTemplate": "New label template",
+    "templateCount": "{count} label templates"
   },
   "payments": {
     "errors": {

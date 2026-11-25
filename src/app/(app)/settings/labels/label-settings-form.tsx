@@ -1,7 +1,6 @@
 "use client";
 
-import { Checkbox } from "@/components/ui/checkbox";
-import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Copy, EyeOff, Loader2, Plus, Save, Star } from "lucide-react";
@@ -16,6 +15,17 @@ import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { cn } from "@/lib/utils";
 import { NumberInput } from "@/components/ui/number-input";
+import { MobileDetailNav } from "@/components/mobile-detail-nav";
+import { MenuAction } from "@/app/(app)/partners/tabs/customer-mobile";
+import {
+  TEMPLATE_INPUT,
+  TemplateField as Field,
+  TemplateListPhone,
+  TemplateOptionList,
+  TemplateOptionRow,
+  TemplatePanel as Panel,
+  TemplateStatus,
+} from "../template-settings-ui";
 
 const TOGGLES = ["showName", "showSku", "showPrice", "showUnit", "showBarcodeText", "showStoreName"] as const;
 
@@ -100,21 +110,47 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
     );
   }
 
-  const inputCls = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm lg:min-h-10";
+  const inputCls = TEMPLATE_INPUT;
+
+  const duplicate = () => persisted && runAction(() => duplicateLabelTemplate(selected.id), "labelSettings.duplicated");
+  const makeDefault = () => persisted && runAction(() => setDefaultLabelTemplate(selected.id), "labelSettings.defaultSaved");
+  const deactivate = () => persisted && runAction(() => deactivateLabelTemplate(selected.id), "labelSettings.deactivated");
 
   return (
-    <div className="px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:p-6">
+    <>
+    {/* Phones: iOS navigation bar with the template actions in its "…" menu. */}
+    <MobileDetailNav
+      title={t("labelSettings.title")}
+      actions={(
+        <>
+          <MenuAction icon={Save} label={t("labelSettings.saveTemplate")} onSelect={save} disabled={pending} />
+          <MenuAction icon={Plus} label={t("labelSettings.createTemplate")} onSelect={addTemplate} disabled={pending} />
+          <MenuAction icon={Copy} label={t("labelSettings.duplicate")} onSelect={duplicate} disabled={!persisted || pending} />
+          <MenuAction icon={Star} label={t("labelSettings.setDefault")} onSelect={makeDefault} disabled={!persisted || selected.isDefault || pending} />
+          <MenuAction icon={EyeOff} label={t("labelSettings.deactivate")} onSelect={deactivate} disabled={!persisted || selected.isDefault || pending} destructive />
+        </>
+      )}
+    />
+    <div className="px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:p-6 max-lg:px-ios-inset max-lg:pt-2">
       <MobileDetailHeader
         backHref={Routes.Settings}
         backLabel={t("common.back")}
         title={t("labelSettings.title")}
         subtitle={t("labelSettings.settingsDesc")}
         flush
-        className="-mx-3 -mt-3 mb-5 md:-mx-6 md:-mt-6"
+        className="-mx-3 -mt-3 mb-5 md:-mx-6 md:-mt-6 max-lg:hidden"
       />
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="rounded-card border border-border bg-surface">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)] max-lg:gap-ios-section">
+        <TemplateListPhone
+          title={t("labelSettings.templateCount", { count: drafts.length })}
+          templates={drafts}
+          selectedId={selected.id}
+          onSelect={(id) => { setSelectedId(id); setMsg(null); }}
+          emptyLabel={t("labelSettings.templateList")}
+          subtitle={(item) => `${item.widthMm}x${item.heightMm}mm · ${item.columns} ${t("labelSettings.columnsShort")} · ${item.isActive ? t("labelSettings.active") : t("labelSettings.inactive")}`}
+        />
+        <aside className="rounded-card border border-border bg-surface max-lg:hidden">
           <div className="flex items-center justify-between border-b border-border-soft p-3">
             <div className="text-sm font-bold">{t("labelSettings.templateList")}</div>
             <button type="button" onClick={addTemplate} aria-label={t("common.add")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white min-w-11">
@@ -147,17 +183,16 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
           </div>
         </aside>
 
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="order-1 space-y-4">
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] max-lg:gap-ios-section">
+          <div className="order-1 space-y-4 max-lg:space-y-ios-section">
             <Panel>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={t("labelSettings.templateName")}><input value={selected.name} onChange={(event) => patch({ name: event.target.value })} className={inputCls} /></Field>
                 <Field label={t("labelSettings.sortOrder")}><NumberInput value={selected.sortOrder} min={0} max={9999} onChange={(value) => patch({ sortOrder: value ?? selected.sortOrder })} className={inputCls} /></Field>
               </div>
-              <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold lg:min-h-0 min-w-11 lg:min-w-0">
-                <Checkbox checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
-                {t("labelSettings.defaultTemplate")}
-              </label>
+              <div className="mt-3 max-lg:mt-2">
+                <TemplateOptionRow label={t("labelSettings.defaultTemplate")} checked={selected.isDefault} onChange={(checked) => patch({ isDefault: checked })} />
+              </div>
             </Panel>
 
             <Panel title={t("labelSettings.sizeSection")}>
@@ -175,13 +210,14 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
                       barcodeQuietMm: preset.barcodeQuietMm,
                       fontScale: preset.fontScale,
                     })}
-                    className="min-h-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 min-w-11"
+                    data-button-radius="pill"
+                    className="min-h-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 min-w-11 max-lg:!rounded-full max-lg:border-ios-stroke/40 max-lg:px-3.5 max-lg:text-[15px] max-lg:text-ios-accent"
                   >
                     {preset.widthMm}x{preset.heightMm}mm
                   </button>
                 ))}
               </div>
-              <div className="grid gap-3 sm:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-4 max-lg:grid-cols-2">
                 <Field label={t("labelSettings.widthMm")}><NumberInput value={selected.widthMm} min={10} max={120} step={1} onChange={(value) => patch({ widthMm: value ?? selected.widthMm })} className={inputCls} /></Field>
                 <Field label={t("labelSettings.heightMm")}><NumberInput value={selected.heightMm} min={8} max={80} step={1} onChange={(value) => patch({ heightMm: value ?? selected.heightMm })} className={inputCls} /></Field>
                 <Field label={t("labelSettings.columns")}><NumberInput value={selected.columns} min={1} max={6} step={1} onChange={(value) => patch({ columns: Math.round(value ?? selected.columns) })} className={inputCls} /></Field>
@@ -193,30 +229,29 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
             </Panel>
 
             <Panel title={t("labelSettings.contentSection")}>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <TemplateOptionList>
                 {TOGGLES.map((key) => (
-                  <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0 min-w-11 lg:min-w-0">
-                    <Checkbox checked={Boolean(selected[key])} onChange={(event) => patch({ [key]: event.target.checked })} />
-                    {t(`labelSettings.toggles.${key}`)}
-                  </label>
+                  <TemplateOptionRow key={key} label={t(`labelSettings.toggles.${key}`)} checked={Boolean(selected[key])} onChange={(checked) => patch({ [key]: checked })} />
                 ))}
-              </div>
+              </TemplateOptionList>
             </Panel>
 
-            <div className="sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center gap-2 border-t border-border bg-surface/95 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+            <TemplateStatus msg={msg} />
+
+            <div className="sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center gap-2 border-t border-border bg-surface/95 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none max-lg:hidden">
               <button type="button" onClick={save} disabled={pending} aria-label={t("common.save")} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50 min-w-11">
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {t("common.save")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => duplicateLabelTemplate(selected.id), "labelSettings.duplicated")} disabled={!persisted || pending} aria-label={t("labelSettings.duplicate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
+              <button type="button" onClick={duplicate} disabled={!persisted || pending} aria-label={t("labelSettings.duplicate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
                 <Copy className="h-4 w-4" />
                 {t("labelSettings.duplicate")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => setDefaultLabelTemplate(selected.id), "labelSettings.defaultSaved")} disabled={!persisted || selected.isDefault || pending} aria-label={t("labelSettings.setDefault")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
+              <button type="button" onClick={makeDefault} disabled={!persisted || selected.isDefault || pending} aria-label={t("labelSettings.setDefault")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
                 <Star className="h-4 w-4" />
                 {t("labelSettings.setDefault")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => deactivateLabelTemplate(selected.id), "labelSettings.deactivated")} disabled={!persisted || selected.isDefault || pending} aria-label={t("labelSettings.deactivate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-er/40 px-4 text-sm font-semibold text-er disabled:opacity-50 min-w-11">
+              <button type="button" onClick={deactivate} disabled={!persisted || selected.isDefault || pending} aria-label={t("labelSettings.deactivate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-er/40 px-4 text-sm font-semibold text-er disabled:opacity-50 min-w-11">
                 <EyeOff className="h-4 w-4" />
                 {t("labelSettings.deactivate")}
               </button>
@@ -225,8 +260,8 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
           </div>
 
           <div className="order-2 min-w-0">
-            <p className="mb-2 text-xs font-semibold text-slate-500">{t("labelSettings.preview")}</p>
-            <div className="overflow-auto rounded-card border border-border bg-slate-200 p-4 dark:bg-slate-950">
+            <p className="mb-2 text-xs font-semibold text-slate-500 max-lg:px-1 max-lg:text-[13px] max-lg:text-ios-label-secondary">{t("labelSettings.preview")}</p>
+            <div className="overflow-auto rounded-card border border-border bg-slate-200 p-4 dark:bg-slate-950 max-lg:rounded-[22px] max-lg:border-0">
               <div
                 className="overflow-hidden border border-slate-300 bg-white p-[2mm] text-slate-950 shadow-sm"
                 style={{ width: `${selected.widthMm}mm`, height: `${selected.heightMm}mm` }}
@@ -258,23 +293,6 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
         </section>
       </div>
     </div>
-  );
-}
-
-function Panel({ title, children }: { title?: string; children: ReactNode }) {
-  return (
-    <div className="rounded-card border border-border bg-surface p-3 md:p-5">
-      {title && <h2 className="mb-3 text-sm font-bold">{title}</h2>}
-      {children}
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-semibold text-slate-500">{label}</span>
-      {children}
-    </label>
+    </>
   );
 }

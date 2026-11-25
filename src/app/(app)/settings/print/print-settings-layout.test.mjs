@@ -72,3 +72,18 @@ test("the action button is the only control for setting a template as default", 
   expect(form).toContain("setDefaultPrintTemplate(templateId)");
   expect(form).toContain("isDefault: item.id === templateId");
 });
+
+const labels = readFileSync(new URL("../labels/label-settings-form.tsx", import.meta.url), "utf8");
+
+// Phones follow the iOS template designer: nav bar "…" menu, template rows, switch rows.
+test("phone template editors use the iOS navigation menu and template list", () => {
+  for (const source of [form, labels]) {
+    expect(source).toContain("<MobileDetailNav");
+    expect(source).toContain("<TemplateListPhone");
+    expect(source).toContain("<TemplateOptionRow");
+    expect(source).toContain("<TemplateStatus msg={msg} />");
+    expect(source).not.toContain("<Checkbox");
+  }
+  expect(form).toContain('onSelect={() => void removeTemplate()} disabled={!persisted || selected.isDefault || actionPending} destructive');
+  expect(form).toContain("lg:bottom-6 lg:right-6 max-lg:hidden");
+});
