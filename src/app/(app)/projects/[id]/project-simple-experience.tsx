@@ -30,6 +30,7 @@ import { ProjectCompletionButton } from "./project-completion-button";
 import { ProjectServiceTab, ProjectServiceTabs } from "./project-service-tabs";
 import { ProjectNotesClient } from "./notes/project-notes-client";
 import { BUSINESS_TIME_ZONE } from "@/lib/dates/business-date";
+import { FitText } from "@/components/fit-text";
 
 type ServiceOptions = Awaited<ReturnType<typeof getServiceFormOptions>>;
 
@@ -56,8 +57,8 @@ export async function ProjectSimpleExperience({
   const installedCount = assets.filter((asset) => asset.status === "installed").length;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4" data-project-experience="simple">
-      <section className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+    <div className="mx-auto max-w-6xl space-y-4 max-lg:space-y-ios-section max-lg:px-ios-inset max-lg:pb-[calc(env(safe-area-inset-bottom)+2rem)] max-lg:pt-1" data-project-experience="simple">
+      <section className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between max-lg:rounded-[22px] max-lg:border-0 max-lg:shadow-none">
         <div className="grid flex-1 grid-cols-2 divide-x divide-border-soft">
           <SummaryMetric
             icon={<CheckCircle2 className="h-5 w-5" />}
@@ -71,17 +72,17 @@ export async function ProjectSimpleExperience({
           />
         </div>
         {canManage && (
-          <ProjectCompletionButton projectId={project.id} completed={completed} />
+          <ProjectCompletionButton projectId={project.id} completed={completed} className={completed ? "max-lg:hidden" : undefined} />
         )}
       </section>
 
       <ProjectMediaUploadCoordinator key={project.id} initialItems={detail.projectAttachments}>
         <ProjectServiceTabs initialActive="overview">
           <ProjectServiceTab id="overview" label="Tổng quan" icon={<House />}>
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,.72fr)]">
-              <section className="overflow-hidden rounded-xl border border-border bg-surface">
-                <header className="border-b border-border-soft px-4 py-3">
-                  <h2 className="font-semibold">Thông tin công trình</h2>
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,.72fr)]">
+              <section className="overflow-hidden rounded-xl border border-border bg-surface max-lg:rounded-[22px] max-lg:border-0">
+                <header className="border-b border-border-soft px-4 py-3 max-lg:border-0 max-lg:px-ios-inset max-lg:pb-1 max-lg:pt-3.5">
+                  <h2 className="font-semibold max-lg:text-[17px]">Thông tin công trình</h2>
                 </header>
                 <dl>
                   <InfoRow label="Khách hàng" value={<PartnerDetailLink kind="customer" partnerId={project.customerId} name={project.customerName ?? "—"} />} />
@@ -114,9 +115,9 @@ export async function ProjectSimpleExperience({
                 </p>
               </header>
               {detail.jobs.length ? (
-                <div className="grid gap-3 lg:grid-cols-2">
+                <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
                   {detail.jobs.map((job) => (
-                    <article key={job.id} className="rounded-xl border border-border-soft bg-surface p-4">
+                    <article key={job.id} className="rounded-xl border border-border-soft bg-surface p-4 max-lg:rounded-[22px] max-lg:border-0 max-lg:p-ios-inset">
                       <header className="mb-3 flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <p className="font-mono text-xs text-slate-500">{job.code}</p>
@@ -172,15 +173,15 @@ export async function ProjectSimpleExperience({
                 )}
               </header>
               {assets.length ? (
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {assets.map((asset) => (
-                    <article key={asset.id} className="rounded-xl border border-border-soft bg-surface p-3">
+                    <article key={asset.id} className="rounded-xl border border-border-soft bg-surface p-3 max-lg:rounded-[22px] max-lg:border-0 max-lg:p-ios-inset">
                       <div className="flex items-start gap-3">
                         <InstalledAssetPhotoThumbnail assetId={asset.id} assetName={asset.name} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <h3 className="truncate text-sm font-semibold">{asset.name}</h3>
+                              <h3 className="text-sm font-semibold max-lg:text-[17px]"><FitText className="block truncate" title={asset.name}>{asset.name}</FitText></h3>
                               <p className="mt-1 truncate text-xs text-slate-500">
                                 {[asset.brand, asset.model].filter(Boolean).join(" ") || asset.assetKind}
                               </p>
@@ -230,10 +231,10 @@ export async function ProjectSimpleExperience({
 function SummaryMetric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex min-w-0 items-center gap-3 px-3 first:pl-0 last:pr-0 sm:px-5">
-      <span className="text-primary-700">{icon}</span>
+      <span className="text-primary-700 max-lg:text-ios-accent">{icon}</span>
       <span className="min-w-0">
-        <span className="block text-xs text-slate-500">{label}</span>
-        <strong className="block truncate text-sm sm:text-base">{value}</strong>
+        <span className="block text-xs text-slate-500 max-lg:text-[13px] max-lg:text-ios-label-secondary">{label}</span>
+        <strong className="block truncate text-sm sm:text-base max-lg:text-[17px]">{value}</strong>
       </span>
     </div>
   );
@@ -241,8 +242,8 @@ function SummaryMetric({ icon, label, value }: { icon: React.ReactNode; label: s
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 border-b border-border-soft px-4 py-3 text-sm last:border-0">
-      <dt className="text-slate-500">{label}</dt>
+    <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 border-b border-border-soft px-4 py-3 text-sm last:border-0 max-lg:mx-ios-inset max-lg:grid-cols-[8.5rem_minmax(0,1fr)] max-lg:border-border max-lg:px-0 max-lg:py-3.5 max-lg:text-[15px]">
+      <dt className="text-slate-500 max-lg:text-ios-label-secondary">{label}</dt>
       <dd className="font-medium">{value}</dd>
     </div>
   );
@@ -250,8 +251,8 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 function QuickStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
-    <div className="rounded-xl bg-surface-2 p-3">
-      <span className="text-primary-700 [&_svg]:h-4 [&_svg]:w-4">{icon}</span>
+    <div className="rounded-xl bg-surface-2 p-3 max-lg:rounded-[22px] max-lg:bg-surface max-lg:p-ios-inset">
+      <span className="text-primary-700 max-lg:text-ios-accent [&_svg]:h-4 [&_svg]:w-4">{icon}</span>
       <strong className="mt-3 block font-mono text-xl tabular-nums">{value}</strong>
       <span className="mt-1 block text-xs text-slate-500">{label}</span>
     </div>
@@ -260,7 +261,7 @@ function QuickStat({ icon, label, value }: { icon: React.ReactNode; label: strin
 
 function EmptyState({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   return (
-    <div className="rounded-xl bg-surface-2 px-5 py-12 text-center">
+    <div className="rounded-xl bg-surface-2 px-5 py-12 text-center max-lg:rounded-[22px] max-lg:bg-surface">
       <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-primary-50 text-primary-700 [&_svg]:h-5 [&_svg]:w-5">{icon}</span>
       <h3 className="mt-3 font-semibold">{title}</h3>
       <p className="mt-1 text-sm text-slate-500">{text}</p>

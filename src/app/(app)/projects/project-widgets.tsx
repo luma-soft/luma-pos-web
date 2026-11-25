@@ -290,16 +290,26 @@ export function ProjectEdit({
   project,
   customers,
   triggerVariant = "link",
+  open: controlledOpen,
+  onOpenChange,
 }: {
   project: EditableProject;
   customers: { id: string; name: string }[];
-  triggerVariant?: "link" | "outline" | "icon";
+  /** "none" renders no trigger; the caller opens the editor with `open`. */
+  triggerVariant?: "link" | "outline" | "icon" | "none";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
   const { confirm } = useConfirmDialog();
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (controlledOpen === undefined) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
   const [name, setName] = useState(project.name);
   const [customerId, setCustomerId] = useState(project.customerId ?? "");
   const [createdCustomers, setCreatedCustomers] = useState<{ id: string; name: string }[]>([]);
@@ -377,7 +387,7 @@ export function ProjectEdit({
 
   return (
     <>
-      {triggerVariant === "icon" ? (
+      {triggerVariant === "none" ? null : triggerVariant === "icon" ? (
         <Button
           type="button"
           variant="ghost"

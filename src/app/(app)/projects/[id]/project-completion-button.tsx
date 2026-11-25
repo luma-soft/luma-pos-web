@@ -6,18 +6,14 @@ import { useRouter } from "next/navigation";
 
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   completeServiceProjectManually,
   toggleProjectStatus,
 } from "@/lib/actions/extras";
 
-export function ProjectCompletionButton({
-  projectId,
-  completed,
-}: {
-  projectId: string;
-  completed: boolean;
-}) {
+/** Complete / reopen a project with the same confirmations; shared by the button and the phone "…" menu. */
+export function useProjectCompletion(projectId: string, completed: boolean) {
   const router = useRouter();
   const { alert, confirm } = useConfirmDialog();
   const [busy, setBusy] = useState(false);
@@ -71,15 +67,29 @@ export function ProjectCompletionButton({
     });
   }
 
+  return { busy, act, completeManually };
+}
+
+export function ProjectCompletionButton({
+  projectId,
+  completed,
+  className,
+}: {
+  projectId: string;
+  completed: boolean;
+  className?: string;
+}) {
+  const { busy, act, completeManually } = useProjectCompletion(projectId, completed);
+
   return (
-    <div className="flex w-full flex-col gap-2 sm:w-auto">
+    <div className={cn("flex w-full flex-col gap-2 sm:w-auto", className)}>
       <Button
         type="button"
         variant={completed ? "outline" : "default"}
         onClick={() => void act()}
         disabled={busy}
         loading={busy}
-        className="w-full sm:w-auto"
+        className="w-full sm:w-auto max-lg:h-[50px] max-lg:!rounded-[14px] max-lg:text-[17px]"
       >
         {completed ? <RotateCcw className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
         {completed ? "Mở lại công trình" : "Đánh dấu hoàn thành"}
@@ -91,7 +101,7 @@ export function ProjectCompletionButton({
           size="sm"
           onClick={() => void completeManually()}
           disabled={busy}
-          className="w-full text-xs text-slate-500 sm:w-auto"
+          className="w-full text-xs text-slate-500 sm:w-auto max-lg:h-11 max-lg:text-[15px] max-lg:text-ios-accent"
         >
           Hoàn thành thủ công (bỏ qua nghiệm thu)
         </Button>

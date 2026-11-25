@@ -1290,7 +1290,7 @@ function ProjectMediaPanelBody({
   return (
     <section
       ref={panelRef}
-      className="overflow-visible rounded-xl border border-border bg-surface"
+      className="overflow-visible rounded-xl border border-border bg-surface max-lg:rounded-[22px] max-lg:border-0"
       aria-labelledby={titleId}
       data-project-media-phases={phaseFilter?.join(",") ?? "all"}
       data-project-media-upload-signal={uploadSignalMode}

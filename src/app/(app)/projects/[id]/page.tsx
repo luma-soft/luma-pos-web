@@ -7,6 +7,7 @@ import { getProjectDetail } from "@/lib/data/projects";
 import { getServiceFormOptions } from "@/lib/data/services";
 import { getSyncRelayConfig } from "@/lib/sync/config";
 import { ProjectDetailView } from "./project-detail-view";
+import { ProjectMobileNavActions } from "@/app/(app)/projects/[id]/project-mobile-nav-actions";
 import { requireStoreContext } from "@/lib/auth/store-context";
 
 export default async function ProjectDetailPage({
@@ -30,6 +31,16 @@ export default async function ProjectDetailPage({
       title={detail.project.name}
       subtitle={<PartnerDetailLink kind="customer" partnerId={detail.project.customerId} name={detail.project.customerName ?? t("projects.noCustomer")} />}
       closeLabel={t("common.close")}
+      backLabel={t("common.back")}
+      mobileActions={(
+        <ProjectMobileNavActions
+          project={detail.project}
+          customers={serviceOptions?.customerOptions ?? []}
+          canEdit={Boolean(serviceOptions) && ["owner", "manager"].includes(context.role)}
+          canDelete={["owner", "manager"].includes(context.role)}
+          canReopen={Boolean(detail.project.serviceType && serviceOptions) && ["owner", "manager"].includes(context.role)}
+        />
+      )}
       closeHref={`${Routes.Services}?tab=projects`}
     >
       <ProjectDetailView

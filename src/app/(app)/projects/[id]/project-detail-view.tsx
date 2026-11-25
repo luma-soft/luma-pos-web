@@ -69,7 +69,7 @@ export async function ProjectDetailView({
         />
       )}
       {presentation === "modal" && (
-        <div className="flex justify-end px-4 py-4 sm:px-6">
+        <div className="flex justify-end px-4 py-4 sm:px-6 max-lg:hidden">
           <ProjectDetailActions
             project={detail.project}
             serviceOptions={serviceOptions}

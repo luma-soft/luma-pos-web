@@ -170,7 +170,7 @@ export function ProjectNotesClient({
       ) : notes && notes.length > 0 ? (
         <div className="space-y-3">
           {notes.map((note) => (
-            <article key={note.id} className="rounded-2xl border border-border bg-surface px-4 pb-3 pt-4 shadow-sm">
+            <article key={note.id} className="rounded-2xl border border-border bg-surface px-4 pb-3 pt-4 shadow-sm max-lg:rounded-[22px] max-lg:border-0 max-lg:shadow-none">
               <p className="whitespace-pre-wrap text-sm leading-6 text-slate-800 dark:text-slate-100">{note.content}</p>
               <footer className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border-soft pt-3">
                 <p className="flex items-center gap-1.5 text-xs text-slate-500">

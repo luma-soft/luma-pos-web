@@ -12,8 +12,8 @@ export function ProjectServiceTabs({ children, initialActive }: { children: Reac
 
   return (
     <TabContext.Provider value={{ active, setActive }}>
-      <div className="rounded-card border border-border bg-surface overflow-hidden">
-        <div role="tablist" className="flex snap-x snap-mandatory gap-1 overflow-x-auto border-b border-border-soft p-2 [&::-webkit-scrollbar]:h-0">
+      <div className="rounded-card border border-border bg-surface overflow-hidden max-lg:overflow-visible max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent">
+        <div role="tablist" className="flex snap-x snap-mandatory gap-1 overflow-x-auto border-b border-border-soft p-2 [&::-webkit-scrollbar]:h-0 max-lg:-mx-ios-inset max-lg:snap-none max-lg:gap-1.5 max-lg:border-0 max-lg:px-ios-inset max-lg:pb-ios-section max-lg:pt-0">
           {items.map((item) => {
             const selected = item.props.id === active;
             return (
@@ -28,7 +28,11 @@ export function ProjectServiceTabs({ children, initialActive }: { children: Reac
                 className={cn(
                   "inline-flex min-h-11 shrink-0 snap-start items-center gap-2 rounded-[10px] px-3.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 min-w-11",
                   selected ? "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300" : "text-slate-500 hover:bg-surface-2 hover:text-slate-900 dark:hover:text-slate-200",
+                  // Phones: iOS capsule segments.
+                  "max-lg:min-h-[38px] max-lg:!rounded-full max-lg:text-[15px]",
+                  selected ? "max-lg:bg-ios-accent max-lg:text-white dark:max-lg:bg-ios-accent dark:max-lg:text-white" : "max-lg:bg-surface max-lg:text-ios-label",
                 )}
+                data-button-radius="pill"
               >
                 {item.props.icon && (
                   <span
@@ -43,7 +47,7 @@ export function ProjectServiceTabs({ children, initialActive }: { children: Reac
                 {item.props.count !== undefined && (
                   <span className={cn(
                     "rounded-full px-1.5 py-0.5 font-mono text-[10px]",
-                    selected ? "bg-primary-100 text-primary-800 dark:bg-primary-900" : "bg-surface-2 text-slate-500",
+                    selected ? "bg-primary-100 text-primary-800 dark:bg-primary-900 max-lg:bg-white/25 max-lg:text-white dark:max-lg:bg-white/25" : "bg-surface-2 text-slate-500",
                   )}>{item.props.count}</span>
                 )}
               </button>
@@ -73,7 +77,7 @@ export function ProjectServiceTab({ id, children }: ProjectServiceTabProps) {
       id={`project-service-panel-${id}`}
       aria-labelledby={`project-service-tab-${id}`}
       hidden={!active}
-      className={cn("p-3 sm:p-4", active && "block")}
+      className={cn("p-3 sm:p-4 max-lg:p-0", active && "block")}
     >
       {children}
     </div>

@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { ProjectDetailDialog } from "@/components/project-detail-dialog";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { getProjectDetail } from "@/lib/data/projects";
+import { ProjectMobileNavActions } from "@/app/(app)/projects/[id]/project-mobile-nav-actions";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { getSyncRelayConfig } from "@/lib/sync/config";
 import { getServiceFormOptions } from "@/lib/data/services";
@@ -29,6 +30,16 @@ export default async function ProjectDetailModalPage({
       title={detail.project.name}
       subtitle={<PartnerDetailLink kind="customer" partnerId={detail.project.customerId} name={detail.project.customerName ?? t("projects.noCustomer")} />}
       closeLabel={t("common.close")}
+      backLabel={t("common.back")}
+      mobileActions={(
+        <ProjectMobileNavActions
+          project={detail.project}
+          customers={serviceOptions?.customerOptions ?? []}
+          canEdit={Boolean(serviceOptions) && ["owner", "manager"].includes(context.role)}
+          canDelete={["owner", "manager"].includes(context.role)}
+          canReopen={Boolean(detail.project.serviceType && serviceOptions) && ["owner", "manager"].includes(context.role)}
+        />
+      )}
     >
       <ProjectDetailView
         detail={detail}

@@ -2,7 +2,7 @@
 
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 
 export function shouldCloseProjectDetailOnEscape(
   event: Pick<KeyboardEvent, "key" | "defaultPrevented">,
@@ -23,12 +23,18 @@ export function ProjectDetailDialog({
   closeLabel,
   children,
   closeHref,
+  backLabel,
+  mobileActions,
 }: {
   title: string;
   subtitle: ReactNode;
   closeLabel: string;
   children: ReactNode;
   closeHref?: string;
+  /** Phone back button label (defaults to the close label). */
+  backLabel?: string;
+  /** Phone navigation-bar trailing control, e.g. the "…" menu. */
+  mobileActions?: ReactNode;
 }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -67,10 +73,27 @@ export function ProjectDetailDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="project-detail-title"
-        className="flex h-dvh w-full max-w-[1600px] flex-col overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl"
+        className="flex h-dvh w-full max-w-[1600px] flex-col overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl max-lg:h-dvh max-lg:rounded-none max-lg:bg-canvas max-lg:shadow-none"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-6">
+        {/* Phones: iOS navigation bar — back, centred title, "…" menu. */}
+        <div className="flex shrink-0 items-center gap-3 px-ios-inset pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] lg:hidden">
+          <button
+            type="button"
+            onClick={close}
+            aria-label={backLabel ?? closeLabel}
+            data-button-radius="pill"
+            className="grid size-11 shrink-0 place-items-center rounded-full border border-black/[0.06] bg-surface/90 text-ios-label shadow-[0_2px_10px_rgb(0_0_0/0.08)] backdrop-blur-md dark:border-white/10"
+          >
+            <ChevronLeft className="size-6" strokeWidth={2.4} aria-hidden="true" />
+          </button>
+          <div className="min-w-0 flex-1 text-center">
+            <h2 className="truncate text-[17px] font-semibold leading-[22px]">{title}</h2>
+            <p className="truncate text-[13px] leading-[18px] text-ios-label-secondary">{subtitle}</p>
+          </div>
+          {mobileActions ?? <span className="size-11 shrink-0" aria-hidden="true" />}
+        </div>
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-6 max-lg:hidden">
           <div className="min-w-0">
             <h2
               id="project-detail-title"

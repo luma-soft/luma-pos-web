@@ -11,13 +11,8 @@ import { withListFilters } from "@/lib/list-return-navigation";
 import { Routes } from "@/lib/routes";
 import { PROJECT_DELETED_EVENT } from "@/lib/projects/client-events";
 
-export function ProjectDeleteButton({
-  projectId,
-  projectName,
-}: {
-  projectId: string;
-  projectName: string;
-}) {
+/** Confirm, delete and leave the project; shared by the button and the phone "…" menu. */
+export function useProjectDelete(projectId: string, projectName: string) {
   const t = useTranslations();
   const router = useRouter();
   const dialog = useConfirmDialog();
@@ -49,6 +44,19 @@ export function ProjectDeleteButton({
       variant: "destructive",
     });
   }
+
+  return { busy, remove };
+}
+
+export function ProjectDeleteButton({
+  projectId,
+  projectName,
+}: {
+  projectId: string;
+  projectName: string;
+}) {
+  const t = useTranslations();
+  const { busy, remove } = useProjectDelete(projectId, projectName);
 
   return (
     <button
