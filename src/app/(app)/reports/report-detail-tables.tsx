@@ -2,12 +2,50 @@
 
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 
+import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
+import { BarChart3, CircleUserRound, Package, type LucideIcon } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
-import { MobileRecordField } from "@/components/mobile-ui";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import type { ReportCustomerRow, ReportInventoryRow, ReportProductRow } from "@/lib/data/reports";
 import { useReportFormat } from "./report-format";
+
+/** Phone list: one grouped card of hairline rows, like the iOS report rankings. */
+export const reportMobileListClassName = "!space-y-0 overflow-hidden rounded-[14px] bg-surface px-3 [&>*:not(:first-child)]:shadow-[inset_0_1px_0_var(--color-border)]";
+export const reportMobileRowClassName = "!rounded-none !border-0 !bg-transparent";
+
+/** NativeReportRankedRowView: accent icon, title, secondary subtitle, value on the right. */
+export function ReportMobileRow({
+  icon: Icon,
+  title,
+  subtitle,
+  value,
+  valueClassName,
+  onOpen,
+  openLabel,
+}: {
+  icon: LucideIcon;
+  title: ReactNode;
+  subtitle: ReactNode;
+  value: ReactNode;
+  valueClassName?: string;
+  onOpen?: () => void;
+  openLabel?: string;
+}) {
+  return (
+    <div className="relative flex items-center gap-3 py-2">
+      {onOpen && (
+        <button type="button" onClick={onOpen} aria-label={openLabel} className="absolute inset-0 focus-visible:outline-2 focus-visible:outline-primary-500" />
+      )}
+      <Icon className="pointer-events-none size-5 shrink-0 text-ios-accent" aria-hidden="true" />
+      <div className="pointer-events-none min-w-0 flex-1">
+        <div className="truncate text-[15px] font-medium leading-5">{title}</div>
+        <div className="mt-0.5 line-clamp-2 text-[12px] leading-4 text-ios-label-secondary">{subtitle}</div>
+      </div>
+      <div className={cn("pointer-events-none shrink-0 text-[15px] font-semibold tabular-nums", valueClassName)}>{value}</div>
+    </div>
+  );
+}
 
 const emptyClassName = "rounded-card border border-dashed border-border p-12 text-center text-sm text-slate-400";
 
@@ -88,26 +126,17 @@ export function ReportProductsTable({ rows }: { rows: ReportProductRow[] }) {
 
 export function ReportProductMobileRow({ row }: { row: ReportProductRow }) {
   const t = useTranslations();
+  const f = useReportFormat();
   const profit = Number(row.profit);
-
+  const revenue = Number(row.revenue);
+  const margin = revenue === 0 ? 0 : (profit / revenue) * 100;
   return (
-    <div className="p-3">
-      <div className="break-words text-sm font-black leading-snug">{row.productName}</div>
-      <dl className="mt-3 grid grid-cols-2 gap-2">
-        <MobileRecordField label={t("reports.qtySold")} value={`${formatNumber(Number(row.qtySold))} ${row.baseUnit}`} />
-        <MobileRecordField
-          label={t("reports.revenue")}
-          value={formatCurrency(Number(row.revenue))}
-          className="[&_dd]:break-words [&_dd]:whitespace-normal"
-        />
-        <MobileRecordField
-          label={t("reports.grossProfit")}
-          value={formatCurrency(profit)}
-          tone={profit >= 0 ? "success" : "danger"}
-          className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal"
-        />
-      </dl>
-    </div>
+    <ReportMobileRow
+      icon={BarChart3}
+      title={row.productName}
+      subtitle={`${formatNumber(Number(row.qtySold))} ${row.baseUnit} · ${t("reports.grossProfit")} ${f.money(profit)} · ${f.percent(margin)}`}
+      value={f.money(revenue)}
+    />
   );
 }
 
@@ -190,29 +219,16 @@ export function ReportCustomersTable({ rows }: { rows: ReportCustomerRow[] }) {
 
 export function ReportCustomerMobileRow({ row }: { row: ReportCustomerRow }) {
   const t = useTranslations();
+  const f = useReportFormat();
   const remaining = Number(row.remaining);
-
+  const type = row.customerType && row.customerType !== "retail" ? ` (${t(`customers.types.${row.customerType}` as never)})` : "";
   return (
-    <div className="p-3">
-      <div className="break-words text-sm font-black leading-snug">
-        <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} openInCurrentTab className="max-w-full whitespace-normal break-words" />
-        {row.customerType && row.customerType !== "retail" ? ` (${t(`customers.types.${row.customerType}` as never)})` : ""}
-      </div>
-      <dl className="mt-3 grid grid-cols-2 gap-2">
-        <MobileRecordField label={t("reports.orders")} value={formatNumber(row.orderCount)} />
-        <MobileRecordField
-          label={t("reports.revenue")}
-          value={formatCurrency(Number(row.revenue))}
-          className="[&_dd]:break-words [&_dd]:whitespace-normal"
-        />
-        <MobileRecordField
-          label={t("reports.uncollected")}
-          value={remaining > 0 ? formatCurrency(remaining) : "—"}
-          tone={remaining > 0 ? "danger" : "neutral"}
-          className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal"
-        />
-      </dl>
-    </div>
+    <ReportMobileRow
+      icon={CircleUserRound}
+      title={<><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} openInCurrentTab className="pointer-events-auto relative z-10 max-w-full" />{type}</>}
+      subtitle={`${t("reports.orders")}: ${formatNumber(row.orderCount)}${remaining > 0 ? ` · ${t("reports.uncollected")} ${f.money(remaining)}` : ""}`}
+      value={f.money(Number(row.revenue))}
+    />
   );
 }
 
@@ -288,15 +304,12 @@ export function ReportInventoryTable({ rows }: { rows: ReportInventoryRow[] }) {
       columns={columns}
       getRowId={(row) => row.productId}
       renderMobileRow={(row) => (
-        <div className="p-3">
-          <div className="break-words text-sm font-black leading-snug">{row.productName}</div>
-          <dl className="mt-3 grid grid-cols-2 gap-2">
-            <MobileRecordField label={t("inventory.onHand")} value={`${formatNumber(row.quantity)} ${row.baseUnit}`} />
-            <MobileRecordField label={t("inventory.value")} value={formatCurrency(row.stockValue)} />
-            <MobileRecordField label={t("inventory.sold")} value={`${formatNumber(row.soldQuantity)} ${row.baseUnit}`} tone={row.soldQuantity === 0 ? "danger" : undefined} />
-            <MobileRecordField label={t("inventory.lastSold")} value={lastSold(row)} />
-          </dl>
-        </div>
+        <ReportMobileRow
+          icon={Package}
+          title={row.productName}
+          subtitle={`${t("inventory.onHand")} ${formatNumber(row.quantity)} ${row.baseUnit} · ${t("inventory.sold")} ${formatNumber(row.soldQuantity)} · ${t("inventory.lastSold")} ${lastSold(row)}`}
+          value={f.money(row.stockValue)}
+        />
       )}
     />
   );
@@ -323,6 +336,8 @@ function ReportTable<T>({
       columns={columns}
       getRowId={getRowId}
       renderMobileRow={({ row }) => renderMobileRow(row)}
+      mobileListClassName={reportMobileListClassName}
+      mobileRowClassName={reportMobileRowClassName}
       minWidth="760px"
       minHeight={420}
       empty={<div className={emptyClassName}>{t("dashboard.noData")}</div>}

@@ -2,13 +2,14 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { PackageOpen } from "lucide-react";
+import { FileText, PackageOpen } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
-import { MobileRecordField } from "@/components/mobile-ui";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { ReportInvoiceRow } from "@/lib/data/reports";
+import { ReportMobileRow, reportMobileListClassName, reportMobileRowClassName } from "./report-detail-tables";
+import { useReportFormat } from "./report-format";
 
 export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
   const t = useTranslations();
@@ -108,45 +109,25 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
       rowClickMode="row"
       empty={<div className="rounded-card border border-dashed border-border p-12 text-center text-sm text-slate-400">{t("dashboard.noData")}</div>}
       renderMobileRow={({ row }) => <ReportInvoiceMobileRow row={row} onOpen={() => openInvoice(row)} />}
+      mobileListClassName={reportMobileListClassName}
+      mobileRowClassName={reportMobileRowClassName}
     />
   );
 }
 
 export function ReportInvoiceMobileRow({ row, onOpen }: { row: ReportInvoiceRow; onOpen: () => void }) {
-  const t = useTranslations();
-  const profit = Number(row.profit);
-
+  const status = useTranslations("reports.d.status");
+  const f = useReportFormat();
+  const statusLabel = row.status === "completed" ? status("completed") : row.status === "returned" ? status("returned") : row.status === "cancelled" ? status("cancelled") : status("processing");
   return (
-    <div className="relative p-3">
-      <button
-        type="button"
-        onClick={onOpen}
-        aria-label={row.code}
-        className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
-      />
-      <div className="pointer-events-none">
-        <OrderSummaryLink row={row} mobile />
-        <div className="break-words text-xs font-medium text-slate-400">
-          {formatDate(row.createdAt)} · <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} openInCurrentTab className="pointer-events-auto relative z-10 max-w-full whitespace-normal break-words" />
-        </div>
-        <dl className="mt-3 grid grid-cols-2 gap-2">
-        <MobileRecordField
-          label={t("orders.cols.total")}
-          value={formatCurrency(Number(row.total))}
-          className="[&_dd]:break-words [&_dd]:whitespace-normal"
-        />
-        <MobileRecordField label={t("orders.cols.status")} value={<OrderStatus status={row.status} />} />
-        <MobileRecordField label={t("reports.d.kpi.cost")} value={formatCurrency(row.cost)} />
-        <MobileRecordField
-          label={t("reports.profit")}
-          value={formatCurrency(profit)}
-          tone={profit >= 0 ? "success" : "danger"}
-          className="[&_dd]:break-words [&_dd]:whitespace-normal"
-        />
-        <MobileRecordField label={t("reports.d.cols.margin")} value={`${row.margin.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`} />
-        </dl>
-      </div>
-    </div>
+    <ReportMobileRow
+      icon={FileText}
+      title={row.code}
+      subtitle={<>{formatDate(row.createdAt)} · <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} openInCurrentTab className="pointer-events-auto relative z-10" /> · {statusLabel}</>}
+      value={f.money(Number(row.total))}
+      onOpen={onOpen}
+      openLabel={row.code}
+    />
   );
 }
 

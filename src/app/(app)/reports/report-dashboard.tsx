@@ -430,8 +430,8 @@ function Delta({ value, point, inverse }: { value: number | null; point?: boolea
 function ReportSurface({ title, subtitle, children, flush }: { title: React.ReactNode; subtitle?: string; children: React.ReactNode; flush?: boolean }) {
   const heading = <>{title}{subtitle && <span className="font-medium text-slate-400"> ({subtitle})</span>}</>;
   return (
-    <section className={cn("overflow-hidden rounded-xl border border-border bg-surface", !flush && "p-4")}>
-      {flush ? <h2 className="border-b border-border px-4 py-3 text-sm font-black">{heading}</h2> : <h2 className="mb-3 text-sm font-black">{heading}</h2>}
+    <section className={cn("overflow-hidden rounded-xl border border-border bg-surface max-lg:rounded-[22px] max-lg:border-0", !flush && "p-4 max-lg:p-ios-inset", flush && "max-lg:overflow-visible max-lg:bg-transparent")}>
+      {flush ? <h2 className="border-b border-border px-4 py-3 text-sm font-black max-lg:border-0 max-lg:px-1 max-lg:pb-2.5 max-lg:pt-0 max-lg:text-[17px] max-lg:font-semibold">{heading}</h2> : <h2 className="mb-3 text-sm font-black max-lg:text-[17px] max-lg:font-semibold">{heading}</h2>}
       {children}
     </section>
   );
