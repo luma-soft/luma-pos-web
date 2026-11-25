@@ -208,6 +208,22 @@ như daemon hệ thống, và sống qua khởi động lại máy khi không ai
 
 ### Giai đoạn 3 — Trình hướng dẫn cài đặt (2–3 ngày)
 
+> **Đã làm bản đầu 2026-11-25 (chưa chạy thật trên Mac trống).** App Mac hiện
+> trình hướng dẫn thay cho bảng điều khiển khi chưa có `current` lẫn `app` (bản
+> Debug xem thử bằng `-LumaSetupPreview YES`, không đụng hệ thống). Các bước:
+> kiểm tra máy → quyền quản trị (`bootstrap`) → chọn gói runtime (`install-runtime`
+> + `activate-runtime`, chỉ đổi `current` khi chưa có DB) → cơ sở dữ liệu
+> (`init-database`, `init-runtime-env`, `migrate`) → cửa hàng mới
+> (`provision-store`, mật khẩu qua stdin) → Internet (chỉ máy này hoặc
+> Cloudflare: tên miền + tệp JSON của `cloudflared tunnel create`,
+> `configure-tunnel`) → khóa sao lưu (`backup-key`, chép/lưu tệp, phải xác nhận
+> đã cất) → `start-services` → hoàn tất. `lumapos-admin` v5 thêm các lệnh này;
+> `init-runtime-env` không bao giờ đổi khóa đã có.
+>
+> **Chưa có:** khôi phục từ Google Drive (đăng nhập rclone + `restore`), nhận từ
+> máy cũ (giai đoạn 4), đăng nhập Cloudflare trong app (`cloudflared tunnel
+> login`), chế độ LAN cho máy khác (web vẫn chỉ nghe `127.0.0.1`).
+
 Màn mới trong app Mac (VI/EN, theo `LumaTheme`), hiện khi chưa có
 `/Users/Shared/LumaPOS/current`.
 

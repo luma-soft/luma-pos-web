@@ -80,6 +80,11 @@ if [[ -f "$app_root/manifest.json" && -f "$app_root/server.js" && -d "$app_root/
       # One-shot, run by `lumapos-admin migrate` with MIGRATION_DATABASE_URL.
       exec "$bun_bin" workers/apply-migrations-from-database-url.js
       ;;
+    provision-store)
+      # One-shot, run by `lumapos-admin provision-store`; the owner password
+      # arrives in LUMA_OWNER_PASSWORD, the rest as arguments.
+      exec "$bun_bin" workers/provision-store.js "${@:2}"
+      ;;
     *)
       printf '%s\n' "Unknown LumaPOS service name." >&2
       exit 64

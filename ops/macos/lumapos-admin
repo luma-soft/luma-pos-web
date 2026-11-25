@@ -36,13 +36,22 @@
 #       random passwords written only to secrets/runtime.env.
 #   lumapos-admin migrate
 #   lumapos-admin write-secret <runtime.env|rclone.conf|cloudflared.yml|cloudflared-tunnel.json>  (stdin)
+#   lumapos-admin init-runtime-env [public-url]
+#       Default settings and generated keys; existing keys are kept.
+#   lumapos-admin backup-key
+#       Prints the backup encryption key so the owner can keep a copy.
+#   lumapos-admin provision-store <slug> <owner-email>
+#       stdin: store name, owner name, owner password (one per line).
+#   lumapos-admin configure-tunnel <hostname>
+#       stdin: Cloudflare tunnel credentials JSON.
+#   lumapos-admin start-services
 #
 # Progress lines start with "STEP:" so the Mac host console can show them.
 set -uo pipefail
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 umask 022
 
-readonly HELPER_VERSION=4
+readonly HELPER_VERSION=5
 readonly LUMAPOS_ROOT=/Users/Shared/LumaPOS
 readonly LIVE_ROOT="$LUMAPOS_ROOT/app"
 readonly STAGING_ROOT="$LUMAPOS_ROOT/app-next"
@@ -582,6 +591,11 @@ cmd_activate_runtime() {
     unload_services postgres
     load_service postgres
   fi
+  if [[ ! -f "$PGDATA/PG_VERSION" ]]; then
+    # First install: services start after init-database (start-services).
+    step "active $version (no database yet)"
+    return 0
+  fi
   if [[ -f "$PGDATA/PG_VERSION" ]]; then
     wait_postgres || { [[ -n "$previous" ]] && point_current_at "$previous"; fail "PostgreSQL did not start"; }
     if [[ "$mode" != --no-migrate ]]; then
@@ -713,6 +727,143 @@ cmd_migrate() {
   step "migrated"
 }
 
+# ---- setup (first install) ----
+
+env_has() { [[ -f "$RUNTIME_ENV" ]] && grep -q -E "^[[:space:]]*(export[[:space:]]+)?$1=" "$RUNTIME_ENV"; }
+env_value() {
+  [[ -f "$RUNTIME_ENV" ]] || return 1
+  sed -n "s/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}$1=//p" "$RUNTIME_ENV" | tail -n 1 | tr -d "\"'"
+}
+set_env_default() { env_has "$1" || set_env_value "$1" "$2"; }
+random_hex() { openssl rand -hex "$1"; }
+
+# Writes the settings a new store Mac needs and generates its own keys. Keys
+# that already exist are never changed (a new backup key would make earlier
+# archives unreadable).
+cmd_init_runtime_env() {
+  local public_url="${1:-}"
+  [[ -d "$SECRETS_DIR" && ! -L "$SECRETS_DIR" ]] || fail "Run bootstrap first"
+  if [[ -n "$public_url" ]]; then
+    [[ "$public_url" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]] || fail "Public URL must look like https://pos.example.com" 64
+  fi
+  set_env_default LUMAPOS_AUTH_PROVIDER lumapos
+  set_env_default LUMAPOS_PRIMARY_DATABASE_CONFIRMED true
+  set_env_default LUMAPOS_BACKUP_SOURCE_CONFIRMED true
+  set_env_default LUMAPOS_SYNC_INBOX_ENABLED true
+  set_env_default NOTIFICATION_QUEUE_PROVIDER database
+  set_env_default MEDIA_WRITE_PROVIDER local
+  set_env_default MEDIA_LOCAL_ROOT "$LUMAPOS_ROOT/media"
+  set_env_default LUMAPOS_INTERNAL_URL "http://127.0.0.1:3000"
+  set_env_default LUMAPOS_BACKUP_PROVIDER google-drive
+  set_env_default LUMAPOS_BACKUP_STAGING_ROOT "$LUMAPOS_ROOT/backup-staging"
+  set_env_default LUMAPOS_RCLONE_CONFIG "$SECRETS_DIR/rclone.conf"
+  set_env_default LUMAPOS_BACKUP_REMOTE "lumapos:Backups/LumaPOS"
+  set_env_default LUMAPOS_BACKUP_ENCRYPTION_KEY "$(random_hex 32)"
+  set_env_default SERVICE_VAULT_ENCRYPTION_KEY "$(random_hex 32)"
+  set_env_default MOBILE_CASHIER_CONTEXT_SECRET "$(random_hex 32)"
+  set_env_default CRON_SECRET "$(random_hex 32)"
+  if [[ -n "$public_url" ]]; then
+    set_env_value LUMAPOS_PUBLIC_URL "$public_url"
+  else
+    set_env_default LUMAPOS_PUBLIC_URL "http://127.0.0.1:3000"
+  fi
+  step "runtime.env ready"
+}
+
+# The backup key is needed to restore an archive on another Mac, so the owner
+# must keep a copy away from this Mac. Only the sudoers user can read it.
+cmd_backup_key() {
+  local key
+  key="$(env_value LUMAPOS_BACKUP_ENCRYPTION_KEY)" || fail "No runtime.env"
+  [[ "$key" =~ ^[0-9a-fA-F]{64}$ ]] || fail "No backup key yet (run init-runtime-env)" 66
+  printf '%s\n' "$key"
+}
+
+# provision-store <slug> <owner-email>; stdin: store name, owner name and
+# password on three lines.
+cmd_provision_store() {
+  local slug="${1:-}" email="${2:-}" store_name owner_name password app="$CURRENT_LINK/app"
+  [[ "$slug" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ && ${#slug} -le 48 ]] || fail "Store code must be lowercase letters, digits and dashes" 64
+  [[ "$email" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ && ${#email} -le 254 ]] || fail "Owner email is invalid" 64
+  IFS= read -r store_name || true
+  IFS= read -r owner_name || true
+  IFS= read -r password || true
+  [[ -n "$store_name" && ${#store_name} -le 120 ]] || fail "Store name is required" 64
+  [[ ${#owner_name} -le 120 ]] || fail "Owner name is too long" 64
+  [[ -n "$password" ]] || fail "Owner password is required" 64
+  current_version >/dev/null || fail "No active runtime"
+  wait_postgres || fail "PostgreSQL is not running"
+  [[ -f "$app/workers/provision-store.js" ]] || fail "This runtime cannot provision a store"
+  local args=(--slug "$slug" --name "$store_name" --owner-email "$email")
+  [[ -n "$owner_name" ]] && args+=(--owner-name "$owner_name")
+  sudo -u "$SERVICE_USER" -- /usr/bin/env -i \
+    PATH="$CURRENT_LINK/tools/bin:/usr/bin:/bin" \
+    LUMAPOS_APP_ROOT="$app" LUMAPOS_ENV_FILE="$RUNTIME_ENV" \
+    LUMAPOS_BUN_BIN="$CURRENT_LINK/tools/bin/bun" \
+    LUMA_OWNER_PASSWORD="$password" \
+    /bin/bash "$app/ops/shared/run-service.sh" provision-store "${args[@]}" >/dev/null \
+    || fail "Could not create the store (check the password rules and the email)"
+  step "store $slug ready"
+}
+
+# configure-tunnel <hostname>; stdin: the Cloudflare tunnel credentials JSON
+# (from `cloudflared tunnel create`). Writes the credentials, a config that
+# only publishes the local web server, and the public URL.
+cmd_configure_tunnel() {
+  local hostname="${1:-}" tmp tunnel_id
+  [[ "$hostname" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]] || fail "Hostname is invalid" 64
+  [[ -d "$SECRETS_DIR" && ! -L "$SECRETS_DIR" ]] || fail "Run bootstrap first"
+  tmp="$(mktemp "$SECRETS_DIR/.tunnel.XXXXXX")" || fail "Could not create a temporary file"
+  head -c 16385 > "$tmp"
+  if (( $(stat -f '%z' "$tmp") > 16384 )); then rm -f "$tmp"; fail "Tunnel credentials are too large" 64; fi
+  tunnel_id="$(manifest_value "$tmp" TunnelID)"
+  if [[ ! "$tunnel_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] \
+    || [[ -z "$(manifest_value "$tmp" TunnelSecret)" ]]; then
+    rm -f "$tmp"; fail "This is not a Cloudflare tunnel credentials file" 64
+  fi
+  chown "$SERVICE_USER:staff" "$tmp" && chmod 0600 "$tmp" && mv -f -- "$tmp" "$SECRETS_DIR/cloudflared-tunnel.json" \
+    || { rm -f "$tmp"; fail "Could not write the tunnel credentials"; }
+  tmp="$(mktemp "$SECRETS_DIR/.cloudflared.XXXXXX")" || fail "Could not create a temporary file"
+  cat > "$tmp" <<EOF
+# Managed by lumapos-admin configure-tunnel
+tunnel: $tunnel_id
+credentials-file: $SECRETS_DIR/cloudflared-tunnel.json
+ingress:
+  - hostname: $hostname
+    service: http://127.0.0.1:3000
+  - service: http_status:404
+EOF
+  chown "$SERVICE_USER:staff" "$tmp" && chmod 0600 "$tmp" && mv -f -- "$tmp" "$SECRETS_DIR/cloudflared.yml" \
+    || { rm -f "$tmp"; fail "Could not write cloudflared.yml"; }
+  set_env_value LUMAPOS_PUBLIC_URL "https://$hostname" || fail "Could not update runtime.env"
+  [[ -f "$(plist_of cloudflared)" ]] || write_packaged_plist cloudflared
+  is_loaded cloudflared && launchctl kickstart -k "$(target_of cloudflared)" >/dev/null 2>&1
+  step "tunnel $tunnel_id for $hostname"
+}
+
+# Starts the packaged services in order: PostgreSQL, web (until it answers),
+# workers, then the tunnel when it is configured.
+cmd_start_services() {
+  local name pg_major
+  current_version >/dev/null || fail "No active runtime"
+  [[ -f "$PGDATA/PG_VERSION" ]] || fail "Run init-database first"
+  pg_major="$(manifest_value "$CURRENT_LINK/manifest.json" postgres.major)"
+  for name in "${PACKAGED_SERVICES[@]}"; do
+    [[ -f "$(plist_of "$name")" ]] || write_packaged_plist "$name" "$pg_major"
+  done
+  step "postgres"
+  load_service postgres && wait_postgres || fail "PostgreSQL did not start"
+  step "web"
+  load_service web && wait_live || fail "The web server did not start; see logs/web.log"
+  step "workers"
+  load_services sync notifications backups || fail "A worker did not start"
+  if [[ -f "$SECRETS_DIR/cloudflared.yml" ]]; then
+    step "tunnel"
+    load_service cloudflared || fail "cloudflared did not start"
+  fi
+  step "services running"
+}
+
 # ---- secrets ----
 
 cmd_write_secret() {
@@ -780,5 +931,10 @@ case "${1:-}" in
   init-database) cmd_init_database ;;
   migrate) cmd_migrate ;;
   write-secret) shift; cmd_write_secret "$@" ;;
-  *) fail "Usage: lumapos-admin deploy | service start|stop|restart <name> | log <name> [lines] | version | status | bootstrap <user> | create-accounts | install-runtime <archive> [sha256] | activate-runtime <version> | rollback-runtime | init-database | migrate | write-secret <name>" 64 ;;
+  init-runtime-env) shift; cmd_init_runtime_env "${1:-}" ;;
+  backup-key) cmd_backup_key ;;
+  provision-store) shift; cmd_provision_store "$@" ;;
+  configure-tunnel) shift; cmd_configure_tunnel "${1:-}" ;;
+  start-services) cmd_start_services ;;
+  *) fail "Usage: lumapos-admin deploy | service start|stop|restart <name> | log <name> [lines] | version | status | bootstrap <user> | create-accounts | install-runtime <archive> [sha256] | activate-runtime <version> | rollback-runtime | init-database | migrate | write-secret <name> | init-runtime-env [public-url] | backup-key | provision-store <slug> <email> | configure-tunnel <hostname> | start-services" 64 ;;
 esac
