@@ -20,8 +20,28 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, "window");
 });
 
-const { getModalLayerCount, getScrollLockCount, lockBodyScroll, pickEscapeLayer, pushModalLayer } =
+const { getModalLayerCount, getScrollLockCount, lockBodyScroll, pickEscapeLayer, pushModalLayer, raiseLayerOverlay } =
   await import("./modal-layer.ts");
+
+class FakeElement {
+  constructor({ z = "auto", position = "fixed", visible = true, previous = null } = {}) {
+    this.style = { zIndex: "" };
+    this.computed = { zIndex: z, position };
+    this.visible = visible;
+    this.previousElementSibling = previous;
+    this.parentElement = null;
+  }
+  getClientRects() { return this.visible ? [{}] : []; }
+}
+
+function withDom(run) {
+  Object.assign(globalThis, { HTMLElement: FakeElement });
+  globalThis.window.getComputedStyle = (element) => ({
+    position: element.computed.position,
+    zIndex: element.style.zIndex || element.computed.zIndex,
+  });
+  try { run(); } finally { Reflect.deleteProperty(globalThis, "HTMLElement"); }
+}
 
 function pressEscape(init = {}) {
   const event = {
@@ -76,6 +96,47 @@ describe("Escape", () => {
     expect(pickEscapeLayer(escape, [registered], registered)).toBe(0);
     expect(pickEscapeLayer(escape, [registered], registered, unregistered)).toBe(-1);
     expect(pickEscapeLayer(escape, [registered], null, registered)).toBe(0);
+  });
+});
+
+describe("hidden layers", () => {
+  test("a rendered but hidden layer does not swallow Escape", () => {
+    withDom(() => {
+      const closed = [];
+      const below = pushModalLayer({ onEscape: () => closed.push("below") });
+      const hidden = new FakeElement({ visible: false });
+      const phoneOnly = pushModalLayer({ onEscape: () => closed.push("phone"), getElement: () => hidden });
+      pressEscape();
+      expect(closed).toEqual(["below"]);
+      phoneOnly.release();
+      below.release();
+    });
+  });
+});
+
+describe("stacking", () => {
+  test("raises a layer whose overlay sits below the layer under it", () => {
+    withDom(() => {
+      const parentOverlay = new FakeElement({ z: "100" });
+      const backdrop = new FakeElement({ z: "80" });
+      const childOverlay = new FakeElement({ z: "80", previous: backdrop });
+      const parent = pushModalLayer({ getElement: () => parentOverlay });
+      const child = pushModalLayer({ getElement: () => childOverlay });
+      expect(childOverlay.style.zIndex).toBe("101");
+      expect(backdrop.style.zIndex).toBe("101");
+      child.release();
+      expect(childOverlay.style.zIndex).toBe("");
+      expect(backdrop.style.zIndex).toBe("");
+      parent.release();
+    });
+  });
+
+  test("keeps a layer that is already above", () => {
+    withDom(() => {
+      const overlay = new FakeElement({ z: "120" });
+      expect(raiseLayerOverlay(overlay, 101)).toEqual({ z: 120, restore: null });
+      expect(overlay.style.zIndex).toBe("");
+    });
   });
 });
 

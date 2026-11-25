@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { Banknote, BadgeCheck, CalendarClock, ChevronRight, ListChecks, SearchX, SlidersHorizontal } from "lucide-react";
@@ -16,6 +16,7 @@ import {
 import { LumaWebPicker } from "@/app/(app)/sales/tabs/filter-drawer-shared";
 import { FilterDrawerFooter, FilterSection, MobileFilterHeader } from "@/app/(app)/sales/tabs/filter-drawer-sections";
 import { cn, formatCurrency } from "@/lib/utils";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 /**
  * Phone sub-screens of the partner profiles, ported from
@@ -320,6 +321,8 @@ function MobileLedgerFilterScreen({
   onClose: () => void;
 }) {
   const t = useTranslations("mobile.partnerLedger.filters");
+  const filterScreenRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: onClose, elementRef: filterScreenRef });
   const [draft, setDraft] = useState<PartnerDebtFilterValue>(() => value.time === "custom" && !value.from
     ? { ...value, ...defaultRange() }
     : value);
@@ -327,7 +330,7 @@ function MobileLedgerFilterScreen({
   const count = (draft.time === "all" ? 0 : 1) + (draft.kind === "all" ? 0 : 1);
 
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label={t("title")} className="fixed inset-0 z-[110] flex flex-col bg-canvas lg:hidden">
+    <div ref={filterScreenRef} role="dialog" aria-modal="true" aria-label={t("title")} className="fixed inset-0 z-[110] flex flex-col bg-canvas lg:hidden">
       <MobileFilterHeader title={t("title")} conditionCount={count} onCancel={onClose} />
       <form
         onSubmit={(event) => {

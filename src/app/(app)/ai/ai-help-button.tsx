@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { HelpCircle, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export function AiHelpButton() {
   const t = useTranslations();
   const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLElement>(null);
+  useModalLayer({ open, onEscape: () => setOpen(false), elementRef: dialogRef });
   const guideItems = [
     t("ai.help.itemAsk"),
     t("ai.help.itemAction"),
@@ -36,7 +39,7 @@ export function AiHelpButton() {
             if (event.target === event.currentTarget) setOpen(false);
           }}
         >
-          <section
+          <section ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="ai-help-title"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
-import { useState, type ReactNode } from "react";
+import { useState, useRef, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { Check, ChevronRight, Ellipsis, Folder, FolderPlus, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { MobileActionSheet } from "@/components/mobile-detail-nav";
@@ -12,6 +12,7 @@ import { selectAllInputOnClick } from "@/lib/input-selection";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn } from "@/lib/utils";
 import { createCategoryNode, updateCategory, deleteCategory } from "@/lib/actions/products";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 interface Cat { id: string; name: string; parentId: string | null; parentName: string | null; productCount: number; }
 interface ParentOption { id: string; name: string; }
@@ -38,12 +39,16 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Cat | null>(null);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open: pendingDelete !== null, onEscape: () => setPendingDelete(null), elementRef: deleteDialogRef });
   const [query, setQuery] = useState("");
   const [menuFor, setMenuFor] = useState<Cat | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   // modal tạo mới
   const [open, setOpen] = useState(false);
+  const createDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open, onEscape: () => setOpen(false), elementRef: createDialogRef });
   const [newName, setNewName] = useState("");
   const [newParent, setNewParent] = useState("");
   const [creating, setCreating] = useState(false);
@@ -271,7 +276,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
       {/* modal tạo nhóm hàng */}
       {open && (
         <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4" onClick={() => setOpen(false)}>
-          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div ref={createDialogRef} role="dialog" aria-modal="true" className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800">
               <h3 className="font-semibold">{t("categories.create")}</h3>
               <button onClick={() => setOpen(false)} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
@@ -306,7 +311,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
 
       {pendingDelete && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4" onClick={() => setPendingDelete(null)}>
-          <div className="w-full max-w-md rounded-2xl bg-surface shadow-2xl" onClick={(event) => event.stopPropagation()}>
+          <div ref={deleteDialogRef} role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-surface shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="border-b border-border-soft px-5 py-4">
               <h3 className="font-bold text-slate-900 dark:text-slate-100">{t("categories.deleteWarningTitle")}</h3>
             </div>

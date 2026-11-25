@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef } from "react";
+
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { X } from "lucide-react";
@@ -10,6 +12,7 @@ import { createSupplierSchema, type CreateSupplierInput, type CreateSupplierOutp
 import { cn } from "@/lib/utils";
 import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
 import { MobileFormHeader, mobileFormSectionTitle } from "@/components/mobile-form-header";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export type SupplierCreateResult = {
   id: string;
@@ -148,12 +151,14 @@ export function SupplierCreateDialog({
   initialValues?: Partial<CreateSupplierInput>;
 }) {
   const t = useTranslations();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open, onEscape: () => onOpenChange(false), elementRef: dialogRef });
   if (!open) return null;
   const formId = editingId ? "supplier-edit-form" : "supplier-create-form";
 
   return (
     <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/40 p-0 lg:items-center lg:p-4" role="presentation">
-      <div
+      <div ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="supplier-create-dialog-title"

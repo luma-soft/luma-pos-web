@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { Ban, Loader2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cancelCashTx } from "@/lib/actions/cashbook";
 import { cancelSupplierPayable } from "@/lib/actions/payables";
 import { cancelCustomerReceivable } from "@/lib/actions/receivables";
 import { formatCurrency } from "@/lib/utils";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type VoucherProps = {
   code: string;
@@ -24,6 +25,14 @@ export function CancelFinancialVoucherButton(props: VoucherProps) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
+  const dialogRef = useRef<HTMLElement>(null);
+  useModalLayer({
+    open,
+    onEscape: () => {
+      if (!pending) close();
+    },
+    elementRef: dialogRef,
+  });
 
   function close() {
     if (pending) return;
@@ -70,7 +79,7 @@ export function CancelFinancialVoucherButton(props: VoucherProps) {
           role="presentation"
           onMouseDown={close}
         >
-          <section
+          <section ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="cancel-financial-voucher-title"

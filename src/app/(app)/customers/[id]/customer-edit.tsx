@@ -2,7 +2,7 @@
 
 import { MobileFormHeader, mobileFormSectionTitle } from "@/components/mobile-form-header";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
@@ -10,6 +10,7 @@ import { useTranslations } from "next-intl";
 import { Pencil, Loader2, X } from "lucide-react";
 import { updateCustomer } from "@/lib/actions/partners";
 import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type CustomerType = "retail" | "wholesale" | "contractor" | "agent";
 
@@ -30,6 +31,8 @@ export function CustomerEdit({ customer, open: controlledOpen, onOpenChange, hid
   const router = useRouter();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
+  const editDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open, onEscape: () => setOpen(false), elementRef: editDialogRef });
   const setOpen = (next: boolean) => {
     if (controlledOpen === undefined) setInternalOpen(next);
     onOpenChange?.(next);
@@ -74,7 +77,7 @@ export function CustomerEdit({ customer, open: controlledOpen, onOpenChange, hid
 
       {open && (
         <div className="fixed inset-0 z-[130] grid place-items-center bg-black/40 p-4 max-lg:block max-lg:bg-canvas max-lg:p-0" onClick={() => setOpen(false)}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg bg-surface rounded-2xl shadow-xl p-5 max-h-[90vh] overflow-auto max-lg:h-dvh max-lg:max-h-none max-lg:max-w-none max-lg:rounded-none max-lg:bg-canvas max-lg:p-0 max-lg:pb-[max(1.5rem,env(safe-area-inset-bottom))] max-lg:shadow-none">
+          <div ref={editDialogRef} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} className="w-full max-w-lg bg-surface rounded-2xl shadow-xl p-5 max-h-[90vh] overflow-auto max-lg:h-dvh max-lg:max-h-none max-lg:max-w-none max-lg:rounded-none max-lg:bg-canvas max-lg:p-0 max-lg:pb-[max(1.5rem,env(safe-area-inset-bottom))] max-lg:shadow-none">
             {/* Phones: NativeCustomerEditorView presented full screen. */}
             <MobileFormHeader
               title={t("mobile.customers.editor.editTitle")}

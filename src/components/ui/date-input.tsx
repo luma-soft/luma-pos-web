@@ -168,8 +168,8 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
           <div ref={popupRef} id={popupId} role="dialog" aria-label={chooseLabel} style={position} className={cn(
             "overflow-auto text-slate-900 dark:text-slate-100",
             phone
-              ? "z-[130] flex flex-col bg-canvas px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
-              : "z-[115] rounded-xl border border-border bg-surface p-3 shadow-e2",
+              ? "z-[1000] flex flex-col bg-canvas px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
+              : "z-[1000] rounded-xl border border-border bg-surface p-3 shadow-e2",
           )} onKeyDown={(event) => {
             if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
           }}>

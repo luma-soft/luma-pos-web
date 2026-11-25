@@ -9,6 +9,7 @@ import { ActionPresetButtons } from "./action-preset-buttons";
 import { AttachmentPill } from "./attachment-pill";
 import { PreviewCard } from "./preview-card";
 import type { AssistantController } from "./types";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 const ACCEPTED_FILE_INPUT_TYPES = [
   "image/png",
@@ -103,6 +104,8 @@ export function AssistantChatSurface({
   const sendDisabled = composerDisabled || !hasComposerPayload;
   const activeSession = sessions.find((session) => session.id === sessionId) ?? null;
   const [sessionDialog, setSessionDialog] = useState<"rename" | "delete" | null>(null);
+  const sessionDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open: sessionDialog !== null, onEscape: () => setSessionDialog(null), elementRef: sessionDialogRef });
   const [sessionTitleDraft, setSessionTitleDraft] = useState("");
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -235,7 +238,7 @@ export function AssistantChatSurface({
             if (event.target === event.currentTarget) setSessionDialog(null);
           }}
         >
-          <div
+          <div ref={sessionDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="ai-session-dialog-title"

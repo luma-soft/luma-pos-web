@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2, Pencil, Printer, X, XCircle } from "lucide-react";
@@ -10,6 +10,7 @@ import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { Button } from "@/components/ui/button";
 import { modalActionSizeClassName } from "@/components/ui/button-variants";
 import { Select } from "@/components/ui/select";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 const REASONS = ["defective", "wrong_item", "changed_mind", "other"] as const;
 
@@ -36,6 +37,14 @@ export function ReturnActions({
   const [selectedReason, setSelectedReason] = useState(reason ?? "other");
   const [draftNote, setDraftNote] = useState(note ?? "");
   const [busy, setBusy] = useState<"edit" | "cancel" | null>(null);
+  const editDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({
+    open: editOpen,
+    onEscape: () => {
+      if (!busy) setEditOpen(false);
+    },
+    elementRef: editDialogRef,
+  });
 
   async function saveEdit() {
     if (busy) return;
@@ -96,7 +105,7 @@ export function ReturnActions({
       {triggers}
       {editOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-[2px]" onMouseDown={() => !busy && setEditOpen(false)}>
-          <div role="dialog" aria-modal="true" aria-labelledby="return-edit-title" className="w-full max-w-lg rounded-card border border-border bg-surface shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+          <div ref={editDialogRef} role="dialog" aria-modal="true" aria-labelledby="return-edit-title" className="w-full max-w-lg rounded-card border border-border bg-surface shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-border-soft px-4 py-3">
               <h2 id="return-edit-title" className="font-semibold">{t("returns.editTitle")}</h2>
               <button type="button" onClick={() => setEditOpen(false)} disabled={Boolean(busy)} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 lg:h-9 lg:w-9" aria-label={t("common.close")}>

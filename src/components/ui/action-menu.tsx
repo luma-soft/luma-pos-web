@@ -153,7 +153,7 @@ export function LumaActionMenu({
               focusItem(event.key === "ArrowDown" ? 1 : -1);
             }
           }}
-          className="z-[100] w-56 overflow-x-hidden overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-e2"
+          className="z-[1000] w-56 overflow-x-hidden overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-e2"
         >
           {items.map((item, index) => {
             const Icon = item.icon;

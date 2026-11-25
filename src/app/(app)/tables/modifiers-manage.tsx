@@ -1,7 +1,7 @@
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Plus, Trash2, Pencil, Loader2, X, Check } from "lucide-react";
@@ -9,6 +9,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 import { saveModifierGroup, setModifierGroupActive, deleteModifierGroup } from "@/lib/actions/modifiers";
 import type { ModifierGroup } from "@/lib/data/modifiers";
 import { MoneyInput } from "@/components/ui/money-input";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type Cat = { id: string; name: string };
 type OptRow = { id: string; label: string; priceDelta: number };
@@ -24,6 +25,8 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
   const [pending, start] = useTransition();
   const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open, onEscape: () => setOpen(false), elementRef: dialogRef });
   const [form, setForm] = useState(emptyForm());
   const [err, setErr] = useState("");
 
@@ -96,7 +99,7 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
 
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-3 sm:p-4" onClick={() => setOpen(false)}>
-          <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-auto rounded-card bg-surface shadow-e2 sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+          <div ref={dialogRef} role="dialog" aria-modal="true" className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-auto rounded-card bg-surface shadow-e2 sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-border sticky top-0 bg-surface">
               <h2 className="font-bold">{editId ? t("modifiers.editTitle") : t("modifiers.add")}</h2>
               <button onClick={() => setOpen(false)} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-surface-2"><X className="h-5 w-5" /></button>

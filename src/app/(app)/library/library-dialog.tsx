@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { lockBodyScroll } from "@/lib/modal-layer";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 /** The native modal top layer provides inert background and keyboard focus containment. */
 export function LibraryDialog({
@@ -34,6 +35,12 @@ export function LibraryDialog({
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  useModalLayer({
+    onEscape: () => {
+      if (!busy) onClose();
+    },
+    elementRef: dialogRef,
+  });
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;

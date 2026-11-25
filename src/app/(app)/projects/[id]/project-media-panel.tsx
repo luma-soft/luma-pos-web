@@ -1061,13 +1061,8 @@ function ProjectMediaPanelBody({
     const initialTarget = focusableElements()[0] ?? focusRoot;
     initialTarget?.focus();
 
+    // Escape is handled by the preview's RowPreviewModal layer.
     function trapFocus(event: KeyboardEvent) {
-      if (event.key === "Escape" && imagePreview) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        setImagePreview(null);
-        return;
-      }
       if (event.key !== "Tab") return;
       const target = projectMediaModalFocusTarget(
         focusableElements(),

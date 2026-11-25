@@ -14,6 +14,7 @@ import { ACCEPTED_ATTACHMENT_TYPES, MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES, attac
 import { AiQuickActionPreviewPanel } from "./ai-quick-action-preview-panel";
 import type { AiQuickActionApplyMode, AiQuickActionPreset } from "./types";
 import { isPreviewApplicable, quickActionPrompt } from "./utils";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 const ACCEPTED_FILE_INPUT_TYPES = Array.from(ACCEPTED_ATTACHMENT_TYPES).join(",");
 
@@ -65,6 +66,14 @@ export function AiQuickActionModal({
   const [error, setError] = useState("");
   const [responseText, setResponseText] = useState("");
   const [preview, setPreview] = useState<AiActionPreview | null>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+  useModalLayer({
+    open,
+    onEscape: () => {
+      if (!busy && !applyBusy) closeModal();
+    },
+    elementRef: dialogRef,
+  });
 
   if (!open) return null;
 
@@ -221,7 +230,7 @@ export function AiQuickActionModal({
         if (event.target === event.currentTarget && !busy && !applyBusy) closeModal();
       }}
     >
-      <section
+      <section ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}

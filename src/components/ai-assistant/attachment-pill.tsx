@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { ExternalLink, FileText, ImageIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { resolveAiAttachmentUrl } from "./api";
 import type { ComposerAttachment } from "./types";
 import { fileSizeText } from "./utils";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export function AttachmentPill({
   attachment,
@@ -21,6 +22,15 @@ export function AttachmentPill({
   const t = useTranslations();
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   const [viewerError, setViewerError] = useState<string | null>(null);
+  const viewerRef = useRef<HTMLElement>(null);
+  useModalLayer({
+    open: Boolean(viewerUrl || viewerError),
+    onEscape: () => {
+      setViewerUrl(null);
+      setViewerError(null);
+    },
+    elementRef: viewerRef,
+  });
   const canPreview = Boolean(attachment.previewUrl || attachment.signedUrl || (attachment.bucket && attachment.path));
   const isImage = attachment.kind === "image";
   const isPdf = attachment.mimeType === "application/pdf";
@@ -111,7 +121,7 @@ export function AttachmentPill({
             }
           }}
         >
-          <section
+          <section ref={viewerRef}
             role="dialog"
             aria-modal="true"
             aria-label={t("ai.composer.previewAttachment", { name: attachment.name })}

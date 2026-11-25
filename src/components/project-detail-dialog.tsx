@@ -1,21 +1,9 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect, useRef } from "react";
+import { type ReactNode, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, X } from "lucide-react";
-
-export function shouldCloseProjectDetailOnEscape(
-  event: Pick<KeyboardEvent, "key" | "defaultPrevented">,
-  dialog: Element | null,
-  modalDialogs: readonly Element[],
-) {
-  return (
-    event.key === "Escape" &&
-    !event.defaultPrevented &&
-    dialog !== null &&
-    modalDialogs[modalDialogs.length - 1] === dialog
-  );
-}
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export function ProjectDetailDialog({
   title,
@@ -43,25 +31,7 @@ export function ProjectDetailDialog({
     else router.back();
   }, [closeHref, router]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const modalDialogs = Array.from(
-        document.querySelectorAll('[aria-modal="true"]'),
-      );
-      if (
-        shouldCloseProjectDetailOnEscape(
-          event,
-          dialogRef.current,
-          modalDialogs,
-        )
-      ) {
-        close();
-      }
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [close]);
+  useModalLayer({ onEscape: close, elementRef: dialogRef });
 
   return (
     <div

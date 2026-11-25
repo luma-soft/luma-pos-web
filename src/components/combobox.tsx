@@ -207,8 +207,8 @@ export function SearchableSelect({
       ref={menuRef}
       style={isDesktop ? (menuStyle ?? { position: "fixed", left: 0, top: 0, visibility: "hidden" }) : undefined}
       className={isDesktop
-        ? "z-[120] min-w-0 rounded-xl border border-border bg-surface shadow-e2 overflow-hidden flex flex-col"
-        : "fixed inset-x-0 bottom-0 z-50 max-h-[min(80dvh,640px)] rounded-t-2xl bg-surface border border-border shadow-e2 overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)] animate-[slideUp_180ms_ease]"}
+        ? "z-[1000] min-w-0 rounded-xl border border-border bg-surface shadow-e2 overflow-hidden flex flex-col"
+        : "fixed inset-x-0 bottom-0 z-[1000] max-h-[min(80dvh,640px)] rounded-t-2xl bg-surface border border-border shadow-e2 overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)] animate-[slideUp_180ms_ease]"}
     >
       {/* mobile header: tay nắm + tiêu đề + đóng */}
       <div className="lg:hidden">
@@ -371,7 +371,7 @@ export function SearchableSelect({
 
       {open && (
         <>
-          {!isDesktop && <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setOpen(false)} />}
+          {!isDesktop && <div className="fixed inset-0 bg-black/40 z-[999] lg:hidden" onClick={() => setOpen(false)} />}
           {isDesktop && typeof document !== "undefined" ? createPortal(menuSurface, document.body) : menuSurface}
         </>
       )}

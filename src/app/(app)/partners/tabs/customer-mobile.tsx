@@ -34,6 +34,7 @@ import {
   MobileFilterHeader,
   MobileSwitchRow,
 } from "@/app/(app)/sales/tabs/filter-drawer-sections";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 /**
  * Phone UI for the customer list and profile, ported from CustomersView.swift and
@@ -557,6 +558,8 @@ export function MobileCustomerFilterScreen({
   onClose: () => void;
 }) {
   const t = useTranslations("mobile.customers");
+  const filterScreenRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: onClose, elementRef: filterScreenRef });
   const router = useRouter();
   const [draft, setDraft] = useState<CustomerFilterDraft>(() => ({
     type: filters.type ?? "",
@@ -588,7 +591,7 @@ export function MobileCustomerFilterScreen({
   const money = (value: number | null) => (value == null ? "" : String(value));
 
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label={t("filters.title")} className="fixed inset-0 z-[100] flex flex-col bg-canvas lg:hidden">
+    <div ref={filterScreenRef} role="dialog" aria-modal="true" aria-label={t("filters.title")} className="fixed inset-0 z-[100] flex flex-col bg-canvas lg:hidden">
       <MobileFilterHeader title={t("filters.title")} conditionCount={filterDraftCount(draft)} onCancel={onClose} />
       <form onSubmit={apply} className="flex min-h-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 space-y-ios-section overflow-y-auto overscroll-contain px-4 pb-6 pt-1">

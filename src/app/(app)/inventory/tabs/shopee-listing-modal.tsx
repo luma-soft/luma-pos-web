@@ -3,7 +3,7 @@
 import { productDisplayName } from "@/lib/products/variant-presentation";
 import { legacyTextByFlag } from "@/lib/i18n/catalog-text";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -22,6 +22,7 @@ import { isProductStockManaged } from "@/lib/product-stock";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
 import { ProductSearchStockLabel } from "@/components/product-search/product-search-layout";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type FormState = {
   title: string;
@@ -60,6 +61,8 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
   const locale = useLocale();
   const L = locale === "vi";
   const router = useRouter();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: () => router.push(closeHref), elementRef: dialogRef });
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, start] = useTransition();
@@ -171,7 +174,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-2 sm:p-5">
-      <div className="flex h-[min(94dvh,960px)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
+      <div ref={dialogRef} role="dialog" aria-modal="true" className="flex h-[min(94dvh,960px)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
             <div className="text-[10px] font-bold uppercase tracking-wide text-primary-600">{legacyTextByFlag(L, "89a329ca46b4")}</div>
@@ -402,6 +405,8 @@ function ShopeeCategoryDialog({
   onConfirm: (category: ShopeeCategoryPick) => void;
 }) {
   const [query, setQuery] = useState("");
+  const categoryDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: onClose, elementRef: categoryDialogRef });
   const [level1, setLevel1] = useState<ShopeeCategoryNode | null>(null);
   const [level2, setLevel2] = useState<ShopeeCategoryNode | null>(null);
   const [selected, setSelected] = useState<ShopeeCategoryPick | null>(() => flattenShopeeCategories(tree).find((category) => category.path === currentPath) ?? null);
@@ -416,7 +421,7 @@ function ShopeeCategoryDialog({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-3 sm:p-5">
-      <div className="flex h-[min(88dvh,760px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
+      <div ref={categoryDialogRef} role="dialog" aria-modal="true" className="flex h-[min(88dvh,760px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
         <div className="flex items-center justify-between gap-3 px-5 py-4">
           <h3 className="text-xl font-extrabold">{legacyTextByFlag(L, "321febbbd9fb")}</h3>
           <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" aria-label="Close">

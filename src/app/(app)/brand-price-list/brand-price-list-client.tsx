@@ -4,13 +4,14 @@ import { productDisplayName } from "@/lib/products/variant-presentation";
 
 import { matchesSearchTokens } from "@/lib/normalize";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { Copy, Edit3, ExternalLink, ImageOff, Search, X } from "lucide-react";
 import Image from "next/image";
 import { MoneyInput } from "@/components/ui/money-input";
 import type { BrandPriceListProduct } from "@/lib/data/brand-price-lists";
 import { selectAllInputOnClick } from "@/lib/input-selection";
 import { formatCurrency } from "@/lib/utils";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type Palette = {
   ink: string;
@@ -117,6 +118,8 @@ export function BrandPriceListClient({
   )), [initialProducts, priceOverrides]);
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<BrandPriceListProduct | null>(null);
+  const editDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open: editing !== null, onEscape: () => setEditing(null), elementRef: editDialogRef });
   const [price, setPrice] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
 
@@ -373,7 +376,7 @@ export function BrandPriceListClient({
 
       {editing && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4">
-          <div className="w-full max-w-sm bg-white p-5 shadow-2xl">
+          <div ref={editDialogRef} role="dialog" aria-modal="true" className="w-full max-w-sm bg-white p-5 shadow-2xl">
             <div className="flex items-center justify-between">
               <h2 className="font-black" style={{ color: palette.ink }}>Sửa giá tạm thời</h2>
               <button className="min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" onClick={() => setEditing(null)} aria-label="Đóng"><X className="h-5 w-5 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" /></button>

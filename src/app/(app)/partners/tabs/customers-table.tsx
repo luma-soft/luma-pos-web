@@ -57,6 +57,7 @@ import {
   PartnerDebtFilterControl,
   matchesPartnerDebtFilter,
 } from "@/components/partners/partner-debt-filter";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type CustomerRow = CustomerListResult["rows"][number];
 const WALK_IN_ROW_ID = "__walk_in_customer_summary__";
@@ -95,6 +96,8 @@ export function CustomersTable({
   const t = useTranslations();
   const phone = usePhoneLayout();
   const [filterOpen, setFilterOpen] = useState(false);
+  const filterDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open: filterOpen && !phone, onEscape: () => setFilterOpen(false), elementRef: filterDialogRef });
   return (
     <div className="min-w-0">
       <section className="min-w-0">
@@ -128,7 +131,7 @@ export function CustomersTable({
           role="presentation"
           onMouseDown={() => setFilterOpen(false)}
         >
-          <div
+          <div ref={filterDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="customers-filter-title"

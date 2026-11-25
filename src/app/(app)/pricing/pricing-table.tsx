@@ -19,6 +19,7 @@ import { formulaPrice, type PriceFormulaFilters, type UnitPriceMode } from "@/li
 import { productDisplayName } from "@/lib/products/variant-presentation";
 import { UnitPriceConfirmation } from "../products/new/unit-price-confirmation";
 import type { EditablePriceUnit, UnitPriceChoice, UnitPricingSnapshot } from "@/lib/products/unit-price-edit";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export interface PricingBook {
   id: string;
@@ -364,6 +365,14 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<PricingBook | null>(null);
   const [deletingBook, setDeletingBook] = useState(false);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({
+    open: deleteCandidate !== null,
+    onEscape: () => {
+      if (!deletingBook) setDeleteCandidate(null);
+    },
+    elementRef: deleteDialogRef,
+  });
   const [bookMenuOpen, setBookMenuOpen] = useState(false);
   const bookMenuRef = useRef<HTMLDivElement>(null);
 
@@ -835,7 +844,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
           className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-3 sm:p-6"
           onMouseDown={() => !deletingBook && setDeleteCandidate(null)}
         >
-          <div
+          <div ref={deleteDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-price-book-title"

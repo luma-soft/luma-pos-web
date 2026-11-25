@@ -1,7 +1,7 @@
 "use client";
 
 import { DocumentTimeField, documentTimePayload } from "@/components/document-time-field";
-import { useState, type ReactNode } from "react";
+import { useState, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Plus, X } from "lucide-react";
@@ -18,6 +18,7 @@ import { MobileFormHeader } from "@/components/mobile-form-header";
 import { MobileGroupedSection } from "@/components/mobile-pushed-screen";
 import { LumaWebPicker } from "@/app/(app)/sales/tabs/filter-drawer-shared";
 import { cn } from "@/lib/utils";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export function CashTxForm() {
   const t = useTranslations();
@@ -63,7 +64,7 @@ export function CashTxForm() {
           <Plus className="size-5" aria-hidden="true" />{t("mobile.finance.createEntry")}
         </button>
         {open && createPortal(
-          <PhoneSheet>
+          <PhoneSheet onClose={() => setOpen(false)}>
             <MobileFormHeader title={t("mobile.finance.createEntry")} onCancel={() => setOpen(false)} submitLabel={t("common.save")} onSubmit={() => void submit()} submitting={busy} />
             <div className="space-y-ios-section px-ios-inset pb-10 pt-2">
               <MobileGroupedSection>
@@ -155,7 +156,9 @@ export function CashTxForm() {
 }
 
 /** Full-screen phone form that also hides the tab bar while open. */
-function PhoneSheet({ children }: { children: ReactNode }) {
+function PhoneSheet({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  const sheetRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: onClose, elementRef: sheetRef });
   useHideMobileTabBar();
-  return <div role="dialog" aria-modal="true" className="fixed inset-0 z-[110] overflow-y-auto bg-canvas lg:hidden">{children}</div>;
+  return <div ref={sheetRef} role="dialog" aria-modal="true" className="fixed inset-0 z-[110] overflow-y-auto bg-canvas lg:hidden">{children}</div>;
 }

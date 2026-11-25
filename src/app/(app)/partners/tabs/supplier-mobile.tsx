@@ -26,6 +26,7 @@ import {
   mobileLedgerDateTime,
 } from "@/components/partners/partner-mobile-ledger";
 import { Routes } from "@/lib/routes";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 /**
  * Phone UI for the supplier list and profile, ported from SuppliersView.swift and
@@ -394,9 +395,11 @@ export function MobileSupplierFilterScreen({
 }) {
   const t = useTranslations("mobile.suppliers");
   const [draft, setDraft] = useState<SupplierDebtFilterValue>(value);
+  const filterScreenRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: onClose, elementRef: filterScreenRef });
 
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label={t("debtFilter")} className="fixed inset-0 z-[100] flex flex-col bg-canvas lg:hidden">
+    <div ref={filterScreenRef} role="dialog" aria-modal="true" aria-label={t("debtFilter")} className="fixed inset-0 z-[100] flex flex-col bg-canvas lg:hidden">
       <MobileFilterHeader title={t("debtFilter")} conditionCount={draft ? 1 : 0} onCancel={onClose} />
       <form
         onSubmit={(event) => {

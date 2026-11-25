@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
@@ -14,6 +14,7 @@ import { useTenantClientScope } from "@/components/tenant-client-scope";
 import type { ActionResult } from "@/lib/actions/common";
 import { VietnamAddressFields } from "@/components/addresses/vietnam-address-fields";
 import { MobileFormHeader, mobileFormSectionTitle } from "@/components/mobile-form-header";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type AiWorkflowDraft = {
   intent?: string;
@@ -232,10 +233,12 @@ export function CustomerCreateDialog({
   createAction?: CreateCustomerAction;
 }) {
   const t = useTranslations();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open, onEscape: () => onOpenChange(false), elementRef: dialogRef });
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-0 lg:items-center lg:p-4" role="presentation">
-      <div
+      <div ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="customer-create-dialog-title"

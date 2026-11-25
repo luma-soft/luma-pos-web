@@ -309,7 +309,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
               event.stopPropagation();
               focusOption(event.key);
             }}
-            className="z-[100] flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-e2"
+            className="z-[1000] flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-e2"
           >
             {searchable && (
               <div className="shrink-0 border-b border-border-soft bg-surface p-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useRef, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { Banknote, Check, CheckCircle2, ChevronLeft, ChevronRight, FileSearch, Loader2, QrCode, ShieldCheck, UserRound, type LucideIcon, Clock3 } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
@@ -9,6 +9,7 @@ import { useHideMobileTabBar } from "@/components/mobile-tabbar-visibility";
 import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export type PosCheckoutMethod = "cash" | "bank_transfer" | "credit";
 
@@ -115,11 +116,13 @@ export function PosMobileCheckout({
   const tc = useTranslations();
   useHideMobileTabBar();
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const checkoutRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: onBack, elementRef: checkoutRef });
   const { adjustments, total } = pricing;
   const template = printTemplates.find((item) => item.id === printTemplateId);
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-[70] flex flex-col bg-canvas lg:hidden print:hidden">
+    <div ref={checkoutRef} role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-[70] flex flex-col bg-canvas lg:hidden print:hidden">
       <header className="grid shrink-0 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 px-ios-inset pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
         <button
           type="button"

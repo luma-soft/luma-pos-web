@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { ProjectImageViewport } from "./project-image-viewport";
 import { ProjectFileInfo } from "./project-file-info";
 import { projectMediaModalFocusTarget, suspendParentProjectMediaDialog } from "./project-media-panel";
-import { lockBodyScroll } from "@/lib/modal-layer";
 
 export type AssetPhoto = {
   id: string;
@@ -70,17 +69,13 @@ export function InstalledAssetPhotoPreview({ assetId, assetName, photo, trigger,
 
   useEffect(() => {
     const restoreParent = suspendParentProjectMediaDialog(trigger);
-    const unlockScroll = lockBodyScroll();
     const dialog = root.current?.closest('[role="dialog"][aria-modal="true"]');
     const focusables = () => Array.from(dialog?.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),summary,[tabindex]:not([tabindex="-1"])') ?? [])
       .filter((element) => element.getClientRects().length > 0);
     focusables()[0]?.focus();
+    // RowPreviewModal owns Escape and the scroll lock as a modal layer.
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        onClose();
-      } else if (event.key === "Tab") {
+      if (event.key === "Tab") {
         const target = projectMediaModalFocusTarget(focusables(), document.activeElement, event.shiftKey);
         if (target) { event.preventDefault(); target.focus(); }
       }
@@ -89,10 +84,9 @@ export function InstalledAssetPhotoPreview({ assetId, assetName, photo, trigger,
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
       restoreParent();
-      unlockScroll();
       if (trigger?.isConnected) trigger.focus();
     };
-  }, [onClose, trigger]);
+  }, [trigger]);
 
   function retry() { setResolved(null); setFailed(false); setAttempt((value) => value + 1); }
   if (typeof document === "undefined") return null;

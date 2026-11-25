@@ -7,6 +7,7 @@ import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createProductAttribute, deleteProductAttribute, renameProductAttribute } from "@/lib/actions/product-attributes";
 import { attributeNameSchema, type ProductAttribute } from "@/lib/products/attribute-catalog";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type View = { kind: "list" } | { kind: "create" } | { kind: "edit" | "delete"; attribute: ProductAttribute };
 
@@ -20,6 +21,7 @@ export function AttributeCatalogDialog({ attributes, create, draftAttributeIds, 
 }) {
   const t = useTranslations();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  useModalLayer({ onEscape: () => back(), elementRef: dialogRef });
   const inputRef = useRef<HTMLInputElement>(null);
   const titleId = useId();
   const [view, setView] = useState<View>({ kind: create ? "create" : "list" });

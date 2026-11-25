@@ -3,7 +3,7 @@
 import { productDisplayName } from "@/lib/products/variant-presentation";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Plus, Trash2, Loader2, Check, ChefHat, Split, X, MoveRight } from "lucide-react";
@@ -24,6 +24,7 @@ import { ProductSearchThumbnail } from "@/components/product-search/product-sear
 import { expandPosSearchUnitResults, rankProductSearchUnitResults } from "@/lib/pos/search-unit-results";
 import { resolvePosCartUnit } from "@/lib/pos/cart-unit";
 import { isProductStockManaged } from "@/lib/product-stock";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type Method = "cash" | "bank_transfer" | "credit";
 const METHODS: Method[] = ["cash", "bank_transfer", "credit"];
@@ -55,6 +56,8 @@ export function TableOrder({
   const [selected, setSelected] = useState<string[]>([]);
   const [guests, setGuests] = useState(2);
   const [moveOpen, setMoveOpen] = useState(false);
+  const moveDialogRef = useRef<HTMLElement>(null);
+  useModalLayer({ open: moveOpen, onEscape: () => setMoveOpen(false), elementRef: moveDialogRef });
   const [moveTargetId, setMoveTargetId] = useState("");
 
   const total = cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
@@ -356,7 +359,7 @@ export function TableOrder({
       {picker && <ModifierPicker product={picker.product} unitName={picker.unitName} groups={picker.groups} onCancel={() => setPicker(null)} onConfirm={(mods, note) => { addLine(picker.product, mods, note, picker.unitName); setPicker(null); }} />}
       {moveOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-3 sm:p-4" onClick={() => setMoveOpen(false)}>
-          <section
+          <section ref={moveDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="move-table-title"
@@ -408,6 +411,8 @@ export function TableOrder({
 function ModifierPicker({ product, unitName, groups, onCancel, onConfirm }: { product: PosResult; unitName: string; groups: ModifierGroup[]; onCancel: () => void; onConfirm: (mods: CartModifier[], note: string) => void }) {
   const t = useTranslations();
   const [sel, setSel] = useState<Record<string, string[]>>({});
+  const pickerDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: onCancel, elementRef: pickerDialogRef });
   const [note, setNote] = useState("");
   const [err, setErr] = useState("");
 
@@ -437,7 +442,7 @@ function ModifierPicker({ product, unitName, groups, onCancel, onConfirm }: { pr
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-3 sm:p-4" onClick={onCancel}>
-      <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-auto rounded-card bg-surface shadow-e2 sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+      <div ref={pickerDialogRef} role="dialog" aria-modal="true" className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-auto rounded-card bg-surface shadow-e2 sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-border sticky top-0 bg-surface">
           <h2 className="font-bold truncate">{productDisplayName(product)} · {unitName}</h2>
           <button onClick={onCancel} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-surface-2"><X className="w-5 h-5" /></button>

@@ -2,9 +2,10 @@
 
 import { productDisplayName } from "@/lib/products/variant-presentation";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { categoryEmoji } from "@/lib/category-emoji";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type ProductThumbnailLike = {
   name: string;
@@ -18,6 +19,8 @@ export function ProductSearchThumbnail({ product }: { product: ProductThumbnailL
     : "";
   const [imageFailed, setImageFailed] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open: previewOpen && Boolean(imageUrl), onEscape: () => setPreviewOpen(false), elementRef: previewRef });
 
   return (
     <>
@@ -40,7 +43,7 @@ export function ProductSearchThumbnail({ product }: { product: ProductThumbnailL
         </div>
       )}
       {previewOpen && imageUrl && typeof document !== "undefined" && createPortal(
-        <div
+        <div ref={previewRef}
           role="dialog"
           aria-modal="true"
           aria-label={`Ảnh ${productDisplayName(product)}`}

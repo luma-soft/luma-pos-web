@@ -51,7 +51,7 @@ export function ColorPicker({ value, onChange, label }: { value: string | null; 
     <button ref={rootRef} type="button" title={label} aria-label={label} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => { setDraft(value ?? "#0f766e"); setOpen(!open); }} className="relative grid size-11 place-items-center overflow-hidden rounded-lg border border-border bg-surface shadow-sm hover:border-primary-400 focus-visible:outline-2 focus-visible:outline-primary-600 lg:size-9">
       {value ? <span className="absolute inset-1 rounded-md" style={{ backgroundColor: value }} /> : <Ban className="size-4 text-slate-400" />}
     </button>
-    {open && createPortal(<div ref={popupRef} id={id} role="dialog" aria-label={label} style={position} className="fixed z-[115] w-64 rounded-xl border border-border bg-surface p-3 text-slate-900 shadow-e2 dark:text-slate-100" onKeyDown={(event) => {
+    {open && createPortal(<div ref={popupRef} id={id} role="dialog" aria-label={label} style={position} className="fixed z-[1000] w-64 rounded-xl border border-border bg-surface p-3 text-slate-900 shadow-e2 dark:text-slate-100" onKeyDown={(event) => {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
     }}>
       <div role="listbox" aria-label={label} className="grid grid-cols-6 gap-1">

@@ -6,11 +6,12 @@ import { matchesSearchTokens } from "@/lib/normalize";
 
 import Image from "next/image";
 import { Camera, Check, Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export type CameraPickerProduct = {
   id: string;
@@ -38,6 +39,8 @@ export function CameraPickerModal({ open, cameras, selectedCameras = {}, onClose
     if (!query) return cameras;
     return cameras.filter((product) => matchesSearchTokens(`${productDisplayName(product)} ${product.sku} ${product.description ?? ""}`, query));
   }, [cameras, search]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open, onEscape: () => close(), elementRef: dialogRef });
 
   if (!open) return null;
 
@@ -48,7 +51,7 @@ export function CameraPickerModal({ open, cameras, selectedCameras = {}, onClose
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/40 p-0 lg:p-4" role="presentation" onMouseDown={close}>
-      <div className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden border border-border bg-surface shadow-2xl lg:h-[min(860px,calc(100dvh-2rem))] lg:max-h-[calc(100dvh-2rem)] lg:max-w-7xl lg:rounded-2xl" role="dialog" aria-modal="true" aria-label={t("pos.cameraQuote.pickerTitle")} onMouseDown={(event) => event.stopPropagation()}>
+      <div ref={dialogRef} className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden border border-border bg-surface shadow-2xl lg:h-[min(860px,calc(100dvh-2rem))] lg:max-h-[calc(100dvh-2rem)] lg:max-w-7xl lg:rounded-2xl" role="dialog" aria-modal="true" aria-label={t("pos.cameraQuote.pickerTitle")} onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 pt-[calc(.75rem+env(safe-area-inset-top))] pb-3 lg:py-3 lg:px-5">
           <div>
             <h2 className="text-base font-bold sm:text-lg">{t("pos.cameraQuote.pickerTitle")}</h2>

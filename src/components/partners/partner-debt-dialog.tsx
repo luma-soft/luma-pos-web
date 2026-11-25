@@ -1,8 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export function PartnerDebtDialog({
   title,
@@ -13,9 +14,11 @@ export function PartnerDebtDialog({
   children: ReactNode;
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLElement>(null);
+  useModalLayer({ onEscape: onClose, elementRef: dialogRef });
   return (
     <div className="fixed inset-0 z-[130] flex items-end justify-center bg-slate-950/40 p-3 sm:items-center" onMouseDown={onClose}>
-      <section className="max-h-[92vh] w-full max-w-xl overflow-auto rounded-card bg-surface p-5 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} className="max-h-[92vh] w-full max-w-xl overflow-auto rounded-card bg-surface p-5 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold">{title}</h2>
           <button type="button" aria-label="Đóng" onClick={onClose} className="grid min-h-11 min-w-11 place-items-center rounded-lg hover:bg-surface-2 lg:min-h-9 lg:min-w-9">

@@ -74,6 +74,7 @@ import {
 } from "@/lib/schemas/settings";
 import { applyDirectTaxPreset, DIRECT_TAX_PRESETS, DIRECT_TAX_REDUCTION_PERCENT } from "@/lib/tax/direct-tax";
 import { VIETQR_BANKS, type VietQrBank } from "@/lib/payments/vietqr-banks";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 const DEVICES = [
   { ico: "🖨️", name: "XPrinter XP-N260L", labelKey: "thermalPrinter", status: "connected", detail: "USB · COM3" },
@@ -1885,6 +1886,14 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
   const [message, setMessage] = useState("");
   const [pending, start] = useTransition();
   const isEditing = Boolean(form.id);
+  const bankFormRef = useRef<HTMLDivElement>(null);
+  useModalLayer({
+    open: canManage && formOpen,
+    onEscape: () => {
+      if (!pending) closeForm();
+    },
+    elementRef: bankFormRef,
+  });
   const set = <K extends keyof PaymentBankAccountInput>(key: K, value: PaymentBankAccountInput[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setMessage("");
@@ -2036,7 +2045,7 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
             if (event.target === event.currentTarget && !pending) closeForm();
           }}
         >
-          <div className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-surface shadow-e2 sm:rounded-card">
+          <div ref={bankFormRef} role="dialog" aria-modal="true" className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-surface shadow-e2 sm:rounded-card">
             <header className="flex items-start justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-5">
               <div className="min-w-0">
                 <div className="text-sm font-bold">{isEditing ? t("editAccount") : t("addAccount")}</div>

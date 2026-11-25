@@ -155,6 +155,7 @@ import { calculateTaxBreakdown } from "@/lib/tax/calculations";
 import { productDisplayName } from "@/lib/products/variant-presentation";
 import { sortProductsBySort } from "@/lib/product-sort-policy";
 import { sameOriginVietQrImageUrl } from "@/lib/payments/vietqr";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type CartLine = {
   key: string;
@@ -712,6 +713,8 @@ export function PosClient({
   const phone = usePhoneLayout();
   const [mobileView, setMobileView] = useState<"catalog" | "cart">("catalog"); // chuyển đổi trên mobile
   const [mobileInvoicePickerOpen, setMobileInvoicePickerOpen] = useState(false);
+  const mobileInvoicePickerRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open: mobileInvoicePickerOpen, onEscape: () => setMobileInvoicePickerOpen(false), elementRef: mobileInvoicePickerRef });
   const [keyboardInset, setKeyboardInset] = useState(0);
   const [customerOptions, setCustomerOptions] = useState<PosCustomer[]>(() => data.customers);
   const [customerCreateOpen, setCustomerCreateOpen] = useState(false);
@@ -2991,12 +2994,11 @@ export function PosClient({
           className="fixed inset-0 z-[65] bg-black/40 lg:hidden"
         />
       )}
-      <div
+      <div ref={mobileInvoicePickerRef}
         role={mobileInvoicePickerOpen ? "dialog" : undefined}
         aria-modal={mobileInvoicePickerOpen ? true : undefined}
         aria-label={mobileInvoicePickerOpen ? t("pos.order") : undefined}
-        onKeyDown={(event) => { if (event.key === "Escape" && mobileInvoicePickerOpen) { event.preventDefault(); setMobileInvoicePickerOpen(false); } }}
-        className={cn(
+                className={cn(
           "flex items-stretch gap-1.5 overflow-x-auto",
           mobileInvoicePickerOpen
             ? "fixed inset-x-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-[66] max-h-[65dvh] flex-col overflow-y-auto rounded-2xl border border-border bg-surface p-3 shadow-e2"
@@ -4464,6 +4466,8 @@ function SepayCheckoutModal({
   const t = useTranslations();
   const confirmed = checkout != null && ["confirmed", "reconciled", "manual_confirmed"].includes(checkout.status);
   const manuallyConfirmed = checkout?.status === "manual_confirmed";
+  const sepayDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: onClose, elementRef: sepayDialogRef });
   const autoConfirm = checkout?.autoConfirm !== false;
   const [manualConfirming, setManualConfirming] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
@@ -4480,7 +4484,7 @@ function SepayCheckoutModal({
   return (
     <>
       <div className="fixed inset-0 z-[90] bg-slate-950/45" />
-      <div
+      <div ref={sepayDialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="pos-sepay-title"
@@ -4588,11 +4592,13 @@ function VariantPickerModal({
 }) {
   const t = useTranslations();
   const children = productChildren(parent);
+  const variantDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: onClose, elementRef: variantDialogRef });
 
   return (
     <>
       <div className="fixed inset-0 z-55 bg-slate-950/30" onClick={onClose} />
-      <div
+      <div ref={variantDialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="pos-variant-picker-title"
@@ -4697,6 +4703,8 @@ function LinePriceEditor({
 }) {
   const t = useTranslations();
   const defaultBook = priceBooks.find((book) => book.isDefault) ?? priceBooks[0];
+  const lineEditorRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: onClose, elementRef: lineEditorRef });
   const inheritedValue = "__invoice_price_book__";
   const [selectedBook, setSelectedBook] = useState(
     line.freeRestore
@@ -4811,7 +4819,7 @@ function LinePriceEditor({
     const label = "mb-2 block text-[17px] font-semibold";
     const card = "rounded-[14px] bg-surface";
     return (
-      <div
+      <div ref={lineEditorRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="pos-line-screen-title"
@@ -5020,7 +5028,7 @@ function LinePriceEditor({
     <>
       {/* lớp nền để click ra ngoài đóng popup */}
       <div className="fixed inset-0 z-55" onClick={onClose} />
-      <div
+      <div ref={lineEditorRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="pos-price-editor-title"

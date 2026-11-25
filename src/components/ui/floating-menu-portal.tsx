@@ -139,7 +139,7 @@ export function FloatingMenuPortal({
             top: 0,
             visibility: "hidden",
           }}
-      className={`z-[120] overflow-y-auto ${className ?? ""}`}
+      className={`z-[1000] overflow-y-auto ${className ?? ""}`}
     >
       {children}
     </div>,

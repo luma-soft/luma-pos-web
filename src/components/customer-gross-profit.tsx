@@ -279,7 +279,7 @@ export function CustomerGrossProfit({
           aria-label={t("periods.all")}
           style={position}
           onKeyDown={handlePickerKeyDown}
-          className="z-[115] overflow-auto rounded-xl border border-border bg-surface p-3 text-slate-900 shadow-e2 dark:text-slate-100"
+          className="z-[1000] overflow-auto rounded-xl border border-border bg-surface p-3 text-slate-900 shadow-e2 dark:text-slate-100"
         >
           <div className="grid gap-1" role="listbox" aria-label={t("periods.all")}>
             {PERIODS.map((value) => (

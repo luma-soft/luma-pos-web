@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/input";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type RequestRow = {
   id: string;
@@ -55,6 +56,8 @@ export function CustomerRequestsManager({
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = rows.find((row) => row.id === selectedId) ?? null;
+  const detailDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open: selected !== null, onEscape: () => setSelectedId(null), elementRef: detailDialogRef });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
@@ -122,7 +125,7 @@ export function CustomerRequestsManager({
       </div>
       {selected && (
         <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/45 p-4" onMouseDown={() => setSelectedId(null)}>
-          <div className="w-full max-w-2xl rounded-2xl bg-surface p-5 shadow-xl" onMouseDown={(event) => event.stopPropagation()}>
+          <div ref={detailDialogRef} role="dialog" aria-modal="true" className="w-full max-w-2xl rounded-2xl bg-surface p-5 shadow-xl" onMouseDown={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div><p className="font-mono text-xs text-slate-500">{selected.code}</p><h3 className="text-lg font-bold">{selected.title}</h3><p className="mt-1 text-sm text-slate-600">{selected.description}</p></div>
               <Button size="sm" variant="ghost" onClick={() => setSelectedId(null)}>{t("close")}</Button>

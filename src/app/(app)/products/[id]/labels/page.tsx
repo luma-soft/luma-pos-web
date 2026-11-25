@@ -18,6 +18,7 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { ModalLayerSurface } from "@/components/ui/modal-layer-surface";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -146,7 +147,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
-      <section role="dialog" aria-modal="true" aria-labelledby="label-print-title" className="flex h-dvh w-full max-w-7xl flex-col overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl print:h-auto print:max-w-none print:overflow-visible print:border-0 print:shadow-none">
+      <ModalLayerSurface as="section" closeHref={`${Routes.Inventory}?tab=products`} lockScroll role="dialog" aria-modal="true" aria-labelledby="label-print-title" className="flex h-dvh w-full max-w-7xl flex-col overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl print:h-auto print:max-w-none print:overflow-visible print:border-0 print:shadow-none">
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-5 print:hidden">
           <div className="min-w-0">
             <h1 id="label-print-title" className="truncate text-lg font-bold">{t("products.labels.title")}</h1>
@@ -225,7 +226,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           </div>
         </section>
         </div>
-      </section>
+      </ModalLayerSurface>
     </div>
   );
 }
