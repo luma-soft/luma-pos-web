@@ -1,11 +1,8 @@
-import { randomBytes, createCipheriv, createHash } from "node:crypto";
-import { constants as fsConstants, createReadStream, createWriteStream } from "node:fs";
-import { access, appendFile, mkdtemp, readdir, rename, rm, stat, writeFile, lstat } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import { access, mkdtemp, readdir, rm, stat, lstat } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import { hostname } from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
-import { pipeline } from "node:stream/promises";
 import { loadEnvConfig } from "@next/env";
 import {
   createMigrationPostgresClient,
@@ -17,11 +14,10 @@ import {
   uploadGoogleDriveBackupArchive,
 } from "@/lib/ops/google-drive-backups";
 import { postgresUtilityMajorVersion, resolvePostgresUtility } from "./postgres-tools";
+import { buildEncryptedArchive } from "./backup-archive";
 
 const WORKER_LOCK_KEY = 1_280_657_220;
 const POLL_INTERVAL_MS = 10_000;
-const MAGIC = Buffer.from("LUMABKP1");
-const ENCRYPTION_ALGORITHM = "aes-256-gcm";
 const once = process.argv.slice(2).includes("--once");
 const scheduled = process.argv.slice(2).includes("--scheduled");
 
@@ -93,22 +89,6 @@ if (!/^[0-9a-f]{64}$/i.test(encodedKey)) {
 }
 const encryptionKey = Buffer.from(encodedKey, "hex");
 
-function run(command: string, args: string[], env: NodeJS.ProcessEnv = process.env) {
-  return new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, { env, stdio: ["ignore", "ignore", "ignore"] });
-    child.on("error", () => reject(new Error("BACKUP_COMMAND_UNAVAILABLE")));
-    child.on("close", (code) => code === 0
-      ? resolve()
-      : reject(new Error("BACKUP_COMMAND_FAILED")));
-  });
-}
-
-async function sha256File(filePath: string) {
-  const hash = createHash("sha256");
-  for await (const chunk of createReadStream(filePath)) hash.update(chunk as Buffer);
-  return hash.digest("hex");
-}
-
 async function cleanInterruptedBackupStages() {
   const entries = await readdir(resolvedStagingRoot);
   for (const entry of entries) {
@@ -119,16 +99,6 @@ async function cleanInterruptedBackupStages() {
       await rm(candidate, { recursive: true, force: true });
     }
   }
-}
-
-async function encryptFile(inputPath: string, outputPath: string) {
-  const nonce = randomBytes(12);
-  const cipher = createCipheriv(ENCRYPTION_ALGORITHM, encryptionKey, nonce);
-  const output = createWriteStream(outputPath, { flags: "wx", mode: 0o600 });
-  output.write(MAGIC);
-  output.write(nonce);
-  await pipeline(createReadStream(inputPath), cipher, output);
-  await appendFile(outputPath, cipher.getAuthTag(), { mode: 0o600 });
 }
 
 const connection = createMigrationPostgresClient(readMigrationDatabaseUrl({
@@ -262,58 +232,19 @@ async function createBackup(runId: string) {
   if (!mediaRootStats.isDirectory()) throw new Error("MEDIA_ROOT_NOT_READY");
   await access(resolvedMediaRoot, fsConstants.R_OK | fsConstants.X_OK);
   const temporaryDirectory = await mkdtemp(path.join(resolvedStagingRoot, ".lumapos-backup-"));
-  const dumpPath = path.join(temporaryDirectory, "database.dump");
-  const mediaArchivePath = path.join(temporaryDirectory, "media.tar.gz");
-  const bundlePath = path.join(temporaryDirectory, "backup.tar.gz");
-  const partialPath = path.join(temporaryDirectory, `${finalName}.partial`);
-
   try {
-    const password = decodeURIComponent(parsedUrl.password);
-    const sourceEnvironment = {
-      ...process.env,
-      PGPASSWORD: password,
-      PGSSLMODE: parsedUrl.searchParams.get("sslmode") ?? "disable",
-    };
-    await run(pgDumpPath, [
-      "--format=custom",
-      "--no-owner",
-      "--no-acl",
-      "--schema=public",
-      "--exclude-table-data=public.database_backup_runs",
-      "--host", parsedUrl.hostname,
-      "--port", parsedUrl.port || "5432",
-      "--username", decodeURIComponent(parsedUrl.username),
-      "--dbname", decodeURIComponent(parsedUrl.pathname.slice(1)),
-      "--file", dumpPath,
-    ], sourceEnvironment);
-    await run("tar", ["-czf", mediaArchivePath, "-C", resolvedMediaRoot, "."]);
-
-    const [dumpStats, mediaStats] = await Promise.all([stat(dumpPath), stat(mediaArchivePath)]);
-    const files = [
-      { name: "database.dump", sizeBytes: dumpStats.size, sha256: await sha256File(dumpPath) },
-      { name: "media.tar.gz", sizeBytes: mediaStats.size, sha256: await sha256File(mediaArchivePath) },
-    ];
-    const manifest = {
-      format: "postgres-custom-and-media-aes-256-gcm",
-      version: 1,
-      createdAt: new Date().toISOString(),
+    const archive = await buildEncryptedArchive({
+      workDirectory: temporaryDirectory,
+      finalName,
+      databaseUrl: parsedUrl,
+      mediaRoot: resolvedMediaRoot,
+      pgDumpPath,
       databaseMajorVersion,
-      included: ["public PostgreSQL schema and data", "local media files"],
-      excluded: ["database_backup_runs history", "secrets stored outside PostgreSQL", "Supabase-managed schemas"],
-      files,
-    };
-    const manifestPath = path.join(temporaryDirectory, "manifest.json");
-    await writeFile(
-      manifestPath,
-      JSON.stringify(manifest),
-      { mode: 0o600, flag: "wx" },
-    );
-    await run("tar", ["-czf", bundlePath, "-C", temporaryDirectory, "database.dump", "media.tar.gz", "manifest.json"]);
-    await encryptFile(bundlePath, partialPath);
-    const archivePath = path.join(temporaryDirectory, finalName);
-    await rename(partialPath, archivePath);
-    const archiveStats = await stat(archivePath);
-    const archiveSha256 = await sha256File(archivePath);
+      encryptionKey,
+    });
+    const { archivePath, manifest } = archive;
+    const archiveStats = { size: archive.sizeBytes };
+    const archiveSha256 = archive.sha256;
     const uploadedArchive = await uploadGoogleDriveBackupArchive({ localPath: archivePath, archiveKey });
     if (uploadedArchive.sizeBytes !== archiveStats.size) {
       throw new Error("GOOGLE_DRIVE_ARCHIVE_VERIFY_FAILED");

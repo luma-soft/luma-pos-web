@@ -94,6 +94,10 @@ if [[ -f "$app_root/manifest.json" && -f "$app_root/server.js" && -d "$app_root/
       # One-shot, run by `lumapos-admin list-backups`.
       exec "$bun_bin" workers/list-drive-backups.js
       ;;
+    export-store)
+      # One-shot, run by `lumapos-admin export-for-move`.
+      exec "$bun_bin" workers/export-store.js
+      ;;
     restore-backup)
       # One-shot, run by `lumapos-admin restore-backup` on an empty database.
       exec "$bun_bin" workers/restore-database-backup.js "${@:2}"
