@@ -1,15 +1,18 @@
-import { and, desc, eq, gte, ilike, inArray, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, getTableName, gte, ilike, inArray, lt, or, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { db } from "@/db";
-import { orderItemGrossProfitSql, orderItemNetRevenueSql } from "@/lib/data/order-profit";
+import { orderItemCostSql, orderItemGrossProfitSql, orderItemNetRevenueSql, returnItemCostSql, returnItemProfitSql } from "@/lib/data/order-profit";
 import {
   categories,
   customers,
   orderItems,
   orders,
+  payments,
   products,
+  profiles,
   returnItems,
   returns,
+  stockLevels,
 } from "@/db/schema";
 import { calculateDashboardFinancials } from "@/lib/dashboard/financials";
 import {
@@ -17,6 +20,13 @@ import {
   type PublicMediaConfig,
 } from "@/lib/media/config";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
+import {
+  addDaysToKey,
+  BUSINESS_TIME_ZONE_SQL,
+  businessDayKeyOf,
+  businessDayStart,
+  dayKeysBetween,
+} from "@/lib/reports/period";
 
 export type ReportFilters = {
   customerId?: string;
@@ -28,27 +38,41 @@ export type ReportFilters = {
 
 type ReportDatabase = typeof db;
 
-function startOfDay(value: Date) {
-  const date = new Date(value);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
+const BUSINESS_TZ = sql.raw(BUSINESS_TIME_ZONE_SQL);
 
-function addDays(value: Date, amount: number) {
-  const date = new Date(value);
-  date.setDate(date.getDate() + amount);
-  return date;
+/**
+ * Fully qualified column for correlated subqueries: drizzle drops the table
+ * name from columns in a single-table select, which would bind them to the
+ * subquery's own table instead of the outer row.
+ */
+function qualified(column: AnyPgColumn) {
+  return sql.raw(`"${getTableName(column.table)}"."${column.name}"`);
 }
-
-function daysAgo(amount: number) {
-  return addDays(startOfDay(new Date()), -amount);
-}
+/** Payments that actually moved money (cash/manual or matched bank transfers). */
+const SETTLED_PAYMENT_STATUSES = ["manual_confirmed", "confirmed"];
 
 function reportBounds(rangeDays: number, filters: ReportFilters) {
+  const tomorrow = addDaysToKey(businessDayKeyOf(new Date()), 1);
   return {
-    from: filters.from ?? daysAgo(rangeDays - 1),
-    to: filters.to ?? addDays(startOfDay(new Date()), 1),
+    from: filters.from ?? businessDayStart(addDaysToKey(tomorrow, -Math.max(1, rangeDays))),
+    to: filters.to ?? businessDayStart(tomorrow),
   };
+}
+
+/** First completed sale of the order's customer (all time), for new-vs-returning. */
+function firstOrderAtSql(storeId: string) {
+  return sql<Date | null>`(
+    select min(first_order.created_at) from ${orders} as first_order
+    where first_order.store_id = ${storeId}
+      and first_order.customer_id = ${qualified(orders.customerId)}
+      and first_order.document_type = 'sale'
+      and first_order.status in ('completed', 'returned')
+  )`;
+}
+
+function customerSegment(firstOrderAt: Date | string | null, from: Date, to: Date) {
+  const first = firstOrderAt ? new Date(firstOrderAt) : null;
+  return first && first >= from && first < to ? "new" as const : "returning" as const;
 }
 
 function customerSearchCondition(filters: ReportFilters, customerColumn: AnyPgColumn) {
@@ -130,8 +154,8 @@ export async function getReportInvoices(
       total: orders.total,
       amountPaid: orders.amountPaid,
       productCount: sql<number>`count(distinct ${orderItems.productId})::int`,
-      cost: sql<string>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}), 0)`,
-      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
+      cost: sql<string>`coalesce(sum(${orderItemCostSql()}), 0)`,
+      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql()}), 0)`,
     })
       .from(orders)
       .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
@@ -151,8 +175,8 @@ export async function getReportInvoices(
   const returnedRows = orderIds.length === 0 ? [] : await db.select({
     orderId: returns.orderId,
     refund: sql<string>`coalesce(sum(${returnItems.total}), 0)`,
-    returnedCost: sql<string>`coalesce(sum(${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice}), 0)`,
-    returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+    returnedCost: sql<string>`coalesce(sum(${returnItemCostSql()}), 0)`,
+    returnedProfit: sql<string>`coalesce(sum(${returnItemProfitSql()}), 0)`,
   })
     .from(returnItems)
     .innerJoin(returns, eq(returnItems.returnId, returns.id))
@@ -238,8 +262,8 @@ export async function getReportProducts(
       baseUnit: sql<string>`max(${products.baseUnit})`,
       imageUrls: productCompatibilityImageUrls(storeId),
       revenue: sql<string>`sum(${orderItemNetRevenueSql()})`,
-      cost: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})`,
-      profit: sql<string>`sum(${orderItemGrossProfitSql(products.costPrice)})`,
+      cost: sql<string>`sum(${orderItemCostSql()})`,
+      profit: sql<string>`sum(${orderItemGrossProfitSql()})`,
     })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
@@ -247,7 +271,7 @@ export async function getReportProducts(
       .leftJoin(customers, eq(orders.customerId, customers.id))
       .where(where)
       .groupBy(orderItems.productId, products.id, products.imageUrls)
-      .orderBy(desc(sql`sum(${orderItemGrossProfitSql(products.costPrice)})`))
+      .orderBy(desc(sql`sum(${orderItemGrossProfitSql()})`))
       .limit(safePageSize)
       .offset((safePage - 1) * safePageSize),
     db.select({ total: sql<number>`count(distinct ${orderItems.productId})::int` })
@@ -261,8 +285,8 @@ export async function getReportProducts(
     productId: returnItems.productId,
     qtyReturned: sql<string>`coalesce(sum(${returnItems.quantity} * ${returnItems.unitMultiplier}), 0)`,
     refund: sql<string>`coalesce(sum(${returnItems.total}), 0)`,
-    returnedCost: sql<string>`coalesce(sum(${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice}), 0)`,
-    returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+    returnedCost: sql<string>`coalesce(sum(${returnItemCostSql()}), 0)`,
+    returnedProfit: sql<string>`coalesce(sum(${returnItemProfitSql()}), 0)`,
     returnCount: sql<number>`count(distinct ${returns.id})::int`,
   })
     .from(returnItems)
@@ -296,7 +320,7 @@ export async function getReportCustomers(
       customerId: orders.customerId,
       customerName: sql<string>`coalesce(max(${customers.name}), 'Khách lẻ')`,
       customerType: sql<string | null>`max(${customers.type})`,
-      customerCreatedAt: sql<Date | null>`max(${customers.createdAt})`,
+      firstOrderAt: firstOrderAtSql(storeId),
       orderCount: sql<number>`count(*)::int`,
       revenue: sql<string>`sum(${orders.total})`,
       remaining: sql<string>`sum(${orders.total} - ${orders.amountPaid})`,
@@ -320,7 +344,7 @@ export async function getReportCustomers(
   const [profitRows, refundRows, returnedProfitRows] = await Promise.all([
     db.select({
       customerId: orders.customerId,
-      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
+      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql()}), 0)`,
     })
       .from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id))
       .leftJoin(customers, eq(orders.customerId, customers.id)).where(and(where, customerSubset)).groupBy(orders.customerId),
@@ -328,7 +352,7 @@ export async function getReportCustomers(
       .from(returns).leftJoin(customers, eq(returns.customerId, customers.id)).where(and(returnWhere, returnSubset)).groupBy(returns.customerId),
     db.select({
       customerId: returns.customerId,
-      returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      returnedProfit: sql<string>`coalesce(sum(${returnItemProfitSql()}), 0)`,
     })
       .from(returnItems).innerJoin(returns, eq(returnItems.returnId, returns.id)).innerJoin(products, eq(returnItems.productId, products.id))
       .leftJoin(customers, eq(returns.customerId, customers.id)).where(and(returnWhere, returnSubset)).groupBy(returns.customerId),
@@ -339,14 +363,13 @@ export async function getReportCustomers(
   const rows = saleRows.map((row) => {
     const revenue = Number(row.revenue) - (refundMap.get(row.customerId) ?? 0);
     const profit = (profitMap.get(row.customerId) ?? 0) - (returnedProfitMap.get(row.customerId) ?? 0);
-    const createdAt = row.customerCreatedAt ? new Date(row.customerCreatedAt) : null;
     return {
       ...row,
       revenue,
       profit,
       margin: revenue === 0 ? 0 : (profit / revenue) * 100,
       averageOrder: row.orderCount === 0 ? 0 : revenue / row.orderCount,
-      segment: createdAt && createdAt >= from && createdAt < to ? "new" as const : "returning" as const,
+      segment: customerSegment(row.firstOrderAt, from, to),
     };
   });
   return paginated(rows, countRow?.total ?? 0, safePage, safePageSize);
@@ -368,7 +391,8 @@ async function getCoreReportsForDatabase(
     grossByDay, profitByDay, refundsByDay, returnedProfitByDay,
     productSaleRows, productReturnRows,
     customerSaleRows, customerProfitRows, customerRefundRows, customerReturnedProfitRows,
-    byCategory, statusRows,
+    categoryRows, statusRows,
+    paymentRows, staffRows, staffProfitRows, heatmapRows,
   ] = await Promise.all([
     database.select({
       grossRevenue: sql<string>`coalesce(sum(${orders.total}), 0)`,
@@ -377,8 +401,8 @@ async function getCoreReportsForDatabase(
       customerCount: sql<number>`count(distinct ${orders.customerId})::int`,
     }).from(orders).leftJoin(customers, eq(orders.customerId, customers.id)).where(where),
     database.select({
-      grossProfit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
-      costOfGoods: sql<string>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}), 0)`,
+      grossProfit: sql<string>`coalesce(sum(${orderItemGrossProfitSql()}), 0)`,
+      costOfGoods: sql<string>`coalesce(sum(${orderItemCostSql()}), 0)`,
       quantitySold: sql<string>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitMultiplier}), 0)`,
       productCount: sql<number>`count(distinct ${orderItems.productId})::int`,
     }).from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id))
@@ -388,37 +412,37 @@ async function getCoreReportsForDatabase(
       returnCount: sql<number>`count(*)::int`,
     }).from(returns).leftJoin(customers, eq(returns.customerId, customers.id)).where(returnWhere),
     database.select({
-      returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
-      returnedCost: sql<string>`coalesce(sum(${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice}), 0)`,
+      returnedProfit: sql<string>`coalesce(sum(${returnItemProfitSql()}), 0)`,
+      returnedCost: sql<string>`coalesce(sum(${returnItemCostSql()}), 0)`,
       returnedQuantity: sql<string>`coalesce(sum(${returnItems.quantity} * ${returnItems.unitMultiplier}), 0)`,
     }).from(returnItems).innerJoin(returns, eq(returnItems.returnId, returns.id)).innerJoin(products, eq(returnItems.productId, products.id))
       .leftJoin(customers, eq(returns.customerId, customers.id)).where(returnWhere),
     database.select({
-      day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
+      day: sql<string>`to_char(${orders.createdAt} at time zone ${BUSINESS_TZ}, 'YYYY-MM-DD')`,
       revenue: sql<string>`coalesce(sum(${orders.total}), 0)`,
       orderCount: sql<number>`count(*)::int`,
     }).from(orders).leftJoin(customers, eq(orders.customerId, customers.id)).where(where)
-      .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`),
+      .groupBy(sql`to_char(${orders.createdAt} at time zone ${BUSINESS_TZ}, 'YYYY-MM-DD')`),
     database.select({
-      day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
-      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
-      cost: sql<string>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}), 0)`,
+      day: sql<string>`to_char(${orders.createdAt} at time zone ${BUSINESS_TZ}, 'YYYY-MM-DD')`,
+      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql()}), 0)`,
+      cost: sql<string>`coalesce(sum(${orderItemCostSql()}), 0)`,
     }).from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id))
       .leftJoin(customers, eq(orders.customerId, customers.id)).where(where)
-      .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`),
+      .groupBy(sql`to_char(${orders.createdAt} at time zone ${BUSINESS_TZ}, 'YYYY-MM-DD')`),
     database.select({
-      day: sql<string>`to_char(${returns.createdAt}, 'YYYY-MM-DD')`,
+      day: sql<string>`to_char(${returns.createdAt} at time zone ${BUSINESS_TZ}, 'YYYY-MM-DD')`,
       refund: sql<string>`coalesce(sum(${returns.totalRefund}), 0)`,
       returnCount: sql<number>`count(*)::int`,
     }).from(returns).leftJoin(customers, eq(returns.customerId, customers.id)).where(returnWhere)
-      .groupBy(sql`to_char(${returns.createdAt}, 'YYYY-MM-DD')`),
+      .groupBy(sql`to_char(${returns.createdAt} at time zone ${BUSINESS_TZ}, 'YYYY-MM-DD')`),
     database.select({
-      day: sql<string>`to_char(${returns.createdAt}, 'YYYY-MM-DD')`,
-      returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
-      returnedCost: sql<string>`coalesce(sum(${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice}), 0)`,
+      day: sql<string>`to_char(${returns.createdAt} at time zone ${BUSINESS_TZ}, 'YYYY-MM-DD')`,
+      returnedProfit: sql<string>`coalesce(sum(${returnItemProfitSql()}), 0)`,
+      returnedCost: sql<string>`coalesce(sum(${returnItemCostSql()}), 0)`,
     }).from(returnItems).innerJoin(returns, eq(returnItems.returnId, returns.id)).innerJoin(products, eq(returnItems.productId, products.id))
       .leftJoin(customers, eq(returns.customerId, customers.id)).where(returnWhere)
-      .groupBy(sql`to_char(${returns.createdAt}, 'YYYY-MM-DD')`),
+      .groupBy(sql`to_char(${returns.createdAt} at time zone ${BUSINESS_TZ}, 'YYYY-MM-DD')`),
     database.select({
       productId: orderItems.productId,
       productName: sql<string>`max(${orderItems.productName})`,
@@ -426,16 +450,16 @@ async function getCoreReportsForDatabase(
       baseUnit: sql<string>`max(${products.baseUnit})`,
       imageUrls: productCompatibilityImageUrls(storeId, publicMedia),
       revenue: sql<string>`sum(${orderItemNetRevenueSql()})`,
-      cost: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})`,
-      profit: sql<string>`sum(${orderItemGrossProfitSql(products.costPrice)})`,
+      cost: sql<string>`sum(${orderItemCostSql()})`,
+      profit: sql<string>`sum(${orderItemGrossProfitSql()})`,
     }).from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id))
       .leftJoin(customers, eq(orders.customerId, customers.id)).where(where).groupBy(orderItems.productId, products.id, products.imageUrls),
     database.select({
       productId: returnItems.productId,
       qtyReturned: sql<string>`coalesce(sum(${returnItems.quantity} * ${returnItems.unitMultiplier}), 0)`,
       refund: sql<string>`coalesce(sum(${returnItems.total}), 0)`,
-      returnedCost: sql<string>`coalesce(sum(${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice}), 0)`,
-      returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      returnedCost: sql<string>`coalesce(sum(${returnItemCostSql()}), 0)`,
+      returnedProfit: sql<string>`coalesce(sum(${returnItemProfitSql()}), 0)`,
       returnCount: sql<number>`count(distinct ${returns.id})::int`,
     }).from(returnItems).innerJoin(returns, eq(returnItems.returnId, returns.id)).innerJoin(products, eq(returnItems.productId, products.id))
       .leftJoin(customers, eq(returns.customerId, customers.id)).where(returnWhere).groupBy(returnItems.productId),
@@ -443,7 +467,7 @@ async function getCoreReportsForDatabase(
       customerId: orders.customerId,
       customerName: sql<string>`coalesce(max(${customers.name}), 'Khách lẻ')`,
       customerType: sql<string | null>`max(${customers.type})`,
-      customerCreatedAt: sql<Date | null>`max(${customers.createdAt})`,
+      firstOrderAt: firstOrderAtSql(storeId),
       orderCount: sql<number>`count(*)::int`,
       revenue: sql<string>`sum(${orders.total})`,
       remaining: sql<string>`sum(${orders.total} - ${orders.amountPaid})`,
@@ -451,24 +475,52 @@ async function getCoreReportsForDatabase(
     }).from(orders).leftJoin(customers, eq(orders.customerId, customers.id)).where(where).groupBy(orders.customerId),
     database.select({
       customerId: orders.customerId,
-      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
+      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql()}), 0)`,
     }).from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id))
       .leftJoin(customers, eq(orders.customerId, customers.id)).where(where).groupBy(orders.customerId),
     database.select({ customerId: returns.customerId, refund: sql<string>`coalesce(sum(${returns.totalRefund}), 0)` })
       .from(returns).leftJoin(customers, eq(returns.customerId, customers.id)).where(returnWhere).groupBy(returns.customerId),
     database.select({
       customerId: returns.customerId,
-      returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      returnedProfit: sql<string>`coalesce(sum(${returnItemProfitSql()}), 0)`,
     }).from(returnItems).innerJoin(returns, eq(returnItems.returnId, returns.id)).innerJoin(products, eq(returnItems.productId, products.id))
       .leftJoin(customers, eq(returns.customerId, customers.id)).where(returnWhere).groupBy(returns.customerId),
     database.select({
-      categoryName: sql<string>`coalesce(${categories.name}, 'Khác')`,
+      categoryId: products.categoryId,
+      categoryName: sql<string | null>`max(${categories.name})`,
       revenue: sql<string>`sum(${orderItemNetRevenueSql()})`,
+      profit: sql<string>`sum(${orderItemGrossProfitSql()})`,
+      quantity: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier})`,
     }).from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id))
       .leftJoin(categories, eq(products.categoryId, categories.id)).leftJoin(customers, eq(orders.customerId, customers.id)).where(where)
-      .groupBy(categories.name).orderBy(desc(sql`sum(${orderItemNetRevenueSql()})`)),
+      .groupBy(products.categoryId).orderBy(desc(sql`sum(${orderItemNetRevenueSql()})`)),
     database.select({ status: orders.status, count: sql<number>`count(*)::int` })
       .from(orders).leftJoin(customers, eq(orders.customerId, customers.id)).where(operationalWhere).groupBy(orders.status),
+    database.select({
+      method: payments.method,
+      amount: sql<string>`coalesce(sum(${payments.amount}), 0)`,
+      count: sql<number>`count(*)::int`,
+    }).from(payments).innerJoin(orders, eq(payments.orderId, orders.id)).leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(and(where, inArray(payments.status, SETTLED_PAYMENT_STATUSES))).groupBy(payments.method),
+    database.select({
+      staffId: orders.createdBy,
+      staffName: sql<string | null>`max(${profiles.fullName})`,
+      revenue: sql<string>`coalesce(sum(${orders.total}), 0)`,
+      orderCount: sql<number>`count(*)::int`,
+    }).from(orders).leftJoin(profiles, eq(orders.createdBy, profiles.id)).leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where).groupBy(orders.createdBy),
+    database.select({
+      staffId: orders.createdBy,
+      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql()}), 0)`,
+    }).from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id))
+      .leftJoin(customers, eq(orders.customerId, customers.id)).where(where).groupBy(orders.createdBy),
+    database.select({
+      weekday: sql<number>`extract(isodow from ${orders.createdAt} at time zone ${BUSINESS_TZ})::int`,
+      hour: sql<number>`extract(hour from ${orders.createdAt} at time zone ${BUSINESS_TZ})::int`,
+      orderCount: sql<number>`count(*)::int`,
+      revenue: sql<string>`coalesce(sum(${orders.total}), 0)`,
+    }).from(orders).leftJoin(customers, eq(orders.customerId, customers.id)).where(where)
+      .groupBy(sql`1`, sql`2`),
   ]);
 
   const summary = summaryRows[0];
@@ -526,14 +578,13 @@ async function getCoreReportsForDatabase(
   const allCustomers = customerSaleRows.map((row) => {
     const revenue = Number(row.revenue) - (customerRefundMap.get(row.customerId) ?? 0);
     const profit = (customerProfitMap.get(row.customerId) ?? 0) - (customerReturnedProfitMap.get(row.customerId) ?? 0);
-    const createdAt = row.customerCreatedAt ? new Date(row.customerCreatedAt) : null;
     return {
       ...row,
       revenue,
       profit,
       margin: revenue === 0 ? 0 : (profit / revenue) * 100,
       averageOrder: row.orderCount === 0 ? 0 : revenue / row.orderCount,
-      segment: createdAt && createdAt >= from && createdAt < to ? "new" as const : "returning" as const,
+      segment: customerSegment(row.firstOrderAt, from, to),
     };
   });
   const summarizeCustomerSegment = (segment: "new" | "returning") => {
@@ -554,6 +605,47 @@ async function getCoreReportsForDatabase(
     new: summarizeCustomerSegment("new"),
     returning: summarizeCustomerSegment("returning"),
   };
+  const productHighlights = {
+    bestProfit: [...mergedProducts].sort((left, right) => right.profit - left.profit)[0] ?? null,
+    lowestMargin: mergedProducts.filter((row) => row.revenue > 0).sort((left, right) => left.margin - right.margin)[0] ?? null,
+    mostReturned: mergedProducts.filter((row) => row.qtyReturned > 0)
+      .sort((left, right) => right.qtyReturned - left.qtyReturned || right.returnCount - left.returnCount)[0] ?? null,
+  };
+  const categoryRevenueTotal = categoryRows.reduce((sum, row) => sum + Number(row.revenue), 0);
+  const byCategory = categoryRows.map((row) => {
+    const revenue = Number(row.revenue);
+    const profit = Number(row.profit);
+    return {
+      categoryId: row.categoryId,
+      categoryName: row.categoryName,
+      revenue,
+      profit,
+      quantity: Number(row.quantity),
+      margin: revenue === 0 ? 0 : (profit / revenue) * 100,
+      share: categoryRevenueTotal === 0 ? 0 : (revenue / categoryRevenueTotal) * 100,
+    };
+  });
+  const byPaymentMethod = paymentRows
+    .map((row) => ({ method: row.method, amount: Number(row.amount), count: row.count }))
+    .sort((left, right) => right.amount - left.amount);
+  const staffProfit = new Map(staffProfitRows.map((row) => [row.staffId, Number(row.profit)]));
+  const byStaff = staffRows.map((row) => {
+    const revenue = Number(row.revenue);
+    return {
+      staffId: row.staffId,
+      staffName: row.staffName,
+      revenue,
+      orderCount: row.orderCount,
+      averageOrder: row.orderCount === 0 ? 0 : revenue / row.orderCount,
+      profit: staffProfit.get(row.staffId) ?? 0,
+    };
+  }).sort((left, right) => right.revenue - left.revenue);
+  const byHour = heatmapRows.map((row) => ({
+    weekday: row.weekday,
+    hour: row.hour,
+    orderCount: row.orderCount,
+    revenue: Number(row.revenue),
+  }));
   const byCustomer = allCustomers.sort((left, right) => right.revenue - left.revenue).slice(0, 10);
   const newCustomerCount = customerSegments.new.customerCount;
   const returningCustomerCount = customerSegments.returning.customerCount;
@@ -572,6 +664,7 @@ async function getCoreReportsForDatabase(
       refundTotal: Number(refunds?.refundTotal ?? 0),
       returnCount: refunds?.returnCount ?? 0,
       collected: Number(summary?.collected ?? 0),
+      outstanding: Math.max(0, Number(summary?.grossRevenue ?? 0) - Number(summary?.collected ?? 0)),
       orderCount: summary?.orderCount ?? 0,
       operationalOrderCount,
       customerCount: summary?.customerCount ?? 0,
@@ -587,7 +680,11 @@ async function getCoreReportsForDatabase(
     },
     byDay,
     topProducts,
+    productHighlights,
     byCategory,
+    byPaymentMethod,
+    byStaff,
+    byHour,
     byCustomer,
     customerSegments,
     orderStatus,
@@ -611,18 +708,8 @@ function emptyDay(day: string): DayReport {
 
 function createEmptyDays(from: Date, to: Date) {
   const days = new Map<string, DayReport>();
-  for (let cursor = startOfDay(from); cursor < to; cursor = addDays(cursor, 1)) {
-    const day = localDateKey(cursor);
-    days.set(day, emptyDay(day));
-  }
+  for (const day of dayKeysBetween(businessDayKeyOf(from), businessDayKeyOf(to))) days.set(day, emptyDay(day));
   return days;
-}
-
-function localDateKey(value: Date) {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 type CoreReport = Awaited<ReturnType<typeof getCoreReportsForDatabase>>;
@@ -698,3 +785,129 @@ export async function getReportsForDatabase(
 }
 
 export type ReportsData = Awaited<ReturnType<typeof getReports>>;
+
+/**
+ * Stock on hand (all warehouses) for physical, active products, with how much
+ * of each sold in the report period. Rows put items that did not sell in the
+ * period first (slow movers), then by stock value.
+ */
+export async function getReportInventory(
+  storeId: string,
+  rangeDays = 30,
+  filters: ReportFilters = {},
+  page = 1,
+  pageSize = 15,
+) {
+  const safePage = Math.max(1, Math.floor(page));
+  const safePageSize = Math.max(1, Math.floor(pageSize));
+  const { from, to } = reportBounds(rangeDays, filters);
+  const term = filters.q?.trim();
+  const productScope = and(
+    eq(products.storeId, storeId),
+    eq(products.productKind, "product"),
+    eq(products.isActive, true),
+    term ? or(ilike(products.name, `%${term}%`), ilike(products.sku, `%${term}%`)) : undefined,
+  );
+  const stockQuantity = sql<string>`coalesce((
+    select sum(${qualified(stockLevels.quantity)}) from ${stockLevels}
+    where ${qualified(stockLevels.storeId)} = ${qualified(products.storeId)} and ${qualified(stockLevels.productId)} = ${qualified(products.id)}
+  ), 0::numeric)`;
+  const minLevel = sql<string>`coalesce((
+    select sum(coalesce(${qualified(stockLevels.minLevel)}, 0)) from ${stockLevels}
+    where ${qualified(stockLevels.storeId)} = ${qualified(products.storeId)} and ${qualified(stockLevels.productId)} = ${qualified(products.id)}
+  ), 0::numeric)`;
+  const soldQuantity = sql<string>`coalesce((
+    select sum(${qualified(orderItems.quantity)} * ${qualified(orderItems.unitMultiplier)})
+    from ${orderItems} inner join ${orders} on ${qualified(orders.id)} = ${qualified(orderItems.orderId)}
+    where ${qualified(orderItems.productId)} = ${qualified(products.id)}
+      and ${qualified(orders.storeId)} = ${storeId}
+      and ${qualified(orders.documentType)} = 'sale'
+      and ${qualified(orders.status)} in ('completed', 'returned')
+      and ${qualified(orders.createdAt)} >= ${from} and ${qualified(orders.createdAt)} < ${to}
+  ), 0::numeric)`;
+  const lastSoldAt = sql<Date | null>`(
+    select max(${qualified(orders.createdAt)})
+    from ${orderItems} inner join ${orders} on ${qualified(orders.id)} = ${qualified(orderItems.orderId)}
+    where ${qualified(orderItems.productId)} = ${qualified(products.id)}
+      and ${qualified(orders.storeId)} = ${storeId}
+      and ${qualified(orders.documentType)} = 'sale'
+      and ${qualified(orders.status)} in ('completed', 'returned')
+  )`;
+  const base = db.$with("inventory_base").as(
+    db.select({
+      productId: sql<string>`${products.id}`.as("product_id"),
+      productName: sql<string>`${products.name}`.as("product_name"),
+      sku: sql<string | null>`${products.sku}`.as("sku"),
+      baseUnit: sql<string>`${products.baseUnit}`.as("base_unit"),
+      costPrice: sql<string>`${products.costPrice}`.as("cost_price"),
+      quantity: stockQuantity.as("quantity"),
+      minLevel: minLevel.as("min_level"),
+      soldQuantity: soldQuantity.as("sold_quantity"),
+      lastSoldAt: lastSoldAt.as("last_sold_at"),
+    }).from(products).where(productScope),
+  );
+  const value = sql`${base.quantity} * ${base.costPrice}`;
+  const [summaryRows, rows, [countRow]] = await Promise.all([
+    db.with(base).select({
+      stockValue: sql<string>`coalesce(sum(case when ${base.quantity} > 0 then ${value} else 0 end), 0)`,
+      stockQuantity: sql<string>`coalesce(sum(greatest(${base.quantity}, 0)), 0)`,
+      inStock: sql<number>`count(*) filter (where ${base.quantity} > 0)::int`,
+      outOfStock: sql<number>`count(*) filter (where ${base.quantity} <= 0)::int`,
+      lowStock: sql<number>`count(*) filter (where ${base.quantity} > 0 and ${base.minLevel} > 0 and ${base.quantity} <= ${base.minLevel})::int`,
+      slowMoving: sql<number>`count(*) filter (where ${base.quantity} > 0 and ${base.soldQuantity} = 0)::int`,
+      slowMovingValue: sql<string>`coalesce(sum(case when ${base.quantity} > 0 and ${base.soldQuantity} = 0 then ${value} else 0 end), 0)`,
+    }).from(base),
+    db.with(base).select({
+      productId: base.productId,
+      productName: base.productName,
+      sku: base.sku,
+      baseUnit: base.baseUnit,
+      quantity: base.quantity,
+      minLevel: base.minLevel,
+      costPrice: base.costPrice,
+      soldQuantity: base.soldQuantity,
+      lastSoldAt: base.lastSoldAt,
+    }).from(base)
+      .where(sql`${base.quantity} > 0`)
+      .orderBy(sql`(${base.soldQuantity} > 0)`, desc(value), base.productName)
+      .limit(safePageSize)
+      .offset((safePage - 1) * safePageSize),
+    db.with(base).select({ total: sql<number>`count(*)::int` }).from(base).where(sql`${base.quantity} > 0`),
+  ]);
+  const summary = summaryRows[0];
+  const rangeDayCount = Math.max(1, Math.round((to.getTime() - from.getTime()) / 86_400_000));
+  return {
+    summary: {
+      stockValue: Number(summary?.stockValue ?? 0),
+      stockQuantity: Number(summary?.stockQuantity ?? 0),
+      inStock: summary?.inStock ?? 0,
+      outOfStock: summary?.outOfStock ?? 0,
+      lowStock: summary?.lowStock ?? 0,
+      slowMoving: summary?.slowMoving ?? 0,
+      slowMovingValue: Number(summary?.slowMovingValue ?? 0),
+    },
+    ...paginated(rows.map((row) => {
+      const quantity = Number(row.quantity);
+      const soldQuantity = Number(row.soldQuantity);
+      const dailySales = soldQuantity / rangeDayCount;
+      return {
+        productId: row.productId,
+        productName: row.productName,
+        sku: row.sku,
+        baseUnit: row.baseUnit,
+        quantity,
+        minLevel: Number(row.minLevel),
+        stockValue: quantity * Number(row.costPrice),
+        soldQuantity,
+        lastSoldAt: row.lastSoldAt ? new Date(row.lastSoldAt).toISOString() : null,
+        /** Business day (Vietnam) of the last sale, yyyy-MM-dd. */
+        lastSoldDay: row.lastSoldAt ? businessDayKeyOf(new Date(row.lastSoldAt)) : null,
+        /** Days the current stock lasts at the period's sales pace; null = no sales. */
+        daysOfStock: dailySales > 0 ? quantity / dailySales : null,
+      };
+    }), countRow?.total ?? 0, safePage, safePageSize),
+  };
+}
+
+export type ReportInventory = Awaited<ReturnType<typeof getReportInventory>>;
+export type ReportInventoryRow = ReportInventory["rows"][number];

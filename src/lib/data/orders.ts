@@ -17,7 +17,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { db } from "@/db";
-import { orderItemGrossProfitSql } from "@/lib/data/order-profit";
+import { orderItemGrossProfitSql, returnItemProfitSql } from "@/lib/data/order-profit";
 import {
   customers,
   einvoices,
@@ -499,7 +499,7 @@ export async function getOrder(storeId: string, id: string) {
       .orderBy(desc(returns.createdAt)),
     db
       .select({
-        grossProfit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
+        grossProfit: sql<string>`coalesce(sum(${orderItemGrossProfitSql()}), 0)`,
       })
       .from(orderItems)
       .innerJoin(orders, and(eq(orders.id, orderItems.orderId), eq(orders.storeId, storeId)))
@@ -507,7 +507,7 @@ export async function getOrder(storeId: string, id: string) {
       .where(and(eq(orderItems.orderId, id), eq(orderItems.storeId, storeId))),
     db
       .select({
-        returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+        returnedProfit: sql<string>`coalesce(sum(${returnItemProfitSql()}), 0)`,
       })
       .from(returnItems)
       .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))

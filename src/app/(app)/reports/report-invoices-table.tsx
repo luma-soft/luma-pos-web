@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PackageOpen } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
@@ -54,7 +54,7 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
     },
     {
       key: "revenue",
-      label: "Doanh thu thuần",
+      label: t("reports.d.kpi.netRevenue"),
       defaultVisible: true,
       align: "right",
       width: "160px",
@@ -63,7 +63,7 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
     },
     {
       key: "cost",
-      label: "Giá vốn",
+      label: t("reports.d.kpi.cost"),
       defaultVisible: true,
       align: "right",
       width: "160px",
@@ -80,7 +80,7 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
     },
     {
       key: "margin",
-      label: "Biên lãi",
+      label: t("reports.d.cols.margin"),
       defaultVisible: true,
       align: "right",
       width: "120px",
@@ -88,7 +88,7 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
     },
     {
       key: "refund",
-      label: "Hoàn trả",
+      label: t("reports.d.cols.refunds"),
       defaultVisible: true,
       align: "right",
       width: "140px",
@@ -136,14 +136,14 @@ export function ReportInvoiceMobileRow({ row, onOpen }: { row: ReportInvoiceRow;
           className="[&_dd]:break-words [&_dd]:whitespace-normal"
         />
         <MobileRecordField label={t("orders.cols.status")} value={<OrderStatus status={row.status} />} />
-        <MobileRecordField label="Giá vốn" value={formatCurrency(row.cost)} />
+        <MobileRecordField label={t("reports.d.kpi.cost")} value={formatCurrency(row.cost)} />
         <MobileRecordField
           label={t("reports.profit")}
           value={formatCurrency(profit)}
           tone={profit >= 0 ? "success" : "danger"}
           className="[&_dd]:break-words [&_dd]:whitespace-normal"
         />
-        <MobileRecordField label="Biên lãi" value={`${row.margin.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`} />
+        <MobileRecordField label={t("reports.d.cols.margin")} value={`${row.margin.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`} />
         </dl>
       </div>
     </div>
@@ -151,11 +151,12 @@ export function ReportInvoiceMobileRow({ row, onOpen }: { row: ReportInvoiceRow;
 }
 
 function OrderSummaryLink({ row, mobile = false }: { row: ReportInvoiceRow; mobile?: boolean }) {
-  const count = row.productCount.toLocaleString("vi-VN");
+  const t = useTranslations("reports.d.invoice");
+  const count = row.productCount.toLocaleString(useLocale() === "en" ? "en-US" : "vi-VN");
   return (
     <OrderDetailLink
       orderId={row.id}
-      ariaLabel={`Mở chi tiết đơn ${row.code}, gồm ${count} sản phẩm`}
+      ariaLabel={t("open", { code: row.code, count })}
       className={cn(
         "pointer-events-auto relative z-10 inline-flex max-w-full min-w-11 flex-col items-start justify-center rounded-md px-2 -ml-2 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
         mobile ? "min-h-11" : "min-h-10",
@@ -164,13 +165,14 @@ function OrderSummaryLink({ row, mobile = false }: { row: ReportInvoiceRow; mobi
       <span className={cn("max-w-full truncate font-semibold text-primary-600 hover:underline", mobile && "font-black")}>{row.code}</span>
       <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
         <PackageOpen aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
-        {count} sản phẩm
+        {t("products", { count })}
       </span>
     </OrderDetailLink>
   );
 }
 
 function OrderStatus({ status }: { status: ReportInvoiceRow["status"] }) {
-  const label = status === "completed" ? "Hoàn thành" : status === "returned" ? "Hoàn trả" : status === "cancelled" ? "Đã hủy" : "Đang xử lý";
+  const t = useTranslations("reports.d.status");
+  const label = status === "completed" ? t("completed") : status === "returned" ? t("returned") : status === "cancelled" ? t("cancelled") : t("processing");
   return <span className={cn("inline-flex rounded-md px-2 py-1 text-[10px] font-bold", status === "completed" ? "bg-emerald-50 text-emerald-700" : status === "returned" ? "bg-teal-50 text-teal-700" : status === "cancelled" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-700")}>{label}</span>;
 }

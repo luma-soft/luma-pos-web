@@ -4734,13 +4734,211 @@
     "customers": "Khách hàng",
     "unitLabels": {
       "products": "sản phẩm",
-      "customers": "khách hàng"
+      "customers": "khách hàng",
+      "orders": "đơn"
     },
     "topProducts": "Top sản phẩm theo doanh thu",
     "qtySold": "SL bán",
     "grossProfit": "Lãi gộp",
     "byCategory": "Doanh thu theo danh mục",
-    "topCustomers": "Top khách hàng theo doanh thu"
+    "topCustomers": "Top khách hàng theo doanh thu",
+    "d": {
+      "vsPrevious": "so với kỳ trước",
+      "points": "điểm %",
+      "ordersSuffix": " đơn",
+      "noData": "Chưa có dữ liệu",
+      "kpi": {
+        "grossProfit": "Lãi gộp",
+        "netRevenue": "Doanh thu thuần",
+        "cost": "Giá vốn",
+        "margin": "Biên lãi gộp",
+        "refunds": "Hoàn trả",
+        "refundsHint": "Tính theo ngày trả hàng, kể cả hàng của đơn thuộc kỳ trước.",
+        "orders": "Đơn hàng",
+        "avgOrder": "Giá trị TB",
+        "returnRate": "Tỷ lệ hoàn",
+        "productsSold": "Sản phẩm bán",
+        "quantity": "Số lượng",
+        "customers": "Khách hàng",
+        "newCustomers": "Khách mới",
+        "returning": "Quay lại",
+        "costHint": "Giá vốn lưu tại thời điểm bán."
+      },
+      "trend": {
+        "day": "Doanh thu & lãi gộp theo ngày",
+        "week": "Doanh thu & lãi gộp theo tuần",
+        "month": "Doanh thu & lãi gộp theo tháng",
+        "previousRevenue": "Doanh thu kỳ trước",
+        "previousProfit": "Lãi gộp kỳ trước",
+        "aria": "Biểu đồ doanh thu và lãi gộp"
+      },
+      "orderChart": {
+        "day": "Đơn hàng theo ngày",
+        "week": "Đơn hàng theo tuần",
+        "month": "Đơn hàng theo tháng",
+        "completed": "Đơn hoàn thành",
+        "returned": "Đơn hoàn trả",
+        "avg": "Giá trị TB",
+        "aria": "Biểu đồ số đơn và giá trị trung bình"
+      },
+      "status": {
+        "completed": "Hoàn thành",
+        "returned": "Hoàn trả",
+        "processing": "Đang xử lý",
+        "cancelled": "Đã hủy"
+      },
+      "invoiceList": "Danh sách đơn hàng",
+      "collection": {
+        "title": "Thu tiền & công nợ",
+        "collected": "Đã thu",
+        "outstanding": "Còn phải thu",
+        "rate": "Đã thu {rate} tổng hóa đơn",
+        "grossSales": "Tổng hóa đơn",
+        "note": "Tính trên các đơn hoàn thành trong kỳ."
+      },
+      "payment": {
+        "title": "Theo phương thức thanh toán",
+        "transactions": "{count} giao dịch",
+        "empty": "Chưa có khoản thu trong kỳ.",
+        "methods": {
+          "cash": "Tiền mặt",
+          "bank_transfer": "Chuyển khoản",
+          "card": "Thẻ",
+          "vnpay": "VNPay",
+          "momo": "MoMo",
+          "zalopay": "ZaloPay",
+          "credit": "Ghi nợ",
+          "exchange_credit": "Cấn trừ đổi hàng"
+        }
+      },
+      "staff": {
+        "title": "Doanh số theo nhân viên",
+        "name": "Nhân viên",
+        "unknown": "Không rõ (dữ liệu nhập)",
+        "revenue": "Doanh số",
+        "orders": "Số đơn",
+        "avg": "TB/đơn",
+        "profit": "Lãi gộp",
+        "note": "Doanh số theo hóa đơn, chưa trừ hoàn trả."
+      },
+      "heatmap": {
+        "title": "Đơn hàng theo giờ & thứ",
+        "subtitle": "Màu càng đậm càng nhiều đơn",
+        "w1": "T2",
+        "w2": "T3",
+        "w3": "T4",
+        "w4": "T5",
+        "w5": "T6",
+        "w6": "T7",
+        "w7": "CN",
+        "cell": "{day} {hour}h: {orders} đơn · {revenue}",
+        "busiest": "Cao điểm: {day} {hour}h"
+      },
+      "products": {
+        "contribution": "Đóng góp doanh thu & lãi gộp",
+        "scatter": "Biên lãi theo sản phẩm",
+        "scatterSub": "Mỗi điểm là 1 sản phẩm",
+        "scatterAxis": "Doanh thu thuần",
+        "bestProfit": "Lãi cao nhất",
+        "lowMargin": "Biên lãi thấp",
+        "mostReturned": "Hoàn trả nhiều",
+        "marginOf": "Biên lãi {value}",
+        "returnedQty": "Đã trả {qty}",
+        "performance": "Hiệu quả sản phẩm",
+        "scatterAria": "Biểu đồ biên lãi theo sản phẩm"
+      },
+      "category": {
+        "title": "Doanh thu theo nhóm hàng",
+        "uncategorized": "Chưa phân nhóm",
+        "share": "{share} doanh thu",
+        "name": "Nhóm hàng"
+      },
+      "customers": {
+        "segmentTitle": "Doanh thu & lãi gộp theo nhóm khách",
+        "avgPerOrder": "Giá trị TB/đơn",
+        "repeatShare": "Khách quay lại tạo",
+        "repeatShareNote": "tổng lãi gộp",
+        "avgPerCustomer": "Giá trị TB/khách",
+        "frequency": "Tần suất mua",
+        "frequencyNote": "đơn/khách",
+        "returningRate": "Tỷ lệ khách quay lại đạt {rate}",
+        "noIdentified": "Chưa có khách hàng định danh trong kỳ báo cáo.",
+        "tip": "Khách mới là khách mua đơn đầu tiên trong kỳ. Theo dõi nhóm quay lại để tối ưu giá trị và lãi gộp mỗi khách.",
+        "performance": "Hiệu quả khách hàng"
+      },
+      "inventory": {
+        "stockValue": "Giá trị tồn",
+        "inStock": "Mặt hàng còn hàng",
+        "outOfStock": "Hết hàng",
+        "lowStock": "Sắp hết",
+        "slowMoving": "Không bán trong kỳ",
+        "slowMovingValue": "Vốn đọng {value}",
+        "table": "Hàng tồn kho",
+        "tableSub": "hàng không bán trong kỳ xếp trước",
+        "product": "Sản phẩm",
+        "onHand": "Tồn kho",
+        "value": "Giá trị tồn",
+        "sold": "Bán trong kỳ",
+        "lastSold": "Bán gần nhất",
+        "never": "Chưa bán",
+        "daysOfStock": "Đủ bán",
+        "days": "{n} ngày",
+        "costNote": "Giá trị tính theo giá vốn hiện tại."
+      },
+      "units": {
+        "billion": "{value} tỷ",
+        "million": "{value} tr",
+        "thousand": "{value} nghìn"
+      },
+      "chart": {
+        "weekOf": "{from} – {to}",
+        "monthOf": "Tháng {month}",
+        "current": "Kỳ này",
+        "previous": "Kỳ trước"
+      },
+      "export": "Xuất CSV",
+      "filteredBy": "Báo cáo đang lọc theo khách: {name}",
+      "cols": {
+        "margin": "Biên lãi",
+        "refunds": "Hoàn trả",
+        "contribution": "Đóng góp",
+        "customerType": "Loại khách",
+        "avgOrder": "Giá trị TB"
+      },
+      "invoice": {
+        "open": "Mở chi tiết đơn {code}, gồm {count} sản phẩm",
+        "products": "{count} sản phẩm"
+      },
+      "csv": {
+        "code": "Mã đơn",
+        "date": "Ngày",
+        "customer": "Khách hàng",
+        "status": "Trạng thái",
+        "netRevenue": "Doanh thu thuần",
+        "cost": "Giá vốn",
+        "grossProfit": "Lãi gộp",
+        "margin": "Biên lãi (%)",
+        "refunds": "Hoàn trả",
+        "paid": "Đã trả",
+        "product": "Sản phẩm",
+        "unit": "Đơn vị",
+        "quantitySold": "SL bán",
+        "quantityReturned": "SL trả",
+        "share": "Đóng góp (%)",
+        "segment": "Loại khách",
+        "new": "Khách mới",
+        "returning": "Quay lại",
+        "orders": "Số đơn",
+        "outstanding": "Còn nợ",
+        "lastPurchase": "Mua gần nhất",
+        "sku": "Mã hàng",
+        "onHand": "Tồn kho",
+        "stockValue": "Giá trị tồn",
+        "lastSold": "Bán gần nhất",
+        "returnedOrders": "Đơn hoàn trả"
+      }
+    },
+    "inventory": "Tồn kho"
   },
   "returns": {
     "action": "Trả hàng",

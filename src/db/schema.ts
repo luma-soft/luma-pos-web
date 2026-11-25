@@ -1367,6 +1367,8 @@ export const orderItems = pgTable("order_items", {
   unitPrice: decimal("unit_price", { precision: 14, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 14, scale: 2 }).notNull().default("0"),
   total: decimal("total", { precision: 14, scale: 2 }).notNull(),
+  // Giá vốn/đơn vị cơ bản lúc bán; trigger DB tự điền từ products.cost_price.
+  unitCost: decimal("unit_cost", { precision: 14, scale: 2 }),
   note: text("note"),
   taxActivityId: varchar("tax_activity_id", { length: 80 }),
   taxActivityName: text("tax_activity_name"),
@@ -1793,6 +1795,8 @@ export const returnItems = pgTable("return_items", {
   unitPrice: decimal("unit_price", { precision: 14, scale: 2 }).notNull(),
   total: decimal("total", { precision: 14, scale: 2 }).notNull(),
   restock: boolean("restock").notNull().default(true), // false = hàng hỏng, không nhập lại kho bán
+  // Giá vốn/đơn vị cơ bản; trigger DB lấy từ dòng bán gốc hoặc products.cost_price.
+  unitCost: decimal("unit_cost", { precision: 14, scale: 2 }),
   taxActivityId: varchar("tax_activity_id", { length: 80 }),
   taxActivityName: text("tax_activity_name"),
   vatRevenueRate: decimal("vat_revenue_rate", { precision: 5, scale: 2 }),

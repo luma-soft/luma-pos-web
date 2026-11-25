@@ -1,6 +1,6 @@
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import { orderItems, orders } from "@/db/schema";
+import { orderItems, orders, products, returnItems } from "@/db/schema";
 
 /**
  * Invoice discounts are stored on the order, separately from line totals.
@@ -21,7 +21,33 @@ export function orderItemNetRevenueSql() {
   return sql`${orderItems.total} - (${orderItemDiscountShareSql()})`;
 }
 
-export function orderItemGrossProfitSql(costPrice: AnyPgColumn) {
+/**
+ * Unit cost (per base unit) captured when the sale line was written. Lines
+ * written before the snapshot existed fall back to the product's cost price;
+ * the query must join `products`.
+ */
+export function orderItemUnitCostSql() {
+  return sql`coalesce(${orderItems.unitCost}, ${products.costPrice})`;
+}
+
+/** Unit cost (per base unit) of a return line; the query must join `products`. */
+export function returnItemUnitCostSql() {
+  return sql`coalesce(${returnItems.unitCost}, ${products.costPrice})`;
+}
+
+export function orderItemCostSql() {
+  return sql`${orderItems.quantity} * ${orderItems.unitMultiplier} * ${orderItemUnitCostSql()}`;
+}
+
+export function returnItemCostSql() {
+  return sql`${returnItems.quantity} * ${returnItems.unitMultiplier} * ${returnItemUnitCostSql()}`;
+}
+
+export function returnItemProfitSql() {
+  return sql`${returnItems.total} - (${returnItemCostSql()})`;
+}
+
+export function orderItemGrossProfitSql(costPrice: AnyPgColumn | SQL = orderItemUnitCostSql()) {
   return sql`
     ${orderItemNetRevenueSql()}
     - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${costPrice})

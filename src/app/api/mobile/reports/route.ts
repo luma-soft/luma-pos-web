@@ -1,39 +1,24 @@
 import { getReportCustomers, getReportInvoices, getReportProducts, getReports } from "@/lib/data/reports";
 import { requireMobileManager } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk, numberParam, searchParam } from "@/lib/mobile/response";
+import { addDaysToKey, isDateKey, isReportPeriod, resolveReportRange, type ReportPeriod } from "@/lib/reports/period";
 
 function reportRange(request: Request) {
   const range = searchParam(request, "range", "today");
-  const today = startOfDay(new Date());
-  const tomorrow = addDays(today, 1);
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  let from = monthStart;
-  let to = tomorrow;
-
-  if (range === "today") from = today;
-  else if (range === "week") from = addDays(today, -6);
-  else if (range === "30d") from = addDays(today, -29);
-  else if (range === "90d") from = addDays(today, -89);
-  else if (range === "this_month" || range === "month") from = monthStart;
-  else if (range === "last_month") {
-    from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    to = monthStart;
-  } else if (range === "this_year") from = new Date(today.getFullYear(), 0, 1);
-  else if (range === "custom") {
-    const url = new URL(request.url);
-    const customFrom = parseDate(url.searchParams.get("from"));
-    const customTo = parseDate(url.searchParams.get("to"));
-    if (customFrom && customTo && customFrom <= customTo) {
-      from = customFrom;
-      to = addDays(customTo, 1);
-    } else {
-      from = addDays(today, -(Math.max(1, numberParam(request, "days", 30)) - 1));
-    }
+  const url = new URL(request.url);
+  // The native app's "week" is a rolling 7 days; "month" is this month.
+  const period: ReportPeriod = range === "week" ? "7d" : range === "month" ? "this_month" : isReportPeriod(range) ? range : "this_month";
+  const from = url.searchParams.get("from");
+  const to = url.searchParams.get("to");
+  let resolved = resolveReportRange(period, from, to);
+  if (period === "custom" && !(isDateKey(from) && isDateKey(to) && from <= to)) {
+    // Older clients send only a day count for custom ranges.
+    const today = resolveReportRange("today").fromValue;
+    resolved = resolveReportRange("custom", addDaysToKey(today, -(Math.max(1, numberParam(request, "days", 30)) - 1)), today);
   }
-
   return {
-    rangeDays: Math.max(1, Math.round((to.getTime() - from.getTime()) / 86_400_000)),
-    filters: { from, to },
+    rangeDays: resolved.rangeDays,
+    filters: { from: resolved.from, to: resolved.toExclusive },
   };
 }
 
@@ -54,22 +39,4 @@ export async function GET(request: Request) {
           : Promise.resolve(null),
   ]);
   return mobileOk({ ...report, details: details?.rows ?? [] });
-}
-
-function startOfDay(value: Date) {
-  const date = new Date(value);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function addDays(value: Date, amount: number) {
-  const date = new Date(value);
-  date.setDate(date.getDate() + amount);
-  return date;
-}
-
-function parseDate(value: string | null) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
 }

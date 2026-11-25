@@ -5,11 +5,13 @@ import { ChevronLeft } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { Text } from "@/components/ui/text";
 import { requireStoreContext } from "@/lib/auth/store-context";
-import { getReportCustomers, getReportInvoices, getReportProducts, getReports } from "@/lib/data/reports";
+import { getReportCustomers, getReportInventory, getReportInvoices, getReportProducts, getReports } from "@/lib/data/reports";
 import { parsePageSize } from "@/lib/pagination";
 import { Routes } from "@/lib/routes";
-import { CustomersReport, OrdersReport, OverviewReport, ProductsReport } from "./report-dashboard";
-import { ReportPeriodFilter, type ReportPeriod } from "./report-period-filter";
+import { isReportPeriod, resolveReportRange } from "@/lib/reports/period";
+import { CustomersReport, InventoryReport, OrdersReport, OverviewReport, ProductsReport } from "./report-dashboard";
+import { ReportExportButton } from "./report-export-button";
+import { ReportPeriodFilter } from "./report-period-filter";
 import { formatReportRange } from "./report-period-label";
 
 interface PageProps {
@@ -20,12 +22,12 @@ interface PageProps {
   }>;
 }
 
-const REPORT_PERIODS: readonly ReportPeriod[] = ["today", "week", "7d", "30d", "90d", "this_month", "last_month", "this_year", "custom"];
 const REPORT_TABS = [
   { tab: "overview", labelKey: "reports.overview" },
   { tab: "invoices", labelKey: "reports.invoices" },
   { tab: "products", labelKey: "reports.products" },
   { tab: "customers", labelKey: "reports.customers" },
+  { tab: "inventory", labelKey: "reports.inventory" },
 ];
 const REPORT_FILTER_PARAMS = ["period", "range", "from", "to", "customerId", "customer", "q", "source"] as const;
 
@@ -38,8 +40,8 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const pageSize = parsePageSize(params.size);
   const legacyPeriod = ["7", "30", "90"].includes(params.range ?? "") ? `${params.range}d` : undefined;
   const requestedPeriod = params.period ?? legacyPeriod;
-  const period = REPORT_PERIODS.includes(requestedPeriod as ReportPeriod) ? requestedPeriod as ReportPeriod : "today";
-  const dateRange = resolveDateRange(period, params.from, params.to);
+  const period = isReportPeriod(requestedPeriod) ? requestedPeriod : "today";
+  const dateRange = resolveReportRange(period, params.from, params.to);
   const filters = {
     customerId: typeof params.customerId === "string" ? params.customerId : undefined,
     customer: typeof params.customer === "string" ? params.customer : undefined,
@@ -47,12 +49,14 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     from: dateRange.from,
     to: dateRange.toExclusive,
   };
-  const [data, invoices, products, reportCustomers] = await Promise.all([
-    getReports(context.storeId, dateRange.rangeDays, filters),
+  const [data, invoices, products, reportCustomers, inventory] = await Promise.all([
+    activeTab === "inventory" ? null : getReports(context.storeId, dateRange.rangeDays, filters),
     activeTab === "invoices" ? getReportInvoices(context.storeId, dateRange.rangeDays, filters, page, pageSize) : null,
     activeTab === "products" ? getReportProducts(context.storeId, dateRange.rangeDays, filters, page, pageSize) : null,
     activeTab === "customers" ? getReportCustomers(context.storeId, dateRange.rangeDays, filters, page, pageSize) : null,
+    activeTab === "inventory" ? getReportInventory(context.storeId, dateRange.rangeDays, filters, page, pageSize) : null,
   ]);
+  const unitLabel = (key: string) => t(`reports.unitLabels.${key}` as never);
   return (
     <div className="min-h-full bg-canvas">
       <header className="sticky top-0 z-20 border-b border-border bg-surface">
@@ -76,42 +80,18 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           </div>
           <div className="flex items-end justify-between px-6 pb-2">
             <div className="min-w-0 flex-1 pr-6"><GroupTabs base={Routes.Reports} items={REPORT_TABS} preserveParams={REPORT_FILTER_PARAMS} /></div>
-            <div className="flex shrink-0 items-center gap-3"><ReportPeriodFilter period={period} from={dateRange.fromValue} to={dateRange.toValue} /></div>
+            <div className="flex shrink-0 items-center gap-3"><ReportExportButton tab={activeTab} /><ReportPeriodFilter period={period} from={dateRange.fromValue} to={dateRange.toValue} /></div>
           </div>
         </div>
       </header>
       <main className="p-3 sm:p-5 lg:p-6">
-        {(filters.customer || filters.q || filters.customerId) && <div className="mb-4 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm font-semibold text-primary-700">Báo cáo đang lọc theo khách: {filters.customer || filters.q || filters.customerId}</div>}
-        {activeTab === "overview" && <OverviewReport data={data} />}
-        {activeTab === "invoices" && invoices && <><OrdersReport data={data} rows={invoices.rows} /><Pagination page={invoices.page} pageCount={invoices.pageCount} total={invoices.total} pageSize={invoices.pageSize} unitLabel="đơn" /></>}
-        {activeTab === "products" && products && <><ProductsReport data={data} rows={products.rows} /><Pagination page={products.page} pageCount={products.pageCount} total={products.total} pageSize={products.pageSize} unitLabel="sản phẩm" /></>}
-        {activeTab === "customers" && reportCustomers && <><CustomersReport data={data} rows={reportCustomers.rows} /><Pagination page={reportCustomers.page} pageCount={reportCustomers.pageCount} total={reportCustomers.total} pageSize={reportCustomers.pageSize} unitLabel="khách hàng" /></>}
+        {(filters.customer || filters.q || filters.customerId) && <div className="mb-4 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm font-semibold text-primary-700">{t("reports.d.filteredBy", { name: filters.customer || filters.q || filters.customerId || "" })}</div>}
+        {activeTab === "overview" && data && <OverviewReport data={data} />}
+        {activeTab === "invoices" && data && invoices && <><OrdersReport data={data} rows={invoices.rows} /><Pagination page={invoices.page} pageCount={invoices.pageCount} total={invoices.total} pageSize={invoices.pageSize} unitLabel={unitLabel("orders")} /></>}
+        {activeTab === "products" && data && products && <><ProductsReport data={data} rows={products.rows} /><Pagination page={products.page} pageCount={products.pageCount} total={products.total} pageSize={products.pageSize} unitLabel={unitLabel("products")} /></>}
+        {activeTab === "customers" && data && reportCustomers && <><CustomersReport data={data} rows={reportCustomers.rows} /><Pagination page={reportCustomers.page} pageCount={reportCustomers.pageCount} total={reportCustomers.total} pageSize={reportCustomers.pageSize} unitLabel={unitLabel("customers")} /></>}
+        {activeTab === "inventory" && inventory && <><InventoryReport data={inventory} /><Pagination page={inventory.page} pageCount={inventory.pageCount} total={inventory.total} pageSize={inventory.pageSize} unitLabel={unitLabel("products")} /></>}
       </main>
     </div>
   );
 }
-
-
-function resolveDateRange(period: ReportPeriod, fromParam?: string, toParam?: string) {
-  const today = startOfDay(new Date());
-  const tomorrow = addDays(today, 1);
-  let from = new Date(today.getFullYear(), today.getMonth(), 1);
-  let toExclusive = tomorrow;
-  if (period === "today") from = today;
-  else if (period === "week") from = addDays(today, -((today.getDay() + 6) % 7));
-  else if (period === "7d") from = addDays(today, -6);
-  else if (period === "30d") from = addDays(today, -29);
-  else if (period === "90d") from = addDays(today, -89);
-  else if (period === "last_month") { from = new Date(today.getFullYear(), today.getMonth() - 1, 1); toExclusive = new Date(today.getFullYear(), today.getMonth(), 1); }
-  else if (period === "this_year") from = new Date(today.getFullYear(), 0, 1);
-  else if (period === "custom") {
-    const customFrom = parseDate(fromParam); const customTo = parseDate(toParam);
-    if (customFrom && customTo && customFrom <= customTo) { from = customFrom; toExclusive = addDays(customTo, 1); }
-  }
-  const toInclusive = addDays(toExclusive, -1);
-  return { from, toExclusive, fromValue: dateInputValue(from), toValue: dateInputValue(toInclusive), rangeDays: Math.max(1, Math.round((toExclusive.getTime() - from.getTime()) / 86_400_000)) };
-}
-function parseDate(value?: string) { if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null; const date = new Date(`${value}T00:00:00`); return Number.isNaN(date.getTime()) ? null : date; }
-function startOfDay(value: Date) { const date = new Date(value); date.setHours(0, 0, 0, 0); return date; }
-function addDays(value: Date, days: number) { const date = new Date(value); date.setDate(date.getDate() + days); return date; }
-function dateInputValue(value: Date) { return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`; }

@@ -6,7 +6,8 @@ import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { MobileRecordField } from "@/components/mobile-ui";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
-import type { ReportCustomerRow, ReportProductRow } from "@/lib/data/reports";
+import type { ReportCustomerRow, ReportInventoryRow, ReportProductRow } from "@/lib/data/reports";
+import { useReportFormat } from "./report-format";
 
 const emptyClassName = "rounded-card border border-dashed border-border p-12 text-center text-sm text-slate-400";
 
@@ -50,7 +51,7 @@ export function ReportProductsTable({ rows }: { rows: ReportProductRow[] }) {
     },
     {
       key: "margin",
-      label: "Biên lãi",
+      label: t("reports.d.cols.margin"),
       defaultVisible: true,
       align: "right",
       width: "120px",
@@ -59,7 +60,7 @@ export function ReportProductsTable({ rows }: { rows: ReportProductRow[] }) {
     },
     {
       key: "returns",
-      label: "Hoàn trả",
+      label: t("reports.d.cols.refunds"),
       defaultVisible: true,
       align: "right",
       width: "110px",
@@ -67,7 +68,7 @@ export function ReportProductsTable({ rows }: { rows: ReportProductRow[] }) {
     },
     {
       key: "contribution",
-      label: "Đóng góp",
+      label: t("reports.d.cols.contribution"),
       defaultVisible: true,
       align: "right",
       width: "130px",
@@ -136,10 +137,10 @@ export function ReportCustomersTable({ rows }: { rows: ReportCustomerRow[] }) {
     },
     {
       key: "segment",
-      label: "Loại khách",
+      label: t("reports.d.cols.customerType"),
       defaultVisible: true,
       width: "120px",
-      render: (row) => <span className={row.segment === "new" ? "text-info" : "text-ok"}>{row.segment === "new" ? "Khách mới" : "Quay lại"}</span>,
+      render: (row) => <span className={row.segment === "new" ? "text-info" : "text-ok"}>{row.segment === "new" ? t("reports.d.kpi.newCustomers") : t("reports.d.kpi.returning")}</span>,
     },
     {
       key: "revenue",
@@ -161,7 +162,7 @@ export function ReportCustomersTable({ rows }: { rows: ReportCustomerRow[] }) {
     },
     {
       key: "margin",
-      label: "Biên lãi",
+      label: t("reports.d.cols.margin"),
       defaultVisible: true,
       align: "right",
       width: "110px",
@@ -169,7 +170,7 @@ export function ReportCustomersTable({ rows }: { rows: ReportCustomerRow[] }) {
     },
     {
       key: "average",
-      label: "Giá trị TB",
+      label: t("reports.d.cols.avgOrder"),
       defaultVisible: true,
       align: "right",
       width: "150px",
@@ -212,6 +213,92 @@ export function ReportCustomerMobileRow({ row }: { row: ReportCustomerRow }) {
         />
       </dl>
     </div>
+  );
+}
+
+export function ReportInventoryTable({ rows }: { rows: ReportInventoryRow[] }) {
+  const f = useReportFormat();
+  const { t } = f;
+  const lastSold = (row: ReportInventoryRow) => row.lastSoldDay ? f.date(row.lastSoldDay, true) : t("inventory.never");
+  const daysOfStock = (row: ReportInventoryRow) => row.daysOfStock == null ? "—" : t("inventory.days", { n: f.number(row.daysOfStock, 0) });
+  const columns: DataTableColumn<ReportInventoryRow>[] = [
+    {
+      key: "product",
+      label: t("inventory.product"),
+      required: true,
+      width: "320px",
+      wrap: true,
+      render: (row) => (
+        <span className="whitespace-normal break-words">
+          <span className="font-medium">{row.productName}</span>
+          {row.sku && <span className="block text-xs text-slate-400">{row.sku}</span>}
+        </span>
+      ),
+    },
+    {
+      key: "onHand",
+      label: t("inventory.onHand"),
+      defaultVisible: true,
+      align: "right",
+      width: "150px",
+      cellClassName: (row) => cn(row.minLevel > 0 && row.quantity <= row.minLevel && "font-semibold text-amber-600"),
+      render: (row) => `${formatNumber(row.quantity)} ${row.baseUnit}`,
+    },
+    {
+      key: "value",
+      label: t("inventory.value"),
+      defaultVisible: true,
+      align: "right",
+      width: "170px",
+      cellClassName: "font-medium",
+      render: (row) => formatCurrency(row.stockValue),
+    },
+    {
+      key: "sold",
+      label: t("inventory.sold"),
+      defaultVisible: true,
+      align: "right",
+      width: "150px",
+      cellClassName: (row) => row.soldQuantity === 0 ? "font-semibold text-er" : "text-slate-500",
+      render: (row) => `${formatNumber(row.soldQuantity)} ${row.baseUnit}`,
+    },
+    {
+      key: "daysOfStock",
+      label: t("inventory.daysOfStock"),
+      defaultVisible: true,
+      align: "right",
+      width: "120px",
+      cellClassName: "text-slate-500",
+      render: daysOfStock,
+    },
+    {
+      key: "lastSold",
+      label: t("inventory.lastSold"),
+      defaultVisible: true,
+      align: "right",
+      width: "140px",
+      cellClassName: (row) => row.lastSoldAt ? "text-slate-500" : "text-slate-400",
+      render: lastSold,
+    },
+  ];
+  return (
+    <ReportTable
+      tableId="report-inventory"
+      rows={rows}
+      columns={columns}
+      getRowId={(row) => row.productId}
+      renderMobileRow={(row) => (
+        <div className="p-3">
+          <div className="break-words text-sm font-black leading-snug">{row.productName}</div>
+          <dl className="mt-3 grid grid-cols-2 gap-2">
+            <MobileRecordField label={t("inventory.onHand")} value={`${formatNumber(row.quantity)} ${row.baseUnit}`} />
+            <MobileRecordField label={t("inventory.value")} value={formatCurrency(row.stockValue)} />
+            <MobileRecordField label={t("inventory.sold")} value={`${formatNumber(row.soldQuantity)} ${row.baseUnit}`} tone={row.soldQuantity === 0 ? "danger" : undefined} />
+            <MobileRecordField label={t("inventory.lastSold")} value={lastSold(row)} />
+          </dl>
+        </div>
+      )}
+    />
   );
 }
 

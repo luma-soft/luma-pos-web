@@ -4734,13 +4734,211 @@
     "customers": "Customers",
     "unitLabels": {
       "products": "products",
-      "customers": "customers"
+      "customers": "customers",
+      "orders": "orders"
     },
     "topProducts": "Top products by revenue",
     "qtySold": "Qty sold",
     "grossProfit": "Gross profit",
     "byCategory": "Revenue by category",
-    "topCustomers": "Top customers by revenue"
+    "topCustomers": "Top customers by revenue",
+    "d": {
+      "vsPrevious": "vs previous period",
+      "points": "pts",
+      "ordersSuffix": " orders",
+      "noData": "No data yet",
+      "kpi": {
+        "grossProfit": "Gross profit",
+        "netRevenue": "Net revenue",
+        "cost": "Cost of goods",
+        "margin": "Gross margin",
+        "refunds": "Refunds",
+        "refundsHint": "Counted on the return date, including items from orders in earlier periods.",
+        "orders": "Orders",
+        "avgOrder": "Avg. order",
+        "returnRate": "Return rate",
+        "productsSold": "Products sold",
+        "quantity": "Quantity",
+        "customers": "Customers",
+        "newCustomers": "New",
+        "returning": "Returning",
+        "costHint": "Cost is saved at the time of sale."
+      },
+      "trend": {
+        "day": "Revenue & gross profit by day",
+        "week": "Revenue & gross profit by week",
+        "month": "Revenue & gross profit by month",
+        "previousRevenue": "Previous revenue",
+        "previousProfit": "Previous gross profit",
+        "aria": "Revenue and gross profit chart"
+      },
+      "orderChart": {
+        "day": "Orders by day",
+        "week": "Orders by week",
+        "month": "Orders by month",
+        "completed": "Completed",
+        "returned": "Returned",
+        "avg": "Avg. order",
+        "aria": "Orders and average order value chart"
+      },
+      "status": {
+        "completed": "Completed",
+        "returned": "Returned",
+        "processing": "Processing",
+        "cancelled": "Cancelled"
+      },
+      "invoiceList": "Orders",
+      "collection": {
+        "title": "Collections & receivables",
+        "collected": "Collected",
+        "outstanding": "Outstanding",
+        "rate": "{rate} of invoiced collected",
+        "grossSales": "Invoiced",
+        "note": "For completed orders in this period."
+      },
+      "payment": {
+        "title": "By payment method",
+        "transactions": "{count} payments",
+        "empty": "No payments in this period.",
+        "methods": {
+          "cash": "Cash",
+          "bank_transfer": "Bank transfer",
+          "card": "Card",
+          "vnpay": "VNPay",
+          "momo": "MoMo",
+          "zalopay": "ZaloPay",
+          "credit": "On credit",
+          "exchange_credit": "Exchange credit"
+        }
+      },
+      "staff": {
+        "title": "Sales by staff",
+        "name": "Staff",
+        "unknown": "Unknown (imported)",
+        "revenue": "Sales",
+        "orders": "Orders",
+        "avg": "Avg./order",
+        "profit": "Gross profit",
+        "note": "Invoiced sales before returns."
+      },
+      "heatmap": {
+        "title": "Orders by hour & weekday",
+        "subtitle": "Darker means more orders",
+        "w1": "Mon",
+        "w2": "Tue",
+        "w3": "Wed",
+        "w4": "Thu",
+        "w5": "Fri",
+        "w6": "Sat",
+        "w7": "Sun",
+        "cell": "{day} {hour}:00: {orders} orders · {revenue}",
+        "busiest": "Peak: {day} {hour}:00"
+      },
+      "products": {
+        "contribution": "Revenue & gross profit contribution",
+        "scatter": "Margin by product",
+        "scatterSub": "Each dot is one product",
+        "scatterAxis": "Net revenue",
+        "bestProfit": "Top profit",
+        "lowMargin": "Lowest margin",
+        "mostReturned": "Most returned",
+        "marginOf": "Margin {value}",
+        "returnedQty": "{qty} returned",
+        "performance": "Product performance",
+        "scatterAria": "Margin by product chart"
+      },
+      "category": {
+        "title": "Revenue by category",
+        "uncategorized": "Uncategorized",
+        "share": "{share} of revenue",
+        "name": "Category"
+      },
+      "customers": {
+        "segmentTitle": "Revenue & gross profit by customer group",
+        "avgPerOrder": "Avg. per order",
+        "repeatShare": "Returning customers made",
+        "repeatShareNote": "of gross profit",
+        "avgPerCustomer": "Avg. per customer",
+        "frequency": "Purchase frequency",
+        "frequencyNote": "orders/customer",
+        "returningRate": "Returning customer rate: {rate}",
+        "noIdentified": "No identified customers in this period.",
+        "tip": "New customers placed their first order in this period. Track returning customers to grow value and profit per customer.",
+        "performance": "Customer performance"
+      },
+      "inventory": {
+        "stockValue": "Stock value",
+        "inStock": "Items in stock",
+        "outOfStock": "Out of stock",
+        "lowStock": "Low stock",
+        "slowMoving": "Not sold this period",
+        "slowMovingValue": "{value} tied up",
+        "table": "Stock on hand",
+        "tableSub": "items not sold this period first",
+        "product": "Product",
+        "onHand": "On hand",
+        "value": "Stock value",
+        "sold": "Sold this period",
+        "lastSold": "Last sold",
+        "never": "Never",
+        "daysOfStock": "Lasts",
+        "days": "{n} days",
+        "costNote": "Valued at current cost price."
+      },
+      "units": {
+        "billion": "{value}B",
+        "million": "{value}M",
+        "thousand": "{value}K"
+      },
+      "chart": {
+        "weekOf": "{from} – {to}",
+        "monthOf": "{month}",
+        "current": "This period",
+        "previous": "Previous period"
+      },
+      "export": "Export CSV",
+      "filteredBy": "Filtered by customer: {name}",
+      "cols": {
+        "margin": "Margin",
+        "refunds": "Refunds",
+        "contribution": "Share",
+        "customerType": "Customer type",
+        "avgOrder": "Avg. order"
+      },
+      "invoice": {
+        "open": "Open order {code} with {count} products",
+        "products": "{count} products"
+      },
+      "csv": {
+        "code": "Order",
+        "date": "Date",
+        "customer": "Customer",
+        "status": "Status",
+        "netRevenue": "Net revenue",
+        "cost": "Cost of goods",
+        "grossProfit": "Gross profit",
+        "margin": "Margin (%)",
+        "refunds": "Refunds",
+        "paid": "Paid",
+        "product": "Product",
+        "unit": "Unit",
+        "quantitySold": "Qty sold",
+        "quantityReturned": "Qty returned",
+        "share": "Share (%)",
+        "segment": "Customer type",
+        "new": "New",
+        "returning": "Returning",
+        "orders": "Orders",
+        "outstanding": "Outstanding",
+        "lastPurchase": "Last purchase",
+        "sku": "SKU",
+        "onHand": "On hand",
+        "stockValue": "Stock value",
+        "lastSold": "Last sold",
+        "returnedOrders": "Returned orders"
+      }
+    },
+    "inventory": "Inventory"
   },
   "returns": {
     "action": "Return items",

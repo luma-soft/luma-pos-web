@@ -9,6 +9,7 @@ import { RowPreviewModal } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import type { ReportPeriod } from "@/lib/reports/period";
 import { formatReportRange } from "./report-period-label";
 
 const PERIODS = [
@@ -21,9 +22,9 @@ const PERIODS = [
   "last_month",
   "this_year",
   "custom",
-] as const;
+] as const satisfies readonly ReportPeriod[];
 
-export type ReportPeriod = (typeof PERIODS)[number];
+export type { ReportPeriod };
 
 export function ReportPeriodFilter({
   period,

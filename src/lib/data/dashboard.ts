@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { orderItemGrossProfitSql } from "@/lib/data/order-profit";
+import { orderItemGrossProfitSql, returnItemProfitSql } from "@/lib/data/order-profit";
 import {
   categories,
   customers,
@@ -95,7 +95,7 @@ export async function getDashboard(
 
     // lãi gộp = Σ(thành tiền − SL quy đổi × giá vốn hiện tại)
     db.select({
-      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
+      profit: sql<string>`coalesce(sum(${orderItemGrossProfitSql()}), 0)`,
     })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
@@ -107,7 +107,7 @@ export async function getDashboard(
     }).from(returns).where(returnsInRange),
 
     db.select({
-      returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      returnedProfit: sql<string>`coalesce(sum(${returnItemProfitSql()}), 0)`,
     })
       .from(returnItems)
       .innerJoin(returns, eq(returnItems.returnId, returns.id))
@@ -250,7 +250,7 @@ export async function getDashboard(
     db.select({
       key: orderBucketKey,
       label: orderBucketLabel,
-      grossProfit: sql<string>`coalesce(sum(${orderItemGrossProfitSql(products.costPrice)}), 0)`,
+      grossProfit: sql<string>`coalesce(sum(${orderItemGrossProfitSql()}), 0)`,
     })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
@@ -262,7 +262,7 @@ export async function getDashboard(
     db.select({
       key: returnBucketKey,
       label: returnBucketLabel,
-      returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+      returnedProfit: sql<string>`coalesce(sum(${returnItemProfitSql()}), 0)`,
     })
       .from(returnItems)
       .innerJoin(returns, eq(returnItems.returnId, returns.id))
