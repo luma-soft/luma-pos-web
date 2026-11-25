@@ -13,16 +13,36 @@
 #       Then restarts the backup worker onto the new release only while it
 #       is idle (no backup stage directory and no pg_dump/rclone child), so a
 #       running backup is never cut.
-#   lumapos-admin service start|stop|restart <web|sync|notifications|backups|cloudflared>
-#   lumapos-admin log <web|sync|notifications|backups|cloudflared> [lines]
-#   lumapos-admin version
+#   lumapos-admin service start|stop|restart <postgres|web|sync|notifications|backups|cloudflared>
+#   lumapos-admin log <postgres|web|sync|notifications|backups|cloudflared> [lines]
+#   lumapos-admin version | status
+#
+# Packaged layout (LumaPOS.app; see docs/mac-host-installer-plan.md):
+#
+#   lumapos-admin bootstrap <user>
+#       Only from the macOS administrator prompt, never through sudoers:
+#       installs this helper and its sudoers rule, creates the service
+#       accounts and directories and writes the launchd definitions.
+#   lumapos-admin create-accounts
+#   lumapos-admin install-runtime <lumapos-runtime-*.tar.gz> [sha256]
+#       Extracts into runtime/<version> after checking every file against
+#       manifest.json; the tree becomes root-owned.
+#   lumapos-admin activate-runtime <version>
+#       Points current at it, runs migrations, restarts the app services and
+#       returns to the previous runtime if /api/health/live does not answer.
+#   lumapos-admin rollback-runtime
+#   lumapos-admin init-database
+#       initdb with the bundled PostgreSQL, owner and runtime roles with
+#       random passwords written only to secrets/runtime.env.
+#   lumapos-admin migrate
+#   lumapos-admin write-secret <runtime.env|rclone.conf|cloudflared.yml|cloudflared-tunnel.json>  (stdin)
 #
 # Progress lines start with "STEP:" so the Mac host console can show them.
 set -uo pipefail
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 umask 022
 
-readonly HELPER_VERSION=3
+readonly HELPER_VERSION=4
 readonly LUMAPOS_ROOT=/Users/Shared/LumaPOS
 readonly LIVE_ROOT="$LUMAPOS_ROOT/app"
 readonly STAGING_ROOT="$LUMAPOS_ROOT/app-next"
@@ -37,7 +57,7 @@ fail() { printf '%s\n' "$1" >&2; exit "${2:-1}"; }
 
 service_name() {
   case "${1:-}" in
-    web|sync|notifications|backups|cloudflared) printf '%s' "$1" ;;
+    postgres|web|sync|notifications|backups|cloudflared) printf '%s' "$1" ;;
     *) fail "Unknown LumaPOS service: ${1:-}" 64 ;;
   esac
 }
@@ -200,6 +220,530 @@ cmd_deploy() {
   fail "The new release did not come up; the previous release is running again (failed release kept at $failed_release)"
 }
 
+# ---- packaged layout (LumaPOS.app) -----------------------------------------
+#
+# /Users/Shared/LumaPOS/runtime/<version>/{app,postgresql-17,tools/bin}  root-owned
+# /Users/Shared/LumaPOS/current -> runtime/<version>
+# /Users/Shared/LumaPOS/postgres/{data,run}                              _lumapos_db, 0700
+# /Users/Shared/LumaPOS/secrets/runtime.env                              _lumapos_svc, 0600
+#
+# Root never executes files from a runtime: PostgreSQL tools run as
+# _lumapos_db and the web release as _lumapos_svc.
+
+readonly RUNTIME_DIR="$LUMAPOS_ROOT/runtime"
+readonly CURRENT_LINK="$LUMAPOS_ROOT/current"
+readonly PG_DIR="$LUMAPOS_ROOT/postgres"
+readonly PGDATA="$PG_DIR/data"
+readonly PG_SOCKET_DIR="$PG_DIR/run"
+readonly PG_PORT=5432
+readonly SECRETS_DIR="$LUMAPOS_ROOT/secrets"
+readonly RUNTIME_ENV="$SECRETS_DIR/runtime.env"
+readonly LOG_DIR="$LUMAPOS_ROOT/logs"
+readonly DB_USER=_lumapos_db
+readonly DATABASE_NAME=lumapos_prod
+readonly OWNER_ROLE=lumapos_owner
+readonly RUNTIME_ROLE=lumapos_runtime
+readonly PACKAGED_SERVICES=(postgres web sync notifications backups cloudflared)
+readonly APP_SERVICES=(web sync notifications)
+readonly KEEP_RUNTIMES=3
+readonly MAX_RUNTIME_ARCHIVE_BYTES=$((2 * 1024 * 1024 * 1024))
+readonly VERSION_PATTERN='^[0-9]{8}\.[0-9]{6}-[0-9a-f]{8}$'
+
+runtime_path() { printf '%s/%s' "$RUNTIME_DIR" "$1"; }
+current_version() {
+  local target
+  target="$(readlink "$CURRENT_LINK" 2>/dev/null)" || return 1
+  target="${target##*/}"
+  [[ "$target" =~ $VERSION_PATTERN && -d "$(runtime_path "$target")" ]] || return 1
+  printf '%s' "$target"
+}
+# JSON values come from root-owned manifests; JavaScriptCore (osascript) is on
+# every Mac, unlike python3.
+manifest_value() {
+  /usr/bin/osascript -l JavaScript -e '
+    function run(argv) {
+      const text = $.NSString.stringWithContentsOfFileEncodingError(argv[0], $.NSUTF8StringEncoding, null);
+      let value = JSON.parse(ObjC.unwrap(text));
+      for (const key of argv[1].split(".")) value = value == null ? undefined : value[key];
+      return value === undefined || value === null ? "" : String(value);
+    }' "$1" "$2" 2>/dev/null
+}
+manifest_files() {
+  /usr/bin/osascript -l JavaScript -e '
+    function run(argv) {
+      const text = $.NSString.stringWithContentsOfFileEncodingError(argv[0], $.NSUTF8StringEncoding, null);
+      const files = JSON.parse(ObjC.unwrap(text)).files || {};
+      return Object.keys(files).sort().map((name) => files[name] + "  ./" + name).join("\n");
+    }' "$1" 2>/dev/null
+}
+postgres_bin() { printf '%s/postgresql-%s/bin' "$CURRENT_LINK" "$(manifest_value "$CURRENT_LINK/manifest.json" postgres.major)"; }
+
+as_db_user() { sudo -u "$DB_USER" -H -- "$@"; }
+db_psql() {
+  # psql as the cluster superuser over the private socket (peer auth).
+  as_db_user "$(postgres_bin)/psql" -X -q -v ON_ERROR_STOP=1 -h "$PG_SOCKET_DIR" -p "$PG_PORT" "$@"
+}
+wait_postgres() {
+  for _ in $(seq 1 60); do
+    as_db_user "$(postgres_bin)/pg_isready" -q -h "$PG_SOCKET_DIR" -p "$PG_PORT" && return 0
+    sleep 1
+  done
+  return 1
+}
+
+# ---- accounts and directories ----
+
+free_id() {
+  local id
+  for id in $(seq 401 499); do
+    dscl . -search /Users UniqueID "$id" 2>/dev/null | grep -q . && continue
+    dscl . -search /Groups PrimaryGroupID "$id" 2>/dev/null | grep -q . && continue
+    printf '%s' "$id"; return 0
+  done
+  return 1
+}
+
+ensure_account() {
+  local name="$1" real_name="$2" own_group="$3" id gid
+  if dscl . -read "/Users/$name" UniqueID >/dev/null 2>&1; then return 0; fi
+  id="$(free_id)" || fail "No free system user id for $name"
+  gid=20
+  if [[ "$own_group" == yes ]]; then
+    gid="$id"
+    dscl . -create "/Groups/$name" || fail "Could not create group $name"
+    dscl . -create "/Groups/$name" PrimaryGroupID "$gid"
+    dscl . -create "/Groups/$name" Password '*'
+  fi
+  dscl . -create "/Users/$name" || fail "Could not create user $name"
+  dscl . -create "/Users/$name" UniqueID "$id"
+  dscl . -create "/Users/$name" PrimaryGroupID "$gid"
+  dscl . -create "/Users/$name" UserShell /usr/bin/false
+  dscl . -create "/Users/$name" NFSHomeDirectory /var/empty
+  dscl . -create "/Users/$name" RealName "$real_name"
+  dscl . -create "/Users/$name" Password '*'
+  dscl . -create "/Users/$name" IsHidden 1
+  step "account $name ($id)"
+}
+
+ensure_dir() {
+  local path="$1" owner="$2" mode="$3"
+  [[ -L "$path" ]] && fail "$path must not be a symlink"
+  mkdir -p -- "$path" || fail "Could not create $path"
+  chown "$owner" -- "$path" && chmod "$mode" -- "$path" || fail "Could not set permissions on $path"
+}
+
+cmd_create_accounts() {
+  ensure_account "$SERVICE_USER" "LumaPOS services" no
+  ensure_account "$DB_USER" "LumaPOS PostgreSQL" yes
+  ensure_dir "$LUMAPOS_ROOT" root:wheel 0755
+  ensure_dir "$RUNTIME_DIR" root:wheel 0755
+  ensure_dir "$PG_DIR" "$DB_USER:$DB_USER" 0700
+  ensure_dir "$PG_SOCKET_DIR" "$DB_USER:$DB_USER" 0700
+  ensure_dir "$SECRETS_DIR" "$SERVICE_USER:staff" 0700
+  ensure_dir "$LOG_DIR" "$SERVICE_USER:staff" 0755
+  ensure_dir "$LUMAPOS_ROOT/media" "$SERVICE_USER:staff" 0700
+  ensure_dir "$LUMAPOS_ROOT/backup-staging" "$SERVICE_USER:staff" 0700
+  # launchd opens each log file as the job's user.
+  local log
+  [[ -e "$LOG_DIR/postgres.log" ]] || install -o "$DB_USER" -g "$DB_USER" -m 0640 /dev/null "$LOG_DIR/postgres.log"
+  for log in web sync notifications backups cloudflared; do
+    [[ -e "$LOG_DIR/$log.log" ]] || install -o "$SERVICE_USER" -g staff -m 0640 /dev/null "$LOG_DIR/$log.log"
+  done
+  step "accounts ready"
+}
+
+# ---- launchd definitions (generated here; no caller-supplied content) ----
+
+write_packaged_plist() {
+  local name="$1" plist tmp_dir tmp pg_major
+  plist="$(plist_of "$name")"
+  # PlistBuddy creates the file; it cannot start from an empty one.
+  tmp_dir="$(mktemp -d)" || fail "Could not create a temporary directory"
+  tmp="$tmp_dir/com.lumapos.$name.plist"
+  local pb=/usr/libexec/PlistBuddy
+  pg_major="${2:-17}"
+  $pb -c "Add :Label string com.lumapos.$name" "$tmp" >/dev/null
+  $pb -c "Add :RunAtLoad bool true" "$tmp"
+  $pb -c "Add :KeepAlive bool true" "$tmp"
+  $pb -c "Add :ThrottleInterval integer 30" "$tmp"
+  $pb -c "Add :ProgramArguments array" "$tmp"
+  $pb -c "Add :StandardOutPath string $LOG_DIR/$name.log" "$tmp"
+  $pb -c "Add :StandardErrorPath string $LOG_DIR/$name.log" "$tmp"
+  case "$name" in
+    postgres)
+      $pb -c "Add :UserName string $DB_USER" "$tmp"
+      $pb -c "Add :ProgramArguments:0 string $CURRENT_LINK/postgresql-$pg_major/bin/postgres" "$tmp"
+      $pb -c "Add :ProgramArguments:1 string -D" "$tmp"
+      $pb -c "Add :ProgramArguments:2 string $PGDATA" "$tmp"
+      # SIGTERM is a smart shutdown; clients are stopped before it.
+      $pb -c "Add :ExitTimeOut integer 120" "$tmp"
+      ;;
+    cloudflared)
+      $pb -c "Add :UserName string $SERVICE_USER" "$tmp"
+      $pb -c "Add :ProgramArguments:0 string $CURRENT_LINK/tools/bin/cloudflared" "$tmp"
+      $pb -c "Add :ProgramArguments:1 string tunnel" "$tmp"
+      $pb -c "Add :ProgramArguments:2 string --no-autoupdate" "$tmp"
+      $pb -c "Add :ProgramArguments:3 string --config" "$tmp"
+      $pb -c "Add :ProgramArguments:4 string $SECRETS_DIR/cloudflared.yml" "$tmp"
+      $pb -c "Add :ProgramArguments:5 string run" "$tmp"
+      ;;
+    web|sync|notifications|backups)
+      $pb -c "Add :UserName string $SERVICE_USER" "$tmp"
+      $pb -c "Add :WorkingDirectory string $CURRENT_LINK/app" "$tmp"
+      $pb -c "Add :ProgramArguments:0 string /bin/bash" "$tmp"
+      $pb -c "Add :ProgramArguments:1 string $CURRENT_LINK/app/ops/shared/run-service.sh" "$tmp"
+      $pb -c "Add :ProgramArguments:2 string $name" "$tmp"
+      $pb -c "Add :EnvironmentVariables dict" "$tmp"
+      $pb -c "Add :EnvironmentVariables:LUMAPOS_APP_ROOT string $CURRENT_LINK/app" "$tmp"
+      $pb -c "Add :EnvironmentVariables:LUMAPOS_BUN_BIN string $CURRENT_LINK/tools/bin/bun" "$tmp"
+      $pb -c "Add :EnvironmentVariables:LUMAPOS_ENV_FILE string $RUNTIME_ENV" "$tmp"
+      $pb -c "Add :EnvironmentVariables:LUMAPOS_POSTGRES_BIN_DIR string $CURRENT_LINK/postgresql-$pg_major/bin" "$tmp"
+      $pb -c "Add :EnvironmentVariables:LUMAPOS_RCLONE_BIN string $CURRENT_LINK/tools/bin/rclone" "$tmp"
+      $pb -c "Add :EnvironmentVariables:PATH string $CURRENT_LINK/tools/bin:$CURRENT_LINK/postgresql-$pg_major/bin:/usr/bin:/bin:/usr/sbin:/sbin" "$tmp"
+      # Backups get time to finish an upload when stopped.
+      [[ "$name" == backups ]] && $pb -c "Add :ExitTimeOut integer 900" "$tmp"
+      ;;
+  esac
+  local installed=0
+  plutil -lint -s "$tmp" >/dev/null && install -o root -g wheel -m 0644 "$tmp" "$plist" && installed=1
+  rm -f "$tmp"
+  rmdir "$tmp_dir"
+  [[ "$installed" == 1 ]] || fail "Could not install a valid $plist"
+}
+
+# A plist that does not run from $CURRENT_LINK belongs to the classic store
+# setup; bootstrap leaves it alone (moving that Mac is a separate step).
+is_packaged_plist() {
+  /usr/libexec/PlistBuddy -c 'Print :ProgramArguments' "$(plist_of "$1")" 2>/dev/null | grep -q "$CURRENT_LINK/"
+}
+
+install_plists() {
+  local name skipped=0
+  for name in "${PACKAGED_SERVICES[@]}"; do
+    if [[ -f "$(plist_of "$name")" ]] && ! is_packaged_plist "$name"; then
+      step "kept existing com.lumapos.$name"
+      skipped=1
+      continue
+    fi
+    write_packaged_plist "$name"
+  done
+  return 0
+}
+
+# ---- bootstrap ----
+
+# Run once from LumaPOS.app through the macOS administrator prompt:
+#   osascript … do shell script "/bin/bash <app>/Contents/Resources/admin/lumapos-admin bootstrap <user>" with administrator privileges
+# Never through the sudoers rule, which would let that user grant itself
+# rights for another account.
+cmd_bootstrap() {
+  local user="${1:-}" source dir perms rule_file
+  [[ -z "${SUDO_USER:-}" ]] || fail "bootstrap runs only from the administrator prompt" 77
+  [[ "$user" =~ ^[A-Za-z0-9._-]+$ && "$user" != root ]] && id "$user" >/dev/null 2>&1 || fail "Unknown user: $user" 67
+  source="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"
+  bash -n "$source" || fail "Helper source does not parse"
+  for dir in /usr /usr/local; do
+    [[ "$(stat -f '%Su' "$dir")" == root && ! -L "$dir" ]] || fail "$dir must be owned by root"
+    perms="$(stat -f '%Lp' "$dir")"
+    (( (8#$perms & 8#022) == 0 )) || fail "$dir must not be group/world writable"
+  done
+
+  step "helper"
+  install -d -o root -g wheel -m 0755 /usr/local/libexec
+  if [[ "$source" != /usr/local/libexec/lumapos-admin ]]; then
+    install -o root -g wheel -m 0755 "$source" /usr/local/libexec/lumapos-admin || fail "Could not install helper"
+  fi
+  rule_file="$(mktemp)"
+  printf '%s\n' "# Managed by lumapos-admin bootstrap" \
+    "$user ALL=(root) NOPASSWD: /usr/local/libexec/lumapos-admin" > "$rule_file"
+  visudo -cf "$rule_file" >/dev/null || { rm -f "$rule_file"; fail "sudoers rule is invalid"; }
+  install -o root -g wheel -m 0440 "$rule_file" /etc/sudoers.d/lumapos
+  rm -f "$rule_file"
+  visudo -c >/dev/null || fail "sudoers configuration is invalid"
+
+  step "accounts"
+  cmd_create_accounts
+  step "launchd"
+  install_plists
+  step "bootstrapped helper $HELPER_VERSION for $user"
+}
+
+# ---- runtime install / activate / rollback ----
+
+# Every file in the tree must be listed in manifest.json with its SHA-256, and
+# nothing else may exist (no devices, fifos or symlinks leaving the tree).
+verify_runtime_tree() {
+  local root="$1" expected actual link target
+  [[ -f "$root/manifest.json" && ! -L "$root/manifest.json" ]] || return 1
+  [[ "$(manifest_value "$root/manifest.json" kind)" == lumapos-runtime ]] || return 1
+  [[ "$(manifest_value "$root/manifest.json" platform)" == darwin-arm64 ]] || return 1
+  if find "$root" ! -type f ! -type d ! -type l | grep -q .; then return 1; fi
+  while IFS= read -r -d '' link; do
+    target="$(readlink "$link")"
+    [[ "$target" != /* ]] || return 1
+    # Resolve the link's directory physically and require it to stay inside.
+    target="$(cd "$(dirname "$link")" 2>/dev/null && cd "$(dirname "$target")" 2>/dev/null && pwd -P)" || return 1
+    [[ "$target" == "$root" || "$target" == "$root"/* ]] || return 1
+  done < <(find "$root" -type l -print0)
+  expected="$(manifest_files "$root/manifest.json")"
+  actual="$(cd "$root" && find . -type f ! -path ./manifest.json -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256)"
+  [[ -n "$expected" && "$(printf '%s\n' "$expected" | LC_ALL=C sort)" == "$(printf '%s\n' "$actual" | LC_ALL=C sort)" ]]
+}
+
+cmd_install_runtime() {
+  local archive="${1:-}" expected_sha="${2:-}" size incoming top version target
+  [[ "$archive" == /* && -f "$archive" && ! -L "$archive" ]] || fail "Runtime archive must be an absolute path to a file" 64
+  [[ "$(basename "$archive")" =~ ^lumapos-runtime-[0-9]{8}\.[0-9]{6}-[0-9a-f]{8}\.tar\.gz$ ]] || fail "Unexpected runtime archive name" 64
+  size="$(stat -f '%z' "$archive")"
+  (( size > 0 && size < MAX_RUNTIME_ARCHIVE_BYTES )) || fail "Runtime archive size is out of range" 64
+  if [[ -n "$expected_sha" ]]; then
+    [[ "$expected_sha" =~ ^[0-9a-f]{64}$ ]] || fail "SHA-256 must be 64 hex characters" 64
+    [[ "$(shasum -a 256 "$archive" | awk '{print $1}')" == "$expected_sha" ]] || fail "Runtime archive checksum mismatch"
+  fi
+  [[ -d "$RUNTIME_DIR" && ! -L "$RUNTIME_DIR" ]] || fail "Run bootstrap first"
+
+  incoming="$(mktemp -d "$RUNTIME_DIR/.incoming.XXXXXX")" || fail "Could not create a staging directory"
+  chmod 0700 "$incoming"
+  # shellcheck disable=SC2064 # bake the path in: the trap runs after return
+  trap "rm -rf -- '$incoming'" EXIT
+  step "extract"
+  # bsdtar refuses "..", absolute paths and writing through symlinks by
+  # default; -o drops archive ownership.
+  tar -xzof "$archive" -C "$incoming" || fail "Could not extract the runtime archive"
+  top="$(ls -1A "$incoming")"
+  [[ "$(printf '%s\n' "$top" | wc -l | tr -d ' ')" == 1 && "$top" =~ ^lumapos-runtime-(.+)$ ]] || fail "Runtime archive must contain one lumapos-runtime-<version> directory"
+  version="${BASH_REMATCH[1]}"
+  [[ "$version" =~ $VERSION_PATTERN ]] || fail "Unexpected runtime version"
+  [[ -d "$incoming/$top" && ! -L "$incoming/$top" ]] || fail "Runtime archive layout is invalid"
+
+  step "verify"
+  verify_runtime_tree "$incoming/$top" || fail "Runtime files do not match manifest.json"
+  [[ "$(manifest_value "$incoming/$top/manifest.json" version)" == "$version" ]] || fail "Manifest version does not match the archive"
+  target="$(runtime_path "$version")"
+  [[ ! -e "$target" ]] || { step "already installed $version"; return 0; }
+
+  chown -R -h root:wheel "$incoming/$top"
+  chmod -R go-w "$incoming/$top"
+  chmod 0755 "$incoming/$top"
+  # Next.js writes its cache next to the server; it is the only writable path.
+  mkdir -p "$incoming/$top/app/.next/cache"
+  chown "$SERVICE_USER:staff" "$incoming/$top/app/.next/cache"
+  chmod 0700 "$incoming/$top/app/.next/cache"
+  mv -- "$incoming/$top" "$target" || fail "Could not move the runtime into place"
+  rm -rf -- "$incoming"
+  trap - EXIT
+  step "installed $version"
+}
+
+point_current_at() {
+  # ln -sfh replaces the link itself, never a directory it points to.
+  ln -sfh "runtime/$1" "$CURRENT_LINK" || return 1
+  printf '%s\n' "$1" > "$RUNTIME_DIR/.current"
+}
+
+# The PostgreSQL server keeps running across runtime switches unless the
+# PostgreSQL build changes.
+postgres_version_of() { manifest_value "$(runtime_path "$1")/manifest.json" postgres.version; }
+
+# Runtimes in use (current, previous, the one PostgreSQL runs from) are kept.
+prune_runtimes() {
+  local current previous running keep=0 version
+  current="$(current_version 2>/dev/null || true)"
+  previous="$(cat "$RUNTIME_DIR/.previous" 2>/dev/null || true)"
+  running="$(ps -axo command= | awk -v root="$RUNTIME_DIR/" 'index($0, root) == 1 {sub(root, ""); sub(/\/.*/, ""); print}' | sort -u)"
+  for version in $(ls -1 "$RUNTIME_DIR" 2>/dev/null | grep -E "$VERSION_PATTERN" | sort -r); do
+    keep=$((keep + 1))
+    [[ "$version" == "$current" || "$version" == "$previous" ]] && continue
+    printf '%s\n' "$running" | grep -qx "$version" && continue
+    (( keep > KEEP_RUNTIMES )) && rm -rf -- "$(runtime_path "$version")"
+  done
+}
+
+restart_app_services() {
+  unload_services "${APP_SERVICES[@]}"
+  load_services "${APP_SERVICES[@]}" && wait_live
+}
+
+cmd_activate_runtime() {
+  local version="${1:-}" mode="${2:-}" previous
+  [[ "$version" =~ $VERSION_PATTERN ]] || fail "Unexpected runtime version" 64
+  [[ -d "$(runtime_path "$version")" && ! -L "$(runtime_path "$version")" ]] || fail "Runtime $version is not installed" 66
+  previous="$(current_version 2>/dev/null || true)"
+  [[ "$previous" != "$version" ]] || { step "already active $version"; return 0; }
+
+  step "switch $version"
+  point_current_at "$version" || fail "Could not switch the current runtime"
+  [[ -n "$previous" ]] && printf '%s\n' "$previous" > "$RUNTIME_DIR/.previous"
+
+  if [[ -n "$previous" && "$(postgres_version_of "$previous")" != "$(postgres_version_of "$version")" ]] \
+    && is_loaded postgres; then
+    step "restart postgres"
+    unload_services "${APP_SERVICES[@]}" backups
+    unload_services postgres
+    load_service postgres
+  fi
+  if [[ -f "$PGDATA/PG_VERSION" ]]; then
+    wait_postgres || { [[ -n "$previous" ]] && point_current_at "$previous"; fail "PostgreSQL did not start"; }
+    if [[ "$mode" != --no-migrate ]]; then
+      step "migrate"
+      if ! run_migrations; then
+        [[ -n "$previous" ]] && point_current_at "$previous"
+        fail "Migrations failed; the previous runtime stays active"
+      fi
+    fi
+  fi
+
+  step "start"
+  if restart_app_services; then
+    step "live"
+    is_loaded cloudflared && launchctl kickstart -k "$(target_of cloudflared)" >/dev/null 2>&1
+    if is_loaded backups; then refresh_backups; else load_service backups; fi
+    prune_runtimes
+    step "active $version"
+    return 0
+  fi
+
+  if [[ -n "$previous" ]]; then
+    step "rollback"
+    point_current_at "$previous"
+    printf '%s\n' "$version" > "$RUNTIME_DIR/.failed"
+    restart_app_services
+    fail "Runtime $version did not come up; $previous is running again"
+  fi
+  fail "Runtime $version did not come up"
+}
+
+cmd_rollback_runtime() {
+  local previous
+  previous="$(cat "$RUNTIME_DIR/.previous" 2>/dev/null || true)"
+  [[ "$previous" =~ $VERSION_PATTERN && -d "$(runtime_path "$previous")" ]] || fail "No previous runtime to roll back to" 66
+  # The schema only moves forward; the previous runtime runs against it.
+  cmd_activate_runtime "$previous" --no-migrate
+}
+
+# ---- database ----
+
+port_in_use() { lsof -nP -iTCP:"$PG_PORT" -sTCP:LISTEN >/dev/null 2>&1; }
+
+set_env_value() {
+  # Replaces or appends KEY=value in runtime.env, keeping owner and mode.
+  local key="$1" value="$2" tmp
+  tmp="$(mktemp "$SECRETS_DIR/.runtime.env.XXXXXX")" || return 1
+  if [[ -f "$RUNTIME_ENV" ]]; then
+    grep -v -E "^[[:space:]]*(export[[:space:]]+)?$key=" "$RUNTIME_ENV" > "$tmp" || true
+  fi
+  printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  chown "$SERVICE_USER:staff" "$tmp" && chmod 0600 "$tmp" && mv -f -- "$tmp" "$RUNTIME_ENV"
+}
+
+cmd_init_database() {
+  local pgbin owner_password runtime_password
+  current_version >/dev/null || fail "Activate a runtime first"
+  dscl . -read "/Users/$DB_USER" UniqueID >/dev/null 2>&1 || fail "Run bootstrap first"
+  [[ ! -e "$PGDATA/PG_VERSION" ]] || fail "A database cluster already exists at $PGDATA"
+  port_in_use && fail "Port $PG_PORT is already in use (stop the other PostgreSQL first)"
+  pgbin="$(postgres_bin)"
+
+  step "initdb"
+  ensure_dir "$PG_DIR" "$DB_USER:$DB_USER" 0700
+  ensure_dir "$PG_SOCKET_DIR" "$DB_USER:$DB_USER" 0700
+  [[ -d "$PGDATA" ]] && rmdir -- "$PGDATA" 2>/dev/null
+  as_db_user "$pgbin/initdb" -D "$PGDATA" --encoding=UTF8 --locale-provider=libc \
+    --locale=en_US.UTF-8 --auth-local=peer --auth-host=scram-sha-256 >/dev/null \
+    || fail "initdb failed"
+  as_db_user /bin/sh -c "cat >> '$PGDATA/postgresql.conf'" <<EOF
+
+# LumaPOS (lumapos-admin init-database)
+listen_addresses = '127.0.0.1'
+port = $PG_PORT
+unix_socket_directories = '$PG_SOCKET_DIR'
+unix_socket_permissions = 0700
+password_encryption = scram-sha-256
+EOF
+
+  step "start postgres"
+  [[ -f "$(plist_of postgres)" ]] || write_packaged_plist postgres "$(manifest_value "$CURRENT_LINK/manifest.json" postgres.major)"
+  load_service postgres || fail "Could not start PostgreSQL"
+  wait_postgres || fail "PostgreSQL did not start"
+
+  step "roles"
+  owner_password="$(openssl rand -hex 24)"
+  runtime_password="$(openssl rand -hex 24)"
+  # Passwords go through stdin, never the command line.
+  db_psql -d postgres <<EOF || fail "Could not create database roles"
+\\set owner_password '$owner_password'
+\\set runtime_password '$runtime_password'
+CREATE ROLE $OWNER_ROLE LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION PASSWORD :'owner_password';
+CREATE ROLE $RUNTIME_ROLE LOGIN BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION PASSWORD :'runtime_password';
+CREATE ROLE authenticated NOLOGIN;
+CREATE ROLE service_role NOLOGIN BYPASSRLS;
+CREATE DATABASE $DATABASE_NAME OWNER $OWNER_ROLE ENCODING 'UTF8' TEMPLATE template0;
+EOF
+  db_psql -d "$DATABASE_NAME" -c "ALTER SCHEMA public OWNER TO $OWNER_ROLE" || fail "Could not hand the public schema to $OWNER_ROLE"
+
+  step "runtime.env"
+  set_env_value DATABASE_URL "postgresql://$RUNTIME_ROLE:$runtime_password@127.0.0.1:$PG_PORT/$DATABASE_NAME?sslmode=disable" \
+    && set_env_value MIGRATION_DATABASE_URL "postgresql://$OWNER_ROLE:$owner_password@127.0.0.1:$PG_PORT/$DATABASE_NAME?sslmode=disable" \
+    || fail "Could not write $RUNTIME_ENV"
+  step "database ready"
+}
+
+# Compatibility objects and grants run as the owner role (so the owner owns
+# them) inside a superuser session; the schema migrations run as the service
+# user with MIGRATION_DATABASE_URL from runtime.env.
+run_migrations() {
+  local app="$CURRENT_LINK/app"
+  [[ -f "$app/sql/bootstrap-local-postgres-compat.sql" && -f "$app/sql/grant-self-hosted-runtime-role.sql" ]] || {
+    echo "Runtime has no sql/ scripts" >&2; return 1; }
+  { printf 'SET ROLE %s;\n' "$OWNER_ROLE"; cat "$app/sql/bootstrap-local-postgres-compat.sql"; } \
+    | db_psql -d "$DATABASE_NAME" || return 1
+  sudo -u "$SERVICE_USER" -- /usr/bin/env -i \
+    PATH="$CURRENT_LINK/tools/bin:/usr/bin:/bin" \
+    LUMAPOS_APP_ROOT="$app" LUMAPOS_ENV_FILE="$RUNTIME_ENV" \
+    LUMAPOS_BUN_BIN="$CURRENT_LINK/tools/bin/bun" \
+    /bin/bash "$app/ops/shared/run-service.sh" migrate || return 1
+  { printf 'SET ROLE %s;\n' "$OWNER_ROLE"; cat "$app/sql/grant-self-hosted-runtime-role.sql"; } \
+    | db_psql -d "$DATABASE_NAME" || return 1
+}
+
+cmd_migrate() {
+  current_version >/dev/null || fail "No active runtime"
+  wait_postgres || fail "PostgreSQL is not running"
+  run_migrations || fail "Migrations failed"
+  step "migrated"
+}
+
+# ---- secrets ----
+
+cmd_write_secret() {
+  local name="${1:-}" tmp size
+  case "$name" in
+    runtime.env|rclone.conf|cloudflared.yml|cloudflared-tunnel.json) ;;
+    *) fail "Unknown secret: $name" 64 ;;
+  esac
+  [[ -d "$SECRETS_DIR" && ! -L "$SECRETS_DIR" ]] || fail "Run bootstrap first"
+  tmp="$(mktemp "$SECRETS_DIR/.incoming.XXXXXX")" || fail "Could not create a temporary file"
+  head -c 65537 > "$tmp"
+  size="$(stat -f '%z' "$tmp")"
+  if (( size == 0 || size > 65536 )); then rm -f "$tmp"; fail "Secret must be 1 byte to 64 KiB" 64; fi
+  chown "$SERVICE_USER:staff" "$tmp" && chmod 0600 "$tmp" && mv -f -- "$tmp" "$SECRETS_DIR/$name" \
+    || { rm -f "$tmp"; fail "Could not write $name"; }
+  step "wrote $name"
+}
+
+cmd_status() {
+  local version name
+  version="$(current_version 2>/dev/null || true)"
+  printf 'helper=%s\n' "$HELPER_VERSION"
+  printf 'layout=%s\n' "$([[ -n "$version" ]] && echo packaged || { [[ -d "$LIVE_ROOT" ]] && echo classic || echo none; })"
+  printf 'runtime=%s\n' "$version"
+  printf 'previous=%s\n' "$(cat "$RUNTIME_DIR/.previous" 2>/dev/null || true)"
+  printf 'database=%s\n' "$([[ -f "$PGDATA/PG_VERSION" ]] && echo initialized || echo none)"
+  for name in "${PACKAGED_SERVICES[@]}"; do
+    printf 'service.%s=%s\n' "$name" "$(is_loaded "$name" && echo loaded || { [[ -f "$(plist_of "$name")" ]] && echo installed || echo missing; })"
+  done
+}
+
 cmd_service() {
   local action="${1:-}" name
   name="$(service_name "${2:-}")" || exit $?
@@ -227,5 +771,14 @@ case "${1:-}" in
   service) shift; cmd_service "$@" ;;
   log) shift; cmd_log "$@" ;;
   version) echo "$HELPER_VERSION" ;;
-  *) fail "Usage: lumapos-admin deploy | service start|stop|restart <name> | log <name> [lines] | version" 64 ;;
+  status) cmd_status ;;
+  bootstrap) shift; cmd_bootstrap "$@" ;;
+  create-accounts) cmd_create_accounts ;;
+  install-runtime) shift; cmd_install_runtime "$@" ;;
+  activate-runtime) shift; cmd_activate_runtime "${1:-}" ;;
+  rollback-runtime) cmd_rollback_runtime ;;
+  init-database) cmd_init_database ;;
+  migrate) cmd_migrate ;;
+  write-secret) shift; cmd_write_secret "$@" ;;
+  *) fail "Usage: lumapos-admin deploy | service start|stop|restart <name> | log <name> [lines] | version | status | bootstrap <user> | create-accounts | install-runtime <archive> [sha256] | activate-runtime <version> | rollback-runtime | init-database | migrate | write-secret <name>" 64 ;;
 esac

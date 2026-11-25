@@ -145,6 +145,38 @@ còn thư mục `src/` và `node_modules` đầy đủ trong release.
 
 ### Giai đoạn 2 — PostgreSQL, công cụ đi kèm và helper root (2 ngày)
 
+> **Đã làm phần build và helper 2026-11-25; chưa chạy thử quyền root trên Mac
+> trống.**
+> - `ops/macos/build-postgres.sh`: tự build PostgreSQL 17.11 từ mã nguồn
+>   (kiểm SHA-256 của postgresql.org), không ICU (DB dùng locale libc), có
+>   contrib (`pg_trgm`), lz4, zstd, OpenSSL; thư viện chép vào `lib/`, mọi
+>   file Mach-O dùng `@rpath`, ký ad-hoc. 32 MB (nén 10 MB). Đã thử: chép sang
+>   thư mục khác vẫn chạy; `initdb`, `pg_trgm`, `pg_dump` zstd; khôi phục bản
+>   dump `lumapos_prod` vào đó, số dòng 151 bảng khớp.
+> - `ops/macos/build-tools-bundle.sh`: bun, cloudflared, rclone (một file
+>   arm64, chỉ link thư viện hệ thống), ghi phiên bản + SHA-256.
+> - `ops/macos/assemble-runtime.sh`: ghép `app/` (release runtime),
+>   `postgresql-17/`, `tools/bin/` + `manifest.json` (format 2, SHA-256 từng
+>   file) thành `lumapos-runtime-<version>.tar.gz` (320 MB, nén 113 MB).
+>   Release có thêm `sql/` (compat + grant) cho bước migrate.
+> - `lumapos-admin` v4: `bootstrap <user>` (chỉ từ hộp mật khẩu, từ chối khi
+>   chạy qua sudoers), `create-accounts`, `install-runtime` (kiểm mọi file
+>   theo manifest, từ chối symlink ra ngoài/file đặc biệt, cây thành của root),
+>   `activate-runtime` (đổi `current`, chỉ khởi động lại PostgreSQL khi bản
+>   PostgreSQL đổi, migrate, rollback nếu web không lên), `rollback-runtime`,
+>   `init-database` (role `lumapos_owner` cho migrate + `lumapos_runtime`,
+>   mật khẩu ngẫu nhiên chỉ ghi vào `runtime.env`), `migrate`,
+>   `write-secret`, `status`; plist launchd do helper tự sinh. Plist cũ của
+>   store Mac (không chạy từ `current`) được giữ nguyên.
+> - App Mac: build phase chép helper vào `Contents/Resources/admin/`;
+>   `AdminHelper` có `bootstrap`, so phiên bản, `status`, lệnh runtime,
+>   `write(secret:)` qua stdin.
+>
+> **Còn lại:** chạy `bootstrap` → `install-runtime` → `activate-runtime` →
+> `init-database` → `migrate` trên Mac thử hoặc VM (store Mac đang dùng cổng
+> 5432 nên không thử tại chỗ); `restore`, `export-for-move`,
+> `import-from-move`, `uninstall` chuyển sang giai đoạn 3–4.
+
 Repo `luma-pos-app/native-macos` (+ script build trong `luma-pos-web/ops`).
 
 1. Lấy PostgreSQL 17 arm64 relocatable (build từ source với
@@ -328,8 +360,8 @@ trình chuyển máy ở giai đoạn 4 nên tách phần dump/đối chiếu th
 
 1. ~~Tài khoản Apple Developer~~ — đã chốt 2026-11-24: không có; dùng ký
    ad-hoc, không notarize, runtime cập nhật riêng.
-2. Nguồn PostgreSQL đóng kèm: tự build hay dùng bản dựng sẵn (kiểm tra giấy
-   phép phân phối lại).
+2. ~~Nguồn PostgreSQL đóng kèm~~ — đã chốt 2026-11-25: tự build từ mã nguồn
+   (giấy phép PostgreSQL cho phân phối lại), `build-postgres.sh`.
 3. Nơi đặt feed runtime và `.dmg`: R2 với domain `updates.haidangshop.com` hay
    tên khác.
 4. Có cần chế độ chỉ-LAN (không Cloudflare) trong trình hướng dẫn ngay từ đầu.

@@ -132,6 +132,9 @@ done
 # Migrations are read from ./drizzle relative to the working directory.
 cp -Rc "$workspace/drizzle" "$staging_root/drizzle"
 cp -c "$workspace/ops/shared/run-service.sh" "$staging_root/ops/shared/run-service.sh"
+# SQL that `lumapos-admin migrate` runs around the migrations (packaged layout).
+mkdir -p "$staging_root/sql"
+cp -c "$workspace/scripts/bootstrap-local-postgres-compat.sql" "$workspace/scripts/grant-self-hosted-runtime-role.sql" "$staging_root/sql/"
 rm -rf "$staging_root/.next/cache"
 for dotenv in .env .env.local .env.production .env.production.local; do
   rm -f "$staging_root/$dotenv"

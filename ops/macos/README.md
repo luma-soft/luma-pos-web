@@ -163,6 +163,32 @@ sudo /usr/local/libexec/lumapos-admin service start notifications
 Chỉ rollback app trên cùng PostgreSQL khi các release không khác nhau về
 migration.
 
+## Gói runtime cho app Mac (đang làm, chưa dùng trên store Mac)
+
+Bố cục đóng gói (`docs/mac-host-installer-plan.md`, giai đoạn 2) chạy từ
+`/Users/Shared/LumaPOS/current -> runtime/<version>` thay vì `app/`. Build trên
+máy dev, không cần quyền root:
+
+```bash
+ops/macos/build-postgres.sh 17.11     # PostgreSQL relocatable (~5 phút lần đầu)
+ops/macos/build-tools-bundle.sh       # bun, cloudflared, rclone
+ops/macos/assemble-runtime.sh         # từ release đang chạy (app/) hoặc thư mục chỉ định
+```
+
+Kết quả nằm ở `~/Library/Caches/LumaPOS/runtime-build/`
+(`lumapos-runtime-<version>.tar.gz` + `.sha256`). Trên Mac đích:
+
+```bash
+sudo /usr/local/libexec/lumapos-admin install-runtime <file.tar.gz> <sha256>
+sudo /usr/local/libexec/lumapos-admin activate-runtime <version>
+sudo /usr/local/libexec/lumapos-admin init-database      # chỉ lần đầu
+sudo /usr/local/libexec/lumapos-admin status
+```
+
+Lần cài đầu, app chạy `lumapos-admin bootstrap <user>` qua hộp mật khẩu macOS
+(cài helper, sudoers, user `_lumapos_svc`/`_lumapos_db`, thư mục, plist). Helper
+không ghi đè plist cũ không chạy từ `current`.
+
 ## Công cụ quản trị không cần mật khẩu
 
 `ops/macos/lumapos-admin` là helper chạy bằng root, chỉ nhận các lệnh cố định:

@@ -76,6 +76,10 @@ if [[ -f "$app_root/manifest.json" && -f "$app_root/server.js" && -d "$app_root/
     maintenance:media-cleanup|maintenance:notifications|maintenance:einvoices)
       exec "$bun_bin" workers/run-self-hosted-maintenance.js "--task=${service_name#maintenance:}"
       ;;
+    migrate)
+      # One-shot, run by `lumapos-admin migrate` with MIGRATION_DATABASE_URL.
+      exec "$bun_bin" workers/apply-migrations-from-database-url.js
+      ;;
     *)
       printf '%s\n' "Unknown LumaPOS service name." >&2
       exit 64
