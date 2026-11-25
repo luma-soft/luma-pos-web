@@ -10,6 +10,8 @@ import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { CustomerCreateDialog, type CustomerCreateResult } from "@/components/partners/customer-create-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { MobileFormHeader } from "@/components/mobile-form-header";
+import { TouchTargetToggle } from "@/components/mobile-ui";
 import { Field } from "@/components/ui/label";
 import { Input, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -417,6 +419,15 @@ export function ProjectEdit({
         title={t("projects.editTitle")}
         closeLabel={t("common.close")}
         size={isServiceProject ? "lg" : "md"}
+        mobileHeader={(
+          <MobileFormHeader
+            title={t("projects.editTitle")}
+            onCancel={() => setOpen(false)}
+            submitLabel={t("common.save")}
+            onSubmit={() => void submit()}
+            submitting={busy}
+          />
+        )}
         footer={(
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
@@ -424,7 +435,7 @@ export function ProjectEdit({
           </div>
         )}
       >
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 max-lg:gap-4 max-lg:rounded-[22px] max-lg:bg-surface max-lg:p-ios-inset">
           <Field label={t("projects.cols.name")} required><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label={t("orders.cols.customer")}>
             <div className="flex min-w-0 gap-2">
@@ -470,13 +481,20 @@ export function ProjectEdit({
                 {schedule.orderInvalid && <Text as="p" variant="destructive" size="xs" className="mt-1" text={scheduleOrderError} />}
                 {!schedule.orderInvalid && schedule.targetInPast && <p className="mt-1 text-xs font-medium text-amber-700">{pastTargetWarning}</p>}
               </Field>
-              <label className="flex min-h-18 cursor-pointer items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-3 sm:col-span-2">
+              <label className="flex min-h-18 cursor-pointer items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-3 sm:col-span-2 max-lg:hidden">
                 <span>
                   <span className="block text-sm font-semibold">{t("projects.status.done")}</span>
                   <span className="mt-1 block text-xs text-slate-500">{completionHint}</span>
                 </span>
                 <Checkbox checked={completed} onChange={(event) => setCompleted(event.target.checked)} className="size-5" />
               </label>
+              <div className="-mx-ios-inset flex items-center justify-between gap-3 border-t border-border px-ios-inset pt-3 lg:hidden">
+                <span className="min-w-0">
+                  <span className="block text-[17px] leading-[22px]">{t("projects.status.done")}</span>
+                  <span className="mt-0.5 block text-[13px] text-ios-label-secondary">{completionHint}</span>
+                </span>
+                <TouchTargetToggle checked={completed} onChange={setCompleted} aria-label={t("projects.status.done")} />
+              </div>
             </>
           ) : (
             <Field label={t("orders.cols.status")}><Select value={status} onChange={(e) => setStatus(e.target.value)} options={[{ value: "active", label: t("projects.status.active") }, { value: "done", label: t("projects.status.done") }]} /></Field>

@@ -856,6 +856,7 @@ export function RowPreviewModal({
   bodyClassName,
   panelClassName,
   overlayClassName,
+  mobileHeader,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -869,6 +870,11 @@ export function RowPreviewModal({
   panelClassName?: string;
   /** Raise the overlay, e.g. above phone screens pushed from a partner profile. */
   overlayClassName?: string;
+  /**
+   * Phones: full-screen iOS form with this bar (e.g. MobileFormHeader) instead
+   * of the sheet header and footer.
+   */
+  mobileHeader?: ReactNode;
 }) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -930,11 +936,13 @@ export function RowPreviewModal({
           size === "lg" && "max-h-[calc(100dvh-env(safe-area-inset-top))] sm:max-h-[92dvh] sm:max-w-2xl",
           size === "xl" && "max-h-[calc(100dvh-env(safe-area-inset-top))] sm:max-h-[92dvh] sm:max-w-4xl",
           size === "full" && "h-[calc(100dvh-env(safe-area-inset-top))] max-h-[calc(100dvh-env(safe-area-inset-top))] sm:h-full sm:max-h-[900px] sm:max-w-[1600px]",
+          mobileHeader && "max-lg:h-dvh max-lg:max-h-dvh max-lg:max-w-none max-lg:rounded-none max-lg:border-0 max-lg:bg-canvas",
           panelClassName,
         )}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-5">
+        {mobileHeader}
+        <div className={cn("flex shrink-0 items-start justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-5", mobileHeader && "max-lg:hidden")}>
           <div className="min-w-0">
             <div id={titleId} className="truncate text-lg font-bold">{title}</div>
             {subtitle && <div className="mt-0.5 truncate text-sm text-slate-500">{subtitle}</div>}
@@ -943,8 +951,8 @@ export function RowPreviewModal({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className={cn("min-h-0 flex-1 overflow-auto p-4 sm:p-5", bodyClassName)}>{children}</div>
-        {footer && <div className="shrink-0 border-t border-border-soft px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-5 sm:pb-3">{footer}</div>}
+        <div className={cn("min-h-0 flex-1 overflow-auto p-4 sm:p-5", mobileHeader && "max-lg:overscroll-contain max-lg:px-ios-inset max-lg:pb-[calc(env(safe-area-inset-bottom)+1rem)] max-lg:pt-2", bodyClassName)}>{children}</div>
+        {footer && <div className={cn("shrink-0 border-t border-border-soft px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-5 sm:pb-3", mobileHeader && "max-lg:hidden")}>{footer}</div>}
       </div>
     </div>
   );
