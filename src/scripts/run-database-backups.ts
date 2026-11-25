@@ -372,7 +372,7 @@ async function recoverStaleRuns() {
   await connection.unsafe(`
     UPDATE public.database_backup_runs
     SET status = 'queued', started_at = NULL, failure_code = 'WORKER_RESTARTED'
-    WHERE status = 'running' AND started_at < now() - interval '4 hours'
+    WHERE status = 'running' AND started_at < now() - interval '8 hours'
   `);
 }
 

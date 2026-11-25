@@ -95,8 +95,9 @@ function rcloneBindArgs(env: NodeJS.ProcessEnv = process.env): string[] {
   return bind ? ["--bind", bind] : [];
 }
 
-// A ~470 MB archive over a slow uplink can take well over half an hour.
-const ARCHIVE_TRANSFER_TIMEOUT_MS = 3 * 60 * 60_000;
+// A ~470 MB archive took 2h44m on 2026-11-25 (~47 KB/s to Google); allow
+// 6 hours so a slower day still finishes before the 26-hour readiness window.
+const ARCHIVE_TRANSFER_TIMEOUT_MS = 6 * 60 * 60_000;
 
 function runRclone(
   config: GoogleDriveBackupConfig,
