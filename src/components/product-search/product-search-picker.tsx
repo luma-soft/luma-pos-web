@@ -196,8 +196,19 @@ export function ProductSearchPicker<T>({
     const onPointerDown = (event: PointerEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) close();
     };
+    // Open results close on Escape even after focus left the search field
+    // (e.g. onto a quantity input in the result row); the input handles its own.
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      close();
+    };
     document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
     // close deliberately uses the current controlled callbacks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, onQueryChange]);
