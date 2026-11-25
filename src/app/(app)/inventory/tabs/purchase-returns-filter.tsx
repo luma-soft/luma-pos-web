@@ -16,6 +16,7 @@ import {
   isOrderDateRangeValid,
   resolveOrderTimePreset,
 } from "@/lib/orders/filter-date-range";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type Option = { id: string; name: string };
 type Draft = {
@@ -86,18 +87,15 @@ export function PurchaseReturnsFilter({ suppliers, values, resultCount }: Props)
     setOpen(false);
   }, [applied]);
 
+  const layer = useModalLayer({ open, onEscape: closeDrawer, elementRef: panelRef });
+
   useEffect(() => {
     if (!open) return;
     const trigger = triggerRef.current;
     const focusElements = () => collectFocusableElements(panelRef.current);
     window.requestAnimationFrame(() => focusElements()[0]?.focus());
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeDrawer();
-        return;
-      }
-      if (event.key !== "Tab") return;
+      if (event.key !== "Tab" || !layer.isTop()) return;
       const focusable = focusElements();
       if (focusable.length === 0) {
         event.preventDefault();
@@ -115,7 +113,7 @@ export function PurchaseReturnsFilter({ suppliers, values, resultCount }: Props)
       document.removeEventListener("keydown", onKeyDown);
       window.requestAnimationFrame(() => trigger?.focus());
     };
-  }, [closeDrawer, open]);
+  }, [closeDrawer, layer, open]);
 
   useEffect(() => {
     if (!open || dateError) return;

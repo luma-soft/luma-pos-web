@@ -23,6 +23,7 @@ import {
 } from "@/lib/orders/filter-date-range";
 import { Toggle } from "@/components/ui/toggle";
 import { SHOW_WAREHOUSE } from "@/lib/inventory/warehouse-visibility";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type Option = { value: string; label: string };
 type Field =
@@ -188,6 +189,8 @@ export function InventoryFilterDrawer({
     setOpen(false);
   }, [initial, setDraft, setEntityLabels, setOpen]);
 
+  const layer = useModalLayer({ open, onEscape: close, elementRef: panelRef });
+
   useEffect(() => {
     if (!open) return;
     const panel = panelRef.current;
@@ -195,12 +198,7 @@ export function InventoryFilterDrawer({
     const focusElements = () => collectFocusableElements(panel);
     window.requestAnimationFrame(() => focusElements()[0]?.focus());
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        close();
-        return;
-      }
-      if (event.key !== "Tab") return;
+      if (event.key !== "Tab" || !layer.isTop()) return;
       const focusable = focusElements();
       if (focusable.length === 0) {
         event.preventDefault();
@@ -218,7 +216,7 @@ export function InventoryFilterDrawer({
       document.removeEventListener("keydown", onKeyDown);
       window.requestAnimationFrame(() => trigger?.focus());
     };
-  }, [close, open]);
+  }, [close, layer, open]);
 
   useEffect(() => {
     if (!open || customDateError) return;

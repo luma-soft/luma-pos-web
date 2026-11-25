@@ -204,7 +204,8 @@ export function LumaWebPicker({
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
             openAndFocus(Math.max(0, visibleOptions.findIndex((option) => option.value === selectedValue)) || visibleOptions.length - 1);
-          } else if (event.key === "Escape") {
+          } else if (event.key === "Escape" && open) {
+            // Claim Escape only while open; a closed picker lets the drawer close.
             event.preventDefault();
             setOpen(false);
           }
@@ -350,7 +351,7 @@ export function LumaDateRangePicker({
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={(event) => {
-          if (event.key === "Escape") {
+          if (event.key === "Escape" && open) {
             event.preventDefault();
             setOpen(false);
           }

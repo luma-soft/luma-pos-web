@@ -39,6 +39,7 @@ import {
   MobileFilterHeader,
   MobileSwitchRow,
 } from "./filter-drawer-sections";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export type OrdersFilterValues = {
   q: string;
@@ -207,6 +208,8 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
   const invalidAmount = amountRangeInvalid(draft);
   const invalid = dateRangeError || invalidAmount;
 
+  const layer = useModalLayer({ open, onEscape: closeDrawer, elementRef: panelRef });
+
   useEffect(() => {
     if (!open) return;
     const panel = panelRef.current;
@@ -217,12 +220,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
       focusElements()[0]?.focus();
     });
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeDrawer();
-        return;
-      }
-      if (event.key !== "Tab") return;
+      if (event.key !== "Tab" || !layer.isTop()) return;
       const focusable = focusElements();
       if (focusable.length === 0) {
         event.preventDefault();
@@ -240,7 +238,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [closeDrawer, open]);
+  }, [closeDrawer, layer, open]);
 
   const runOrderCountQuery = useCallback(() => {
     const nextRequest = ++requestId.current;

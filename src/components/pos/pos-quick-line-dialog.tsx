@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export type QuickPosLineInput = {
   name: string;
@@ -43,14 +44,8 @@ export function PosQuickLineDialog({ onClose, onAdd }: PosQuickLineDialogProps) 
       nameInputRef.current?.focus({ preventScroll: true });
     }
   }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCloseRef.current();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, []);
+  const layerSurfaceRef = useRef<HTMLElement>(null);
+  useModalLayer({ onEscape: () => onCloseRef.current(), elementRef: layerSurfaceRef });
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -74,7 +69,7 @@ export function PosQuickLineDialog({ onClose, onAdd }: PosQuickLineDialogProps) 
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section
+      <section ref={layerSurfaceRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="pos-quick-line-title"

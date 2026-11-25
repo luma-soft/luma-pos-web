@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { lockBodyScroll } from "@/lib/modal-layer";
 
 /** The native modal top layer provides inert background and keyboard focus containment. */
 export function LibraryDialog({
@@ -40,12 +41,11 @@ export function LibraryDialog({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlockScroll = lockBodyScroll();
     dialog.showModal();
     return () => {
       dialog.close();
-      document.body.style.overflow = overflow;
+      unlockScroll();
       if (previous?.isConnected) previous.focus();
     };
   }, []);

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ProjectImageViewport } from "./project-image-viewport";
 import { ProjectFileInfo } from "./project-file-info";
 import { projectMediaModalFocusTarget, suspendParentProjectMediaDialog } from "./project-media-panel";
+import { lockBodyScroll } from "@/lib/modal-layer";
 
 export type AssetPhoto = {
   id: string;
@@ -69,8 +70,7 @@ export function InstalledAssetPhotoPreview({ assetId, assetName, photo, trigger,
 
   useEffect(() => {
     const restoreParent = suspendParentProjectMediaDialog(trigger);
-    const oldOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlockScroll = lockBodyScroll();
     const dialog = root.current?.closest('[role="dialog"][aria-modal="true"]');
     const focusables = () => Array.from(dialog?.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),summary,[tabindex]:not([tabindex="-1"])') ?? [])
       .filter((element) => element.getClientRects().length > 0);
@@ -89,7 +89,7 @@ export function InstalledAssetPhotoPreview({ assetId, assetName, photo, trigger,
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
       restoreParent();
-      document.body.style.overflow = oldOverflow;
+      unlockScroll();
       if (trigger?.isConnected) trigger.focus();
     };
   }, [onClose, trigger]);

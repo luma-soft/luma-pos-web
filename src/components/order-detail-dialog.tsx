@@ -1,9 +1,10 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect, useRef } from "react";
+import { type ReactNode, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { DetailCloseContext } from "@/components/mobile-detail-nav";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export function OrderDetailDialog({
   orderId,
@@ -33,20 +34,7 @@ export function OrderDetailDialog({
     );
   }, [orderId]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
-      if (dialogs[dialogs.length - 1] !== dialogRef.current) return;
-      // Consume Escape before the customer/history modal underneath handles it.
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      close();
-    }
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [close, isOpen]);
+  useModalLayer({ open: isOpen, onEscape: close, elementRef: dialogRef });
 
   // The server-rendered parallel route can remain mounted after a shallow URL update.
   if (!isOpen) return null;

@@ -1,10 +1,11 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { AlertTriangle, Info, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type ConfirmVariant = "default" | "destructive" | "warning";
 
@@ -63,16 +64,8 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
     [open],
   );
 
-  useEffect(() => {
-    if (!state) return;
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") close(false);
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [close, state]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open: state !== null, onEscape: () => close(false), elementRef: dialogRef });
 
   const variant = state?.variant ?? "default";
   const destructive = variant === "destructive";
@@ -88,6 +81,7 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
           onMouseDown={() => close(false)}
         >
           <div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="app-confirm-title"

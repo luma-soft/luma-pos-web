@@ -48,7 +48,9 @@ export function ActionPresetButtons({
       setOpen(false);
     }
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpen(false);
     }
     document.addEventListener("pointerdown", closeOnOutsideClick);
     document.addEventListener("keydown", closeOnEscape);

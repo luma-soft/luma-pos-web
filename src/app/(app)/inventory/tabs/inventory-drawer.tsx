@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, X } from "lucide-react";
 import { useHideMobileTabBar } from "@/components/mobile-tabbar-visibility";
 import { cn } from "@/lib/utils";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export function InventoryDrawer({
   title,
@@ -60,20 +61,14 @@ export function InventoryDrawer({
   useEffect(() => {
     closeRef.current = close;
   }, [close]);
+  const layerSurfaceRef = useRef<HTMLElement>(null);
+  useModalLayer({ onEscape: () => closeRef.current(), lockScroll: true, elementRef: layerSurfaceRef });
 
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const frame = requestAnimationFrame(() => setIsVisible(true));
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeRef.current();
-    };
-    document.addEventListener("keydown", closeOnEscape);
     return () => {
       cancelAnimationFrame(frame);
       if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", closeOnEscape);
     };
   }, []);
 
@@ -89,7 +84,7 @@ export function InventoryDrawer({
         if (event.currentTarget === event.target) closeRef.current();
       }}
     >
-      <aside
+      <aside ref={layerSurfaceRef}
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel}

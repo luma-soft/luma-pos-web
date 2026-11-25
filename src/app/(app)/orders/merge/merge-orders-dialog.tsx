@@ -1,8 +1,9 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect, useRef } from "react";
+import { type ReactNode, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export function MergeOrdersDialog({
   title,
@@ -20,17 +21,7 @@ export function MergeOrdersDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => router.back(), [router]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      const dialogs = Array.from(document.querySelectorAll('[role="dialog"][aria-modal="true"]'));
-      if (dialogs[dialogs.length - 1] !== dialogRef.current) return;
-      event.preventDefault();
-      close();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [close]);
+  useModalLayer({ onEscape: close, elementRef: dialogRef });
 
   return (
     <div

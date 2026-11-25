@@ -118,7 +118,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
           value={editing.name}
           onChange={(e) => setEditing({ id: c.id, name: e.target.value })}
           onBlur={() => rename(c.id, editing.name)}
-          onKeyDown={(e) => { if (e.key === "Enter") rename(c.id, editing.name); if (e.key === "Escape") setEditing(null); }}
+          onKeyDown={(e) => { if (e.key === "Enter") rename(c.id, editing.name); if (e.key === "Escape") { e.preventDefault(); setEditing(null); } }}
           className="min-h-11 w-full max-w-sm rounded border border-primary-400 bg-white px-2 text-sm dark:bg-slate-900 lg:min-h-0 lg:py-1"
         />
       ) : (

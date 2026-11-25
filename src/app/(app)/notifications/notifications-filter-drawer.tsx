@@ -18,6 +18,7 @@ import {
   type NotificationRow,
   type NotificationTab,
 } from "./notification-view-model";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type Props = {
   open: boolean;
@@ -64,23 +65,22 @@ export function NotificationsFilterDrawer({
     onClose();
   }, [onClose, value]);
 
+  const layer = useModalLayer({
+    open,
+    onEscape: () => {
+      if (!panelRef.current?.querySelector('[role="listbox"]')) close();
+    },
+    lockScroll: true,
+    elementRef: panelRef,
+  });
+
   useEffect(() => {
     if (!open) return;
     const panel = panelRef.current;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const focusable = () => collectFocusableElements(panel);
     window.requestAnimationFrame(() => focusable()[0]?.focus());
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        if (event.defaultPrevented || panel?.querySelector('[role="listbox"]')) {
-          return;
-        }
-        event.preventDefault();
-        close();
-        return;
-      }
-      if (event.key !== "Tab") return;
+      if (event.key !== "Tab" || !layer.isTop()) return;
       const elements = focusable();
       if (elements.length === 0) return;
       const current = elements.indexOf(document.activeElement as HTMLElement);
@@ -92,10 +92,9 @@ export function NotificationsFilterDrawer({
     };
     document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [close, open]);
+  }, [close, layer, open]);
 
   const resultCount = useMemo(
     () => applyNotificationFilters(rows, draft, tab).length,

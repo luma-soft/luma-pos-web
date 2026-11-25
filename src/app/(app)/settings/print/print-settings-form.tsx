@@ -1,7 +1,7 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Copy, Loader2, Maximize2, Minimize2, Plus, Save, Star, Trash2 } from "lucide-react";
@@ -45,6 +45,7 @@ import {
   TemplateStepperRow,
   templateChoiceClass,
 } from "../template-settings-ui";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 const TYPOGRAPHY_KEYS = [
   "storeName", "storeInfo", "documentTitle", "documentMeta", "customer",
@@ -260,20 +261,14 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
   const inputCls = TEMPLATE_INPUT;
   const actionPending = isPending || pendingAction !== null;
   const previewQrReference = formatPrintPaymentReference(selected.options.paymentQrContentTemplate, "XX-000");
+  const layerSurfaceRef = useRef<HTMLElement>(null);
+  useModalLayer({
+    open: isPreviewFullscreen,
+    onEscape: () => setIsPreviewFullscreen(false),
+    lockScroll: true,
+    elementRef: layerSurfaceRef,
 
-  useEffect(() => {
-    if (!isPreviewFullscreen) return;
-    const previousOverflow = document.body.style.overflow;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsPreviewFullscreen(false);
-    };
-    document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [isPreviewFullscreen]);
+  });
 
   useLayoutEffect(() => {
     if (isPreviewFullscreen) previewSurfaceRef.current?.scrollTo({ top: 0, left: 0 });
@@ -626,6 +621,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
         </section>
 
         <section
+          ref={layerSurfaceRef}
           role={isPreviewFullscreen ? "dialog" : undefined}
           aria-modal={isPreviewFullscreen ? true : undefined}
           aria-label={isPreviewFullscreen ? t("printSettings.preview") : undefined}

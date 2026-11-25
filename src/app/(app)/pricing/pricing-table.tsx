@@ -381,7 +381,9 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
     }
 
     function closeBookMenuWithKeyboard(event: KeyboardEvent) {
-      if (event.key === "Escape") setBookMenuOpen(false);
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setBookMenuOpen(false);
     }
 
     document.addEventListener("mousedown", closeBookMenu);
@@ -726,7 +728,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
                         onBlur={() => rename(b.id, editing.name)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") rename(b.id, editing.name);
-                          if (e.key === "Escape") setEditing(null);
+                          if (e.key === "Escape") { e.preventDefault(); setEditing(null); }
                         }}
                         className="min-h-9 min-w-0 flex-1 rounded border border-primary-400 bg-surface px-2 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
                       />
@@ -782,7 +784,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onBlur={addBook}
-            onKeyDown={(e) => { if (e.key === "Enter") addBook(); if (e.key === "Escape") { setCreating(false); setNewName(""); } }}
+            onKeyDown={(e) => { if (e.key === "Enter") addBook(); if (e.key === "Escape") { e.preventDefault(); setCreating(false); setNewName(""); } }}
             placeholder={t("pricing.newBookPlaceholder")}
             className="min-h-11 w-36 rounded-lg border border-primary-400 bg-surface px-2 text-sm"
           />

@@ -7,6 +7,7 @@ import { Building2, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleX, Fil
 import { isOrderDateRangeValid } from "@/lib/orders/filter-date-range";
 import { cn } from "@/lib/utils";
 import type { EntityPickerKind, EntityPickerOption, PickerOption } from "./filter-drawer-shared";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 /**
  * Full-screen pushed screen used by phone filters (LumaProductSelectionHeader on
@@ -28,18 +29,11 @@ function MobileFilterScreen({
   children: ReactNode;
 }) {
   const t = useTranslations();
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      onBack();
-    };
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [onBack]);
+  const layerSurfaceRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: onBack, elementRef: layerSurfaceRef });
 
   return createPortal(
-    <div
+    <div ref={layerSurfaceRef}
       role="dialog"
       aria-modal="true"
       aria-label={title}

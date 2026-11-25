@@ -8,17 +8,7 @@ mock.module("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-const { RowPreviewModal, shouldCloseRowPreviewOnEscape } = await import("./data-table.tsx");
-const first = {};
-const top = {};
-
-test("Escape dismisses only the topmost modal", () => {
-  expect(shouldCloseRowPreviewOnEscape({ key: "Escape", defaultPrevented: false }, first, [first, top])).toBe(false);
-  expect(shouldCloseRowPreviewOnEscape({ key: "Escape", defaultPrevented: false }, top, [first, top])).toBe(true);
-  expect(shouldCloseRowPreviewOnEscape({ key: "Escape", defaultPrevented: true }, top, [first, top])).toBe(false);
-  expect(shouldCloseRowPreviewOnEscape({ key: "Tab", defaultPrevented: false }, top, [first, top])).toBe(false);
-  expect(shouldCloseRowPreviewOnEscape({ key: "Escape", defaultPrevented: false }, null, [])).toBe(false);
-});
+const { RowPreviewModal } = await import("./data-table.tsx");
 
 test("mobile detail panel respects safe areas while desktop geometry stays intact", () => {
   const html = renderToStaticMarkup(createElement(RowPreviewModal, {

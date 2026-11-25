@@ -49,7 +49,7 @@ export function MobileMoreQuickSearch({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => { if (event.key === "Escape") setQuery(""); }}
+            onKeyDown={(event) => { if (event.key === "Escape" && query) { event.preventDefault(); setQuery(""); } }}
             aria-label={searchLabel}
             placeholder={searchLabel}
             autoComplete="off"

@@ -95,6 +95,7 @@ import {
 } from "@/lib/offline/product-stock-history-store";
 import { resolveProductStockHistoryPanelState } from "@/lib/product-stock-history-state";
 import { loadProductPriceBookRows, type ProductPriceBookRow } from "./product-price-actions";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type ProductRow = ProductListResult["rows"][number];
 type StockMovementRow = ProductRow["stockMovements"][number];
@@ -1381,14 +1382,12 @@ function ProductImageLightbox({
 }) {
   const t = useTranslations();
   const hasMultipleImages = imageUrls.length > 1;
+  const layerSurfaceRef = useRef<HTMLDivElement>(null);
+  const layer = useModalLayer({ onEscape: onClose, elementRef: layerSurfaceRef });
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        onClose();
-      }
+      if (!layer.isTop()) return;
       if (event.key === "ArrowLeft" && hasMultipleImages) {
         event.preventDefault();
         onActiveImageChange(
@@ -1407,12 +1406,12 @@ function ProductImageLightbox({
     activeImage,
     hasMultipleImages,
     imageUrls.length,
+    layer,
     onActiveImageChange,
-    onClose,
   ]);
 
   return createPortal(
-    <div
+    <div ref={layerSurfaceRef}
       role="dialog"
       aria-modal="true"
       aria-label={t("products.expand.imageDialog", { name: productName })}
@@ -2083,6 +2082,7 @@ function ProductActionBar({ product, cameraMaterials = false, variant = "bar" }:
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        event.preventDefault();
         setMoreOpen(false);
         moreButtonRef.current?.focus();
       }

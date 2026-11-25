@@ -188,7 +188,11 @@ export function SearchableSelect({
   function pick(v: string) { onChange(v); setOpen(false); setQ(""); }
 
   function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Escape") { setOpen(false); return; }
+    if (e.key === "Escape") {
+      // An open list claims Escape; a closed one lets the enclosing modal close.
+      if (open) { e.preventDefault(); setOpen(false); }
+      return;
+    }
     if (e.key === "ArrowDown") { e.preventDefault(); setActive((i) => Math.min(i + 1, filtered.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
     else if (e.key === "Enter") {

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { MoneyInput } from "@/components/ui/money-input";
 import { cn, formatCurrency } from "@/lib/utils";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 /**
  * Phone presentation of the debt payment / adjustment forms
@@ -29,18 +30,18 @@ export function DebtSheet({
   onClose: () => void;
   children: ReactNode;
 }) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !pending) onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose, pending]);
+  const layerSurfaceRef = useRef<HTMLElement>(null);
+  useModalLayer({
+    onEscape: () => {
+      if (!pending) onClose();
+    },
+    elementRef: layerSurfaceRef,
+  });
 
   const capsule = "inline-flex h-12 shrink-0 items-center justify-center rounded-full border border-black/[0.06] bg-surface/90 px-4 text-[17px] shadow-[0_2px_10px_rgb(0_0_0/0.08)] dark:border-white/10";
   return createPortal(
     <div className="fixed inset-0 z-[130] flex items-end bg-black/35" onMouseDown={() => { if (!pending) onClose(); }}>
-      <section
+      <section ref={layerSurfaceRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}

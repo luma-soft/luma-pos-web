@@ -8,6 +8,7 @@ import {
   applyUnitPriceChoice, buildUnitPriceReview,
   type UnitPriceBook, type UnitPriceChoice, type UnitPricePreviewRow, type UnitPricingSnapshot,
 } from "@/lib/products/unit-price-edit";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 const money = (value: number | null) => value == null ? "—" : `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(value)} đ`;
 const number = (value: number) => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 4 }).format(value);
@@ -106,15 +107,15 @@ export function UnitPriceConfirmation<T extends UnitPricingSnapshot>({ name, bef
   const [mode, setMode] = useState<UnitPriceChoice>("keep");
   const [source, setSource] = useState<string | null>(() => buildUnitPriceReview(before, draft, books).suggestedSource);
 
+  // On top of the product form, so Escape cancels only this confirmation.
+  const layer = useModalLayer({ onEscape: onCancel, elementRef: dialogRef });
+
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const dialog = dialogRef.current;
     dialog?.focus();
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        // This nested confirmation must not close the product form behind it.
-        event.preventDefault(); event.stopImmediatePropagation(); onCancel();
-      } else if (event.key === "Tab" && dialog) {
+      if (event.key === "Tab" && dialog && layer.isTop()) {
         const elements = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), [tabindex="0"]')).filter((element) => element.getClientRects().length > 0);
         const first = elements[0], last = elements[elements.length - 1];
         if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { event.preventDefault(); last?.focus(); }
@@ -123,7 +124,7 @@ export function UnitPriceConfirmation<T extends UnitPricingSnapshot>({ name, bef
     }
     document.addEventListener("keydown", onKeyDown, true);
     return () => { document.removeEventListener("keydown", onKeyDown, true); previous?.focus(); };
-  }, [onCancel]);
+  }, [layer]);
 
   if (typeof document === "undefined") return null;
   return createPortal(<div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/45 p-3 sm:p-6" onMouseDown={onCancel}>

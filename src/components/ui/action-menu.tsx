@@ -82,6 +82,8 @@ export function LumaActionMenu({
     };
     const closeWithEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      // Claim Escape so an enclosing modal stays open.
+      event.preventDefault();
       setOpen(false);
       triggerRef.current?.focus();
     };

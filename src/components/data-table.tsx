@@ -9,6 +9,7 @@ import { ChevronDown, ChevronUp, Columns3, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { updateModalUrlQuery } from "@/lib/modal-url-query";
 import { DATA_TABLE_FILL_ATTRIBUTE, dataTableFillHeight } from "@/lib/data-table-fill";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type SortValue = string | number | Date | null | undefined;
 type SortDirection = "asc" | "desc";
@@ -746,6 +747,7 @@ function ColumnVisibilityMenu<T>({
     firstControl?.focus({ preventScroll: true });
     function closeWithEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
+      event.preventDefault();
       onOpenChange(false);
       triggerRef.current?.focus({ preventScroll: true });
     }
@@ -835,17 +837,6 @@ function ColumnVisibilityMenu<T>({
   );
 }
 
-/** Ignore Escape for an underlying dialog when a child sheet is on top. */
-export function shouldCloseRowPreviewOnEscape(
-  event: Pick<KeyboardEvent, "key" | "defaultPrevented">,
-  dialog: Element | null,
-  openDialogs: readonly Element[],
-) {
-  return event.key === "Escape" &&
-    !event.defaultPrevented &&
-    dialog !== null &&
-    openDialogs[openDialogs.length - 1] === dialog;
-}
 
 function rowPreviewFocusableElements(dialog: HTMLElement) {
   return Array.from(dialog.querySelectorAll<HTMLElement>(
@@ -886,23 +877,21 @@ export function RowPreviewModal({
     onCloseRef.current = onClose;
   }, [onClose]);
 
+  const layer = useModalLayer({
+    open,
+    onEscape: () => onCloseRef.current(),
+    lockScroll: true,
+    elementRef: dialogRef,
+  });
+
   useEffect(() => {
     if (!open) return;
     const dialog = dialogRef.current;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     dialog?.focus({ preventScroll: true });
 
     function onKeyDown(event: KeyboardEvent) {
-      const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[aria-modal="true"]'));
-      if (shouldCloseRowPreviewOnEscape(event, dialog, dialogs)) {
-        event.preventDefault();
-        event.stopPropagation();
-        onCloseRef.current();
-        return;
-      }
-      if (event.key !== "Tab" || event.defaultPrevented || dialogs[dialogs.length - 1] !== dialog || !dialog) return;
+      if (event.key !== "Tab" || event.defaultPrevented || !layer.isTop() || !dialog) return;
 
       const elements = rowPreviewFocusableElements(dialog);
       const first = elements[0];
@@ -922,10 +911,9 @@ export function RowPreviewModal({
     document.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
-      document.body.style.overflow = previousOverflow;
       if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     };
-  }, [open]);
+  }, [layer, open]);
 
   if (!open) return null;
   return (

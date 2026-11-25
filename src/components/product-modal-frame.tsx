@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type ProductModalNavigation = "back" | "push" | "replace";
 const ProductModalDismissContext = createContext<(() => void) | null>(null);
@@ -25,19 +26,6 @@ export function useDismissProductModalAfterSave() {
  * (history back for intercepted routes, so the list keeps its filters). */
 export function useCloseProductModal() {
   return useContext(ProductModalCloseContext);
-}
-
-export function shouldHandleProductModalEscape(
-  event: Pick<KeyboardEvent, "key" | "defaultPrevented">,
-  dialog: Element | null,
-  modalDialogs: readonly Element[],
-) {
-  return (
-    event.key === "Escape" &&
-    !event.defaultPrevented &&
-    dialog !== null &&
-    modalDialogs[modalDialogs.length - 1] === dialog
-  );
 }
 
 function focusableElements(dialog: HTMLElement) {
@@ -72,24 +60,17 @@ export function ProductModalFrame({
     else if (closeHref) router.replace(closeHref);
   }, [closeHref, closeNavigation, dismiss, router]);
 
+  const layer = useModalLayer({ open: !dismissed, onEscape: close, lockScroll: true, elementRef: dialogRef });
+
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
     const dialog = dialogRef.current;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     dialog?.focus({ preventScroll: true });
 
     function onKeyDown(event: KeyboardEvent) {
-      const modalDialogs = Array.from(document.querySelectorAll('[aria-modal="true"]'));
-      if (shouldHandleProductModalEscape(event, dialog, modalDialogs)) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        close();
-        return;
-      }
-      if (event.key !== "Tab" || modalDialogs[modalDialogs.length - 1] !== dialog || !dialog) return;
+      if (event.key !== "Tab" || !dialog || !layer.isTop()) return;
       const elements = focusableElements(dialog);
       const first = elements[0];
       const last = elements[elements.length - 1];
@@ -108,10 +89,9 @@ export function ProductModalFrame({
     document.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
-      document.body.style.overflow = previousOverflow;
       previous?.focus({ preventScroll: true });
     };
-  }, [close]);
+  }, [layer]);
 
   function onBackdropMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
     if (closeOnBackdrop && event.target === event.currentTarget) close();

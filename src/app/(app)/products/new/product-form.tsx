@@ -81,6 +81,7 @@ import {
   type ProductImageUploadDraft,
   type UploadedProductImage,
 } from "@/lib/images/product-image-upload";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type Tab = "info" | "description" | "variants";
 
@@ -1865,6 +1866,8 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
   const [open, setOpen] = useState(false);
   const [draftOverrides, setDraftOverrides] =
     useState<Record<string, number | null>>(priceBookPrices);
+  const priceBooksDialogRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open, onEscape: () => setOpen(false), elementRef: priceBooksDialogRef });
 
   function openPriceBooks() {
     setDraftOverrides({ ...(watch("priceBookPrices") ?? {}) });
@@ -1934,6 +1937,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
       {open && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-0 sm:p-6">
           <div
+            ref={priceBooksDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="product-price-books-title"

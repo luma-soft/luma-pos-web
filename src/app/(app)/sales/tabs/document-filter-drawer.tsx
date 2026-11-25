@@ -55,6 +55,7 @@ import {
   MobileFilterHeader,
   MobileSwitchRow,
 } from "./filter-drawer-sections";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export type DocumentFilterKind = "returns" | "quotes" | "bookings";
 
@@ -411,6 +412,8 @@ export function DocumentFilterDrawer({
     setOpen(false);
   }, [kind, values]);
 
+  const layer = useModalLayer({ open, onEscape: closeDrawer, elementRef: panelRef });
+
   useEffect(() => {
     if (!open) return;
     const panel = panelRef.current;
@@ -421,12 +424,7 @@ export function DocumentFilterDrawer({
       focusElements()[0]?.focus();
     });
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeDrawer();
-        return;
-      }
-      if (event.key !== "Tab") return;
+      if (event.key !== "Tab" || !layer.isTop()) return;
       const focusable = focusElements();
       if (focusable.length === 0) {
         event.preventDefault();
@@ -444,7 +442,7 @@ export function DocumentFilterDrawer({
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [closeDrawer, open]);
+  }, [closeDrawer, layer, open]);
 
   const runDocumentCountQuery = useCallback(() => {
     const nextRequest = ++requestId.current;

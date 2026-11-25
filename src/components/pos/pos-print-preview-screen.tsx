@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { Printer, Share } from "lucide-react";
 import { useHideMobileTabBar } from "@/components/mobile-tabbar-visibility";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 /**
  * Phone print preview after POS checkout, matching the native iOS
@@ -31,14 +32,8 @@ export function PosPrintPreviewScreen({
   const viewportRef = useRef<HTMLDivElement>(null);
   const documentRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  const layerSurfaceRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: onClose, elementRef: layerSurfaceRef });
 
   // A4/A5/K80 documents are sized in mm; shrink them to the phone width.
   useLayoutEffect(() => {
@@ -74,7 +69,7 @@ export function PosPrintPreviewScreen({
   const iconButton = "grid size-11 place-items-center rounded-full bg-ios-card text-ios-accent shadow-sm ring-1 ring-black/5 disabled:opacity-40 dark:ring-white/10";
 
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label={t("print.previewTitle")} className="pos-print-preview-screen fixed inset-0 z-[120] flex flex-col bg-ios-grouped-bg lg:hidden">
+    <div ref={layerSurfaceRef} role="dialog" aria-modal="true" aria-label={t("print.previewTitle")} className="pos-print-preview-screen fixed inset-0 z-[120] flex flex-col bg-ios-grouped-bg lg:hidden">
       <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-ios-inset pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button type="button" onClick={onClose} className="justify-self-start rounded-full bg-ios-card px-4 py-2.5 text-[17px] text-ios-accent shadow-sm ring-1 ring-black/5 dark:ring-white/10">
           {t("common.close")}

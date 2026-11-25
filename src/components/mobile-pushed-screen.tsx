@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { DetailCloseContext, MobileDetailNav } from "@/components/mobile-detail-nav";
 import { cn } from "@/lib/utils";
 import { useHideMobileTabBar } from "@/components/mobile-tabbar-visibility";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 /**
  * A screen pushed onto the phone navigation stack (SwiftUI navigationDestination):
@@ -29,19 +30,12 @@ export function MobilePushedScreen({
   layer?: number;
 }) {
   useHideMobileTabBar();
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      event.preventDefault();
-      onBack();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onBack]);
+  const layerSurfaceRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ onEscape: onBack, elementRef: layerSurfaceRef });
 
   return createPortal(
     <DetailCloseContext.Provider value={onBack}>
-      <div
+      <div ref={layerSurfaceRef}
         role="dialog"
         aria-modal="true"
         className={cn("fixed inset-0 flex flex-col overflow-y-auto overscroll-contain bg-canvas lg:hidden", className)}

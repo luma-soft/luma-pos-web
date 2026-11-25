@@ -1,7 +1,8 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect, useLayoutEffect } from "react";
+import { useCallback, useLayoutEffect, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export function PrintPreviewModal({
   closeHref,
@@ -12,14 +13,8 @@ export function PrintPreviewModal({
 }) {
   const router = useRouter();
   const close = useCallback(() => router.push(closeHref), [closeHref, router]);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [close]);
+  const layerSurfaceRef = useRef<HTMLElement>(null);
+  useModalLayer({ onEscape: close, elementRef: layerSurfaceRef });
 
   useLayoutEffect(() => {
     document.querySelector<HTMLElement>(".print-document-root")?.scrollTo({ top: 0 });
@@ -30,7 +25,7 @@ export function PrintPreviewModal({
       className="print-preview-modal fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:p-5"
       onMouseDown={close}
     >
-      <section
+      <section ref={layerSurfaceRef}
         role="dialog"
         aria-modal="true"
         aria-label="Xem trước bản in"

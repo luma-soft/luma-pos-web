@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useState, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ChevronLeft, Ellipsis, X } from "lucide-react";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 /** Lets a detail rendered inside an overlay close that overlay from its own header. */
 export const DetailCloseContext = createContext<(() => void) | null>(null);
@@ -70,21 +71,13 @@ export function MobileActionSheet({
   children: ReactNode;
 }) {
   const t = useTranslations();
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      // Close only the sheet, not the screen underneath.
-      event.preventDefault();
-      onClose();
-    };
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [open, onClose]);
+  // Close only the sheet, not the screen underneath.
+  const layerSurfaceRef = useRef<HTMLDivElement>(null);
+  useModalLayer({ open, onEscape: onClose, elementRef: layerSurfaceRef });
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[120] flex items-end bg-black/35 lg:hidden" onClick={onClose}>
-      <div
+      <div ref={layerSurfaceRef}
         role="dialog"
         aria-modal="true"
         aria-label={typeof title === "string" ? title : t("common.actions")}

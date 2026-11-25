@@ -12,6 +12,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { withListFilters } from "@/lib/list-return-navigation";
 import { Routes } from "@/lib/routes";
 import { buttonVariants, modalActionSizeClassName } from "@/components/ui/button-variants";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 export function CreateInvoiceFromDraftButton({ orderId }: { orderId: string }) {
   const t = useTranslations();
@@ -120,6 +121,7 @@ export function PaymentForm({ orderId, remaining }: { orderId: string; remaining
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const layer = useModalLayer({ open, onEscape: () => setOpen(false), elementRef: dialogRef });
 
   useEffect(() => {
     if (!open) return;
@@ -130,15 +132,7 @@ export function PaymentForm({ orderId, remaining }: { orderId: string; remaining
     dialog?.focus({ preventScroll: true });
 
     function onKeyDown(event: KeyboardEvent) {
-      const dialogs = Array.from(document.querySelectorAll('[role="dialog"][aria-modal="true"]'));
-      if (dialogs[dialogs.length - 1] !== dialog) return;
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        setOpen(false);
-        return;
-      }
-      if (event.key !== "Tab" || !dialog) return;
+      if (event.key !== "Tab" || !dialog || !layer.isTop()) return;
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
         'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
       )).filter((element) => element.getClientRects().length > 0);
@@ -161,7 +155,7 @@ export function PaymentForm({ orderId, remaining }: { orderId: string; remaining
       document.removeEventListener("keydown", onKeyDown, true);
       previousFocus?.focus({ preventScroll: true });
     };
-  }, [open]);
+  }, [layer, open]);
 
   async function submit() {
     if (amount <= 0 || amount > remaining || busy) return;

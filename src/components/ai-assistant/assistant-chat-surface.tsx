@@ -273,7 +273,7 @@ export function AssistantChatSurface({
                     onChange={(event) => setSessionTitleDraft(event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") void submitRenameSession();
-                      if (event.key === "Escape") setSessionDialog(null);
+                      if (event.key === "Escape") { event.preventDefault(); setSessionDialog(null); }
                     }}
                     maxLength={120}
                     className="mt-1.5 bg-canvas text-sm font-semibold text-slate-700 dark:text-slate-200"

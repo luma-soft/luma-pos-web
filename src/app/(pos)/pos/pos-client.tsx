@@ -1203,7 +1203,9 @@ export function PosClient({
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPosPriceFilterOpen(false);
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setPosPriceFilterOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -2993,7 +2995,7 @@ export function PosClient({
         role={mobileInvoicePickerOpen ? "dialog" : undefined}
         aria-modal={mobileInvoicePickerOpen ? true : undefined}
         aria-label={mobileInvoicePickerOpen ? t("pos.order") : undefined}
-        onKeyDown={(event) => { if (event.key === "Escape") setMobileInvoicePickerOpen(false); }}
+        onKeyDown={(event) => { if (event.key === "Escape" && mobileInvoicePickerOpen) { event.preventDefault(); setMobileInvoicePickerOpen(false); } }}
         className={cn(
           "flex items-stretch gap-1.5 overflow-x-auto",
           mobileInvoicePickerOpen

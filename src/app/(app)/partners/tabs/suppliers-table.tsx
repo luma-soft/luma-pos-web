@@ -6,7 +6,7 @@ import { MobileBottomSearchBar } from "@/components/mobile-bottom-bar";
 import { SupplierCreateDialog, type SupplierCreateResult } from "@/components/partners/supplier-create-dialog";
 import { MobileListTotalsCard, nativeCurrency } from "./customer-mobile";
 import { MobileSupplierDetail, MobileSupplierFilterScreen, SupplierMobileRow } from "./supplier-mobile";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { PurchaseDetailLink } from "@/components/purchase-detail-link";
@@ -31,6 +31,7 @@ import {
   PartnerDebtFilterControl,
   matchesPartnerDebtFilter,
 } from "@/components/partners/partner-debt-filter";
+import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 type SupplierRow = Awaited<ReturnType<typeof getSuppliers>>["rows"][number];
 type SupplierSelectionRow = Pick<SupplierRow, "id" | "name" | "code" | "currentDebt">;
@@ -172,15 +173,8 @@ export function SuppliersTable({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-
-  useEffect(() => {
-    if (!filterOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setFilterOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [filterOpen]);
+  const layerSurfaceRef = useRef<HTMLElement>(null);
+  useModalLayer({ open: filterOpen, onEscape: () => setFilterOpen(false), elementRef: layerSurfaceRef });
 
   function openFilters() {
     setDraftDebtFilter(owing);
@@ -410,7 +404,7 @@ export function SuppliersTable({
           role="presentation"
           onMouseDown={() => setFilterOpen(false)}
         >
-          <aside
+          <aside ref={layerSurfaceRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="supplier-filter-title"
