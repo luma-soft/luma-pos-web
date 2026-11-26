@@ -18,6 +18,7 @@ import { FilterTriggerButton, ListSearchFilterBar, ListSearchInput } from "@/com
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { Routes } from "@/lib/routes";
 import { updateModalUrlQuery } from "@/lib/modal-url-query";
+import { detailReturnAction, RETURN_TO_PARAM } from "@/lib/detail-return";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { getSuppliers } from "@/lib/data/partners";
 import { updateSupplier } from "@/lib/actions/partners";
@@ -240,7 +241,10 @@ export function SuppliersTable({
 
   function closeSupplier() {
     setDetailTab("info");
-    updateModalUrlQuery({ detailSupplierId: null });
+    const back = detailReturnAction(searchParams.get(RETURN_TO_PARAM));
+    if (back.kind === "back") router.back();
+    else if (back.kind === "replace") router.replace(back.href, { scroll: false });
+    else updateModalUrlQuery({ detailSupplierId: null });
     setDraft(null);
     setEditing(false);
     setSaving(false);

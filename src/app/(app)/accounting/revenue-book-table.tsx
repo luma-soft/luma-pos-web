@@ -3,10 +3,9 @@
 import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { MobileRecordField } from "@/components/mobile-ui";
-import Link from "next/link";
+import { OrderDetailLink } from "@/components/order-detail-link";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { RevenueBookRow } from "@/lib/data/accounting";
-import { Routes } from "@/lib/routes";
 
 export function RevenueBookTable({ rows: serverRows, showActivity, loadMore }: {
   rows: RevenueBookRow[];
@@ -21,7 +20,7 @@ export function RevenueBookTable({ rows: serverRows, showActivity, loadMore }: {
       key: "transaction", label: "Giao dịch", required: true, width: "360px", wrap: true, render: (row) => (
         <div className="min-w-0">
           {row.sourceType === "sale" ? (
-            <Link href={Routes.orderDetail(row.sourceId)} className="font-semibold text-primary-700 hover:underline">{row.code}</Link>
+            <OrderDetailLink orderId={row.sourceId} className="font-semibold text-primary-700 hover:underline">{row.code}</OrderDetailLink>
           ) : <div className="font-semibold text-er">{row.code}</div>}
           <div className="mt-0.5 whitespace-normal break-words text-xs leading-5 text-slate-500">{row.description}</div>
         </div>

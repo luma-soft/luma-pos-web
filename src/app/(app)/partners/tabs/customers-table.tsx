@@ -42,6 +42,7 @@ import { CustomerCreateDialog } from "@/components/partners/customer-create-dial
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Routes } from "@/lib/routes";
 import { updateModalUrlQuery } from "@/lib/modal-url-query";
+import { detailReturnAction, RETURN_TO_PARAM } from "@/lib/detail-return";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { setCustomerActive } from "@/lib/actions/partners";
 import type { CustomerFilters, CustomerListResult } from "@/lib/data/partners";
@@ -255,7 +256,10 @@ function CustomerRows({
   const tableRows = walkInRow ? [walkInRow, ...loadedRows] : loadedRows;
   function closeCustomer() {
     setWalkInSelected(false);
-    updateModalUrlQuery({ detailCustomerId: null });
+    const back = detailReturnAction(searchParams.get(RETURN_TO_PARAM));
+    if (back.kind === "back") router.back();
+    else if (back.kind === "replace") router.replace(back.href, { scroll: false });
+    else updateModalUrlQuery({ detailCustomerId: null });
   }
   function openCustomer(customer: CustomerRow) {
     if (customer.id === WALK_IN_ROW_ID) {

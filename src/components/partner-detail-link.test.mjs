@@ -34,8 +34,16 @@ describe("partner detail links", () => {
     }
   });
 
+  // Hooks need a render; outside the app router they read no location.
+  const renderLink = (props) => {
+    let element;
+    function Probe() { element = PartnerDetailLink(props); return null; }
+    renderToStaticMarkup(createElement(Probe));
+    return element;
+  };
+
   test("click and keyboard activation do not activate the parent record", () => {
-    const link = PartnerDetailLink({ kind: "customer", partnerId: "customer-1", name: "Anh Nhật" });
+    const link = renderLink({ kind: "customer", partnerId: "customer-1", name: "Anh Nhật" });
     let stopped = 0;
     let prevented = 0;
     const event = { stopPropagation: () => { stopped += 1; }, preventDefault: () => { prevented += 1; } };
@@ -46,7 +54,7 @@ describe("partner detail links", () => {
   });
 
   test("Escape still reaches the containing modal's dismiss handler", () => {
-    const link = PartnerDetailLink({ kind: "customer", partnerId: "customer-1", name: "Anh Nhật" });
+    const link = renderLink({ kind: "customer", partnerId: "customer-1", name: "Anh Nhật" });
     let stopped = false;
     link.props.onKeyDown({ key: "Escape", stopPropagation: () => { stopped = true; } });
     expect(stopped).toBe(false);

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Banknote, Building2, ChevronRight, CircleUserRound, Landmark, Package, TrendingUp } from "lucide-react";
 import { compactMoney } from "@/app/(app)/partners/tabs/customer-mobile";
 import { Routes } from "@/lib/routes";
+import { useDetailReturnHref } from "@/components/use-detail-return-href";
 import { cn } from "@/lib/utils";
 
 type Range = "today" | "week" | "month";
@@ -93,9 +94,7 @@ export function FinanceSummaryMobile() {
           <section>
             <h3 className="mb-1 text-[17px] text-ios-label-secondary">{t("receivableContext")}</h3>
             {data.topCustomers.filter((c) => Number(c.remaining ?? 0) > 0).slice(0, 5).map((customer) => (
-              <Link key={`${customer.customerId}-${customer.name}`}
-                href={customer.customerId ? `${Routes.Partners}?tab=customers&detailCustomerId=${customer.customerId}` : Routes.Partners}
-                className="flex items-center gap-3 border-b border-border py-3">
+              <ReceivableCustomerLink key={`${customer.customerId}-${customer.name}`} customerId={customer.customerId}>
                 <CircleUserRound className="size-6 shrink-0 text-ios-accent" aria-hidden="true" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold text-ios-accent">{customer.name}</span>
@@ -103,12 +102,21 @@ export function FinanceSummaryMobile() {
                 </span>
                 <span className="text-[15px] font-bold tabular-nums text-ios-accent">{compactMoney(Number(customer.remaining ?? 0))}</span>
                 <ChevronRight className="size-4 text-ios-label-tertiary" aria-hidden="true" />
-              </Link>
+              </ReceivableCustomerLink>
             ))}
             {!data.topCustomers.some((c) => Number(c.remaining ?? 0) > 0) && <p className="py-4 text-[15px] text-ios-label-secondary">{t("noCustomers")}</p>}
           </section>
         </>
       )}
     </div>
+  );
+}
+
+function ReceivableCustomerLink({ customerId, children }: { customerId?: string | null; children: ReactNode }) {
+  const { href, onNavigate } = useDetailReturnHref(customerId ? Routes.customerDetail(customerId) : Routes.Partners, Boolean(customerId));
+  return (
+    <Link href={href} onClick={onNavigate} className="flex items-center gap-3 border-b border-border py-3">
+      {children}
+    </Link>
   );
 }
