@@ -24,7 +24,8 @@ lumapos_root="${LUMAPOS_ROOT:-/Users/Shared/LumaPOS}"
 live_root="$lumapos_root/app"
 staging_root="${1:-$lumapos_root/app-next}"
 layout="${LUMAPOS_RELEASE_LAYOUT:-runtime}"
-export PATH="$lumapos_root/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+# bun: the classic install's copy, the packaged runtime's, or the user's.
+export PATH="$lumapos_root/bin:$lumapos_root/current/tools/bin:$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export NEXT_TELEMETRY_DISABLED=1
 
 step() { printf 'STEP:%s\n' "$1"; }
@@ -71,7 +72,12 @@ fi
 
 # ---- runtime layout --------------------------------------------------------
 
-workspace="$lumapos_root/app-build"
+# The packaged install's root is root-owned: build next to the staging
+# directory in the user's cache instead.
+case "$staging_root" in
+  "$HOME"/Library/Caches/LumaPOS/*) workspace="$HOME/Library/Caches/LumaPOS/app-build" ;;
+  *) workspace="$lumapos_root/app-build" ;;
+esac
 installed_lock="$workspace/.installed-bun.lock"
 
 step "export"
