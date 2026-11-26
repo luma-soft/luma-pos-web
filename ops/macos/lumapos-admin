@@ -67,7 +67,7 @@ set -uo pipefail
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 umask 022
 
-readonly HELPER_VERSION=9
+readonly HELPER_VERSION=10
 readonly LUMAPOS_ROOT=/Users/Shared/LumaPOS
 readonly LIVE_ROOT="$LUMAPOS_ROOT/app"
 readonly STAGING_ROOT="$LUMAPOS_ROOT/app-next"
@@ -581,7 +581,11 @@ prune_runtimes() {
   local current previous running keep=0 version
   current="$(current_version 2>/dev/null || true)"
   previous="$(cat "$RUNTIME_DIR/.previous" 2>/dev/null || true)"
-  running="$(ps -axo command= | awk -v root="$RUNTIME_DIR/" 'index($0, root) == 1 {sub(root, ""); sub(/\/.*/, ""); print}' | sort -u)"
+  # Processes start through the current symlink, so their command lines do not
+  # name a runtime; lsof reports the resolved paths of the executables and
+  # libraries they have mapped. PostgreSQL loads extensions such as plpgsql
+  # from its own runtime for every new connection, so that runtime must stay.
+  running="$(lsof -nP -d txt -Fn 2>/dev/null | sed -n "s|^n$RUNTIME_DIR/\([^/]*\)/.*|\1|p" | sort -u)"
   for version in $(ls -1 "$RUNTIME_DIR" 2>/dev/null | grep -E "$VERSION_PATTERN" | sort -r); do
     keep=$((keep + 1))
     [[ "$version" == "$current" || "$version" == "$previous" ]] && continue
@@ -611,6 +615,13 @@ cmd_activate_runtime() {
     step "restart postgres"
     unload_services "${APP_SERVICES[@]}" backups
     unload_services postgres
+    load_service postgres
+  elif [[ -f "$PGDATA/PG_VERSION" ]] && is_loaded postgres; then
+    # Same PostgreSQL version: a fast restart moves the server onto the new
+    # runtime (launchd starts it again through current), so the old runtime
+    # can be removed later without taking plpgsql and the other modules away.
+    step "restart postgres"
+    as_db_user "$(postgres_bin)/pg_ctl" -D "$PGDATA" -m fast -w -t 60 stop >/dev/null 2>&1
     load_service postgres
   fi
   if [[ ! -f "$PGDATA/PG_VERSION" ]]; then
