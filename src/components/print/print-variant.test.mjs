@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { defaultTemplate } from "../../lib/print/template-shared";
+import { defaultTemplate } from "@/lib/print/template-shared";
 import { PrintDoc } from "./print-doc";
 
 function render(size) {

@@ -1,6 +1,6 @@
+import { readSource } from "../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const src=readFileSync(new URL("./camera-picker-modal.tsx",import.meta.url),"utf8");
+const src=readSource("./camera-picker-modal.tsx", import.meta.url);
 test("camera quote picker uses a true iPhone full-screen surface with desktop preserved",()=>{
  expect(src).toContain("h-[100dvh] max-h-[100dvh]");
  expect(src).toContain("lg:h-[min(860px,calc(100dvh-2rem))]");

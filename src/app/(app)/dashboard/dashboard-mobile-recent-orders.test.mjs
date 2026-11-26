@@ -1,6 +1,6 @@
+import { readSource } from "../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+const source = readSource("./page.tsx", import.meta.url);
 const mobile = source.slice(source.indexOf('<div className="min-h-full bg-canvas lg:hidden">'), source.indexOf('<div className="hidden space-y-5'));
 const desktop = source.slice(source.indexOf('<div className="hidden space-y-5'));
 test("mobile recent sales match the two-row native presentation", () => {

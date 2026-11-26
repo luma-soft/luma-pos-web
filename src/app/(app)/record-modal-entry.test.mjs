@@ -1,8 +1,8 @@
+import { readSource } from "../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
 function source(path) {
-  return readFileSync(new URL(path, import.meta.url), "utf8");
+  return readSource(path, import.meta.url);
 }
 
 test("legacy customer, supplier, order and purchase details redirect into list modals", () => {

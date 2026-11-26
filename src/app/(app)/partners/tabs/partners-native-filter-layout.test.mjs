@@ -1,7 +1,7 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const customer=readFileSync(new URL("./customers-table.tsx",import.meta.url),"utf8");
-const supplier=readFileSync(new URL("./suppliers-table.tsx",import.meta.url),"utf8");
+const customer=readSource("./customers-table.tsx", import.meta.url);
+const supplier=readSource("./suppliers-table.tsx", import.meta.url);
 test("partner filter sheets keep mobile safe-area sizing and desktop width",()=>{
  for(const s of [customer,supplier]){
   expect(s).toContain("h-[100dvh] w-full max-w-none");

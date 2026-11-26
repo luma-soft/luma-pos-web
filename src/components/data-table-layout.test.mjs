@@ -1,6 +1,6 @@
+import { readSource } from "../test-support/read-source.mjs";
 import { describe, expect, mock, test } from "bun:test";
 import { createElement } from "react";
-import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
 mock.module("next/navigation", () => ({
@@ -65,7 +65,7 @@ describe("data table scroll reset key", () => {
 });
 
 test("client-owned detail panels open without Next.js navigation, while server-loaded details keep it", () => {
-  const source = readFileSync(new URL("./data-table.tsx", import.meta.url), "utf8");
+  const source = readSource("./data-table.tsx", import.meta.url);
   expect(source).toContain("clientSideDetailNavigation = false");
   expect(source).toContain("if (clientSideDetailNavigation)");
   expect(source).toContain("updateModalUrlQuery({ [expandedParam]: nextId })");

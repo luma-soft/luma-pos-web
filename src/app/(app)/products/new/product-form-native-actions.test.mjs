@@ -1,8 +1,8 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const src=readFileSync(new URL("./product-form.tsx",import.meta.url),"utf8");
-const vi=JSON.parse(readFileSync(new URL("../../../../../messages/vi.json",import.meta.url),"utf8"));
-const en=JSON.parse(readFileSync(new URL("../../../../../messages/en.json",import.meta.url),"utf8"));
+const src=readSource("./product-form.tsx", import.meta.url);
+const vi=JSON.parse(readSource("../../../../../messages/vi.json", import.meta.url));
+const en=JSON.parse(readSource("../../../../../messages/en.json", import.meta.url));
 test("native mobile toolbar exposes cancel and save without duplicate bottom buttons",()=>{
   const head=src.slice(src.indexOf("      <header className={cn("),src.indexOf("      </header>"));
   expect(head).toContain('tx="common.cancel"');

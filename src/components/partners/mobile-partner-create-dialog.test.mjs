@@ -1,7 +1,7 @@
+import { readSource } from "../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const customer=readFileSync(new URL("./customer-create-dialog.tsx",import.meta.url),"utf8");
-const supplier=readFileSync(new URL("./supplier-create-dialog.tsx",import.meta.url),"utf8");
+const customer=readSource("./customer-create-dialog.tsx", import.meta.url);
+const supplier=readSource("./supplier-create-dialog.tsx", import.meta.url);
 
 test("customer and supplier creation dialogs fit the phone with desktop sizes preserved",()=>{
   for(const source of [customer,supplier]){

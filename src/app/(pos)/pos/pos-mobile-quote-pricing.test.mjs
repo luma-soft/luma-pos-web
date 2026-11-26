@@ -1,13 +1,13 @@
+import { readSource } from "../../../test-support/read-source.mjs";
 import { test, expect } from "bun:test";
-import { readFileSync } from "node:fs";
-const source=readFileSync(new URL("./pos-client.tsx",import.meta.url),"utf8");
-const vi=JSON.parse(readFileSync(new URL("../../../../messages/vi.json",import.meta.url),"utf8"));
-const en=JSON.parse(readFileSync(new URL("../../../../messages/en.json",import.meta.url),"utf8"));
+const source=readSource("./pos-client.tsx", import.meta.url);
+const vi=JSON.parse(readSource("../../../../messages/vi.json", import.meta.url));
+const en=JSON.parse(readSource("../../../../messages/en.json", import.meta.url));
 test("quotation confirmation has a native-specific heading only on mobile",()=>{
   expect(source).toContain('t(isQuoteDraft ? "pos.quotePricingDetails" : "pos.paymentDetails")');
   const checkout=source.slice(source.indexOf("<PosMobileCheckout"));
   expect(checkout).toContain('heading: t(isQuoteDraft ? "pos.quotePricingDetails" : "pos.paymentDetails")');
-  expect(readFileSync(new URL("../../../components/pos/pos-mobile-checkout.tsx",import.meta.url),"utf8")).toContain('lg:hidden print:hidden');
+  expect(readSource("../../../components/pos/pos-mobile-checkout.tsx", import.meta.url)).toContain('lg:hidden print:hidden');
   expect(source).toContain('onValueChange={setDiscountInput}');
   expect(source).toContain('onValueChange={setTaxRate}');
   expect(source).toContain('onValueChange={setShippingFee}');

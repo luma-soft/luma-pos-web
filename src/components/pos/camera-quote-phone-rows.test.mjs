@@ -1,6 +1,6 @@
+import { readSource } from "../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const s=readFileSync(new URL("./camera-quote-panel.tsx",import.meta.url),"utf8");
+const s=readSource("./camera-quote-panel.tsx", import.meta.url);
 test("camera quote material controls fit narrow screens and retain desktop row",()=>{
  expect(s).toContain("grid-cols-[minmax(0,1fr)_44px]");
  expect(s).toContain("lg:grid-cols-[minmax(0,1fr)_120px_32px]");

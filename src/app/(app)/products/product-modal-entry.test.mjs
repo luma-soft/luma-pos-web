@@ -1,21 +1,22 @@
+import { readSource } from "../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 
-const detailPage = readFileSync(new URL("./[id]/page.tsx", import.meta.url), "utf8");
-const editPage = readFileSync(new URL("./[id]/edit/page.tsx", import.meta.url), "utf8");
-const newPage = readFileSync(new URL("./new/page.tsx", import.meta.url), "utf8");
-const routes = readFileSync(new URL("../../../lib/routes.ts", import.meta.url), "utf8");
-const aiActions = readFileSync(new URL("../../../lib/ai/actions.ts", import.meta.url), "utf8");
-const productForm = readFileSync(new URL("./new/product-form.tsx", import.meta.url), "utf8");
-const productModalFrame = readFileSync(new URL("../../../components/product-modal-frame.tsx", import.meta.url), "utf8");
-const productsModal = readFileSync(new URL("../inventory/tabs/products.tsx", import.meta.url), "utf8");
-const productsTable = readFileSync(new URL("../inventory/tabs/products-table.tsx", import.meta.url), "utf8");
-const interceptedDetailPage = readFileSync(new URL("../@productModal/(.)products/[id]/page.tsx", import.meta.url), "utf8");
-const productDetailDialog = readFileSync(new URL("../../../components/product-detail-dialog.tsx", import.meta.url), "utf8");
-const productActions = readFileSync(new URL("../../../lib/actions/products.ts", import.meta.url), "utf8");
-const productVariantActions = readFileSync(new URL("../../../lib/actions/product-variants.ts", import.meta.url), "utf8");
-const appDataSyncProvider = readFileSync(new URL("../../../components/app-data-sync-provider.tsx", import.meta.url), "utf8");
-const deferredAppRouteRefresh = readFileSync(new URL("../../../lib/sync/deferred-app-route-refresh.ts", import.meta.url), "utf8");
+const detailPage = readSource("./[id]/page.tsx", import.meta.url);
+const editPage = readSource("./[id]/edit/page.tsx", import.meta.url);
+const newPage = readSource("./new/page.tsx", import.meta.url);
+const routes = readSource("../../../lib/routes.ts", import.meta.url);
+const aiActions = readSource("../../../lib/ai/actions.ts", import.meta.url);
+const productForm = readSource("./new/product-form.tsx", import.meta.url);
+const productModalFrame = readSource("../../../components/product-modal-frame.tsx", import.meta.url);
+const productsModal = readSource("../inventory/tabs/products.tsx", import.meta.url);
+const productsTable = readSource("../inventory/tabs/products-table.tsx", import.meta.url);
+const interceptedDetailPage = readSource("../@productModal/(.)products/[id]/page.tsx", import.meta.url);
+const productDetailDialog = readSource("../../../components/product-detail-dialog.tsx", import.meta.url);
+const productActions = readSource("../../../lib/actions/products.ts", import.meta.url);
+const productVariantActions = readSource("../../../lib/actions/product-variants.ts", import.meta.url);
+const appDataSyncProvider = readSource("../../../components/app-data-sync-provider.tsx", import.meta.url);
+const deferredAppRouteRefresh = readSource("../../../lib/sync/deferred-app-route-refresh.ts", import.meta.url);
 
 test("hard-loaded product detail keeps the detail inside a dialog", () => {
   expect(detailPage).toContain("<ProductDetailDialog");

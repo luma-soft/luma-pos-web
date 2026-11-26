@@ -1,6 +1,6 @@
+import { readSource } from "../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const src=readFileSync(new URL("./pos-client.tsx",import.meta.url),"utf8");
+const src=readSource("./pos-client.tsx", import.meta.url);
 const start=src.indexOf('onClick={parkActiveDraft}');
 const section=src.slice(start-300,start+1900);
 test("mobile POS confirmation spans the full row without hiding amount",()=>{

@@ -1,8 +1,8 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
 function source(path) {
-  return readFileSync(new URL(path, import.meta.url), "utf8");
+  return readSource(path, import.meta.url);
 }
 
 test("bulk product actions route every selected product into purchase and POS drafts", () => {

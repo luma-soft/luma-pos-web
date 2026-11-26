@@ -1,9 +1,9 @@
+import { readSource } from "../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
-const productForm = readFileSync(new URL("./new/product-form.tsx", import.meta.url), "utf8");
-const variantChildrenField = readFileSync(new URL("./new/variant-children-field.tsx", import.meta.url), "utf8");
-const vi = JSON.parse(readFileSync(new URL("../../../../messages/vi.json", import.meta.url), "utf8"));
+const productForm = readSource("./new/product-form.tsx", import.meta.url);
+const variantChildrenField = readSource("./new/variant-children-field.tsx", import.meta.url);
+const vi = JSON.parse(readSource("../../../../messages/vi.json", import.meta.url));
 
 test("an existing product points users to the safe variant workflow", () => {
   expect(vi.products.saveAndCreateVariant).toBe("Lưu & tạo biến thể");

@@ -1,7 +1,7 @@
+import { readSource } from "../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
-const source = readFileSync(new URL("./supplier-payable-actions.tsx", import.meta.url), "utf8");
+const source = readSource("./supplier-payable-actions.tsx", import.meta.url);
 
 test("successful supplier payment closes before refreshing the detail", () => {
   const paymentDialog = source.slice(

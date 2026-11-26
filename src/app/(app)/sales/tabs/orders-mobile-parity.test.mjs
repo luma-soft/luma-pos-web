@@ -1,10 +1,10 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
-const orders = readFileSync(new URL("./orders-table.tsx", import.meta.url), "utf8");
-const sales = readFileSync(new URL("../page.tsx", import.meta.url), "utf8");
-const inventory = readFileSync(new URL("../../inventory/page.tsx", import.meta.url), "utf8");
-const groupTabs = readFileSync(new URL("../../../../components/group-tabs.tsx", import.meta.url), "utf8");
+const orders = readSource("./orders-table.tsx", import.meta.url);
+const sales = readSource("../page.tsx", import.meta.url);
+const inventory = readSource("../../inventory/page.tsx", import.meta.url);
+const groupTabs = readSource("../../../../components/group-tabs.tsx", import.meta.url);
 const row = orders.slice(orders.indexOf("export function OrderMobileRow("), orders.indexOf("export function OrdersTable("));
 
 test("native-style order row enters selection by long press and keeps a full-row open target", () => {

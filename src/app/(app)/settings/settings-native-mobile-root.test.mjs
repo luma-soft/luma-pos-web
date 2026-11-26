@@ -1,7 +1,7 @@
+import { readSource } from "../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const src=readFileSync(new URL("./settings-client.tsx",import.meta.url),"utf8");
-const root=readFileSync(new URL("./settings-mobile-root.tsx",import.meta.url),"utf8");
+const src=readSource("./settings-client.tsx", import.meta.url);
+const root=readSource("./settings-mobile-root.tsx", import.meta.url);
 test("native settings root uses the iOS groups and one settings form tree",()=>{
  expect(src).toContain("mobileSectionSelected");
  expect(src).toContain("<SettingsMobileRoot");

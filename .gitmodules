@@ -1,0 +1,3 @@
+[submodule "vendor/backend"]
+	path = vendor/backend
+	url = https://github.com/luma-soft/luma-pos-backend.git

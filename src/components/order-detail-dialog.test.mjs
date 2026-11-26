@@ -1,6 +1,6 @@
+import { readSource } from "../test-support/read-source.mjs";
 import { describe, expect, mock, test } from "bun:test";
 import { createElement, Fragment } from "react";
-import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
 let activeSearchParams = new URLSearchParams("tab=customers&detailCustomerId=customer-1&q=Anh&detailOrderId=order-1");
@@ -75,7 +75,7 @@ describe("invoice opened from customer history", () => {
   });
 
   test("invoice close updates the URL without server navigation", () => {
-    const source = readFileSync(new URL("./order-detail-dialog.tsx", import.meta.url), "utf8");
+    const source = readSource("./order-detail-dialog.tsx", import.meta.url);
     expect(source).toContain("window.history.replaceState(\n      null,");
     expect(source).not.toContain("window.history.state,");
     expect(source).not.toContain("router.replace(");

@@ -1,9 +1,9 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const inventoryPage = readFileSync(new URL("../page.tsx", import.meta.url), "utf8");
-const productsTab = readFileSync(new URL("./products.tsx", import.meta.url), "utf8");
-const catalog = readFileSync(new URL("./product-catalog-products-content.tsx", import.meta.url), "utf8");
-const skeleton = readFileSync(new URL("../../../../components/mobile-inventory-catalog-skeleton.tsx", import.meta.url), "utf8");
+const inventoryPage = readSource("../page.tsx", import.meta.url);
+const productsTab = readSource("./products.tsx", import.meta.url);
+const catalog = readSource("./product-catalog-products-content.tsx", import.meta.url);
+const skeleton = readSource("../../../../components/mobile-inventory-catalog-skeleton.tsx", import.meta.url);
 
 test("product tab keeps one consistent shell from streaming through cache restore", () => {
   expect(inventoryPage).toContain("<Suspense fallback={<ProductsTabLoading />}>");

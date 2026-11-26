@@ -1,7 +1,7 @@
+import { readSource } from "../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const notice=readFileSync(new URL("./mobile-dashboard-offline-notice.tsx",import.meta.url),"utf8");
-const page=readFileSync(new URL("../app/(app)/dashboard/page.tsx",import.meta.url),"utf8");
+const notice=readSource("./mobile-dashboard-offline-notice.tsx", import.meta.url);
+const page=readSource("../app/(app)/dashboard/page.tsx", import.meta.url);
 test("offline notice mirrors the native warning without duplicating dashboard data requests",()=>{
   expect(notice).toContain('window.addEventListener("offline"');
   expect(notice).toContain('window.addEventListener("online"');

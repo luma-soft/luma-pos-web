@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { approvePriceBookSwitch, prepareInvoicePriceBookSwitch, prepareLinePriceBookSwitch, selectedPosUnitPrice, type PriceBookSwitchLine } from "./price-book-switch";
-import { createLinePriceEditorState } from "./line-price-editor";
+import { createLinePriceEditorState } from "@/lib/pos/line-price-editor";
 
 const books = [
   { id: "retail", isDefault: true, systemType: "retail" as const },

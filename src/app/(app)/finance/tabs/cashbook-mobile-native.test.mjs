@@ -1,6 +1,6 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const src = readFileSync(new URL("./cashbook-table.tsx", import.meta.url), "utf8");
+const src = readSource("./cashbook-table.tsx", import.meta.url);
 test("cashbook mobile row retains native signed amounts and transaction details", () => {
   expect(src).toContain('renderMobileRow={({ row, toggle })');
   expect(src).toContain("onClick={toggle}");

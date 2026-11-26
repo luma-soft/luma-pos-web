@@ -1,6 +1,6 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const src = readFileSync(new URL("./product-form.tsx", import.meta.url), "utf8");
+const src = readSource("./product-form.tsx", import.meta.url);
 test("product wizard mobile tabs are equally sized and localized", () => {
   expect(src).toContain("flex items-end gap-0 lg:gap-6");
   expect(src).toContain("min-h-12 min-w-0 flex-1 whitespace-nowrap border-b-2");

@@ -1,7 +1,7 @@
+import { readSource } from "../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
-const css = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf8");
+const css = readSource("../../app/globals.css", import.meta.url);
 
 test("A4 and A5 print pages reserve a margin on every physical page", () => {
   expect(css).toContain("@page print-a4 { size: A4 portrait; margin: 12mm; }");

@@ -1,4 +1,4 @@
-import type { PrintDocType } from "./template-shared";
+import type { PrintDocType } from "@/lib/print/template-shared";
 
 export type ShareablePrintDocType = Extract<PrintDocType, "order" | "quote" | "booking">;
 

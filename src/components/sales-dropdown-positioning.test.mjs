@@ -1,5 +1,5 @@
+import { readSource } from "../test-support/read-source.mjs";
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
 const sources = [
   ["print template", "./print/print-template-menu.tsx"],
@@ -10,7 +10,7 @@ const sources = [
 describe("sales dropdown viewport positioning", () => {
   for (const [name, path] of sources) {
     test(`${name} uses the shared floating portal`, () => {
-      const source = readFileSync(new URL(path, import.meta.url), "utf8");
+      const source = readSource(path, import.meta.url);
       expect(source).toContain("FloatingMenuPortal");
     });
   }

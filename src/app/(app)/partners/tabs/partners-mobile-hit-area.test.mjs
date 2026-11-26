@@ -1,8 +1,8 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const customer = readFileSync(new URL("./customers-table.tsx", import.meta.url), "utf8");
-const supplier = readFileSync(new URL("./suppliers-table.tsx", import.meta.url), "utf8");
-const nav = readFileSync(new URL("../../../../components/group-tabs.tsx", import.meta.url), "utf8");
+const customer = readSource("./customers-table.tsx", import.meta.url);
+const supplier = readSource("./suppliers-table.tsx", import.meta.url);
+const nav = readSource("../../../../components/group-tabs.tsx", import.meta.url);
 test("partner rows have full touch areas and independent deep links", () => {
   // Phone rows are whole-row buttons (NativeCustomerRow / NativeSupplierItemRow) that push the profile.
   expect(customer).toContain("onOpen={() => openCustomer(customer)}");

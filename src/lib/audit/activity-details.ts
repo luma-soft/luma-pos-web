@@ -1,4 +1,4 @@
-import { activityObject, activityText, type NotificationActivity } from "./activity-presentation";
+import { activityObject, activityText, type NotificationActivity } from "@/lib/audit/activity-presentation";
 
 export const activityFieldKinds = {
   quantity: "number", beforeQuantity: "number", plannedQuantity: "number", usedQuantity: "number",

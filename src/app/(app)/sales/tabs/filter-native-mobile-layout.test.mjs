@@ -1,8 +1,8 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { test, expect } from "bun:test";
-import { readFileSync } from "node:fs";
 // The drawers share their footer/header pieces from filter-drawer-sections.tsx.
-const sections = readFileSync(new URL("filter-drawer-sections.tsx", import.meta.url), "utf8");
-const sources = ["orders-filter-drawer.tsx", "document-filter-drawer.tsx"].map((name) => `${readFileSync(new URL(name, import.meta.url), "utf8")}\n${sections}`);
+const sections = readSource("filter-drawer-sections.tsx", import.meta.url);
+const sources = ["orders-filter-drawer.tsx", "document-filter-drawer.tsx"].map((name) => `${readSource(name, import.meta.url)}\n${sections}`);
 test("all invoice filters use iPhone full-screen sheets with desktop drawer restored", () => {
  for (const src of sources) {
   expect(src).toContain('h-[100dvh] w-full max-w-none');
@@ -15,7 +15,7 @@ test("all invoice filters use iPhone full-screen sheets with desktop drawer rest
  }
 });
 test("shared nested product/customer picker search avoids zoom on iPhone", () => {
- const picker = readFileSync(new URL("filter-drawer-shared.tsx", import.meta.url), "utf8");
+ const picker = readSource("filter-drawer-shared.tsx", import.meta.url);
  expect(picker).toContain("pl-9 pr-3 text-base outline-none");
  expect(picker).toContain("lg:h-10 lg:min-h-0 lg:text-sm");
 });

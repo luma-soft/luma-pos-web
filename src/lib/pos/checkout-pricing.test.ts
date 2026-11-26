@@ -1,6 +1,6 @@
+import { readSource } from "../../test-support/read-source.mjs";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { buildExpectedPosPricing, countPosPricingConflicts, requestPosOrder } from "./checkout-pricing";
 import { buildPosOrderItemPayload } from "./order-item-payload";
 
@@ -79,7 +79,7 @@ describe("POS checkout pricing consumer", () => {
   });
 
   it("all POS create/edit/copy modes share the snapshot and rejected submissions never close the cart or start payment", () => {
-    const source = readFileSync(new URL("../../app/(pos)/pos/pos-client.tsx", import.meta.url), "utf8");
+    const source = readSource("../../app/(pos)/pos/pos-client.tsx", import.meta.url);
     const submit = source.slice(source.indexOf("async function submitOrder("), source.indexOf("async function submitReturn("));
     assert.match(submit, /expectedPricing: buildExpectedPosPricing\(cart, \(line\) => effPrice\(line\)\.price\)/);
     assert.match(submit, /source: orderSource/);

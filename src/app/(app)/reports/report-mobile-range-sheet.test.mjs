@@ -1,6 +1,6 @@
+import { readSource } from "../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const src = readFileSync(new URL("./report-period-filter.tsx", import.meta.url), "utf8");
+const src = readSource("./report-period-filter.tsx", import.meta.url);
 test("native Mobile report range is draft-only until Apply", () => {
   expect(src).toContain("setDraftPeriod(period)");
   expect(src).toContain('onClick={() => setDraftPeriod(option)}');

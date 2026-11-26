@@ -1,8 +1,8 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const internal = readFileSync(new URL("./internal-use-table.tsx", import.meta.url), "utf8");
-const internalMobile = readFileSync(new URL("./internal-use-mobile.tsx", import.meta.url), "utf8");
-const stock = readFileSync(new URL("./stock-table.tsx", import.meta.url), "utf8");
+const internal = readSource("./internal-use-table.tsx", import.meta.url);
+const internalMobile = readSource("./internal-use-mobile.tsx", import.meta.url);
+const stock = readSource("./stock-table.tsx", import.meta.url);
 test("mobile internal-use row pushes the detail without dropping authorized actions", () => {
   expect(internal).toContain("onOpen={() => setOpenId(row.id)}");
   expect(internal).toContain("<MobileInternalUseDetail row={openRow} capabilities={capabilities}");

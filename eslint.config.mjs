@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // App mobile (Expo) có toolchain/eslint riêng — không lint bằng config web.
     "mobile/**",
+    // Backend source checked out as a submodule; linted in luma-pos-backend.
+    "vendor/**",
   ]),
 ]);
 

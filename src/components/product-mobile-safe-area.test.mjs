@@ -1,7 +1,7 @@
+import { readSource } from "../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const frame=readFileSync(new URL("./product-modal-frame.tsx",import.meta.url),"utf8");
-const products=readFileSync(new URL("../app/(app)/inventory/tabs/products-table.tsx",import.meta.url),"utf8");
+const frame=readSource("./product-modal-frame.tsx", import.meta.url);
+const products=readSource("../app/(app)/inventory/tabs/products-table.tsx", import.meta.url);
 const preview=products.slice(products.indexOf("function ProductImageLightbox("),products.indexOf("function ProductDescriptionPanel("));
 test("product create and detail modal content clears iPhone status area",()=>{
   expect(frame).toContain("pt-[env(safe-area-inset-top)]");

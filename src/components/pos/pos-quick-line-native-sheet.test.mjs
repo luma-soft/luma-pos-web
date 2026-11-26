@@ -1,6 +1,6 @@
+import { readSource } from "../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const src=readFileSync(new URL("./pos-quick-line-dialog.tsx",import.meta.url),"utf8");
+const src=readSource("./pos-quick-line-dialog.tsx", import.meta.url);
 test("web-only quick line uses iPhone safe-area sheet with desktop dialog retained",()=>{
  expect(src).toContain("lg:items-center lg:p-4");
  expect(src).toContain("env(safe-area-inset-top)");

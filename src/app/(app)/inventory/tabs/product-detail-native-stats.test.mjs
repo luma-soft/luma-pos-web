@@ -1,6 +1,6 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { test, expect } from "bun:test";
-import { readFileSync } from "node:fs";
-const src=readFileSync(new URL("./products-table.tsx",import.meta.url),"utf8");
+const src=readSource("./products-table.tsx", import.meta.url);
 const panel=src.slice(src.indexOf("function ProductInfoPanel("),src.indexOf("function ProductImageLightbox("));
 test("mobile product summary matches the iOS three-metric strip",()=>{
   expect(panel).toContain("grid grid-cols-3 divide-x divide-border-soft");

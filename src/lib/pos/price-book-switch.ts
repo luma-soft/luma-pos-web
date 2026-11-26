@@ -1,6 +1,6 @@
 import { resolvePosUnitPrice } from "./price-book-price";
 import { resolvePosCartUnit } from "./cart-unit";
-import { createLinePriceEditorState, resolveLinePriceEditor, type LineDiscountMode, type LinePriceEditorState } from "./line-price-editor";
+import { createLinePriceEditorState, resolveLinePriceEditor, type LineDiscountMode, type LinePriceEditorState } from "@/lib/pos/line-price-editor";
 
 type PriceProduct = Parameters<typeof resolvePosUnitPrice>[0] & {
   baseUnit: string;

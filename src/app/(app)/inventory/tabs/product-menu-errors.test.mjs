@@ -1,8 +1,8 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
-const products = readFileSync(new URL("./products-table.tsx", import.meta.url), "utf8");
-const customers = readFileSync(new URL("../../partners/tabs/customer-mobile.tsx", import.meta.url), "utf8");
+const products = readSource("./products-table.tsx", import.meta.url);
+const customers = readSource("../../partners/tabs/customer-mobile.tsx", import.meta.url);
 
 // The phone "…" sheet closes when an action is chosen, so failures must be alerts.
 test("phone product actions report failures in an alert", () => {

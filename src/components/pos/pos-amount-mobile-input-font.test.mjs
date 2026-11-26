@@ -1,7 +1,7 @@
+import { readSource } from "../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const shared=readFileSync(new URL("./pos-summary-controls.tsx",import.meta.url),"utf8");
-const pos=readFileSync(new URL("../../app/(pos)/pos/pos-client.tsx",import.meta.url),"utf8");
+const shared=readSource("./pos-summary-controls.tsx", import.meta.url);
+const pos=readSource("../../app/(pos)/pos/pos-client.tsx", import.meta.url);
 test("POS discount VAT shipping fields have 16px mobile font, 14px desktop",()=>{
   expect(shared.match(/text-base tabular-nums outline-none lg:text-sm/g)?.length).toBe(2);
   expect(shared).toContain("onValueChange(nextValue ?? 0)");

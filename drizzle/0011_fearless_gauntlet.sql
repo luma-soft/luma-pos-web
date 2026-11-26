@@ -1,1 +1,0 @@
-ALTER TABLE "products" ADD COLUMN "last_purchase_price" numeric(14, 2);

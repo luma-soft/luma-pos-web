@@ -1,7 +1,7 @@
+import { readSource } from "../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
-const source = readFileSync(new URL("./library-upload-dialog.tsx", import.meta.url), "utf8");
+const source = readSource("./library-upload-dialog.tsx", import.meta.url);
 
 test("a completed upload closes before the library refresh finishes", () => {
   const successStart = source.indexOf("if (!failed.length)");

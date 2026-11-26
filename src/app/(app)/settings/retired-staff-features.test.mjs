@@ -1,9 +1,9 @@
+import { readSource } from "../../../test-support/read-source.mjs";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const client = readFileSync(new URL("./settings-client.tsx", import.meta.url), "utf8");
-const actions = readFileSync(new URL("../../../lib/actions/settings.ts", import.meta.url), "utf8");
+const client = readSource("./settings-client.tsx", import.meta.url);
+const actions = readSource("../../../lib/actions/settings.ts", import.meta.url);
 
 test("staff and role-administration screens and their actions are retired", () => {
   assert.doesNotMatch(client, /StaffSection|StaffRowItem|active === "staff"|id: "staff"/);
@@ -27,7 +27,7 @@ for (const path of [
   "../../../app/api/mobile/auth/invitations/accept/route.ts",
 ]) {
   test("retired mutation API rejects calls: " + path, () => {
-    const source = readFileSync(new URL(path, import.meta.url), "utf8");
+    const source = readSource(path, import.meta.url);
     assert.match(source, /mobileError\("errors\.notFound", 404\)/);
     assert.doesNotMatch(source, /applyStaffSettingsMutation|createStaffInvitation|createCashierContextToken|acceptStaffInvitation/);
   });

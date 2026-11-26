@@ -3,7 +3,7 @@ import {
   mediaIdSchema,
   normalizeMediaType,
   type MediaPurpose,
-} from "./schemas";
+} from "@/lib/media/schemas";
 
 const MEDIA_UPLOADS_ENDPOINT = "/api/mobile/media/uploads";
 const MEDIA_UPLOAD_RETRY_DELAYS_MS = [250, 750] as const;

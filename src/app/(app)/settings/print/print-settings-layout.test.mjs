@@ -1,3 +1,4 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
@@ -73,7 +74,7 @@ test("the action button is the only control for setting a template as default", 
   expect(form).toContain("isDefault: item.id === templateId");
 });
 
-const labels = readFileSync(new URL("../labels/label-settings-form.tsx", import.meta.url), "utf8");
+const labels = readSource("../labels/label-settings-form.tsx", import.meta.url);
 
 // Phones follow the iOS template designer: nav bar "…" menu, template rows, switch rows.
 test("phone template editors use the iOS navigation menu and template list", () => {

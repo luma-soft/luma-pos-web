@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BatchDebtSummary } from "./batch-debt-summary";
-import { defaultTemplate } from "../../lib/print/template-shared";
+import { defaultTemplate } from "@/lib/print/template-shared";
 
 const labels = {
   title: "TỔNG HỢP CÔNG NỢ",

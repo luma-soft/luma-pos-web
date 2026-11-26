@@ -1,7 +1,7 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
-const source = readFileSync(new URL("./products-table.tsx", import.meta.url), "utf8");
+const source = readSource("./products-table.tsx", import.meta.url);
 const row = source.slice(source.indexOf("export function ProductMobileRow("), source.indexOf("function ProductGroupMobileButton("));
 
 test("native mobile product rows keep image, product, price, stock and unit actions together", () => {

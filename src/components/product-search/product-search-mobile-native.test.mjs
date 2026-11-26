@@ -1,6 +1,6 @@
+import { readSource } from "../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const src=readFileSync(new URL("./product-search-picker.tsx",import.meta.url),"utf8");
+const src=readSource("./product-search-picker.tsx", import.meta.url);
 test("shared product picker keeps iPhone input size and full-size dismiss touch target",()=>{
  expect(src).toContain("pl-10 pr-11 text-base outline-none");
  expect(src).toContain("lg:pr-10 lg:text-sm");

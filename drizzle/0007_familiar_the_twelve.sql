@@ -1,2 +1,0 @@
-ALTER TABLE "products" ADD COLUMN "supplier_id" uuid;--> statement-breakpoint
-ALTER TABLE "products" ADD CONSTRAINT "products_supplier_id_suppliers_id_fk" FOREIGN KEY ("supplier_id") REFERENCES "public"."suppliers"("id") ON DELETE no action ON UPDATE no action;

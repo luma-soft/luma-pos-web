@@ -1,6 +1,6 @@
+import { readSource } from "../../../test-support/read-source.mjs";
 import { test, expect } from "bun:test";
-import { readFileSync } from "node:fs";
-const src = readFileSync(new URL("./pos-client.tsx",import.meta.url),"utf8");
+const src = readSource("./pos-client.tsx", import.meta.url);
 const editor = src.slice(src.indexOf("function LinePriceEditor("));
 test("POS price editor is a bottom sheet on phones while retaining desktop placement",()=>{
  expect(editor).toContain("fixed inset-x-0 bottom-0");

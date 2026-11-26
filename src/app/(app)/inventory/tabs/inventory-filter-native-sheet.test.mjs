@@ -1,6 +1,6 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const src=readFileSync(new URL("./inventory-filter-drawer.tsx",import.meta.url),"utf8");
+const src=readSource("./inventory-filter-drawer.tsx", import.meta.url);
 test("inventory filters use full-screen native mobile geometry with desktop drawer preserved",()=>{
   expect(src).toContain("h-dvh w-full max-w-none");
   expect(src).toContain("lg:h-full lg:max-w-[460px]");

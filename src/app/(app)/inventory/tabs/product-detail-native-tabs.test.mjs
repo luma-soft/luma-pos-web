@@ -1,6 +1,6 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const src=readFileSync(new URL("./products-table.tsx",import.meta.url),"utf8");
+const src=readSource("./products-table.tsx", import.meta.url);
 const start=src.indexOf("export function ProductDetailView(");
 const detail=src.slice(start,src.indexOf("function ProductInfoPanel(",start));
 test("native product detail tabs are 46px with 3px mobile indicator",()=>{

@@ -1,7 +1,7 @@
+import { readSource } from "../../../test-support/read-source.mjs";
 import { test, expect } from "bun:test";
-import { readFileSync } from "node:fs";
 
-const pos = readFileSync(new URL("./pos-client.tsx", import.meta.url), "utf8");
+const pos = readSource("./pos-client.tsx", import.meta.url);
 const tabs = pos.slice(pos.indexOf("  const invoiceTabs = ("), pos.indexOf("  // Danh sách dòng hàng đã chọn", pos.indexOf("  const invoiceTabs = (")));
 
 test("iPhone POS uses a compact current-draft selector and a single reusable draft list", () => {

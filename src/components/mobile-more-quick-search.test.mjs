@@ -1,8 +1,8 @@
+import { readSource } from "../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
-const component = readFileSync(new URL("./mobile-more-quick-search.tsx", import.meta.url), "utf8");
-const page = readFileSync(new URL("../app/(app)/more/page.tsx", import.meta.url), "utf8");
+const component = readSource("./mobile-more-quick-search.tsx", import.meta.url);
+const page = readSource("../app/(app)/more/page.tsx", import.meta.url);
 
 test("More search has one results list and hides the menu only on mobile when searching", () => {
   expect(component).toContain('normalizedQuery ? "hidden lg:block lg:space-y-5" : "space-y-8 lg:space-y-5"');

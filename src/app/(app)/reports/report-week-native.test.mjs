@@ -1,7 +1,7 @@
+import { readSource } from "../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const period = readFileSync(new URL("../../../lib/reports/period.ts", import.meta.url), "utf8");
-const filter = readFileSync(new URL("./report-period-filter.tsx", import.meta.url), "utf8");
+const period = readSource("../../../lib/reports/period.ts", import.meta.url);
+const filter = readSource("./report-period-filter.tsx", import.meta.url);
 test("iOS reports week starts Monday and is mobile-only preset", () => {
   expect(period).toContain('period === "week"');
   expect(period).toContain("(weekday + 6) % 7");

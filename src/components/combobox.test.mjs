@@ -1,7 +1,8 @@
+import { readSource } from "../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-const source = readFileSync(new URL("./combobox.tsx", import.meta.url), "utf8");
+const source = readSource("./combobox.tsx", import.meta.url);
 const filterPickerSource = readFileSync(
   new URL("../app/(app)/sales/tabs/filter-drawer-shared.tsx", import.meta.url),
   "utf8",

@@ -1,8 +1,8 @@
+import { readSource } from "../../../../test-support/read-source.mjs";
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-const purchase = readFileSync(new URL("./purchases-table.tsx", import.meta.url), "utf8");
-const returns = readFileSync(new URL("./purchase-returns-table.tsx", import.meta.url), "utf8");
-const returnMobile = readFileSync(new URL("./purchase-return-mobile.tsx", import.meta.url), "utf8");
+const purchase = readSource("./purchases-table.tsx", import.meta.url);
+const returns = readSource("./purchase-returns-table.tsx", import.meta.url);
+const returnMobile = readSource("./purchase-return-mobile.tsx", import.meta.url);
 test("mobile purchase row matches supplier-first native pattern and preserves modal", () => {
   expect(purchase).toContain("purchase.items.length");
   expect(purchase).toContain("purchaseOwed(purchase)");
