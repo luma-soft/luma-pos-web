@@ -359,7 +359,8 @@ ensure_dir() {
   local path="$1" owner="$2" mode="$3"
   [[ -L "$path" ]] && fail "$path must not be a symlink"
   mkdir -p -- "$path" || fail "Could not create $path"
-  chown "$owner" -- "$path" && chmod "$mode" -- "$path" || fail "Could not set permissions on $path"
+  # BSD chown/chmod take no "--" after the owner or mode operand.
+  chown "$owner" "$path" && chmod "$mode" "$path" || fail "Could not set permissions on $path"
 }
 
 cmd_create_accounts() {

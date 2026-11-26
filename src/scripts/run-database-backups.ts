@@ -314,7 +314,16 @@ try {
   do {
     if (scheduled) await requestScheduledBackup();
     const runId = await claimRun();
-    if (runId) await createBackup(runId);
+    if (runId) {
+      // A backup uploads for hours; keep the heartbeat fresh meanwhile so
+      // readiness (45-second window) does not report the worker offline.
+      const heartbeat = setInterval(() => { void writeHeartbeat("running").catch(() => undefined); }, 15_000);
+      try {
+        await createBackup(runId);
+      } finally {
+        clearInterval(heartbeat);
+      }
+    }
     await writeHeartbeat("running");
     if (once) break;
     if (!runId) await delay(POLL_INTERVAL_MS);

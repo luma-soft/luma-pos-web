@@ -303,6 +303,21 @@ Terminal lần nào.
    - Gỡ 5 plist cũ trong `/Library/LaunchDaemons`, gỡ `lumapos-admin` và
      sudoers, tắt `brew services` PostgreSQL (giữ data cũ 7 ngày).
    - Kiểm tra health, URL công khai, iOS sync, backup đêm đầu tiên.
+   > **Đã chuyển 2026-11-26 10:16–10:18** bằng
+   > `ops/macos/convert-classic-to-packaged.sh` (dịch vụ dừng khoảng 2 phút):
+   > runtime `20261126.031147-c0e839e1`, 150 bảng khớp số dòng, 3.168 tệp ảnh
+   > khớp, local và public đều 200. Lần chạy đầu dừng ở `bootstrap` vì
+   > `chown owner -- path` (BSD không nhận `--` sau tham số) đã đổi chủ
+   > `/Users/Shared/LumaPOS` sang root mà chưa đặt 0755; đã đặt lại 0755 và sửa
+   > `ensure_dir`. Sau khi chuyển: archive không chứa lịch sử
+   > `database_backup_runs` nên đã chép 13 bản ghi thành công từ cụm Homebrew
+   > (chạy tạm trên socket riêng, chỉ đọc) và bỏ bản sao lưu trùng ngày 26/11
+   > mà worker mới vừa bắt đầu. Giữ để quay lại: dữ liệu Homebrew
+   > (`launchctl disable gui/<uid>/sh.brew.postgresql@17`),
+   > `media.classic-20261126_101648`, `classic-launchd-20261126_101648`,
+   > `backups/pre-packaged-20261126_101648.lumaenc`, thư mục `app`. Xóa sau 7
+   > ngày chạy ổn. Deploy web giờ đi qua runtime (`assemble-runtime.sh` +
+   > `install-runtime` + `activate-runtime`).
 3. Cập nhật `self-hosted-operations.md`, `ops/macos/README.md`,
    README app Mac.
 
