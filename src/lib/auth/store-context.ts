@@ -4,6 +4,7 @@ import { createClient as createBearerClient, type User } from "@supabase/supabas
 import { db } from "@/db";
 import { profiles, storeFeatures, storeSettings, stores } from "@/db/schema";
 import type { Role } from "@/lib/auth/roles";
+import { UnauthorizedError } from "@/lib/auth/unauthorized-error";
 import {
   activeStorePrincipal,
   type StorePrincipal,
@@ -25,11 +26,7 @@ export type StoreContext = StorePrincipal & {
   features: StoreFeatureSet;
 };
 
-export class UnauthorizedError extends Error {
-  constructor() {
-    super("UNAUTHORIZED");
-  }
-}
+export { UnauthorizedError };
 
 export async function getAuthenticatedUser(): Promise<User | LumaAuthenticatedUser | null> {
   const authorization = (await headers()).get("authorization");

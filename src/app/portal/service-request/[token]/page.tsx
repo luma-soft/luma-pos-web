@@ -1,15 +1,8 @@
-import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { db } from "@/db";
-import { projects, serviceCustomerRequests, storeFeatures } from "@/db/schema";
-import {
-  hashCustomerRequestToken,
-  isCustomerRequestTokenSubmittable,
-  isCustomerRequestTokenViewable,
-} from "@/lib/services/customer-request-token";
+import { getServiceRequestPortalView } from "@/lib/data/portal";
+import { isCustomerRequestTokenSubmittable } from "@/lib/services/customer-request-token";
 import { ServiceRequestForm } from "./service-request-form";
-import { consumePublicRateLimitCore } from "@/lib/services/customer-request-portal";
 
 export const dynamic = "force-dynamic";
 
@@ -21,43 +14,8 @@ export default async function ServiceRequestPage({
   const t = await getTranslations("serviceRequestPortal");
   const { token } = await params;
   if (token.length < 40) notFound();
-  const tokenHash = hashCustomerRequestToken(token);
-  const [request] = await db.select({
-    storeId: serviceCustomerRequests.storeId,
-    projectName: projects.name,
-    status: serviceCustomerRequests.status,
-    submittedAt: serviceCustomerRequests.submittedAt,
-    responseDueAt: serviceCustomerRequests.responseDueAt,
-    resolutionDueAt: serviceCustomerRequests.resolutionDueAt,
-    respondedAt: serviceCustomerRequests.respondedAt,
-    resolvedAt: serviceCustomerRequests.resolvedAt,
-    tokenExpiresAt: serviceCustomerRequests.tokenExpiresAt,
-  }).from(serviceCustomerRequests)
-    .innerJoin(projects, eq(serviceCustomerRequests.projectId, projects.id))
-    .innerJoin(storeFeatures, and(
-      eq(storeFeatures.storeId, serviceCustomerRequests.storeId),
-      eq(storeFeatures.featureKey, "field_services"),
-      eq(storeFeatures.enabled, true),
-    ))
-    .where(eq(serviceCustomerRequests.tokenHash, tokenHash))
-    .limit(1);
-  if (!request || !isCustomerRequestTokenViewable({
-    expiresAt: request.tokenExpiresAt,
-  })) notFound();
-  const storeLimit = await db.transaction((tx) => consumePublicRateLimitCore(tx, {
-    storeId: request.storeId,
-    key: "customer-request:page:store",
-    limit: 10_000,
-    windowSeconds: 60,
-  }));
-  if (!storeLimit.allowed) notFound();
-  const tokenLimit = await db.transaction((tx) => consumePublicRateLimitCore(tx, {
-    storeId: request.storeId,
-    key: `customer-request:page:token:${tokenHash}`,
-    limit: 60,
-    windowSeconds: 3600,
-  }));
-  if (!tokenLimit.allowed) notFound();
+  const request = await getServiceRequestPortalView(token);
+  if (!request) notFound();
   const canSubmit = isCustomerRequestTokenSubmittable({
     status: request.status,
     submittedAt: request.submittedAt,

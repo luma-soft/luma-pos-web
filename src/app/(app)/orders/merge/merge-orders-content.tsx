@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { and, eq, inArray } from "drizzle-orm";
-import { db } from "@/db";
-import { einvoices, returnItems, returns } from "@/db/schema";
+import { getIssuedEInvoiceOrderIds, getReturnedOrderItemIds } from "@/lib/data/web-pages";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { getOrder } from "@/lib/data/orders";
 import { getStoreSettings } from "@/lib/data/settings";
@@ -32,27 +30,9 @@ export async function MergeOrdersContent({
   const [loadedOrders, printTemplates, issuedEInvoices, storeSettings, referencedItems] = await Promise.all([
     Promise.all(ids.map((id) => getOrder(context.storeId, id).catch(() => null))),
     getPrintTemplatesForDoc(context.storeId, "order"),
-    ids.length
-      ? db
-          .select({ orderId: einvoices.orderId })
-          .from(einvoices)
-          .where(and(
-            eq(einvoices.storeId, context.storeId),
-            inArray(einvoices.orderId, ids),
-            eq(einvoices.status, "issued"),
-          ))
-      : Promise.resolve([]),
+    getIssuedEInvoiceOrderIds(context.storeId, ids),
     getStoreSettings(context.storeId),
-    ids.length
-      ? db
-          .select({ orderItemId: returnItems.orderItemId })
-          .from(returnItems)
-          .innerJoin(returns, eq(returnItems.returnId, returns.id))
-          .where(and(
-            eq(returnItems.storeId, context.storeId),
-            inArray(returns.orderId, ids),
-          ))
-      : Promise.resolve([]),
+    getReturnedOrderItemIds(context.storeId, ids),
   ]);
 
   const selectedOrders = loadedOrders.filter((order): order is LoadedOrder => order !== null);

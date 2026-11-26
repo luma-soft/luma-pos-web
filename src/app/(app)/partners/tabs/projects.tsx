@@ -1,8 +1,6 @@
 import { getTranslations } from "next-intl/server";
-import { and, asc, eq } from "drizzle-orm";
 import { Building2 } from "lucide-react";
-import { db } from "@/db";
-import { customers } from "@/db/schema";
+import { getActiveCustomerOptions } from "@/lib/data/web-pages";
 import { Pagination } from "@/components/pagination";
 import { DesktopPagination } from "@/components/mobile-load-more";
 import { loadProjectsPage } from "./load-more-actions";
@@ -20,7 +18,7 @@ export async function ProjectsTab({ searchParams }: { searchParams: SP }) {
   const pageSize = parsePageSize(searchParams.size);
   const [{ rows, total, pageCount }, customerOptions] = await Promise.all([
     getProjectPage(context.storeId, page, pageSize),
-    db.select({ id: customers.id, name: customers.name }).from(customers).where(and(eq(customers.storeId, context.storeId), eq(customers.isActive, true))).orderBy(asc(customers.name)).limit(300),
+    getActiveCustomerOptions(context.storeId),
   ]);
 
   return (

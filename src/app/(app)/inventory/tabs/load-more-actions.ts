@@ -6,7 +6,7 @@ import { getPurchaseReturns } from "@/lib/data/purchase-returns";
 import { parsePageSize } from "@/lib/pagination";
 import { purchaseReturnsListFilters } from "./purchase-returns";
 import { purchasesListFilters } from "./purchases";
-import { getStocktakeListPage } from "./stocktakes";
+import { getStocktakeListPage } from "@/lib/data/stocktakes";
 import { parseStockStatus } from "./stock";
 import { getCategoriesWithCounts } from "@/lib/data/categories";
 

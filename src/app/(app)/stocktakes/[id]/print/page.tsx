@@ -1,9 +1,7 @@
-import { and, asc, eq, sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { AutoPrint } from "@/components/print/auto-print";
-import { db } from "@/db";
-import { products, profiles, stocktakeItems, stocktakes, warehouses } from "@/db/schema";
+import { getStocktakePrintData } from "@/lib/data/stocktakes";
 import { requireStockAccess } from "@/lib/actions/common";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 import { Routes } from "@/lib/routes";
@@ -19,50 +17,9 @@ export default async function PrintStocktakePage({ params }: { params: Promise<{
   const t = await getTranslations();
   const canViewValues = canViewPurchasePrices(gate.role);
 
-  const [stocktake] = await db
-    .select({
-      id: stocktakes.id,
-      code: stocktakes.code,
-      status: stocktakes.status,
-      note: stocktakes.note,
-      createdAt: stocktakes.createdAt,
-      balancedAt: stocktakes.balancedAt,
-      warehouseName: warehouses.name,
-      byName: profiles.fullName,
-    })
-    .from(stocktakes)
-    .innerJoin(warehouses, and(
-      eq(stocktakes.warehouseId, warehouses.id),
-      eq(warehouses.storeId, gate.storeId),
-    ))
-    .leftJoin(profiles, and(
-      eq(stocktakes.createdBy, profiles.id),
-      eq(profiles.storeId, gate.storeId),
-    ))
-    .where(and(eq(stocktakes.storeId, gate.storeId), eq(stocktakes.id, id)))
-    .limit(1);
-  if (!stocktake) notFound();
-
-  const items = await db
-    .select({
-      id: stocktakeItems.id,
-      productName: sql<string>`case when ${products.lifecycleStatus} = 'deleted' then ${products.name} || ' {DEL}' else ${products.name} end`,
-      sku: products.sku,
-      baseUnit: products.baseUnit,
-      systemQty: stocktakeItems.systemQty,
-      actualQty: stocktakeItems.actualQty,
-      costPrice: canViewValues ? products.costPrice : sql<string | null>`null`,
-    })
-    .from(stocktakeItems)
-    .innerJoin(products, and(
-      eq(stocktakeItems.productId, products.id),
-      eq(products.storeId, gate.storeId),
-    ))
-    .where(and(
-      eq(stocktakeItems.storeId, gate.storeId),
-      eq(stocktakeItems.stocktakeId, id),
-    ))
-    .orderBy(asc(products.name), asc(products.sku));
+  const data = await getStocktakePrintData(gate.storeId, id, canViewValues);
+  if (!data) notFound();
+  const { stocktake, items } = data;
 
   const summary = items.reduce((total, item) => {
     const diff = Number(item.actualQty) - Number(item.systemQty);

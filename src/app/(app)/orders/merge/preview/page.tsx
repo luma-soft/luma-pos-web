@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { and, eq, inArray } from "drizzle-orm";
-import { db } from "@/db";
-import { einvoices } from "@/db/schema";
+import { getIssuedEInvoiceOrderIds } from "@/lib/data/web-pages";
 import { AutoPrint } from "@/components/print/auto-print";
 import { PrintDoc } from "@/components/print/print-doc";
 import { shouldShowPrintTax } from "@/lib/print/template-shared";
@@ -43,16 +41,7 @@ export default async function MergePrintPreviewPage({ searchParams }: Props) {
   }
 
   const [issuedEInvoice, template] = await Promise.all([
-    db
-      .select({ id: einvoices.id })
-      .from(einvoices)
-      .where(and(
-        eq(einvoices.storeId, context.storeId),
-        inArray(einvoices.orderId, ids),
-        eq(einvoices.status, "issued"),
-      ))
-      .limit(1)
-      .then((rows) => rows[0]),
+    getIssuedEInvoiceOrderIds(context.storeId, ids).then((rows) => rows[0]),
     getPrintTemplate(context.storeId, "order", params.templateId),
   ]);
   if (issuedEInvoice) notFound();

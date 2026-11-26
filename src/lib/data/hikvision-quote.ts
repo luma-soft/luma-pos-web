@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { brands, products } from "@/db/schema";
 import { CAMERA_IP_QUOTE_SKUS } from "@/lib/data/camera-ip-quote";
 
-export const HIKVISION_QUOTE_SKUS = CAMERA_IP_QUOTE_SKUS;
+export { CAMERA_IP_QUOTE_SKUS as HIKVISION_QUOTE_SKUS };
 
 export type HikvisionQuoteProduct = {
   id: string;
@@ -26,7 +26,7 @@ export async function getHikvisionQuoteProducts(storeId: string): Promise<Hikvis
     })
     .from(products)
     .leftJoin(brands, eq(products.brandId, brands.id))
-    .where(and(eq(products.storeId, storeId), inArray(products.sku, [...HIKVISION_QUOTE_SKUS])))
+    .where(and(eq(products.storeId, storeId), inArray(products.sku, [...CAMERA_IP_QUOTE_SKUS])))
     .orderBy(asc(products.name));
 
   return rows.map((row) => ({

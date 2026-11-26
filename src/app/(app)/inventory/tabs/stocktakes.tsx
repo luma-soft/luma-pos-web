@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { and, count, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
 import { ClipboardCheck, Plus } from "lucide-react";
 import { ListSearchInput } from "@/components/list-search-filter";
-import { db } from "@/db";
-import { profiles, stocktakeItems, stocktakes, warehouses } from "@/db/schema";
+import { getStocktakeListPage } from "@/lib/data/stocktakes";
 import { Routes } from "@/lib/routes";
 import { StocktakesTable } from "./stocktakes-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
@@ -13,61 +11,9 @@ import { parsePageSize } from "@/lib/pagination";
 import { Pagination } from "@/components/pagination";
 import { DesktopPagination } from "@/components/mobile-load-more";
 import { loadStocktakesPage } from "./load-more-actions";
-import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
-import { stocktakeListSummaryFields } from "@/lib/stocktakes/list-summary-fields";
 
 type SP = Record<string, string | undefined>;
 
-/** Stocktake list query shared by the server page and the phone load-more action. */
-export async function getStocktakeListPage(
-  context: { storeId: string; role: Parameters<typeof canViewPurchasePrices>[0] },
-  searchParams: SP,
-  requestedPage: number,
-  pageSize: number,
-) {
-  const q = searchParams.stocktakeQ?.trim();
-  const searchCondition = q
-    ? or(
-      ilike(stocktakes.code, `%${q}%`),
-      ilike(stocktakes.note, `%${q}%`),
-      ilike(warehouses.name, `%${q}%`),
-      ilike(profiles.fullName, `%${q}%`),
-    )
-    : undefined;
-  const where = and(
-    eq(stocktakes.storeId, context.storeId),
-    ne(stocktakes.status, "cancelled"),
-    searchCondition,
-  );
-  const canViewValues = canViewPurchasePrices(context.role);
-
-  const [countResult] = await db
-    .select({ total: count() })
-    .from(stocktakes)
-    .innerJoin(warehouses, eq(stocktakes.warehouseId, warehouses.id))
-    .leftJoin(profiles, eq(stocktakes.createdBy, profiles.id))
-    .where(where);
-  const total = countResult?.total ?? 0;
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const page = Math.min(requestedPage, pageCount);
-
-  const rows = await db
-    .select({
-      id: stocktakes.id, code: stocktakes.code, status: stocktakes.status, note: stocktakes.note,
-      createdAt: stocktakes.createdAt, balancedAt: stocktakes.balancedAt, warehouseName: warehouses.name, byName: profiles.fullName,
-      itemCount: sql<number>`(select count(*) from ${stocktakeItems} where ${stocktakeItems.stocktakeId} = ${stocktakes.id})::int`,
-      totalDiff: sql<string>`coalesce((select sum(${stocktakeItems.actualQty} - ${stocktakeItems.systemQty}) from ${stocktakeItems} where ${stocktakeItems.stocktakeId} = ${stocktakes.id}), 0)`,
-      ...stocktakeListSummaryFields(context.storeId, canViewValues),
-    })
-    .from(stocktakes)
-    .innerJoin(warehouses, eq(stocktakes.warehouseId, warehouses.id))
-    .leftJoin(profiles, eq(stocktakes.createdBy, profiles.id))
-    .where(where)
-    .orderBy(desc(stocktakes.createdAt))
-    .limit(pageSize)
-    .offset((page - 1) * pageSize);
-  return { rows, total, page, pageCount, canViewValues };
-}
 
 export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
   const context = await requireStoreContext();

@@ -1,22 +1,12 @@
 import { getTranslations } from "next-intl/server";
-import { and, desc, eq } from "drizzle-orm";
 import { FileCheck2 } from "lucide-react";
-import { db } from "@/db";
-import { einvoices, orders } from "@/db/schema";
+import { getEInvoiceQueue } from "@/lib/data/web-pages";
 import { EInvoicesTable } from "./einvoices-table";
 import { requireStoreContext } from "@/lib/auth/store-context";
 
 export async function EInvoicesTab() {
   const [t, context] = await Promise.all([getTranslations(), requireStoreContext()]);
-  const rows = await db
-    .select({
-      id: einvoices.id, number: einvoices.number, serial: einvoices.serial, status: einvoices.status,
-      buyerName: einvoices.buyerName, buyerTaxCode: einvoices.buyerTaxCode, vatRate: einvoices.vatRate,
-      totalBeforeVat: einvoices.totalBeforeVat, vatAmount: einvoices.vatAmount, issuedAt: einvoices.issuedAt,
-      attemptCount: einvoices.attemptCount, nextAttemptAt: einvoices.nextAttemptAt, lastError: einvoices.lastError,
-      orderId: einvoices.orderId, orderCode: orders.code, orderTotal: orders.total,
-    })
-    .from(einvoices).innerJoin(orders, and(eq(einvoices.orderId, orders.id), eq(orders.storeId, context.storeId))).where(eq(einvoices.storeId, context.storeId)).orderBy(desc(einvoices.createdAt)).limit(50);
+  const rows = await getEInvoiceQueue(context.storeId);
 
   return (
     <>
