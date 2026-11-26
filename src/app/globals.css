@@ -537,3 +537,11 @@ select:not([multiple]):not(.ui-select) {
   background-position: right 0.6rem center;
   padding-right: 2rem !important;
 }
+
+/* Dialog surfaces take focus programmatically (tabindex="-1") to hold the
+   focus trap; they are not keyboard stops, so no focus ring around the whole
+   modal (e.g. after a full page load lands on an open detail modal). */
+[role="dialog"][tabindex="-1"]:focus,
+[role="alertdialog"][tabindex="-1"]:focus {
+  outline: none;
+}
