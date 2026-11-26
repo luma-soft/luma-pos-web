@@ -318,6 +318,20 @@ Terminal lần nào.
    > `backups/pre-packaged-20261126_101648.lumaenc`, thư mục `app`. Xóa sau 7
    > ngày chạy ổn. Deploy web giờ đi qua runtime (`assemble-runtime.sh` +
    > `install-runtime` + `activate-runtime`).
+   > **Cài lại thử bằng DMG trên store Mac 2026-11-26 11:05–11:13** (cửa hàng
+   > dừng khoảng 8 phút): `export-for-move`, `uninstall keep-data`, đổi tên
+   > thư mục thành `LumaPOS.before-reinstall-20261126_110543`, rồi trình hướng
+   > dẫn từ DMG (helper v10, runtime `548d528b`): khôi phục từ tệp chuyển máy,
+   > tunnel bằng tệp JSON cũ với 3 tên miền, Drive bằng `rclone.conf` cũ. Mọi
+   > khóa trong `runtime.env` giữ nguyên giá trị (so sánh từng khóa), 3.168 tệp
+   > ảnh khớp, ready 200. Lỗi tìm ra và đã sửa trên đường đi: archive không
+   > mang `runtime.env` (giờ có `settings.env`), tunnel chỉ một tên miền, bỏ
+   > qua bước Sao lưu sau khi khôi phục từ tệp, archive không mang lịch sử sao
+   > lưu (giờ mang, lượt dở dang của máy cũ thành failed), PostgreSQL chạy từ
+   > runtime đã bị xóa sau deploy (mất plpgsql 10:44–10:59, một đơn 84.000đ lỗi;
+   > helper v10 khởi động lại PostgreSQL mỗi lần chuyển runtime và giữ runtime
+   > đang dùng theo `lsof`), và build tự động cần thư mục build trong cache
+   > người dùng khi `/Users/Shared/LumaPOS` thuộc root.
 3. Cập nhật `self-hosted-operations.md`, `ops/macos/README.md`,
    README app Mac.
 
