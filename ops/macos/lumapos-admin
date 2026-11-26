@@ -42,7 +42,7 @@
 #       Prints the backup encryption key so the owner can keep a copy.
 #   lumapos-admin provision-store <slug> <owner-email>
 #       stdin: store name, owner name, owner password (one per line).
-#   lumapos-admin configure-tunnel <hostname>
+#   lumapos-admin configure-tunnel <hostname> [more hostnames]
 #       stdin: Cloudflare tunnel credentials JSON.
 #   lumapos-admin start-services
 #   lumapos-admin configure-drive <remote>
@@ -832,8 +832,12 @@ cmd_provision_store() {
 # (from `cloudflared tunnel create`). Writes the credentials, a config that
 # only publishes the local web server, and the public URL.
 cmd_configure_tunnel() {
-  local hostname="${1:-}" tmp tunnel_id
-  [[ "$hostname" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]] || fail "Hostname is invalid" 64
+  local hostname="${1:-}" tmp tunnel_id name ingress=""
+  (( $# >= 1 && $# <= 10 )) || fail "Pass one to ten hostnames" 64
+  for name in "$@"; do
+    [[ "$name" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]] || fail "Hostname is invalid: $name" 64
+    ingress+="  - hostname: $name"$'\n'"    service: http://127.0.0.1:3000"$'\n'
+  done
   [[ -d "$SECRETS_DIR" && ! -L "$SECRETS_DIR" ]] || fail "Run bootstrap first"
   tmp="$(mktemp "$SECRETS_DIR/.tunnel.XXXXXX")" || fail "Could not create a temporary file"
   head -c 16385 > "$tmp"
@@ -851,9 +855,7 @@ cmd_configure_tunnel() {
 tunnel: $tunnel_id
 credentials-file: $SECRETS_DIR/cloudflared-tunnel.json
 ingress:
-  - hostname: $hostname
-    service: http://127.0.0.1:3000
-  - service: http_status:404
+${ingress}  - service: http_status:404
 EOF
   chown "$SERVICE_USER:staff" "$tmp" && chmod 0600 "$tmp" && mv -f -- "$tmp" "$SECRETS_DIR/cloudflared.yml" \
     || { rm -f "$tmp"; fail "Could not write cloudflared.yml"; }
@@ -1217,7 +1219,7 @@ case "${1:-}" in
   init-runtime-env) shift; cmd_init_runtime_env "${1:-}" ;;
   backup-key) cmd_backup_key ;;
   provision-store) shift; cmd_provision_store "$@" ;;
-  configure-tunnel) shift; cmd_configure_tunnel "${1:-}" ;;
+  configure-tunnel) shift; cmd_configure_tunnel "$@" ;;
   start-services) cmd_start_services ;;
   configure-drive) shift; cmd_configure_drive "${1:-}" ;;
   set-network) shift; cmd_set_network "${1:-}" ;;
@@ -1228,5 +1230,5 @@ case "${1:-}" in
   set-backup-key) cmd_set_backup_key ;;
   list-backups) cmd_list_backups ;;
   restore-backup) shift; cmd_restore_backup "${1:-}" ;;
-  *) fail "Usage: lumapos-admin deploy | service start|stop|restart <name> | log <name> [lines] | version | status | bootstrap <user> | create-accounts | install-runtime <archive> [sha256] | activate-runtime <version> | rollback-runtime | init-database | migrate | write-secret <name> | init-runtime-env [public-url] | backup-key | provision-store <slug> <email> | configure-tunnel <hostname> | start-services | configure-drive <remote> | set-backup-key | list-backups | restore-backup <archive> | set-network <local|lan> | restore-file <path> | export-for-move | cancel-move | uninstall [keep-data|delete-data YYYYMMDD]" 64 ;;
+  *) fail "Usage: lumapos-admin deploy | service start|stop|restart <name> | log <name> [lines] | version | status | bootstrap <user> | create-accounts | install-runtime <archive> [sha256] | activate-runtime <version> | rollback-runtime | init-database | migrate | write-secret <name> | init-runtime-env [public-url] | backup-key | provision-store <slug> <email> | configure-tunnel <hostname>... | start-services | configure-drive <remote> | set-backup-key | list-backups | restore-backup <archive> | set-network <local|lan> | restore-file <path> | export-for-move | cancel-move | uninstall [keep-data|delete-data YYYYMMDD]" 64 ;;
 esac
