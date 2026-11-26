@@ -240,6 +240,7 @@ async function createBackup(runId: string) {
       mediaRoot: resolvedMediaRoot,
       pgDumpPath,
       databaseMajorVersion,
+      settingsPath: process.env.LUMAPOS_ENV_FILE?.trim() || undefined,
       encryptionKey,
     });
     const { archivePath, manifest } = archive;

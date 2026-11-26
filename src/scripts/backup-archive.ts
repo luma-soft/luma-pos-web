@@ -6,7 +6,7 @@
  */
 import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { appendFile, rename, stat, writeFile } from "node:fs/promises";
+import { appendFile, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { pipeline } from "node:stream/promises";
@@ -23,6 +23,34 @@ export type BackupArchiveManifest = {
   excluded: string[];
   files: Array<{ name: string; sizeBytes: number; sha256: string }>;
 };
+
+/**
+ * Settings that belong to one machine or one database cluster; the rest of
+ * runtime.env (keys that encrypt or sign stored data, feature flags) travels
+ * with the archive so a restore on another Mac keeps working.
+ */
+export const MACHINE_SPECIFIC_SETTINGS = new Set([
+  "DATABASE_URL",
+  "MIGRATION_DATABASE_URL",
+  "LUMAPOS_RCLONE_BIN",
+  "LUMAPOS_POSTGRES_BIN_DIR",
+  "LUMAPOS_BUN_BIN",
+  "LUMAPOS_LISTEN_ADDRESS",
+  "LUMAPOS_LAN_HTTP",
+]);
+
+/** runtime.env without machine-specific keys; the last value of a key wins. */
+export function portableSettings(envText: string): string {
+  const values = new Map<string, string>();
+  for (const rawLine of envText.split(/\r?\n/)) {
+    const line = rawLine.replace(/^\s*(export\s+)?/, "");
+    const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+    if (!match || MACHINE_SPECIFIC_SETTINGS.has(match[1])) continue;
+    values.delete(match[1]);
+    values.set(match[1], match[2]);
+  }
+  return [...values].map(([key, value]) => `${key}=${value}\n`).join("");
+}
 
 export function runQuietly(command: string, args: string[], env: NodeJS.ProcessEnv = process.env) {
   return new Promise<void>((resolve, reject) => {
@@ -62,6 +90,8 @@ export async function buildEncryptedArchive(input: {
   pgDumpPath: string;
   databaseMajorVersion: number;
   encryptionKey: Buffer;
+  /** runtime.env of this Mac; its portable settings go into the archive. */
+  settingsPath?: string;
 }): Promise<{ archivePath: string; manifest: BackupArchiveManifest; sizeBytes: number; sha256: string }> {
   const { workDirectory, databaseUrl } = input;
   const dumpPath = path.join(workDirectory, "database.dump");
@@ -88,21 +118,40 @@ export async function buildEncryptedArchive(input: {
   ], sourceEnvironment);
   await runQuietly("tar", ["-czf", mediaArchivePath, "-C", input.mediaRoot, "."]);
 
+  const settingsFile = path.join(workDirectory, "settings.env");
+  const includeSettings = Boolean(input.settingsPath);
+  if (input.settingsPath) {
+    await writeFile(settingsFile, portableSettings(await readFile(input.settingsPath, "utf8")), { mode: 0o600, flag: "wx" });
+  }
   const [dumpStats, mediaStats] = await Promise.all([stat(dumpPath), stat(mediaArchivePath)]);
   const manifest: BackupArchiveManifest = {
     format: "postgres-custom-and-media-aes-256-gcm",
     version: 1,
     createdAt: new Date().toISOString(),
     databaseMajorVersion: input.databaseMajorVersion,
-    included: ["public PostgreSQL schema and data", "local media files"],
-    excluded: ["database_backup_runs history", "secrets stored outside PostgreSQL", "Supabase-managed schemas"],
+    included: [
+      "public PostgreSQL schema and data",
+      "local media files",
+      ...(includeSettings ? ["runtime settings and keys (settings.env)"] : []),
+    ],
+    excluded: [
+      "database_backup_runs history",
+      includeSettings ? "database URLs and machine paths" : "secrets stored outside PostgreSQL",
+      "Supabase-managed schemas",
+    ],
     files: [
       { name: "database.dump", sizeBytes: dumpStats.size, sha256: await sha256File(dumpPath) },
       { name: "media.tar.gz", sizeBytes: mediaStats.size, sha256: await sha256File(mediaArchivePath) },
+      ...(includeSettings
+        ? [{ name: "settings.env", sizeBytes: (await stat(settingsFile)).size, sha256: await sha256File(settingsFile) }]
+        : []),
     ],
   };
   await writeFile(path.join(workDirectory, "manifest.json"), JSON.stringify(manifest), { mode: 0o600, flag: "wx" });
-  await runQuietly("tar", ["-czf", bundlePath, "-C", workDirectory, "database.dump", "media.tar.gz", "manifest.json"]);
+  await runQuietly("tar", [
+    "-czf", bundlePath, "-C", workDirectory,
+    "database.dump", "media.tar.gz", ...(includeSettings ? ["settings.env"] : []), "manifest.json",
+  ]);
   await encryptFile(bundlePath, partialPath, input.encryptionKey);
   const archivePath = path.join(workDirectory, input.finalName);
   await rename(partialPath, archivePath);

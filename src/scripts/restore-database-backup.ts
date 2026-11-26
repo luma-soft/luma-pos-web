@@ -206,13 +206,13 @@ try {
     || manifest.version !== 1
     || manifest.databaseMajorVersion !== Math.floor(currentVersion / 10_000)
     || !Array.isArray(manifest.files)
-    || manifest.files.length !== 2) {
+    || (manifest.files.length !== 2 && manifest.files.length !== 3)) {
     throw new Error("Backup manifest is incompatible with the target PostgreSQL version");
   }
   const verifiedFiles = new Set<string>();
   for (const expected of manifest.files) {
     if (
-      !/^(database\.dump|media\.tar\.gz)$/.test(expected.name)
+      !/^(database\.dump|media\.tar\.gz|settings\.env)$/.test(expected.name)
       || verifiedFiles.has(expected.name)
       || !Number.isSafeInteger(expected.sizeBytes)
       || expected.sizeBytes < 0
@@ -351,8 +351,18 @@ try {
   ];
   for (const statement of runtimePrivileges) await connection.unsafe(statement);
 
+  // The helper merges these into this Mac's runtime.env (lumapos-admin
+  // restore_archive) and removes the file.
+  const settingsRestored = verifiedFiles.has("settings.env");
+  if (settingsRestored) {
+    const settingsTarget = path.join(resolvedStagingRoot, "restored-settings.env");
+    await rm(settingsTarget, { force: true });
+    await writeFile(settingsTarget, await readFile(path.join(unpackPath, "settings.env")), { mode: 0o600, flag: "wx" });
+  }
+
   console.log(JSON.stringify({
     status: "restored",
+    settingsRestored,
     databaseMajorVersion: manifest.databaseMajorVersion,
     mediaArchiveBytes,
     archiveSha256,

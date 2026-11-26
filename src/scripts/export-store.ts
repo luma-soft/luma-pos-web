@@ -56,6 +56,7 @@ try {
     mediaRoot: resolvedMediaRoot,
     pgDumpPath,
     databaseMajorVersion,
+    settingsPath: process.env.LUMAPOS_ENV_FILE?.trim() || undefined,
     encryptionKey: Buffer.from(encodedKey, "hex"),
   });
   await rename(archive.archivePath, path.join(resolvedStagingRoot, finalName));

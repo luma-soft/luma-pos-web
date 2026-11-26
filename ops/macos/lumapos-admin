@@ -67,7 +67,7 @@ set -uo pipefail
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 umask 022
 
-readonly HELPER_VERSION=8
+readonly HELPER_VERSION=9
 readonly LUMAPOS_ROOT=/Users/Shared/LumaPOS
 readonly LIVE_ROOT="$LUMAPOS_ROOT/app"
 readonly STAGING_ROOT="$LUMAPOS_ROOT/app-next"
@@ -987,6 +987,25 @@ cmd_list_backups() {
   run_worker list-backups || fail "Could not read the backups on Google Drive (check rclone.conf and the folder)"
 }
 
+# Archives carry the old Mac's runtime settings (keys that encrypt or sign
+# stored data, feature flags; not the database URLs or machine paths). The
+# restore worker leaves them in backup-staging; they replace this Mac's
+# generated values.
+readonly MACHINE_SPECIFIC_KEYS=" DATABASE_URL MIGRATION_DATABASE_URL LUMAPOS_RCLONE_BIN LUMAPOS_POSTGRES_BIN_DIR LUMAPOS_BUN_BIN LUMAPOS_LISTEN_ADDRESS LUMAPOS_LAN_HTTP "
+merge_restored_settings() {
+  local file="$LUMAPOS_ROOT/backup-staging/restored-settings.env" line key count=0
+  [[ -f "$file" && ! -L "$file" ]] || return 0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] || continue
+    key="${BASH_REMATCH[1]}"
+    [[ "$MACHINE_SPECIFIC_KEYS" == *" $key "* ]] && continue
+    set_env_value "$key" "${BASH_REMATCH[2]}" || { rm -f -- "$file"; return 1; }
+    count=$((count + 1))
+  done < "$file"
+  rm -f -- "$file"
+  step "settings $count keys from the archive"
+}
+
 # Restores <archive> (a Drive key or an archive name in backup-staging) into
 # this empty install, then applies the migrations of the active runtime.
 restore_archive() {
@@ -1005,6 +1024,7 @@ restore_archive() {
   step "restore (large backups take a while)"
   run_worker restore-backup --confirm-empty-database --archive "$archive" >/dev/null \
     || return 1
+  merge_restored_settings || fail "The backup was restored but its settings could not be applied"
   step "migrate"
   run_migrations >/dev/null || fail "The backup was restored but migrations failed"
   step "restored"
