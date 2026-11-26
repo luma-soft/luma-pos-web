@@ -10,7 +10,7 @@ import { Button, Input, MoneyInput, QuantityInput, Select } from "@/components/u
 import { formatNumber } from "@/lib/utils";
 import { buildVariantCombinations } from "@/lib/products/variant-model";
 import { compareVariantValues } from "@/lib/products/variant-presentation";
-import type { CreateProductInput } from "./schema";
+import type { CreateProductInput } from "@/lib/products/create-product-schema";
 import { initialVariantCombinationBudget, reconcileVariantChildDrafts } from "./variant-child-drafts";
 import { useTranslations } from "next-intl";
 import {

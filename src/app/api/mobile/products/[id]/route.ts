@@ -7,7 +7,7 @@ import {
 } from "@/lib/actions/products";
 import { getProduct } from "@/lib/data/products";
 import { saveProductVariantGroup } from "@/lib/actions/product-variants";
-import type { CreateProductInput } from "@/app/(app)/products/new/schema";
+import type { CreateProductInput } from "@/lib/products/create-product-schema";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import {
   mobileAction,

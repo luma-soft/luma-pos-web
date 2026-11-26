@@ -3,7 +3,7 @@
 import { db } from "@/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { products } from "@/db/schema";
-import { createProductSchema, type CreateProductInput } from "@/app/(app)/products/new/schema";
+import { createProductSchema, type CreateProductInput } from "@/lib/products/create-product-schema";
 import { requireStockAccess, pgErrorCode, type ActionResult } from "./common";
 import { saveVariantGroupInTransaction } from "@/lib/products/variant-write";
 import { VariantValidationError } from "@/lib/products/variant-model";

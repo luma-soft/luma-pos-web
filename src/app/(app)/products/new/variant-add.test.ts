@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createProductSchema } from "./schema";
+import { createProductSchema } from "@/lib/products/create-product-schema";
 import { prepareVariantAddition, variantAddFieldLabel } from "./variant-add";
 import { buildVariantCombinations } from "@/lib/products/variant-model";
 

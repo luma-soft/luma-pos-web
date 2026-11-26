@@ -5,7 +5,7 @@ import { useFieldArray, useFormContext, Controller, useWatch } from "react-hook-
 import { useTranslations } from "next-intl";
 import { ArrowDown, ArrowUp, Plus, Settings2, Tag, Trash2 } from "lucide-react";
 import { Button, Select } from "@/components/ui";
-import type { CreateProductInput } from "./schema";
+import type { CreateProductInput } from "@/lib/products/create-product-schema";
 import { buildAttributeNameOptions } from "./attribute-name-options";
 import { getProductAttributes } from "@/lib/actions/product-attributes";
 import { findCatalogAttribute, type ProductAttribute } from "@/lib/products/attribute-catalog";

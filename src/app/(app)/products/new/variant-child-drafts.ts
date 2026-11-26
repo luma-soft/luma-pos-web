@@ -1,5 +1,5 @@
 import { reconcileVariantRows, variantCombinationBudget, type VariantCombination } from "@/lib/products/variant-model";
-import type { CreateProductInput } from "./schema";
+import type { CreateProductInput } from "@/lib/products/create-product-schema";
 
 type Child = NonNullable<CreateProductInput["variantChildren"]>[number];
 

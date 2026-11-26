@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { attributeValueChange } from "./attribute-value-change";
-import { createProductSchema } from "./schema";
+import { createProductSchema } from "@/lib/products/create-product-schema";
 
 for (const label of ["1*1.0", "1*1.0*"]) {
   test(`renaming a selected SKU to ${label} preserves identity and passes single-product validation`, () => {

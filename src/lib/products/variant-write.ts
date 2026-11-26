@@ -4,7 +4,7 @@ import { and, eq, inArray, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "@/db/schema";
 import { brands, categories, products, productSuppliers, productUnits, stockLevels, stockMovements, suppliers, warehouses, profiles, priceBooks, productPrices } from "@/db/schema";
-import type { CreateProductOutput } from "@/app/(app)/products/new/schema";
+import type { CreateProductOutput } from "@/lib/products/create-product-schema";
 import { buildVariantCombinations, MAX_VARIANT_COMBINATIONS, normalizeVariantAttributes, validateVariantSubmission, variantCombinationBudget, variantCombinationKey, VariantValidationError, variantNameKey, type NormalizedVariantAttribute } from "./variant-model";
 
 type Tx = Parameters<Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]>[0];

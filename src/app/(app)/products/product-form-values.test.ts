@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ProductDetail } from "@/lib/data/products";
-import { createProductSchema } from "./new/schema";
+import { createProductSchema } from "@/lib/products/create-product-schema";
 import { latestVariantMemberId, productToFormInitialValues, resolveProductFormSeed } from "./product-form-values";
 
 const base = {

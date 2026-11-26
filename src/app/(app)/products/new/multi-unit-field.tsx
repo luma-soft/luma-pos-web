@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { Plus, Trash2 } from "lucide-react";
 import { Button, Checkbox, Input, NumberInput, MoneyInput, Field } from "@/components/ui";
 import { formatNumber } from "@/lib/utils";
-import type { CreateProductInput } from "./schema";
+import type { CreateProductInput } from "@/lib/products/create-product-schema";
 
 export function MultiUnitField() {
   const t = useTranslations();

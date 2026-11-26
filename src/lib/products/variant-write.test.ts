@@ -7,7 +7,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { SQL } from "drizzle-orm";
 import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
 import * as schema from "@/db/schema";
-import { createProductSchema, type CreateProductInput } from "@/app/(app)/products/new/schema";
+import { createProductSchema, type CreateProductInput } from "@/lib/products/create-product-schema";
 import { buildVariantCombinations, variantCombinationBudget } from "./variant-model";
 import { prepareVariantAddition } from "@/app/(app)/products/new/variant-add";
 import { saveVariantGroupInTransaction } from "./variant-write";

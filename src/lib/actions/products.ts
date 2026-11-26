@@ -31,7 +31,7 @@ import {
   productUnitSchema,
   siblingApplySchema,
   type CreateProductOutput,
-} from "@/app/(app)/products/new/schema";
+} from "@/lib/products/create-product-schema";
 import { Routes } from "@/lib/routes";
 import {
   pgErrorCode,

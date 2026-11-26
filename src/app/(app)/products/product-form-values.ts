@@ -1,5 +1,5 @@
 import type { ProductDetail } from "@/lib/data/products";
-import type { CreateProductInput } from "./new/schema";
+import type { CreateProductInput } from "@/lib/products/create-product-schema";
 import { buildVariantCombinations, normalizeVariantAttributes, variantCombinationBudget, variantNameKey } from "@/lib/products/variant-model";
 
 export type ProductSeedMode = "edit" | "copy" | "groupCopy" | "sameType" | "groupEdit" | "groupAdd";

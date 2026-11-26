@@ -1,4 +1,4 @@
-import type { CreateProductOutput } from "./schema";
+import type { CreateProductOutput } from "@/lib/products/create-product-schema";
 import { buildVariantCombinations, normalizeVariantAttributes, variantCombinationKey, variantNameKey, VariantValidationError } from "@/lib/products/variant-model";
 
 export function variantAddFieldLabel(attributeName: string): string {

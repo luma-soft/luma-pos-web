@@ -1,4 +1,4 @@
-import type { CreateProductInput } from "./schema";
+import type { CreateProductInput } from "@/lib/products/create-product-schema";
 
 type Attribute = NonNullable<CreateProductInput["attributes"]>[number];
 

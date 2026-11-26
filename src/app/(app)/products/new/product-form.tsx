@@ -45,7 +45,7 @@ import {
   createProductSchema,
   type CreateProductInput,
   type CreateProductOutput,
-} from "./schema";
+} from "@/lib/products/create-product-schema";
 import { MultiUnitField } from "./multi-unit-field";
 import { UnitPriceConfirmation } from "./unit-price-confirmation";
 import { buildUnitPriceReview, normalizeUnitPriceDraft, type UnitPricingSnapshot, type UnitPriceBook } from "@/lib/products/unit-price-edit";
