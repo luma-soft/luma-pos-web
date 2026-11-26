@@ -1,7 +1,6 @@
 "use client";
 
 import { useMobileLoadMore, type LoadMoreSource } from "@/components/mobile-load-more";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { BarChart3, Bot, Box, CheckCircle2, ChevronRight, CircleAlert, Clock, ExternalLink, FileWarning, History, PackageCheck, RefreshCw, ShieldAlert, Smartphone, Sparkles, UserRound, Waypoints, XCircle } from "lucide-react";
@@ -10,6 +9,7 @@ import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/component
 import { cn, formatDate } from "@/lib/utils";
 import { NOTIFICATION_INBOX_CHANGED_EVENT } from "@/lib/notifications/inbox-count";
 import { OrderDetailLink } from "@/components/order-detail-link";
+import { DetailReturnLink } from "@/components/detail-return-link";
 import type { AuditSource, AuditStatus } from "@/lib/audit";
 import {
   activityActionKey, activityEntity, activityObject, activityPrompt,
@@ -453,9 +453,9 @@ function ExpandedAudit({ row }: { row: AuditRow }) {
           <h3 className="text-xs font-semibold text-slate-500">{t("notifications.activity.subject")}</h3>
           <div className="text-base font-semibold">{activityRecordLabel(entity)}</div>
           {entity.context && <p className="text-slate-600">{t("notifications.activity.project")}: {entity.context}</p>}
-          {href && <Link href={href} onClick={stopRowToggle} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary-600 px-4 font-semibold text-white hover:bg-primary-700">
+          {href && <DetailReturnLink href={href} onClick={stopRowToggle} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary-600 px-4 font-semibold text-white hover:bg-primary-700">
             {t(entity.type === "service_job" ? "notifications.activity.openProject" : "notifications.activity.openRecord")}<ExternalLink className="h-4 w-4" />
-          </Link>}
+          </DetailReturnLink>}
         </section>
       )}
       {(serviceType || version !== null) && <dl className="flex flex-wrap gap-x-8 gap-y-3 rounded-xl bg-canvas p-4">
@@ -487,7 +487,7 @@ function ExpandedAudit({ row }: { row: AuditRow }) {
                   </OrderDetailLink>
                 );
               }
-              return href ? <Link key={`${label}-${index}`} href={href} onClick={stopRowToggle} className="inline-flex min-h-11 min-w-11">{chip}</Link> : <span key={`${label}-${index}`}>{chip}</span>;
+              return href ? <DetailReturnLink key={`${label}-${index}`} href={href} onClick={stopRowToggle} className="inline-flex min-h-11 min-w-11">{chip}</DetailReturnLink> : <span key={`${label}-${index}`}>{chip}</span>;
             })}
           </div>
         </div>

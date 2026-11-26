@@ -25,7 +25,7 @@ function switchTarget(target?: string, id?: string) {
     case "customers":
     case "crm":
     case "debt":
-      return id ? `/partners?tab=customers&expandedCustomer=${encodeURIComponent(id)}` : `${Routes.Partners}?tab=customers`;
+      return id ? Routes.customerDetail(id) : `${Routes.Partners}?tab=customers`;
     case "reports":
     case "sales":
       return Routes.Reports;

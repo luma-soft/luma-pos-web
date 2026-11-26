@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useModalClose } from "@/components/use-modal-close";
 import { ChevronLeft, X } from "lucide-react";
 import { useHideMobileTabBar } from "@/components/mobile-tabbar-visibility";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ export function InventoryDrawer({
   icon,
   closeLabel,
   closeHref,
+  closeModalParam,
   onClose,
   children,
   footer,
@@ -28,6 +29,8 @@ export function InventoryDrawer({
   icon: ReactNode;
   closeLabel: string;
   closeHref?: string;
+  /** Query key that opens this drawer on `closeHref`'s page; closing goes back to the page without it. */
+  closeModalParam?: string;
   onClose?: () => void;
   children: ReactNode;
   footer?: ReactNode;
@@ -37,7 +40,7 @@ export function InventoryDrawer({
   mobileSubtitleClassName?: string;
   footerClassName?: string;
 }) {
-  const router = useRouter();
+  const closeToOpener = useModalClose(closeHref ?? "/", { modalParam: closeModalParam });
   const [isVisible, setIsVisible] = useState(false);
   useHideMobileTabBar();
   const closeRef = useRef<() => void>(() => {});
@@ -52,12 +55,12 @@ export function InventoryDrawer({
     closeTimerRef.current = setTimeout(() => {
       closeTimerRef.current = null;
       if (closeHref) {
-        router.push(closeHref, { scroll: false });
+        closeToOpener();
       } else {
         onClose?.();
       }
     }, prefersReducedMotion ? 0 : 300);
-  }, [closeHref, onClose, router]);
+  }, [closeHref, closeToOpener, onClose]);
   useEffect(() => {
     closeRef.current = close;
   }, [close]);

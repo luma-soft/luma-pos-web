@@ -16,6 +16,7 @@ import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/lib/routes";
 import { notificationHref } from "./notification-actions";
+import { prepareDetailNavigation } from "@/lib/detail-return";
 import { NOTIFICATION_INBOX_CHANGED_EVENT } from "@/lib/notifications/inbox-count";
 import {
   InboxNotificationsTable,
@@ -280,7 +281,7 @@ export function NotificationsClient({
       if (!href) return;
       if (/^https?:\/\//i.test(href))
         window.open(href, "_blank", "noopener,noreferrer");
-      else router.push(href);
+      else router.push(prepareDetailNavigation(href), { scroll: false });
     });
   }
 

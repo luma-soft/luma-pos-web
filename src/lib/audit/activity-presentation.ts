@@ -43,8 +43,8 @@ export function activityRecordHref(record: ActivityRecord) {
   const id = encodeURIComponent(record.id);
   switch (record.type) {
     case "product": case "product_price": return Routes.product(record.id);
-    case "customer": return `/partners?tab=customers&expandedCustomer=${id}`;
-    case "supplier": return `/partners?tab=suppliers&expanded=${id}`;
+    case "customer": return Routes.customerDetail(record.id);
+    case "supplier": return Routes.supplierDetail(record.id);
     case "booking": return Routes.salesOrder(record.id, "confirmed");
     case "quote": return Routes.salesOrder(record.id, "quote");
     case "order": case "invoice": return Routes.salesOrder(record.id, "completed");

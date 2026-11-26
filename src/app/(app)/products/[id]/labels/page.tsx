@@ -19,6 +19,7 @@ import { Select } from "@/components/ui/select";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { ModalLayerSurface } from "@/components/ui/modal-layer-surface";
+import { ModalCloseLink } from "@/components/ui/modal-close-link";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -150,7 +151,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
       <ModalLayerSurface as="section" closeHref={`${Routes.Inventory}?tab=products`} lockScroll role="dialog" aria-modal="true" aria-labelledby="label-print-title" className="flex h-dvh w-full max-w-7xl flex-col overflow-hidden bg-surface max-lg:bg-canvas shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl print:h-auto print:max-w-none print:overflow-visible print:border-0 print:shadow-none">
         {/* Phones: ProductLabelPrintView nav bar (Cancel · title · Print). */}
         <header className="flex shrink-0 items-center gap-2 px-ios-inset pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] lg:hidden print:hidden">
-          <Link href={`${Routes.Inventory}?tab=products`} className="flex min-h-11 w-24 items-center text-[17px] text-ios-accent">{t("common.cancel")}</Link>
+          <ModalCloseLink href={`${Routes.Inventory}?tab=products`} className="flex min-h-11 w-24 items-center text-[17px] text-ios-accent">{t("common.cancel")}</ModalCloseLink>
           <div className="min-w-0 flex-1 text-center">
             <h1 className="truncate text-[17px] font-semibold">{t("products.labels.title")}</h1>
             <p className="truncate text-[12px] text-ios-label-secondary">{isBatch ? t("products.labels.selectedCount", { count: products.length }) : product.name}</p>
@@ -164,7 +165,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           </div>
           <div className="flex items-center gap-2">
             <LabelPrintButton label={t("products.labels.print")} />
-            <Link href={`${Routes.Inventory}?tab=products`} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-700 lg:h-9 lg:w-9" aria-label={t("common.close")}><X className="h-5 w-5" /></Link>
+            <ModalCloseLink href={`${Routes.Inventory}?tab=products`} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-700 lg:h-9 lg:w-9" aria-label={t("common.close")}><X className="h-5 w-5" /></ModalCloseLink>
           </div>
         </header>
 

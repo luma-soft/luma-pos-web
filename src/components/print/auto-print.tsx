@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useModalClose } from "@/components/use-modal-close";
 import { waitForPrintImages } from "@/lib/print/wait-for-images";
 
 export function AutoPrint({ closeHref, printTitle }: { closeHref: string; printTitle?: string }) {
-  const router = useRouter();
+  // After printing, go back to the screen that opened the print page (a
+  // detail modal, a filtered list); `closeHref` only when there is none.
+  const closeToOpener = useModalClose(closeHref, { anyOpener: true });
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -29,10 +32,10 @@ export function AutoPrint({ closeHref, printTitle }: { closeHref: string; printT
       restoreDocumentTitle();
       if (searchParams.get("autoclose") === "1") {
         window.close();
-        window.setTimeout(() => router.replace(closeHref, { scroll: false }), 250);
+        window.setTimeout(closeToOpener, 250);
         return;
       }
-      router.replace(closeHref, { scroll: false });
+      closeToOpener();
     };
     window.addEventListener("afterprint", close, { once: true });
     let cancelled = false;
@@ -44,7 +47,7 @@ export function AutoPrint({ closeHref, printTitle }: { closeHref: string; printT
       window.removeEventListener("afterprint", close);
       restoreDocumentTitle();
     };
-  }, [closeHref, printTitle, router, searchParams]);
+  }, [closeToOpener, printTitle, searchParams]);
 
   return <div className="print:hidden fixed inset-0 z-[100] grid place-items-center bg-white" aria-live="polite">Đang mở hộp thoại in…</div>;
 }

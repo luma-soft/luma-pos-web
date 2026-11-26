@@ -111,6 +111,7 @@ async function StockStatusDetail({
       icon={<Warehouse className="h-5 w-5" />}
       closeLabel={t("common.close")}
       closeHref={`${Routes.Inventory}?tab=stock`}
+      closeModalParam="stockStatus"
       mobileSubtitle={`${formatNumber(total)} SKU`}
       footerClassName="max-lg:hidden"
       mobileSubtitleClassName={status === "lowStock" ? "text-ios-orange" : status === "inStock" ? "text-ios-green" : "text-ios-red"}

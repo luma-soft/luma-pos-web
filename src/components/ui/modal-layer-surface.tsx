@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, type HTMLAttributes } from "react";
-import { useRouter } from "next/navigation";
+import { useModalClose } from "@/components/use-modal-close";
 import { useModalLayer } from "@/components/ui/use-modal-layer";
 
 /**
  * Modal surface for server-rendered pages: registers the surface in the
- * app-wide modal layer stack, and on Escape navigates to `closeHref`.
+ * app-wide modal layer stack, and on Escape closes back to the page that
+ * opened it (or `closeHref` with its remembered list filters).
  */
 export function ModalLayerSurface({
   as: Tag = "section",
@@ -18,10 +19,10 @@ export function ModalLayerSurface({
   closeHref?: string;
   lockScroll?: boolean;
 }) {
-  const router = useRouter();
+  const close = useModalClose(closeHref ?? "/");
   const surfaceRef = useRef<HTMLElement>(null);
   useModalLayer({
-    onEscape: closeHref ? () => router.push(closeHref) : undefined,
+    onEscape: closeHref ? close : undefined,
     lockScroll,
     elementRef: surfaceRef,
   });

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { detailReturnAction, rememberDetailNavigation, safeReturnHref, withReturnTo } from "./detail-return.ts";
+import { detailReturnAction, modalCloseAction, rememberDetailNavigation, resolveDetailHref, safeReturnHref, withReturnTo } from "./detail-return.ts";
 
 describe("detail return", () => {
   test("adds returnTo only when the detail lives on another page", () => {
@@ -23,5 +23,60 @@ describe("detail return", () => {
       expect(detailReturnAction(value)).toEqual({ kind: "none" });
     }
     expect(safeReturnHref("/sales?tab=orders#x")).toBe("/sales?tab=orders#x");
+  });
+});
+
+describe("record links keep the current page", () => {
+  const origin = "/notifications?tab=activity&page=2";
+
+  test("orders and purchases open in place", () => {
+    expect(resolveDetailHref("/sales?tab=orders&detailOrderId=o1", origin))
+      .toEqual({ href: "/notifications?tab=activity&page=2&detailOrderId=o1", remember: false });
+    expect(resolveDetailHref("/purchases/p1", origin))
+      .toEqual({ href: "/notifications?tab=activity&page=2&detailPurchaseId=p1", remember: false });
+    expect(resolveDetailHref("/purchases/new", origin).href).toBe("/purchases/new");
+  });
+
+  test("partners carry returnTo", () => {
+    const resolved = resolveDetailHref("/partners?tab=customers&detailCustomerId=c1", origin);
+    expect(resolved.remember).toBe(true);
+    expect(new URL(resolved.href, "http://x").searchParams.get("returnTo")).toBe(origin);
+  });
+
+  test("other links are unchanged", () => {
+    for (const href of ["/products/x", "/projects/y", "/pos", "https://example.com/a"]) {
+      expect(resolveDetailHref(href, origin)).toEqual({ href, remember: false });
+    }
+  });
+});
+
+describe("route-backed modal close", () => {
+  function withHistory(previousUrl, run) {
+    globalThis.window = {
+      location: { origin: "http://luma.local" },
+      navigation: previousUrl
+        ? { currentEntry: { index: 1 }, entries: () => [{ url: `http://luma.local${previousUrl}` }, { url: "http://luma.local/now" }] }
+        : { currentEntry: { index: 0 }, entries: () => [{ url: "http://luma.local/now" }] },
+    };
+    try { run(); } finally { delete globalThis.window; }
+  }
+
+  test("goes back to the opener, else to the fallback", () => {
+    withHistory("/inventory?tab=products&q=den", () => {
+      expect(modalCloseAction("/inventory?tab=products")).toEqual({ kind: "back" });
+    });
+    withHistory("/inventory?tab=stock&stockStatus=lowStock&page=2", () => {
+      const isOpener = (previous) => !previous.searchParams.has("stockStatus");
+      expect(modalCloseAction("/inventory?tab=stock", isOpener)).toEqual({ kind: "replace", href: "/inventory?tab=stock" });
+    });
+    withHistory(null, () => {
+      expect(modalCloseAction("/inventory?tab=products")).toEqual({ kind: "replace", href: "/inventory?tab=products" });
+    });
+  });
+
+  test("partner detail goes back when the previous entry is returnTo", () => {
+    withHistory("/inventory?tab=purchases", () => {
+      expect(detailReturnAction("/inventory?tab=purchases")).toEqual({ kind: "back" });
+    });
   });
 });
