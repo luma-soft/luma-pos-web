@@ -208,6 +208,8 @@ refresh_backups() {
 }
 
 cmd_deploy() {
+  # A packaged install updates through install-runtime + activate-runtime.
+  [[ -L "$LUMAPOS_ROOT/current" ]] && fail "This Mac runs the packaged install; deploy a runtime with install-runtime and activate-runtime" 65
   check_staging
   [[ -d "$LIVE_ROOT" && ! -L "$LIVE_ROOT" ]] || fail "No live release at $LIVE_ROOT"
   local stamp previous

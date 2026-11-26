@@ -12,6 +12,10 @@
 #   lumapos-runtime-<version>/          app/  postgresql-17/  tools/bin/  manifest.json
 #   lumapos-runtime-<version>.tar.gz    and .sha256
 #
+# The last line is RUNTIME:<archive path>. The unpacked folder is removed
+# after packaging, and only the newest $LUMAPOS_RUNTIME_KEEP archives (3)
+# stay, since the store Mac builds one for every web deploy.
+#
 # manifest.json lists every file with its SHA-256; `lumapos-admin
 # install-runtime` checks it before a runtime can be activated. Signing the
 # package (EdDSA) belongs to the release step (phase 5).
@@ -90,3 +94,10 @@ step "package"
 COPYFILE_DISABLE=1 tar -czf "$archive" -C "$build_root" "$name"
 shasum -a 256 "$archive" | awk '{print $1}' > "$archive.sha256"
 step "built $name ($(du -sh "$out_dir" | cut -f1), archive $(du -h "$archive" | cut -f1))"
+rm -rf "$out_dir"
+keep="${LUMAPOS_RUNTIME_KEEP:-3}"
+ls -1 "$build_root"/lumapos-runtime-*.tar.gz 2>/dev/null | sort -r | tail -n "+$((keep + 1))" | while IFS= read -r old; do
+  [[ "$old" == "$archive" ]] && continue
+  rm -f -- "$old" "$old.sha256" "$old.sig"
+done
+printf 'RUNTIME:%s\n' "$archive"

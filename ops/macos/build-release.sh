@@ -29,9 +29,11 @@ export NEXT_TELEMETRY_DISABLED=1
 
 step() { printf 'STEP:%s\n' "$1"; }
 
+# The packaged install (root-owned $lumapos_root) stages in the user's cache;
+# assemble-runtime.sh packs it from there.
 case "$staging_root" in
-  "$lumapos_root"/app-next*) ;;
-  *) echo "Staging directory must be $lumapos_root/app-next*" >&2; exit 64 ;;
+  "$lumapos_root"/app-next*|"$HOME"/Library/Caches/LumaPOS/app-next*) ;;
+  *) echo "Staging directory must be $lumapos_root/app-next* or ~/Library/Caches/LumaPOS/app-next*" >&2; exit 64 ;;
 esac
 case "$layout" in
   runtime|classic) ;;
