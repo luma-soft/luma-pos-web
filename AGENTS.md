@@ -17,7 +17,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Code không chạm DB của backend (types, schema zod, định dạng…) được import qua
   `@/…` (tsconfig rơi về `vendor/backend/src`). `bun run check:backend-boundary`
   phải không báo lỗi: web không được kéo code DB vào bundle.
-- Chạy local: backend `bun run dev` (cổng 3001) trong `luma-pos-backend`, web
+- Chạy local: backend `bun run dev` (cổng 3201; 3001 là backend thật của store Mac) trong `luma-pos-backend`, web
   `bun run dev` (cổng 3000) ở đây; hai bên dùng chung `LUMAPOS_WEB_PROXY_SECRET`
   trong `.env.local`.
 
