@@ -104,12 +104,14 @@ export async function buildEncryptedArchive(input: {
     PGPASSWORD: decodeURIComponent(databaseUrl.password),
     PGSSLMODE: databaseUrl.searchParams.get("sslmode") ?? "disable",
   };
+  // The backup history is included: a restored store keeps knowing its last
+  // Drive backup (readiness), and the restore marks the runs that were still
+  // queued or running on the old Mac as failed.
   await runQuietly(input.pgDumpPath, [
     "--format=custom",
     "--no-owner",
     "--no-acl",
     "--schema=public",
-    "--exclude-table-data=public.database_backup_runs",
     "--host", databaseUrl.hostname,
     "--port", databaseUrl.port || "5432",
     "--username", decodeURIComponent(databaseUrl.username),
@@ -135,7 +137,6 @@ export async function buildEncryptedArchive(input: {
       ...(includeSettings ? ["runtime settings and keys (settings.env)"] : []),
     ],
     excluded: [
-      "database_backup_runs history",
       includeSettings ? "database URLs and machine paths" : "secrets stored outside PostgreSQL",
       "Supabase-managed schemas",
     ],

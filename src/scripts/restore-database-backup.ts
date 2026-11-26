@@ -351,6 +351,20 @@ try {
   ];
   for (const statement of runtimePrivileges) await connection.unsafe(statement);
 
+  // Archives carry the backup history. A run that was queued or running when
+  // the archive was made (the backup that wrote it, for one) belonged to the
+  // old Mac's worker; this Mac's worker would otherwise wait on it for hours.
+  const [{ to_regclass: backupRuns }] = await connection.unsafe(
+    "select to_regclass('public.database_backup_runs')::text",
+  ) as Array<{ to_regclass: string | null }>;
+  if (backupRuns) {
+    await connection.unsafe(`
+      UPDATE public.database_backup_runs
+      SET status = 'failed', finished_at = coalesce(finished_at, now()), failure_code = 'RESTORED_FROM_ARCHIVE'
+      WHERE status IN ('queued', 'running')
+    `);
+  }
+
   // The helper merges these into this Mac's runtime.env (lumapos-admin
   // restore_archive) and removes the file.
   const settingsRestored = verifiedFiles.has("settings.env");
