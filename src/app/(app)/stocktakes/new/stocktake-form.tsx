@@ -222,6 +222,7 @@ export function StocktakeForm({
     <div className="min-h-dvh bg-canvas p-4 sm:p-6">
       <MobileDetailHeader
         backHref={Routes.Stocktakes}
+        returnToOpener
         backLabel={t("common.back")}
         title={t("stocktakes.createNew")}
         subtitle={copyFromCode ? t("stocktakes.copyingFrom", { code: copyFromCode }) : t("stocktakes.balanceHint")}

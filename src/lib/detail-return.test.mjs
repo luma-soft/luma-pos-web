@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { detailReturnAction, modalCloseAction, rememberDetailNavigation, resolveDetailHref, safeReturnHref, withReturnTo } from "./detail-return.ts";
+import { detailReturnAction, isEditorLocation, modalCloseAction, openerEntry, rememberDetailNavigation, resolveDetailHref, safeReturnHref, withReturnTo } from "./detail-return.ts";
 
 describe("detail return", () => {
   test("adds returnTo only when the detail lives on another page", () => {
@@ -78,5 +78,22 @@ describe("route-backed modal close", () => {
     withHistory("/inventory?tab=purchases", () => {
       expect(detailReturnAction("/inventory?tab=purchases")).toEqual({ kind: "back" });
     });
+  });
+});
+
+describe("forms return to their opener", () => {
+  test("editors and print pages are never openers", () => {
+    for (const href of ["/purchases/new?productId=x", "/purchases/p1/edit", "/orders/o1/print", "/inventory?tab=products&productModal=create"]) {
+      expect(isEditorLocation(new URL(href, "http://luma.local"))).toBe(true);
+    }
+    expect(isEditorLocation(new URL("/notifications?detailPurchaseId=p1", "http://luma.local"))).toBe(false);
+  });
+
+  test("openerEntry skips an editor history entry", () => {
+    globalThis.window = {
+      location: { origin: "http://luma.local" },
+      navigation: { currentEntry: { index: 1 }, entries: () => [{ url: "http://luma.local/products/new?productModal=create" }, { url: "http://luma.local/purchases/new" }] },
+    };
+    try { expect(openerEntry()).toBeNull(); } finally { delete globalThis.window; }
   });
 });

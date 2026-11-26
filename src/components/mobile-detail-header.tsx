@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ModalCloseLink } from "@/components/ui/modal-close-link";
 
 type MobileDetailHeaderProps = {
   backHref?: string;
@@ -10,6 +11,8 @@ type MobileDetailHeaderProps = {
   badge?: React.ReactNode;
   actions?: React.ReactNode;
   onBack?: () => void;
+  /** Back returns to the page that opened this screen when known, else to `backHref`. */
+  returnToOpener?: boolean;
   flush?: boolean;
   stackActionsOnMobile?: boolean;
   className?: string;
@@ -23,6 +26,7 @@ export function MobileDetailHeader({
   badge,
   actions,
   onBack,
+  returnToOpener = false,
   flush = false,
   stackActionsOnMobile = false,
   className,
@@ -39,7 +43,11 @@ export function MobileDetailHeader({
         className,
       )}
     >
-      {backHref ? (
+      {backHref && returnToOpener ? (
+        <ModalCloseLink href={backHref} anyOpener aria-label={backLabel} className={backClassName}>
+          {backContent}
+        </ModalCloseLink>
+      ) : backHref ? (
         <Link href={backHref} aria-label={backLabel} className={backClassName}>
           {backContent}
         </Link>

@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import Link from "next/link";
+import { ModalCloseLink } from "@/components/ui/modal-close-link";
 import { Search, Trash2 } from "lucide-react";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
@@ -333,9 +333,9 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
             {t("common.back")}
           </button>
         ) : (
-          <Link href={backHref} className="inline-flex min-h-11 w-20 shrink-0 items-center text-[17px] text-ios-accent">
+          <ModalCloseLink href={backHref} anyOpener className="inline-flex min-h-11 w-20 shrink-0 items-center text-[17px] text-ios-accent">
             {t("common.cancel")}
-          </Link>
+          </ModalCloseLink>
         )}
         <h1 className="min-w-0 flex-1 truncate text-center text-[17px] font-semibold">{mobileStep === "payment" ? t("purchaseReturns.mobilePaymentTitle") : formTitle}</h1>
         <span className="w-20 shrink-0" aria-hidden="true" />
@@ -343,6 +343,7 @@ export function PurchaseReturnForm({ options, initial, initialPurchase }: { opti
       <MobileDetailHeader
         flush
         backHref={backHref}
+        returnToOpener
         backLabel={t("common.back")}
         title={formTitle}
         className="max-lg:hidden"

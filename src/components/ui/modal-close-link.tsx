@@ -9,8 +9,8 @@ import { useModalClose } from "@/components/use-modal-close";
  * (keeping its filters and scroll), else to `href`. Modified clicks keep the
  * plain link behaviour.
  */
-export function ModalCloseLink({ href, onClick, ...props }: Omit<ComponentProps<typeof Link>, "href"> & { href: string }) {
-  const close = useModalClose(href);
+export function ModalCloseLink({ href, onClick, anyOpener = false, ...props }: Omit<ComponentProps<typeof Link>, "href"> & { href: string; anyOpener?: boolean }) {
+  const close = useModalClose(href, { anyOpener });
   return (
     <Link
       {...props}

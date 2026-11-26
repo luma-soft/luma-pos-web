@@ -37,6 +37,17 @@ export function previousAppEntry(): URL | null {
   }
 }
 
+/** Editors and creation forms; never a page to return to after closing another. */
+export function isEditorLocation(url: URL) {
+  return /\/(new|edit|print)(\/|$)/.test(url.pathname) || url.searchParams.has("productModal");
+}
+
+/** The previous history entry when it is an app page a form or modal was opened from. */
+export function openerEntry(): URL | null {
+  const previous = previousAppEntry();
+  return previous && !isEditorLocation(previous) ? previous : null;
+}
+
 function sameLocation(url: URL, href: string) {
   const other = new URL(href, url.origin);
   const left = new URLSearchParams(url.search);

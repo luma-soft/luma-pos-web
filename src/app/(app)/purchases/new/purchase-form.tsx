@@ -7,6 +7,8 @@ import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ModalCloseLink } from "@/components/ui/modal-close-link";
+import { useReturnAfterSave } from "@/components/use-return-after-save";
 import { useTranslations } from "next-intl";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { Routes } from "@/lib/routes";
@@ -250,6 +252,7 @@ export function PurchaseForm({
   const catalog = useProductCatalog();
   const t = useTranslations();
   const router = useRouter();
+  const returnAfterSave = useReturnAfterSave();
 
   const [supplierId, setSupplierId] = useState(initialValues?.supplierId ?? "");
   const [createdSuppliers, setCreatedSuppliers] = useState<PurchaseFormOptions["suppliers"]>([]);
@@ -560,7 +563,9 @@ export function PurchaseForm({
           code: "code" in res.data ? res.data.code : purchaseCode ?? "",
           isDraft: action === "draft",
         });
-        window.location.assign(destination);
+        // Editing returns to the screen that opened the form (e.g. the
+        // purchase modal over a filtered list) and refreshes it.
+        if (!(mode === "edit" && returnAfterSave())) window.location.assign(destination);
       } else {
         setError(t(res.error as never));
       }
@@ -620,9 +625,9 @@ export function PurchaseForm({
             {t("common.back")}
           </button>
         ) : (
-          <Link href={backHref} className="inline-flex min-h-11 w-20 shrink-0 items-center text-[17px] text-ios-accent">
+          <ModalCloseLink href={backHref} anyOpener className="inline-flex min-h-11 w-20 shrink-0 items-center text-[17px] text-ios-accent">
             {t("common.cancel")}
-          </Link>
+          </ModalCloseLink>
         )}
         <h1 className="min-w-0 flex-1 truncate text-center text-[17px] font-semibold">{mobileStep === "payment" ? t("purchases.mobileCompleteTitle") : title}</h1>
         <span className="w-20 shrink-0" aria-hidden="true" />
@@ -630,6 +635,7 @@ export function PurchaseForm({
       <MobileDetailHeader
         flush
         backHref={backHref}
+        returnToOpener
         backLabel={t("common.back")}
         title={title}
         className="max-lg:hidden"
