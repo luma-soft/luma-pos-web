@@ -1,5 +1,7 @@
 # Sales Mgmt
 
+> **Từ 2026-11-26:** repo này chỉ còn giao diện web. Backend (API, database, workers, `ops/`) ở repo riêng tư `luma-soft/luma-pos-backend` (submodule `vendor/backend`). Phần hướng dẫn PostgreSQL/Supabase/scripts bên dưới thuộc về backend.
+
 Hệ thống quản lý bán hàng cho cửa hàng VLXD / thiết bị điện nước / thiết bị nhà bếp.
 
 ## Runtime hiện tại và kiến trúc đích
