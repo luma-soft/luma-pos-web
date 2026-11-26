@@ -9,7 +9,7 @@ import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
 import * as schema from "@/db/schema";
 import { createProductSchema, type CreateProductInput } from "@/lib/products/create-product-schema";
 import { buildVariantCombinations, variantCombinationBudget } from "./variant-model";
-import { prepareVariantAddition } from "@/app/(app)/products/new/variant-add";
+import { prepareVariantAddition } from "./variant-add";
 import { saveVariantGroupInTransaction } from "./variant-write";
 
 const pg = new PGlite();

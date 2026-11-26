@@ -51,7 +51,7 @@ import { UnitPriceConfirmation } from "./unit-price-confirmation";
 import { buildUnitPriceReview, normalizeUnitPriceDraft, type UnitPricingSnapshot, type UnitPriceBook } from "@/lib/products/unit-price-edit";
 import { AttributesField } from "./attributes-field";
 import { VariantChildrenField } from "./variant-children-field";
-import { prepareVariantAddition, variantAddFieldLabel } from "./variant-add";
+import { prepareVariantAddition, variantAddFieldLabel } from "@/lib/products/variant-add";
 import { normalizeVariantAttributes } from "@/lib/products/variant-model";
 import { saveProductVariantGroup } from "@/lib/actions/product-variants";
 import {
