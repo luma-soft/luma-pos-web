@@ -2456,9 +2456,22 @@ export function PosClient({
         }
         if (receipt?.status === "rejected" || receipt?.status === "conflict") {
           const error = receipt.errorCode || "errors.serverError";
+          const failure = receipt.result as {
+            referenceCode?: unknown;
+            errorDetails?: { kind?: unknown; column?: unknown };
+          } | null;
+          const referenceCode = typeof failure?.referenceCode === "string" ? failure.referenceCode : undefined;
+          const errorDetails = failure?.errorDetails?.kind === "missingColumn" && typeof failure.errorDetails.column === "string"
+            ? { kind: "missingColumn" as const, column: failure.errorDetails.column }
+            : undefined;
           await markFailed(storageScope, localId, error);
           await refreshOutboxSummary();
-          return { ok: false, error };
+          return {
+            ok: false,
+            error,
+            ...(referenceCode ? { referenceCode } : {}),
+            ...(errorDetails ? { errorDetails } : {}),
+          };
         }
         if (attempt < 7) await new Promise((resolve) => window.setTimeout(resolve, 750));
       }
@@ -2753,6 +2766,9 @@ export function PosClient({
       } else if (res.referenceCode) {
         const columnDetail = res.errorDetails?.kind === "missingColumn" ? ` (${res.errorDetails.column})` : "";
         setError(`${t("errors.serverError")}${columnDetail} · ${res.referenceCode}`);
+      } else if (["errors.serverErrorWithReference", "errors.missingDatabaseColumn", "errors.schemaOutOfDate"].includes(res.error)) {
+        // These messages interpolate {reference}; never show the raw placeholder.
+        setError(t("errors.serverError"));
       } else {
         setError(t(res.error));
       }
