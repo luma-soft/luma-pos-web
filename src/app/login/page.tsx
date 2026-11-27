@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, type FieldError } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,7 +43,10 @@ export default function LoginPage() {
   });
   const [identifier, password] = useWatch({ control: form.control, name: ["identifier", "password"] });
   const loginMethod = loginMethodFor(identifier ?? "");
-  const submitting = form.formState.isSubmitting;
+  // Stay busy after a successful login until the next page has rendered:
+  // router.push is not awaited, so isSubmitting alone ends too early.
+  const [navigating, startNavigation] = useTransition();
+  const submitting = form.formState.isSubmitting || navigating;
   const canSubmit = (identifier ?? "").trim().length > 0 && (password ?? "").length > 0;
   const { errors } = form.formState;
 
@@ -81,8 +84,10 @@ export default function LoginPage() {
     const nextRoute = ONLINE_SALES_ENABLED && method === "email" && values.identifier.trim().toLowerCase() === "review@lumapos.shop"
       ? `${Routes.OnlineSales}?tab=overview&channel=shopee`
       : Routes.Dashboard;
-    router.push(nextRoute);
-    router.refresh();
+    startNavigation(() => {
+      router.push(nextRoute);
+      router.refresh();
+    });
   }
 
   const identifierField = form.register("identifier", { onChange: () => setServerErr(null) });
@@ -206,7 +211,11 @@ export default function LoginPage() {
               type="submit"
               disabled={submitting || !canSubmit}
               aria-busy={submitting}
-              className="relative mt-4 flex h-[52px] w-full items-center justify-center rounded-[14px] bg-ios-accent text-[17px] font-semibold text-white transition-[opacity,transform] duration-150 ease-out active:scale-[0.985] active:opacity-80 disabled:active:scale-100 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ios-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ios-grouped-bg"
+              className={cn(
+                "relative mt-4 flex h-[52px] w-full items-center justify-center rounded-[14px] bg-ios-accent text-[17px] font-semibold text-white transition-[opacity,transform] duration-150 ease-out active:scale-[0.985] active:opacity-80 disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ios-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ios-grouped-bg",
+                // Loading keeps the button at full strength so the spinner reads as progress, not a disabled state.
+                submitting ? "cursor-progress" : "disabled:opacity-40",
+              )}
             >
               {/* Loading keeps the label in layout (LumaLoadingButtonLabel) and centers a spinner over it. */}
               <span className={cn(submitting && "invisible")}>{t("auth.loginButton")}</span>
