@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { getIssuedEInvoiceOrderIds } from "@/lib/data/web-pages";
+import { getIssuedEInvoiceOrderIds, getReturnedOrderItemIds } from "@/lib/data/web-pages";
 import { AutoPrint } from "@/components/print/auto-print";
 import { PrintDoc } from "@/components/print/print-doc";
 import { shouldShowPrintTax } from "@/lib/print/template-shared";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { getOrder } from "@/lib/data/orders";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
+import { mergeEquivalentOrderItems } from "@/lib/orders/merge-order-items";
 import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
 import { MergePrintToolbar } from "../merge-print-toolbar";
 
@@ -40,9 +41,10 @@ export default async function MergePrintPreviewPage({ searchParams }: Props) {
     notFound();
   }
 
-  const [issuedEInvoice, template] = await Promise.all([
+  const [issuedEInvoice, template, referencedItems] = await Promise.all([
     getIssuedEInvoiceOrderIds(context.storeId, ids).then((rows) => rows[0]),
     getPrintTemplate(context.storeId, "order", params.templateId),
+    getReturnedOrderItemIds(context.storeId, ids),
   ]);
   if (issuedEInvoice) notFound();
 
@@ -57,6 +59,14 @@ export default async function MergePrintPreviewPage({ searchParams }: Props) {
   const paid = sourceOrders.reduce((sum, order) => sum + Number(order.amountPaid), 0);
   const remaining = Math.max(0, total - paid);
   const primaryOrder = sourceOrders[0];
+  const protectedItemIds = new Set(
+    referencedItems.map((row) => row.orderItemId).filter((id): id is string => id !== null),
+  );
+  const mergedItems = mergeEquivalentOrderItems(
+    sourceOrders.flatMap((order) => [...order.items]
+      .sort((left, right) => Number(left.lineOrder) - Number(right.lineOrder) || left.id.localeCompare(right.id))),
+    protectedItemIds,
+  );
   const baseParams = new URLSearchParams();
   ids.forEach((id) => baseParams.append("ids", id));
   const backHref = `/orders/merge?${baseParams.toString()}`;
@@ -87,8 +97,8 @@ export default async function MergePrintPreviewPage({ searchParams }: Props) {
           deliverToLabel={t("print.deliverTo")}
           sellerLabel={t("orders.detail.seller")}
           sellerName={primaryOrder.sellerName}
-          items={sourceOrders.flatMap((order) => order.items.map((item) => ({
-            id: `${order.id}-${item.id}`,
+          items={mergedItems.map(({ item }) => ({
+            id: item.id,
             name: item.productName,
             variantName: item.productVariantName,
             specs: item.productSpecs,
@@ -96,7 +106,7 @@ export default async function MergePrintPreviewPage({ searchParams }: Props) {
             quantity: Number(item.quantity),
             ...readOrderLinePricing(item),
             total: Number(item.total),
-          })))}
+          }))}
           totals={[
             { label: t("pos.subtotal"), value: subtotal, kind: "subtotal" },
             ...(template.options.showDiscount ? [{ label: t("pos.discount"), value: discount, negative: true, kind: "discount" as const }] : []),

@@ -6236,7 +6236,9 @@
       "sameCustomer": "Orders must share one customer.",
       "hasReturns": "An order has returns — can't merge.",
       "hasEInvoice": "An order already has an e-invoice — can't merge."
-    }
+    },
+    "combinedLines": "{count} lines combined",
+    "productsSummary": "{lines} lines → {products} products"
   },
   "projectMedia": {
     "photos": "Photos",

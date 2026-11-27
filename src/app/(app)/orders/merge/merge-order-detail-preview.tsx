@@ -54,11 +54,11 @@ export async function MergeOrderDetailPreview({
     : `${t("pos.tax")} (${formatNumber(effectiveTaxRate)}%)`;
   const shippingFee = sourceOrders.reduce((sum, order) => sum + Number(order.shippingFee), 0);
   const remaining = Math.max(0, total - paid);
-  const items = mergeEquivalentOrderItems(
-    sourceOrders.flatMap((order) => order.items)
-      .sort((left, right) => Number(left.lineOrder) - Number(right.lineOrder) || left.id.localeCompare(right.id)),
-    protectedItemIds,
-  ).map(({ item }) => item);
+  // Same order as the merge action: selected invoice order, then line order.
+  const sourceLines = sourceOrders.flatMap((order) => [...order.items]
+    .sort((left, right) => Number(left.lineOrder) - Number(right.lineOrder) || left.id.localeCompare(right.id)));
+  const items = mergeEquivalentOrderItems(sourceLines, protectedItemIds)
+    .map(({ item, sourceItemIds }) => ({ ...item, combinedCount: sourceItemIds.length }));
   const payments = sourceOrders.flatMap((order) => order.payments.map((payment) => ({
     ...payment,
     sourceCode: order.code,
@@ -131,7 +131,11 @@ export async function MergeOrderDetailPreview({
               <section className="max-lg:order-2 overflow-hidden rounded-card border border-border bg-surface max-lg:rounded-[16px] max-lg:border-0">
                 <div className="flex items-center justify-between gap-3 border-b border-border-soft px-4 py-3 max-lg:border-b-0 max-lg:pb-1 max-lg:pt-4">
                   <h4 className="font-semibold">{t("merge.products")}</h4>
-                  <span className="text-sm text-slate-500">{items.length}</span>
+                  <span className="text-sm text-slate-500">
+                    {sourceLines.length > items.length
+                      ? t("merge.productsSummary", { lines: sourceLines.length, products: items.length })
+                      : items.length}
+                  </span>
                 </div>
                 {items.length === 0 ? (
                   <p className="p-4 text-sm text-slate-500">{t("merge.noProducts")}</p>
@@ -150,6 +154,7 @@ export async function MergeOrderDetailPreview({
                                   specs: item.productSpecs,
                                 })}
                                 {item.priceBookName && <div className="mt-1 text-xs font-normal text-slate-500">{item.priceBookName}</div>}
+                                {item.combinedCount > 1 && <CombinedBadge label={t("merge.combinedLines", { count: item.combinedCount })} />}
                               </div>
                               <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.total))}</div>
                             </div>
@@ -188,6 +193,7 @@ export async function MergeOrderDetailPreview({
                                     specs: item.productSpecs,
                                   })}
                                   {item.priceBookName && <div className="mt-1 text-xs font-normal text-slate-500">{item.priceBookName}</div>}
+                                  {item.combinedCount > 1 && <CombinedBadge label={t("merge.combinedLines", { count: item.combinedCount })} />}
                                 </td>
                                 <td className="px-3 py-3 text-slate-500">{item.unitName}</td>
                                 <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
@@ -299,6 +305,16 @@ export async function MergeOrderDetailPreview({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function CombinedBadge({ label }: { label: string }) {
+  return (
+    <div className="mt-1">
+      <span className="inline-flex rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-950/40 dark:text-primary-300">
+        {label}
+      </span>
     </div>
   );
 }

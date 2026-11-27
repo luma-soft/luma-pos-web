@@ -6236,7 +6236,9 @@
       "sameCustomer": "Các đơn phải cùng một khách hàng.",
       "hasReturns": "Có đơn đã trả hàng — không gộp được.",
       "hasEInvoice": "Có đơn đã phát hành HĐĐT — không gộp được."
-    }
+    },
+    "combinedLines": "Gộp {count} dòng",
+    "productsSummary": "{lines} dòng → {products} sản phẩm"
   },
   "projectMedia": {
     "photos": "Ảnh",
