@@ -6203,9 +6203,13 @@
       "useSource": "Vui lòng hủy giao dịch từ chứng từ gốc liên quan."
     }
   },
+  "editBlocked": {
+    "title": "Không thể sửa {code}",
+    "message": "Phiếu này đã bị hủy, đã được sửa thành phiếu khác hoặc không còn ở trạng thái cho phép sửa.",
+    "viewDocument": "Xem phiếu {code}",
+    "openReplacement": "Mở phiếu đã sửa"
+  },
   "orderEdit": {
-    "openSource": "Xem đơn {code}",
-    "openReplacement": "Mở hóa đơn đã sửa",
     "title": "Sửa đơn {code}",
     "action": "Sửa đơn",
     "editDraftAction": "Sửa đơn nháp",

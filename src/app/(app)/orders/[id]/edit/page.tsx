@@ -3,12 +3,26 @@ import { getOrder } from "@/lib/data/orders";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { OrderEditForm } from "./order-edit-form";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { Routes } from "@/lib/routes";
+import { getTranslations } from "next-intl/server";
+import { EditBlockedNotice } from "@/components/edit-blocked-notice";
 
 export default async function OrderEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const context = await requireStoreContext();
   const order = await getOrder(context.storeId, id).catch(() => null);
-  if (!order || (order.status !== "completed" && order.status !== "quote") || order.returns.length > 0) notFound();
+  if (!order) notFound();
+  if (order.replacedByOrderId || (order.status !== "completed" && order.status !== "quote") || order.returns.length > 0) {
+    const t = await getTranslations("orderEdit.errors");
+    return (
+      <EditBlockedNotice
+        code={order.code}
+        documentHref={Routes.order(order.id)}
+        replacementHref={order.replacedByOrderId ? Routes.order(order.replacedByOrderId) : null}
+        message={order.returns.length > 0 ? t("hasReturns") : undefined}
+      />
+    );
+  }
 
   return (
     <OrderEditForm

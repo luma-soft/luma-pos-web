@@ -3,11 +3,19 @@ import { requireStoreContext } from "@/lib/auth/store-context";
 import { getInternalUseIssue } from "@/lib/data/internal-use";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { InternalUseForm } from "../../../inventory/internal-use-form";
+import { EditBlockedNotice } from "@/components/edit-blocked-notice";
+
+export const dynamic = "force-dynamic";
+
 export default async function EditInternalUsePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { storeId, role } = await requireStoreContext();
   const initial = await getInternalUseIssue(storeId, id);
   if (!initial) notFound();
+  // Same states updateInternalUse accepts; a cancelled issue opened from a stale list stops here.
+  if (initial.status !== "draft" && initial.status !== "pending" && initial.status !== "approved") {
+    return <EditBlockedNotice code={initial.code} documentHref={`/inventory?tab=internal&expanded=${initial.id}`} />;
+  }
   return <div className="min-h-full flex flex-col bg-canvas lg:h-dvh">
     <MobileDetailHeader flush backHref="/inventory?tab=internal" backLabel="Quay lại" title={`Sửa phiếu ${initial.code}`} />
     <InternalUseForm canCompletePending={role === "owner" || role === "manager"} initial={initial} warehouse={initial.warehouseId ? { id: initial.warehouseId, name: initial.warehouseName ?? "Kho", isDefault: true } : null} />

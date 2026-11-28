@@ -6203,9 +6203,13 @@
       "useSource": "Cancel this transaction from its source record."
     }
   },
+  "editBlocked": {
+    "title": "Can't edit {code}",
+    "message": "This document was cancelled, already edited into another one, or is no longer in a state that can be edited.",
+    "viewDocument": "View {code}",
+    "openReplacement": "Open the edited document"
+  },
   "orderEdit": {
-    "openSource": "View {code}",
-    "openReplacement": "Open the edited invoice",
     "title": "Edit {code}",
     "action": "Edit order",
     "editDraftAction": "Edit draft order",

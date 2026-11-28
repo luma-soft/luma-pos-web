@@ -4,6 +4,9 @@ import { PurchaseForm } from "../../new/purchase-form";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 import { formatDate } from "@/lib/utils";
+import { Routes } from "@/lib/routes";
+import { getTranslations } from "next-intl/server";
+import { EditBlockedNotice } from "@/components/edit-blocked-notice";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +14,17 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
   const { id } = await params;
   const context = await requireStoreContext();
   const purchase = await getPurchase(context.storeId, id).catch(() => null);
-  if (!purchase || purchase.hasReturns || (purchase.status !== "received" && purchase.status !== "draft")) notFound();
+  if (!purchase) notFound();
+  if (purchase.hasReturns || (purchase.status !== "received" && purchase.status !== "draft")) {
+    const t = await getTranslations("purchases.errors");
+    return (
+      <EditBlockedNotice
+        code={purchase.code}
+        documentHref={Routes.purchaseDetail(purchase.id)}
+        message={purchase.hasReturns ? t("hasReturns") : undefined}
+      />
+    );
+  }
 
   const [options, initialProducts] = await Promise.all([
     getPurchaseFormOptions(context.storeId),

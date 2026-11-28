@@ -17,6 +17,7 @@ import { getSyncRelayConfig } from "@/lib/sync/config";
 import { PosClient, type PosSourceInvoice } from "./pos-client";
 import type { PosInitialContext } from "./pos-client";
 import { ProductEditorModal } from "@/app/(app)/inventory/tabs/products";
+import { EditBlockedNotice } from "@/components/edit-blocked-notice";
 
 export const dynamic = "force-dynamic";
 
@@ -137,30 +138,12 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
   const context = await requireStoreContext();
   const { source: sourceInvoice, blocked: blockedEdit } = await sourceInvoiceFromParams(context.storeId, params);
   if (blockedEdit) {
-    const t = await getTranslations();
     return (
-      <div className="h-full grid place-items-center p-6">
-        <div role="alert" className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center space-y-4">
-          <p className="font-semibold">{t("orderEdit.title", { code: blockedEdit.code })}</p>
-          <p className="text-sm text-slate-500">{t("orderEdit.errors.notEditable")}</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            <Link
-              href={Routes.order(blockedEdit.id)}
-              className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800"
-            >
-              {t("orderEdit.openSource", { code: blockedEdit.code })}
-            </Link>
-            {blockedEdit.replacementId && (
-              <Link
-                href={Routes.order(blockedEdit.replacementId)}
-                className="inline-flex items-center rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-700"
-              >
-                {t("orderEdit.openReplacement")}
-              </Link>
-            )}
-          </div>
-        </div>
-      </div>
+      <EditBlockedNotice
+        code={blockedEdit.code}
+        documentHref={Routes.order(blockedEdit.id)}
+        replacementHref={blockedEdit.replacementId ? Routes.order(blockedEdit.replacementId) : null}
+      />
     );
   }
   const baseInitialContext = initialContextFromParams(params);
