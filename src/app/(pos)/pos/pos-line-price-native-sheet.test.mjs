@@ -19,3 +19,12 @@ test("editing remains wired to original price logic and mobile focus is deferred
  expect(editor).toContain("onCheckedChange={changeFree}");
  expect(editor).toContain("onChangeRef.current(selectedPriceBook()");
 });
+test("a product priced 0 opens editable, not as a free line", async () => {
+ expect(editor).toContain("if (!line.freeRestore) return { ...createLinePriceEditorState(editablePrice, editableDiscount, editableDiscountMode, editableDiscountValue), free: false };");
+ expect(editor).toContain("priceBooks) ?? Number.NaN, 0), free: false };");
+ const { createLinePriceEditorState, setLinePriceInput, resolveLinePriceEditor } = await import("@/lib/pos/line-price-editor");
+ const opened = { ...createLinePriceEditorState(0, 0), free: false };
+ const typed = setLinePriceInput(opened, "150000");
+ expect(typed.free).toBe(false);
+ expect(resolveLinePriceEditor(typed).unitPrice).toBe(150000);
+});

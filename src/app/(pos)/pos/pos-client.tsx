@@ -4779,7 +4779,10 @@ function LinePriceEditor({
   const editableDiscountMode = line.freeRestore?.lineDiscountMode ?? line.lineDiscountMode ?? "vnd";
   const editableDiscountValue = line.freeRestore?.lineDiscountValue ?? line.lineDiscountValue ?? editableDiscount;
   const [editor, setEditor] = useState(() => {
-    if (!line.freeRestore) return createLinePriceEditorState(editablePrice, editableDiscount, editableDiscountMode, editableDiscountValue);
+    // Only a line switched to free carries freeRestore. A product whose price is
+    // simply 0 must stay editable, so it does not open as "free" (which would
+    // disable the price field and re-mark itself free when switched off).
+    if (!line.freeRestore) return { ...createLinePriceEditorState(editablePrice, editableDiscount, editableDiscountMode, editableDiscountValue), free: false };
     return {
       ...createLinePriceEditorState(0, 0),
       restore: {
@@ -4856,7 +4859,7 @@ function LinePriceEditor({
         const selected = selectedBook === inheritedValue
           ? undefined
           : selectedBook === defaultBook?.id ? "" : selectedBook;
-        return createLinePriceEditorState(selectedPosUnitPrice(line.product, line.unitName, selected ?? invoicePriceBook, priceBooks) ?? Number.NaN, 0);
+        return { ...createLinePriceEditorState(selectedPosUnitPrice(line.product, line.unitName, selected ?? invoicePriceBook, priceBooks) ?? Number.NaN, 0), free: false };
       }
       return next;
     });
