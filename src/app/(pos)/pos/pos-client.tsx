@@ -15,6 +15,8 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Search, Plus, ListPlus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw, MoreHorizontal, Pencil, ChevronDown, ShieldCheck, SlidersHorizontal, Star, UserRound, PackagePlus, Sparkles, Package, Minus, AlertTriangle, Clock3 } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
+import { editSettlement, type EditExcessChoice } from "@/lib/pos/edit-settlement";
+import { EditSettlementSummary } from "@/components/pos/edit-settlement-summary";
 import { createPortal } from "react-dom";
 import { Combobox } from "@/components/combobox";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -299,6 +301,8 @@ interface PosDraft {
   shippingFee: number;
   payMethod: PayMethod;
   paidInput: number | null;
+  /** Editing a paid invoice down: refund the excess or keep it as credit. */
+  editExcess?: EditExcessChoice;
   note?: string;
   returnOrderId?: string;
   returnOrderCode?: string;
@@ -1160,6 +1164,7 @@ export function PosClient({
     shippingFee,
     payMethod,
     paidInput,
+    editExcess: editExcessChoiceInput,
     note: orderNote,
     returnOrderId,
     returnOrderCode,
@@ -1238,6 +1243,7 @@ export function PosClient({
   const setOrderNote = (v: string) => patchActive({ note: v });
   const setPayMethod = (v: PayMethod) => patchActive({ payMethod: v });
   const setPaidInput = (v: number | null) => patchActive({ paidInput: v });
+  const setEditExcessChoice = (v: EditExcessChoice) => patchActive({ editExcess: v });
 
   /** Thêm tab POS mới và chuyển sang nó. */
   function addDraft(kind: PosDraftKind, cameraQuote = false) {
@@ -1875,9 +1881,21 @@ export function PosClient({
   const taxAmount = isReturnDraft ? 0 : taxBreakdown.tax;
   const total = isReturnDraft ? subtotal : Math.max(0, taxBreakdown.totalAfterTax + shippingFee);
   const mixedTaxRates = taxBreakdown.rates.length > 1;
-  const paid = payMethod === "credit" ? 0 : (paidInput ?? total);
-  const payableAmount = Math.min(Math.max(0, paid), total);
-  const remaining = Math.max(0, total - paid);
+  // Editing a paid invoice keeps what was collected; the cashier only enters
+  // money collected now (backend resolveEditSettlement mirrors this).
+  const isPaidInvoiceEdit = isInvoiceDraft && sourceInvoice?.mode === "edit" && (sourceInvoice.amountPaid ?? 0) > 0;
+  const settlement = editSettlement({
+    total,
+    alreadyPaid: isPaidInvoiceEdit ? sourceInvoice?.amountPaid ?? 0 : 0,
+    hasCustomer: Boolean(customerId),
+    choice: editExcessChoiceInput,
+  });
+  const amountDue = settlement.due;
+  const paid = payMethod === "credit" ? 0 : (paidInput ?? amountDue);
+  const payableAmount = Math.min(Math.max(0, paid), amountDue);
+  const remaining = Math.max(0, amountDue - paid);
+  // Paid total printed on the edited invoice (carried + new − refunded).
+  const invoicePaidTotal = settlement.alreadyPaid + payableAmount - settlement.refund;
   // The unpaid part becomes debt, so it needs a saved customer. Existing invoices being edited keep theirs.
   const partialNeedsCustomer = isInvoiceDraft && payMethod !== "credit" && remaining > 0 && !customerId
     && sourceInvoice?.mode !== "edit" && sourceInvoice?.mode !== "draft_edit";
@@ -1994,7 +2012,7 @@ export function PosClient({
         shipping: shippingFee,
       },
       grandTotal: total,
-      paid: isInvoiceDraft ? payableAmount : 0,
+      paid: isInvoiceDraft ? invoicePaidTotal : 0,
       remaining: isInvoiceDraft ? remaining : total,
       payMethod: isInvoiceDraft ? payMethod : "credit",
       isTemporarySlip: input.isTemporarySlip === true,
@@ -2496,13 +2514,13 @@ export function PosClient({
       setError(t("pos.quickLine.cannotSubmit"));
       return;
     }
-    const amount = Math.min(Math.max(0, paidInput ?? total), total);
+    const amount = Math.min(Math.max(0, paidInput ?? amountDue), amountDue);
     // Checked before the customer transfers anything, never after.
     if (amount <= 0) {
       setError(t("pos.sepay.invalidAmount"));
       return;
     }
-    if (amount < total && !customerId && sourceInvoice?.mode !== "edit" && sourceInvoice?.mode !== "draft_edit") {
+    if (amount < amountDue && !customerId && sourceInvoice?.mode !== "edit" && sourceInvoice?.mode !== "draft_edit") {
       setError(t("pos.errors.partialNeedsCustomer"));
       return;
     }
@@ -2561,7 +2579,9 @@ export function PosClient({
       return;
     }
     const submitMode = sourceInvoice ? sourceInvoice.kind === "quote" ? "quote" : sourceInvoice.kind === "booking" ? "booking" : mode : mode;
-    if (submitMode === "sale" && selectedPayMethod === "bank_transfer" && !paymentSessionId) {
+    // Nothing left to collect on an edited paid invoice: no QR to open.
+    const nothingToCollect = isPaidInvoiceEdit && amountDue <= 0;
+    if (submitMode === "sale" && selectedPayMethod === "bank_transfer" && !paymentSessionId && !nothingToCollect) {
       // Opening the QR flow is a preview-only action. The real sale is sent
       // back through this function only with a confirmed session id.
       await startSepayCheckout();
@@ -2572,8 +2592,8 @@ export function PosClient({
       return;
     }
     const isCheckoutMode = submitMode === "sale";
-    const selectedPaid = selectedPayMethod === "credit" ? 0 : (paidInput ?? total);
-    const selectedPayableAmount = Math.min(Math.max(0, selectedPaid), total);
+    const selectedPaid = selectedPayMethod === "credit" ? 0 : (paidInput ?? amountDue);
+    const selectedPayableAmount = Math.min(Math.max(0, selectedPaid), amountDue);
     if (submitMode === "sale" && selectedPayMethod === "credit" && !customerId) {
       setError(t("pos.errors.creditNeedsCustomer"));
       return;
@@ -2582,7 +2602,7 @@ export function PosClient({
       setError(t("pos.errors.partialNeedsCustomer"));
       return;
     }
-    if (submitMode === "sale" && selectedPayMethod === "bank_transfer" && selectedPayableAmount <= 0) {
+    if (submitMode === "sale" && selectedPayMethod === "bank_transfer" && selectedPayableAmount <= 0 && !nothingToCollect) {
       setError(t("pos.sepay.invalidAmount"));
       return;
     }
@@ -2618,16 +2638,19 @@ export function PosClient({
           : effPrice(line).price,
       })),
       expectedPricing: buildExpectedPosPricing(cart, (line) => effPrice(line).price),
-      paymentPending: isCheckoutMode && selectedPayMethod === "bank_transfer" && !paymentSessionId,
+      paymentPending: isCheckoutMode && selectedPayMethod === "bank_transfer" && !paymentSessionId && !nothingToCollect,
       paymentSessionId,
       payment: {
         method: isCheckoutMode && selectedPayMethod === "bank_transfer"
-          ? paymentSessionId ? "bank_transfer" : "credit"
+          ? paymentSessionId || nothingToCollect ? "bank_transfer" : "credit"
           : isCheckoutMode ? selectedPayMethod : "credit",
         amount: isCheckoutMode && selectedPayMethod === "bank_transfer"
           ? paymentSessionId ? selectedPayableAmount : 0
-          : isCheckoutMode ? paid : 0,
+          : isCheckoutMode ? (isPaidInvoiceEdit ? selectedPayableAmount : paid) : 0,
+        // Edits: the amount is money collected now, on top of what was paid.
+        ...(sourceInvoice?.mode === "edit" ? { scope: "additional" as const } : {}),
       },
+      ...(isCheckoutMode && settlement.excess > 0 ? { editExcess: settlement.excessChoice } : {}),
     };
     setSubmittingMode(submitMode);
     setError("");
@@ -2686,7 +2709,7 @@ export function PosClient({
           return;
         }
         void productCatalog.refresh();
-        if (submitMode === "sale" && selectedPayMethod === "bank_transfer" && !paymentSessionId) {
+        if (submitMode === "sale" && selectedPayMethod === "bank_transfer" && !paymentSessionId && !nothingToCollect) {
           const paymentRes = await fetch("/api/payments/sepay", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -4085,23 +4108,35 @@ export function PosClient({
                 ))}
               </div>
 
-              {/* hàng "khách trả" luôn render để không nhảy layout khi đổi ghi nợ */}
-              <div className="flex justify-between items-center gap-2">
-                <span className="text-slate-500">
-                  {payMethod === "credit" ? t("pos.payMethods.credit") : t("pos.paidAmount")}
-                </span>
-                {payMethod !== "credit" ? (
-                  <MoneyInput
-                    value={paidInput ?? total}
-                    onChange={(v) => setPaidInput(v ?? 0)}
-                    className="no-spinner min-h-11 w-36 rounded-md border border-border bg-surface px-2 py-1 text-right text-base lg:min-h-0 lg:text-sm"
-                  />
-                ) : (
-                  <span className="w-36 px-2 py-1 text-right text-sm font-semibold text-warn tabular-nums border border-transparent">
-                    {formatCurrency(total)}
+              {isPaidInvoiceEdit && (
+                <EditSettlementSummary
+                  alreadyPaid={settlement.alreadyPaid}
+                  due={amountDue}
+                  excess={settlement.excess}
+                  excessChoice={settlement.excessChoice}
+                  hasCustomer={Boolean(customerId)}
+                  onExcessChoice={setEditExcessChoice}
+                />
+              )}
+              {/* hàng "khách trả" luôn render để không nhảy layout khi đổi ghi nợ; ẩn khi sửa hóa đơn đã trả đủ */}
+              {!(isPaidInvoiceEdit && amountDue <= 0) && (
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-slate-500">
+                    {payMethod === "credit" ? t("pos.payMethods.credit") : t("pos.paidAmount")}
                   </span>
-                )}
-              </div>
+                  {payMethod !== "credit" ? (
+                    <MoneyInput
+                      value={paidInput ?? amountDue}
+                      onChange={(v) => setPaidInput(v ?? 0)}
+                      className="no-spinner min-h-11 w-36 rounded-md border border-border bg-surface px-2 py-1 text-right text-base lg:min-h-0 lg:text-sm"
+                    />
+                  ) : (
+                    <span className="w-36 px-2 py-1 text-right text-sm font-semibold text-warn tabular-nums border border-transparent">
+                      {formatCurrency(amountDue)}
+                    </span>
+                  )}
+                </div>
+              )}
               {owedNotice && <p className="text-xs text-warn text-right">{owedNotice}</p>}
             </>
           ) : (
@@ -4242,9 +4277,21 @@ export function PosClient({
             selected: payMethod,
             onSelect: (method) => void selectPayMethod(method),
             paid: isReturnDraft ? null : {
-              value: paidInput ?? total,
+              value: paidInput ?? amountDue,
               // Typing the full amount makes the field follow the total again.
-              onChange: (value) => setPaidInput(value === total ? null : value),
+              onChange: (value) => setPaidInput(value === amountDue ? null : value),
+              due: amountDue,
+              settlement: isPaidInvoiceEdit ? (
+                <EditSettlementSummary
+                  variant="mobile"
+                  alreadyPaid={settlement.alreadyPaid}
+                  due={amountDue}
+                  excess={settlement.excess}
+                  excessChoice={settlement.excessChoice}
+                  hasCustomer={Boolean(customerId)}
+                  onExcessChoice={setEditExcessChoice}
+                />
+              ) : null,
               isCredit: payMethod === "credit",
               owedNotice,
             },

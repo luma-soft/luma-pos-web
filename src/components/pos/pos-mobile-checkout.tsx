@@ -36,7 +36,16 @@ type Payment = {
   selected: string;
   onSelect: (method: PosCheckoutMethod) => void;
   /** Sale drafts: what the customer pays now. Null for returns. */
-  paid: { value: number; onChange: (value: number) => void; isCredit: boolean; owedNotice: string | null } | null;
+  paid: {
+    value: number;
+    onChange: (value: number) => void;
+    isCredit: boolean;
+    owedNotice: string | null;
+    /** Amount still to collect; differs from the total when editing a paid invoice. */
+    due?: number;
+    /** Paid-invoice edit summary (already paid / excess handling). */
+    settlement?: ReactNode;
+  } | null;
   /** VietQR session being paid; replaces the amount section while it is open. */
   qr: Qr | null;
 };
@@ -222,7 +231,7 @@ export function PosMobileCheckout({
           </section>
         )}
 
-        {payment?.qr ? <QrSection qr={payment.qr} /> : payment?.paid && <PaidSection total={total} paid={payment.paid} />}
+        {payment?.qr ? <QrSection qr={payment.qr} /> : payment?.paid && <PaidSection total={payment.paid.due ?? total} paid={payment.paid} />}
 
         <fieldset disabled={locked} className={cn("min-w-0", card, "space-y-3")}>
           {extras}
@@ -285,6 +294,7 @@ function PaidSection({ total, paid }: { total: number; paid: NonNullable<Payment
   const settled = !paid.isCredit && amount >= total && amount > 0;
   return (
     <section className={cn(card, "space-y-2.5")}>
+      {paid.settlement}
       <h2 className="text-[15px] text-ios-label-secondary">{t("received")}</h2>
       {paid.isCredit ? (
         <p className="rounded-[14px] border border-ios-orange/25 bg-ios-orange/10 p-3 text-[15px] font-semibold text-ios-orange">{t("fullDebtNotice")}</p>
