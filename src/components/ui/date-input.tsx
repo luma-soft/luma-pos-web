@@ -53,6 +53,8 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
     const inputRef = React.useRef<HTMLInputElement>(null);
     const validationRef = React.useRef<HTMLInputElement>(null);
     const popupRef = React.useRef<HTMLDivElement>(null);
+    const bodyRef = React.useRef<HTMLDivElement>(null);
+    const repositionRef = React.useRef<() => void>(() => {});
     const triggerRef = React.useRef<HTMLButtonElement>(null);
     const popupId = React.useId();
     const dateTime = type === "datetime-local";
@@ -76,10 +78,30 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
         }
         const rect = rootRef.current?.getBoundingClientRect();
         if (!rect) return;
-        const width = Math.min(320, window.innerWidth - 16);
-        const height = Math.min(520, window.innerHeight - 16);
-        setPosition({ position: "fixed", width, left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)), top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - height - 8)), maxHeight: height });
+        const margin = 8;
+        const gap = 4;
+        const width = Math.min(320, window.innerWidth - margin * 2);
+        const left = Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin));
+        // Natural height = full body + the popup's own chrome (padding, border, footer).
+        const popup = popupRef.current;
+        const body = bodyRef.current;
+        const natural = popup && body ? body.scrollHeight + popup.offsetHeight - body.clientHeight : 520;
+        const below = window.innerHeight - rect.bottom - gap - margin;
+        const above = rect.top - gap - margin;
+        const viewport = window.innerHeight - margin * 2;
+        if (natural <= below) {
+          setPosition({ position: "fixed", width, left, top: rect.bottom + gap, maxHeight: below });
+        } else if (natural <= above) {
+          setPosition({ position: "fixed", width, left, top: rect.top - gap - natural, maxHeight: above });
+        } else {
+          // Neither side fits a short window: slide up over the field so the
+          // whole calendar, time and Clear/Apply stay visible. Only a window
+          // shorter than the calendar scrolls its body (the footer stays put).
+          const height = Math.min(natural, viewport);
+          setPosition({ position: "fixed", width, left, top: Math.max(margin, Math.min(rect.bottom + gap, window.innerHeight - margin - height)), maxHeight: height });
+        }
       };
+      repositionRef.current = reposition;
       reposition();
       const focus = window.requestAnimationFrame(() => (popupRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]') ?? popupRef.current?.querySelector<HTMLButtonElement>('[data-day]:not(:disabled)'))?.focus({ preventScroll: true }));
       document.addEventListener("pointerdown", outside);
@@ -102,6 +124,11 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
       form.addEventListener("reset", reset);
       return () => form.removeEventListener("reset", reset);
     }, [value, defaultValue]);
+
+    // A month with five or six week rows changes the popup's height.
+    React.useLayoutEffect(() => {
+      if (open) repositionRef.current();
+    }, [open, month, dateTime]);
 
     function change(next: string) {
       setDraft(next);
@@ -140,7 +167,7 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
     const navButtonStyle = "grid size-11 shrink-0 place-items-center rounded-full text-primary-600 hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary-600";
     const buttonStyle = phone
       ? "grid aspect-square min-h-11 w-full place-items-center rounded-full text-[17px] hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-30"
-      : "grid min-h-10 min-w-10 place-items-center rounded-lg text-sm hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-30";
+      : "grid min-h-8 min-w-8 place-items-center rounded-lg text-sm hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-30";
 
     return (
       <div ref={rootRef} className="relative min-w-0">
@@ -166,9 +193,9 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
         </button>
         {open && !disabled && !readOnly && createPortal(
           <div ref={popupRef} id={popupId} role="dialog" aria-label={chooseLabel} style={position} className={cn(
-            "overflow-auto text-slate-900 dark:text-slate-100",
+            "flex flex-col overflow-hidden text-slate-900 dark:text-slate-100",
             phone
-              ? "z-[1000] flex flex-col bg-canvas px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
+              ? "z-[1000] bg-canvas px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
               : "z-[1000] rounded-xl border border-border bg-surface p-3 shadow-e2",
           )} onKeyDown={(event) => {
             if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
@@ -180,9 +207,10 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
                 <span />
               </div>
             )}
+            <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <label className="mb-2 block text-xs font-medium">
               <span className={cn(phone && "sr-only")}>{dateTime ? (legacyTextByFlag(vi, "8698d9e5abb9")) : (legacyTextByFlag(vi, "69790dda07ce"))}</span>
-              <input type="text" value={draft} aria-invalid={!validDraft} placeholder={dateTime ? "YYYY-MM-DDTHH:mm" : "YYYY-MM-DD"} className={cn("mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary-600", phone ? "text-base" : "text-sm")} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (validDraft) { change(draft); close(); } } }} />
+              <input type="text" value={draft} aria-invalid={!validDraft} placeholder={dateTime ? "YYYY-MM-DDTHH:mm" : "YYYY-MM-DD"} className={cn("mt-1 w-full rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary-600", phone ? "h-11 text-base" : "h-9 text-sm")} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (validDraft) { change(draft); close(); } } }} />
             </label>
             {!validDraft && <p className="mb-2 text-xs text-red-600">{legacyTextByFlag(vi, "84eec5799fdb")}</p>}
             <div className="mb-2 flex items-center justify-between">
@@ -191,7 +219,7 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
               <button type="button" className={phone ? navButtonStyle : buttonStyle} aria-label={legacyTextByFlag(vi, "8d5d6dafe0af")} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}><ChevronRight className="size-4" /></button>
             </div>
             <div className="grid grid-cols-7" role="grid" aria-label={chooseLabel}>
-              {(vi ? ["T2", "T3", "T4", "T5", "T6", "T7", "CN"] : ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]).map((day) => <span key={day} className="py-2 text-center text-xs text-slate-500">{day}</span>)}
+              {(vi ? ["T2", "T3", "T4", "T5", "T6", "T7", "CN"] : ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]).map((day) => <span key={day} className={cn("text-center text-xs text-slate-500", phone ? "py-2" : "py-1")}>{day}</span>)}
               {Array.from({ length: offset }, (_, index) => <span key={`empty-${index}`} />)}
               {Array.from({ length: dayCount }, (_, index) => {
                 const day = isoDay(new Date(month.getFullYear(), month.getMonth(), index + 1));
@@ -208,14 +236,15 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
                 }}>{index + 1}</button>;
               })}
             </div>
-            {dateTime && <label className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3 text-sm font-medium">
+            {dateTime && <label className={cn("flex items-center justify-between gap-3 border-t border-border text-sm font-medium", phone ? "mt-3 pt-3" : "mt-2 pt-2")}>
               {legacyTextByFlag(vi, "b748baae9f10")}
-              <input type="text" inputMode="numeric" aria-label={legacyTextByFlag(vi, "6013a84b2bcb")} placeholder="HH:mm" defaultValue={time} key={time} maxLength={5} pattern="[0-2][0-9]:[0-5][0-9]" className="h-11 w-24 rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary-600" onBlur={(event) => {
+              <input type="text" inputMode="numeric" aria-label={legacyTextByFlag(vi, "6013a84b2bcb")} placeholder="HH:mm" defaultValue={time} key={time} maxLength={5} pattern="[0-2][0-9]:[0-5][0-9]" className={cn("w-24 rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary-600", phone ? "h-11" : "h-9")} onBlur={(event) => {
                 if (/^([01]\d|2[0-3]):[0-5]\d$/.test(event.target.value)) setDraft(`${draft.slice(0, 10) || isoDay(new Date())}T${event.target.value}`);
                 else event.target.value = time;
               }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} />
             </label>}
-            <div className={cn("mt-3 flex justify-between gap-2 border-t border-border pt-2", phone && "mt-auto pt-3")}>
+            </div>
+            <div className={cn("flex shrink-0 justify-between gap-2 border-t border-border pt-2", phone ? "mt-3 pt-3" : "mt-2")}>
               <button type="button" disabled={required} className="min-h-11 rounded-lg px-3 text-sm text-slate-600 hover:bg-surface-2 disabled:opacity-50" onClick={() => { change(""); close(); }}>{legacyTextByFlag(vi, "0462d45bf155")}</button>
               <button type="button" disabled={!validDraft} className="min-h-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50" onClick={() => { change(draft); close(); }}>{legacyTextByFlag(vi, "7b131edeebbd")}</button>
             </div>
