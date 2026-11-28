@@ -34,13 +34,34 @@ function csvUuids(value: string | string[] | undefined) {
   return raw.split(",").map((item) => item.trim()).filter((item) => UUID_RE.test(item));
 }
 
-async function sourceInvoiceFromParams(storeId: string, params: PosSearchParams): Promise<PosSourceInvoice | null> {
+type BlockedSourceEdit = { id: string; code: string; replacementId: string | null };
+
+/**
+ * Mirrors the save-time guard in createOrderForUser: an edit opened from a
+ * stale page (the invoice was already edited, i.e. cancelled and replaced,
+ * merged or returned meanwhile) must stop here, not after the user re-enters
+ * every line and only then hits "notEditable" on save.
+ */
+function sourceEditable(mode: "edit" | "draft_edit", order: { status: string; documentType: string; replacedByOrderId: string | null }) {
+  if (order.replacedByOrderId) return false;
+  if (mode === "draft_edit") return order.status === "draft" && order.documentType === "sale";
+  return order.status === "completed" || order.status === "quote" || order.status === "confirmed" || order.status === "draft";
+}
+
+async function sourceInvoiceFromParams(
+  storeId: string,
+  params: PosSearchParams,
+): Promise<{ source: PosSourceInvoice | null; blocked: BlockedSourceEdit | null }> {
+  const none = { source: null, blocked: null };
   const mode = one(params.sourceMode);
   const kind = one(params.sourceKind);
   const orderId = one(params.sourceOrderId);
-  if ((mode !== "edit" && mode !== "draft_edit" && mode !== "copy" && mode !== "return") || !orderId || !UUID_RE.test(orderId)) return null;
+  if ((mode !== "edit" && mode !== "draft_edit" && mode !== "copy" && mode !== "return") || !orderId || !UUID_RE.test(orderId)) return none;
   const order = await getOrder(storeId, orderId);
-  if (!order) return null;
+  if (!order) return none;
+  if ((mode === "edit" || mode === "draft_edit") && !sourceEditable(mode, order)) {
+    return { source: null, blocked: { id: order.id, code: order.code, replacementId: order.replacedByOrderId } };
+  }
   const sourceKind = mode === "return"
     ? "return_invoice"
       : kind === "quote" || kind === "booking" || kind === "invoice"
@@ -50,7 +71,7 @@ async function sourceInvoiceFromParams(storeId: string, params: PosSearchParams)
         : order.status === "confirmed"
           ? "booking"
           : "invoice";
-  return {
+  return { source: {
     mode,
     kind: sourceKind,
     id: order.id,
@@ -80,7 +101,7 @@ async function sourceInvoiceFromParams(storeId: string, params: PosSearchParams)
         note: item.note ?? "",
       };
     }),
-  };
+  }, blocked: null };
 }
 
 function initialContextFromParams(params: PosSearchParams): PosInitialContext | null {
@@ -114,7 +135,34 @@ function initialContextFromParams(params: PosSearchParams): PosInitialContext | 
 export default async function POSPage({ searchParams }: { searchParams: Promise<PosSearchParams> }) {
   const params = await searchParams;
   const context = await requireStoreContext();
-  const sourceInvoice = await sourceInvoiceFromParams(context.storeId, params);
+  const { source: sourceInvoice, blocked: blockedEdit } = await sourceInvoiceFromParams(context.storeId, params);
+  if (blockedEdit) {
+    const t = await getTranslations();
+    return (
+      <div className="h-full grid place-items-center p-6">
+        <div role="alert" className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center space-y-4">
+          <p className="font-semibold">{t("orderEdit.title", { code: blockedEdit.code })}</p>
+          <p className="text-sm text-slate-500">{t("orderEdit.errors.notEditable")}</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Link
+              href={Routes.order(blockedEdit.id)}
+              className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              {t("orderEdit.openSource", { code: blockedEdit.code })}
+            </Link>
+            {blockedEdit.replacementId && (
+              <Link
+                href={Routes.order(blockedEdit.replacementId)}
+                className="inline-flex items-center rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-700"
+              >
+                {t("orderEdit.openReplacement")}
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
   const baseInitialContext = initialContextFromParams(params);
   const bulkProductIds = csvUuids(params.productIds);
   const aiProductIds = csvUuids(params.aiProducts);

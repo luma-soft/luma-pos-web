@@ -6196,6 +6196,8 @@
     }
   },
   "orderEdit": {
+    "openSource": "Xem đơn {code}",
+    "openReplacement": "Mở hóa đơn đã sửa",
     "title": "Sửa đơn {code}",
     "action": "Sửa đơn",
     "editDraftAction": "Sửa đơn nháp",
